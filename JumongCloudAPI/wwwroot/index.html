@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jumong POS - Cloud Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;background:#0a0a1a;color:#e6e6f5;min-height:100vh}
+.header{background:#14142d;padding:15px 30px;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #1e1e3f;gap:15px;flex-wrap:wrap}
+.header h1{color:#00f5ff;font-size:1.5em}
+.header .live-dot{width:10px;height:10px;background:#2ecc71;border-radius:50%;display:inline-block;margin-right:8px;animation:pulse 2s infinite}
+.header-actions{display:flex;align-items:center;gap:10px}
+.store-select{background:#1a1a3a;color:#e6e6f5;border:1px solid #282850;padding:8px 12px;border-radius:6px;font-size:0.85em;cursor:pointer;min-width:200px}
+.store-select:focus{outline:none;border-color:#00f5ff}
+.store-badge{padding:3px 8px;border-radius:4px;font-size:0.7em;background:#2828a0;color:#e6e6f5;margin-left:6px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:15px;padding:20px}
+.card{background:#14142d;border-radius:10px;padding:20px;border:1px solid #282850}
+.card-title{font-size:0.75em;color:#8c8caa;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.card-value{font-size:1.8em;font-weight:bold;color:#00f5ff}
+.card-sub{font-size:0.8em;color:#5c5c8a;margin-top:4px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:15px;padding:0 20px 20px}
+.panel{background:#14142d;border-radius:10px;padding:20px;border:1px solid #282850}
+.panel h3{color:#00f5ff;margin-bottom:15px;font-size:0.95em;text-transform:uppercase;letter-spacing:1px}
+table{width:100%;border-collapse:collapse;font-size:0.85em}
+th{text-align:left;color:#8c8caa;padding:8px 6px;border-bottom:1px solid #282850;font-weight:600;font-size:0.75em;text-transform:uppercase}
+td{padding:8px 6px;border-bottom:1px solid #1a1a35}
+tr:hover{background:#1a1a3a}
+.badge{padding:3px 8px;border-radius:4px;font-size:0.75em;font-weight:bold}
+.bg-cash{background:#27ae60;color:#fff}
+.bg-ewallet{background:#2980b9;color:#fff}
+.bg-credit{background:#f39c12;color:#fff}
+.bg-void{background:#e74c3c;color:#fff}
+.green{color:#2ecc71}
+.red{color:#e74c3c}
+.tabs{display:flex;gap:5px;margin-bottom:15px}
+.tab{padding:8px 16px;background:#1a1a3a;border:none;color:#8c8caa;cursor:pointer;border-radius:6px;font-size:0.85em}
+.tab.active{background:#2828a0;color:#fff}
+.loading{text-align:center;padding:30px;color:#5c5c8a}
+.chart-bar{display:flex;align-items:end;gap:4px;height:120px;margin-top:10px}
+.chart-bar-item{flex:1;background:#2828a0;border-radius:3px 3px 0 0;min-width:8px;position:relative;transition:height .3s}
+.chart-bar-item:hover{background:#00f5ff}
+.refresh-btn{background:#2828a0;color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:0.85em}
+.refresh-btn:hover{background:#3a3ac0}
+.full-width{grid-column:1/-1}
+.tf-btn{padding:8px 22px;background:#14142d;border:1px solid #282850;color:#8c8caa;cursor:pointer;border-radius:6px;font-size:0.82em;font-weight:600;transition:all .2s}
+.tf-btn:hover{background:#1a1a3a;color:#e6e6f5}
+.tf-btn.active{background:#2828a0;color:#fff;border-color:#00f5ff}
+@media(max-width:768px){.grid-2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="header">
+<h1><span class="live-dot"></span>JUMONG POS DASHBOARD <span style="font-size:0.5em;color:#5c5c8a;margin-left:8px">v3</span></h1>
+<div class="header-actions">
+<select class="store-select" id="storeSelect" onchange="onStoreChange()"><option value="">All Stores</option></select>
+<button class="refresh-btn" onclick="renameStore()" style="font-size:0.7em;padding:6px 10px;background:#1a1a3a">RENAME</button>
+<button class="refresh-btn" onclick="location.reload()">REFRESH</button>
+</div>
+</div>
+
+<div style="display:flex;justify-content:center;padding:10px 20px 0;gap:8px;flex-wrap:wrap">
+<button class="tf-btn active" data-range="today" onclick="setRange(this)">TODAY</button>
+<button class="tf-btn" data-range="yesterday" onclick="setRange(this)">YESTERDAY</button>
+<button class="tf-btn" data-range="week" onclick="setRange(this)">WEEK</button>
+<button class="tf-btn" data-range="month" onclick="setRange(this)">MONTH</button>
+<button class="tf-btn" data-range="all" onclick="setRange(this)">ALL TIME</button>
+</div>
+
+<div class="cards" id="summaryCards"></div>
+
+<div class="grid-2">
+<div class="panel">
+<h3>DAILY TRENDS (30 DAYS)</h3>
+<div id="trendsChart" class="chart-bar"></div>
+</div>
+<div class="panel">
+<h3>RECENT SALES</h3>
+<div class="tabs">
+<button class="tab active" onclick="loadRecentSales()">All</button>
+</div>
+<table><thead><tr><th>Invoice</th><th>Time</th><th>Amount</th><th>Method</th><th>Store</th><th>Cashier</th></tr></thead>
+<tbody id="recentSalesBody"></tbody></table>
+</div>
+<div class="panel">
+<h3>TOP PRODUCTS</h3>
+<table><thead><tr><th>Product</th><th>Qty Sold</th><th>Revenue</th></tr></thead>
+<tbody id="topProductsBody"></tbody></table>
+</div>
+<div class="panel">
+<h3>EXPENSES BY CATEGORY</h3>
+<table><thead><tr><th>Category</th><th>Amount</th></tr></thead>
+<tbody id="expensesBody"></tbody></table>
+</div>
+<div class="panel full-width">
+<h3>SHIFT HISTORY</h3>
+<table><thead><tr><th>Close Date</th><th>Store</th><th>Sales</th><th>Cash</th><th>E-Wallet</th><th>Credit</th><th>Voided</th><th>Expenses</th><th>Cash on Hand</th><th>Variance</th><th>User</th></tr></thead>
+<tbody id="shiftHistoryBody"></tbody></table>
+</div>
+<div class="panel full-width">
+<h3>RECENT STOCK RECEIVING <button class="refresh-btn" onclick="loadReceiving()" style="font-size:0.7em;padding:4px 10px;margin-left:10px;vertical-align:middle">LOAD</button></h3>
+<table><thead><tr><th>Product</th><th>Barcode</th><th>Qty Added</th><th>Before</th><th>After</th><th>Reference</th><th>Cashier</th><th>Store</th><th>Date</th></tr></thead>
+<tbody id="receivingBody"></tbody></table>
+</div>
+<div class="panel full-width">
+<h3>STOCK STATUS <button class="refresh-btn" onclick="loadStockStatus()" style="font-size:0.7em;padding:4px 10px;margin-left:10px;vertical-align:middle">LOAD</button></h3>
+<table><thead><tr><th>Product</th><th>Barcode</th><th>Category</th><th>Stock</th><th>Price</th><th>Cost</th></tr></thead>
+<tbody id="stockStatusBody"></tbody></table>
+</div>
+</div>
+
+<script>
+const API = '/api/dashboard';
+
+function getStoreId(){const s=document.getElementById('storeSelect');return s?s.value:''}
+
+function storeParam(){const sid=getStoreId();return sid?'&storeId='+encodeURIComponent(sid):''}
+var currentRange='today';
+function rangeParam(){return '&range='+currentRange}
+function filterParams(){return storeParam()+rangeParam()}
+
+function setRange(btn){
+  document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  currentRange=btn.dataset.range;
+  loadAll();
+  if(document.getElementById('receivingBody').innerHTML) loadReceiving();
+  if(document.getElementById('stockStatusBody').innerHTML) loadStockStatus();
+}
+
+async function fetchJSON(url){const r=await fetch(url);return r.json()}
+
+function fmt(n){return n.toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})}
+
+function shortStore(sid,name){if(name)return name;return sid?sid.replace('STORE-','').slice(0,8):''}
+
+var _storeMap={};
+async function loadStores(){
+  try{
+    const stores=await fetchJSON(API+'/stores');
+    const sel=document.getElementById('storeSelect');
+    stores.forEach(s=>{
+      _storeMap[s.storeId]=s.storeName||'';
+      const o=document.createElement('option');
+      o.value=s.storeId;
+      o.textContent=s.storeName||s.storeId;
+      sel.appendChild(o);
+    });
+  }catch(e){console.error('Failed to load stores',e)}
+}
+
+function onStoreChange(){
+  loadAll();
+  loadReceiving();
+}
+
+function renameStore(){
+  const sid=getStoreId();
+  if(!sid){alert('Select a store first');return;}
+  const name=prompt('Enter store name:',_storeMap[sid]||sid);
+  if(name===null)return;
+  fetch(API+'/stores/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({storeId:sid,storeName:name})})
+  .then(()=>{_storeMap[sid]=name;const sel=document.getElementById('storeSelect');for(let o of sel.options)if(o.value===sid)o.textContent=name||sid;loadAll();})
+  .catch(e=>alert('Failed: '+e));
+}
+
+async function loadSummary(){
+  const d=await fetchJSON(API+'/summary?'+filterParams().replace('&',''));
+  document.getElementById('summaryCards').innerHTML=`
+<div class="card"><div class="card-title">Today Revenue</div><div class="card-value">₱${fmt(d.todayRevenue)}</div><div class="card-sub">${d.todaySales} sales today</div></div>
+<div class="card"><div class="card-title">Total Revenue</div><div class="card-value">₱${fmt(d.totalRevenue)}</div><div class="card-sub">${d.totalSales} total sales</div></div>
+<div class="card"><div class="card-title">Total Expenses</div><div class="card-value red">₱${fmt(d.totalExpenses)}</div></div>
+<div class="card"><div class="card-title">Cash Sales</div><div class="card-value">₱${fmt(d.totalCashSales)}</div></div>
+<div class="card"><div class="card-title">E-Wallet Sales</div><div class="card-value">₱${fmt(d.totalEwalletSales)}</div></div>
+<div class="card"><div class="card-title">Credit Sales</div><div class="card-value" style="color:#f39c12">₱${fmt(d.totalCreditSales)}</div></div>
+<div class="card"><div class="card-title">Products / Customers</div><div class="card-value">${d.totalProducts} / ${d.totalCustomers}</div></div>
+`;
+}
+
+async function loadTrends(){
+  const d=await fetchJSON(API+'/trends?days=30'+filterParams());
+  const max=Math.max(...d.map(x=>x.revenue),1);
+  document.getElementById('trendsChart').innerHTML=d.map(x=>{
+    const h=(x.revenue/max*100).toFixed(0);
+    return `<div class="chart-bar-item" style="height:${Math.max(h,2)}%" title="${x.day}: ₱${fmt(x.revenue)} (${x.salesCount} sales)"></div>`;
+  }).join('');
+}
+
+async function loadRecentSales(){
+  const d=await fetchJSON(API+'/recent-sales?limit=20'+filterParams());
+  document.getElementById('recentSalesBody').innerHTML=d.map(x=>{
+    const dt=new Date(x.saleDate);
+    const time=dt.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+    const badgeClass=x.isVoided?'bg-void':'bg-'+x.paymentMethod.toLowerCase().replace('-','');
+    const label=x.isVoided?'VOID':x.paymentMethod;
+    const storeBadge=getStoreId()?'':`<span class="store-badge">${shortStore(x.storeId,_storeMap[x.storeId])}</span>`;
+    return `<tr style="${x.isVoided?'opacity:0.5':''}"><td>${x.invoiceNo}</td><td>${time}</td><td>₱${fmt(x.grandTotal)}</td><td><span class="badge ${badgeClass}">${label}</span></td><td>${storeBadge}</td><td>${x.cashier}</td></tr>`;
+  }).join('');
+}
+
+async function loadTopProducts(){
+  const d=await fetchJSON(API+'/top-products?days=30&limit=10'+filterParams());
+  document.getElementById('topProductsBody').innerHTML=d.map(x=>
+    `<tr><td>${x.productName}</td><td>${x.totalQty}</td><td>₱${fmt(x.totalAmount)}</td></tr>`
+  ).join('');
+}
+
+async function loadExpenses(){
+  const d=await fetchJSON(API+'/expenses-summary?days=30'+filterParams());
+  document.getElementById('expensesBody').innerHTML=d.map(x=>
+    `<tr><td>${x.category}</td><td class="red">₱${fmt(x.total)}</td></tr>`
+  ).join('');
+}
+
+async function loadShiftHistory(){
+  const d=await fetchJSON(API+'/shift-history?days=60'+filterParams());
+  document.getElementById('shiftHistoryBody').innerHTML=d.map(x=>{
+    const dt=new Date(x.closeDate);
+    const storeBadge=getStoreId()?'':`<span class="store-badge">${shortStore(x.storeId,_storeMap[x.storeId])}</span>`;
+    return `<tr>
+<td>${dt.toLocaleDateString('en-PH')} ${dt.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'})}</td>
+<td>${storeBadge}</td>
+<td>₱${fmt(x.totalSales)}</td><td>₱${fmt(x.totalCash)}</td><td>₱${fmt(x.totalEwallet)}</td>
+<td>₱${fmt(x.totalCredit)}</td><td>₱${fmt(x.totalVoided)}</td><td>₱${fmt(x.totalExpenses)}</td>
+<td>₱${fmt(x.cashOnHand)}</td><td class="${x.difference>=0?'green':'red'}">₱${fmt(x.difference)}</td>
+<td>${x.userName}</td></tr>`;
+  }).join('');
+}
+
+async function loadStockStatus(){
+  const d=await fetchJSON(API+'/stock-status?'+filterParams().replace('&',''));
+  document.getElementById('stockStatusBody').innerHTML=d.map(x=>{
+    const cls=x.stockQty==0?'red':x.stockQty<10?'#f39c12':'';
+    return `<tr><td>${x.name}</td><td>${x.barcode}</td><td>${x.category}</td><td style="color:${cls}">${x.stockQty}</td><td>₱${fmt(x.price)}</td><td>₱${fmt(x.cost)}</td></tr>`;
+  }).join('');
+}
+
+async function loadReceiving(){
+  const d=await fetchJSON(API+'/recent-receiving?limit=30'+filterParams());
+  document.getElementById('receivingBody').innerHTML=d.map(x=>{
+    const dt=new Date(x.createdAt);
+    const storeBadge=getStoreId()?'':`<span class="store-badge">${shortStore(x.storeId,_storeMap[x.storeId])}</span>`;
+    return `<tr><td>${x.productName}</td><td>${x.barcode||''}</td><td>${x.quantityAdded}</td><td>${x.stockBefore}</td><td style="color:#2ecc71">${x.stockAfter}</td><td>${x.reference||''}</td><td>${x.userName||''}</td><td>${storeBadge}</td><td>${dt.toLocaleDateString('en-PH')} ${dt.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'})}</td></tr>`;
+  }).join('');
+}
+
+async function loadAll(){
+  await Promise.all([loadSummary(),loadTrends(),loadRecentSales(),loadTopProducts(),loadExpenses(),loadShiftHistory()]);
+}
+
+loadStores();
+loadAll();
+setInterval(loadAll,60000);
+</script>
+</body>
+</html>

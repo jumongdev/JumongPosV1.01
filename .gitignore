@@ -1,0 +1,13 @@
+bin/
+obj/
+publish/
+*.db
+*.exe
+*.ico
+*.zip
+*.user
+.vs/
+JumongCloudAPI/bin/
+JumongCloudAPI/obj/
+JumongCloudAPI/out/
+JumongCloudAPI/wwwroot/updates/

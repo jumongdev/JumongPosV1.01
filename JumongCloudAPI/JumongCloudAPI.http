@@ -1,0 +1,6 @@
+@JumongCloudAPI_HostAddress = http://localhost:5010
+
+GET {{JumongCloudAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

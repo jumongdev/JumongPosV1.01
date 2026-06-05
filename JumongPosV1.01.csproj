@@ -1,0 +1,50 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>JumongPosV1._01</RootNamespace>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishDir>$(MSBuildThisFileDirectory)publish\</PublishDir>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="app.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="assets\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ReaLTaiizor" Version="3.8.1.8" />
+    <PackageReference Include="System.Data.SQLite.Core" Version="1.0.119" />
+    <PackageReference Include="Microsoft.VisualBasic" Version="10.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="JumongCloudAPI\**" />
+    <Content Remove="JumongCloudAPI\**" />
+    <EmbeddedResource Remove="JumongCloudAPI\**" />
+    <None Remove="JumongCloudAPI\**" />
+  </ItemGroup>
+
+  <Target Name="CopyAssetsAfterPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <_AssetsFiles Include="assets\**" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_AssetsFiles)" DestinationFolder="$(PublishDir)\assets\%(RecursiveDir)" />
+  </Target>
+
+</Project>
