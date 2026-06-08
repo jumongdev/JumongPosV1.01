@@ -10,6 +10,9 @@ public static class PgDatabaseHelper
     {
         var conn = new NpgsqlConnection(ConnectionString);
         conn.Open();
+        using var tz = conn.CreateCommand();
+        tz.CommandText = "SET TIMEZONE TO 'Asia/Manila'";
+        try { tz.ExecuteNonQuery(); } catch { }
         return conn;
     }
 
@@ -234,6 +237,17 @@ public static class PgDatabaseHelper
         mig2.CommandText = "ALTER TABLE sales ADD COLUMN IF NOT EXISTS cashier_name TEXT DEFAULT ''";
         mig2.ExecuteNonQuery();
 
+        // Migration: backfill empty cashier_name from users table
+        using var backfill = conn.CreateCommand();
+        backfill.CommandText = @"
+            UPDATE sales s
+            SET cashier_name = COALESCE(NULLIF(u.full_name,''), NULLIF(u.username,''), '')
+            FROM users u
+            WHERE s.user_id = u.pos_id AND s.store_id = u.store_id
+            AND (s.cashier_name IS NULL OR s.cashier_name = '')
+        ";
+        try { backfill.ExecuteNonQuery(); } catch { }
+
         // Recreate unique constraints with store_id
         using var dropCmd = conn.CreateCommand();
         dropCmd.CommandText = @"
@@ -291,5 +305,33 @@ public static class PgDatabaseHelper
             CREATE INDEX IF NOT EXISTS idx_credit_transactions_customer_id ON credit_transactions(customer_id);
         ";
         idxCmd.ExecuteNonQuery();
+
+        // Master product catalog (shared across stores)
+        using var masterCmd = conn.CreateCommand();
+        masterCmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS master_products (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                barcode TEXT,
+                category TEXT DEFAULT '',
+                price NUMERIC NOT NULL DEFAULT 0,
+                cost NUMERIC NOT NULL DEFAULT 0,
+                stock_qty INTEGER NOT NULL DEFAULT 0,
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                modified_by TEXT DEFAULT ''
+            );
+            CREATE TABLE IF NOT EXISTS master_product_units (
+                id SERIAL PRIMARY KEY,
+                product_id INTEGER NOT NULL REFERENCES master_products(id) ON DELETE CASCADE,
+                unit_name TEXT NOT NULL DEFAULT 'Piece',
+                price NUMERIC NOT NULL DEFAULT 0,
+                cost NUMERIC NOT NULL DEFAULT 0,
+                qty_per_unit INTEGER NOT NULL DEFAULT 1,
+                is_default BOOLEAN NOT NULL DEFAULT FALSE
+            );
+            CREATE INDEX IF NOT EXISTS idx_master_product_units_product_id ON master_product_units(product_id);
+        ";
+        masterCmd.ExecuteNonQuery();
     }
 }

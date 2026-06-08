@@ -214,7 +214,7 @@ public partial class MainForm : Form
         var hoverBg = Color.FromArgb(55, 55, 78);
 
         BackColor = darkBg;
-        Text = "Jumong POS v1.01";
+        Text = $"Jumong POS v{AppVersion.Current}";
         StartPosition = FormStartPosition.CenterScreen;
         WindowState = FormWindowState.Maximized;
         ForeColor = textColor;
@@ -261,17 +261,7 @@ public partial class MainForm : Form
         btnSettings = CreateMenuButton("Settings", 0, 615, btnSettings_Click, cardBg, textColor, hoverBg);
         btnLogout = CreateMenuButton("Logout", 0, 670, btnLogout_Click, Color.FromArgb(50, 35, 35), Color.FromArgb(231, 76, 60), Color.FromArgb(70, 45, 45));
 
-        var versionLabel = new Label
-        {
-            Text = "v1.01",
-            Font = new Font("Segoe UI", 8F),
-            ForeColor = Color.FromArgb(100, 100, 120),
-            Location = new Point(0, 710),
-            Size = new Size(520, 20),
-            TextAlign = ContentAlignment.MiddleCenter
-        };
-
-        Controls.AddRange(new Control[] { title, userInfo, divider, btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout, versionLabel });
+        Controls.AddRange(new Control[] { title, userInfo, divider, btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout });
     }
 
     private Button CreateMenuButton(string text, int x, int y, EventHandler click, Color bg, Color fg, Color hoverBg)

@@ -5,7 +5,7 @@ publish/
 /installer/
 *.zip
 *.db
-*.exe
+/*.exe
 *.ico
 *.iss
 *.user

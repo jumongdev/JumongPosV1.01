@@ -68,18 +68,20 @@ public class DashboardController : ControllerBase
             var tfExp = TimeframeClause(range, "timestamp", cmd);
             if (string.IsNullOrEmpty(range) || range == "all") tfSales = "";
 
+            var slj = "FROM sale_items si JOIN sales s ON si.sale_id = s.pos_id AND si.store_id = s.store_id";
             cmd.CommandText = $@"
                 SELECT 
                     (SELECT COUNT(*) FROM sales WHERE is_voided = false {StoreFilter(storeId, "sales")}{tfSales}) AS total_sales,
-                    (SELECT COALESCE(SUM(grand_total),0) FROM sales WHERE is_voided = false {StoreFilter(storeId, "sales")}{tfSales}) AS total_revenue,
+                    (SELECT COALESCE(SUM(si.total_price),0) {slj} WHERE s.is_voided = false AND si.is_voided = false {StoreFilter(storeId, "s")}{tfSales.Replace("sale_date","s.sale_date")}) AS total_revenue,
                     (SELECT COALESCE(SUM(amount),0) FROM expenses WHERE 1=1 {StoreFilter(storeId, "expenses")}{tfExp}) AS total_expenses,
                     (SELECT COUNT(*) FROM products WHERE 1=1 {StoreFilter(storeId, "products")}) AS total_products,
                     (SELECT COUNT(*) FROM customers WHERE is_active = true {StoreFilter(storeId, "customers")}) AS total_customers,
-                    (SELECT COALESCE(SUM(grand_total),0) FROM sales WHERE is_voided = false AND sale_date::date = CURRENT_DATE {StoreFilter(storeId, "sales")}) AS today_revenue,
+                    (SELECT COALESCE(SUM(si.total_price),0) {slj} WHERE s.is_voided = false AND si.is_voided = false AND s.sale_date::date = CURRENT_DATE {StoreFilter(storeId, "s")}) AS today_revenue,
                     (SELECT COUNT(*) FROM sales WHERE is_voided = false AND sale_date::date = CURRENT_DATE {StoreFilter(storeId, "sales")}) AS today_sales,
-                    (SELECT COALESCE(SUM(grand_total),0) FROM sales WHERE is_voided = false AND payment_method = 'Cash' {StoreFilter(storeId, "sales")}{tfSales}) AS total_cash_sales,
-                    (SELECT COALESCE(SUM(grand_total),0) FROM sales WHERE is_voided = false AND payment_method = 'E-Wallet' {StoreFilter(storeId, "sales")}{tfSales}) AS total_ewallet_sales,
-                    (SELECT COALESCE(SUM(grand_total),0) FROM sales WHERE is_voided = false AND payment_method = 'Credit' {StoreFilter(storeId, "sales")}{tfSales}) AS total_credit_sales
+                    (SELECT COALESCE(SUM(si.total_price),0) {slj} WHERE s.is_voided = false AND si.is_voided = false AND s.payment_method = 'Cash' {StoreFilter(storeId, "s")}{tfSales.Replace("sale_date","s.sale_date")}) AS total_cash_sales,
+                    (SELECT COALESCE(SUM(si.total_price),0) {slj} WHERE s.is_voided = false AND si.is_voided = false AND s.payment_method = 'E-Wallet' {StoreFilter(storeId, "s")}{tfSales.Replace("sale_date","s.sale_date")}) AS total_ewallet_sales,
+                    (SELECT COALESCE(SUM(si.total_price),0) {slj} WHERE s.is_voided = false AND si.is_voided = false AND s.payment_method = 'Credit' {StoreFilter(storeId, "s")}{tfSales.Replace("sale_date","s.sale_date")}) AS total_credit_sales,
+                    (SELECT COALESCE(SUM(si.total_price),0) {slj} WHERE s.is_voided = false AND si.is_voided = true {StoreFilter(storeId, "s")}{tfSales.Replace("sale_date","s.sale_date")}) AS total_voided
             ";
             var row = cmd.ExecuteReader();
             row.Read();
@@ -94,7 +96,8 @@ public class DashboardController : ControllerBase
                 todaySales = row.GetInt32(6),
                 totalCashSales = row.GetDecimal(7),
                 totalEwalletSales = row.GetDecimal(8),
-                totalCreditSales = row.GetDecimal(9)
+                totalCreditSales = row.GetDecimal(9),
+                totalVoided = row.GetDecimal(10)
             };
             return Ok(result);
         }
@@ -156,7 +159,7 @@ public class DashboardController : ControllerBase
             if (string.IsNullOrEmpty(range) || range == "all") tf = "";
             cmd.CommandText = $@"
                 SELECT s.invoice_no, s.sale_date, s.grand_total, s.payment_method, s.order_type, s.is_voided,
-                       COALESCE(NULLIF(s.cashier_name,''), u.full_name) AS cashier, s.store_id
+                       COALESCE(NULLIF(s.cashier_name,''), NULLIF(u.full_name,''), NULLIF(u.username,''), 'Cashier #' || COALESCE(s.user_id::text,'')) AS cashier, s.store_id
                 FROM sales s
                 LEFT JOIN users u ON s.user_id = u.pos_id AND s.store_id = u.store_id
                 WHERE 1=1 {StoreFilter(storeId, "s")}{tf}
@@ -189,6 +192,35 @@ public class DashboardController : ControllerBase
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
                 data.Add(new { category = reader.GetString(0), total = reader.GetDecimal(1) });
+            return Ok(data);
+        }
+
+        [HttpGet("expenses-list")]
+        public IActionResult GetExpensesList([FromQuery] string? storeId = null, [FromQuery] string? range = null, [FromQuery] int limit = 200)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            var tf = TimeframeClause(range, "timestamp", cmd);
+            if (string.IsNullOrEmpty(range) || range == "all") tf = "";
+            cmd.CommandText = $@"
+                SELECT e.amount, e.category, e.description, e.reference_no, e.cashier_username, e.timestamp
+                FROM expenses e
+                WHERE 1=1 {StoreFilter(storeId, "e")}{tf}
+                ORDER BY e.timestamp DESC
+                LIMIT @lim";
+            cmd.Parameters.AddWithValue("lim", limit);
+            if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
+            var data = new List<object>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                data.Add(new {
+                    amount = reader.GetDecimal(0),
+                    category = reader.GetString(1),
+                    description = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                    referenceNo = reader.IsDBNull(3) ? "" : reader.GetString(3),
+                    cashier = reader.IsDBNull(4) ? "" : reader.GetString(4),
+                    timestamp = reader.GetDateTime(5)
+                });
             return Ok(data);
         }
 
@@ -274,11 +306,557 @@ public class DashboardController : ControllerBase
             return Ok(new { success = true, message = "All tables dropped and recreated" });
         }
 
+        [HttpDelete("stores/{storeId}")]
+        public IActionResult DeleteStore(string storeId)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var tx = conn.BeginTransaction();
+            try
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.Transaction = tx;
+                cmd.CommandText = @"
+                    DELETE FROM sale_items WHERE store_id = @sid;
+                    DELETE FROM void_logs WHERE store_id = @sid;
+                    DELETE FROM stock_trails WHERE store_id = @sid;
+                    DELETE FROM credit_transactions WHERE store_id = @sid;
+                    DELETE FROM daily_closes WHERE store_id = @sid;
+                    DELETE FROM expenses WHERE store_id = @sid;
+                    DELETE FROM sales WHERE store_id = @sid;
+                    DELETE FROM products WHERE store_id = @sid;
+                    DELETE FROM customers WHERE store_id = @sid;
+                    DELETE FROM users WHERE store_id = @sid;
+                    DELETE FROM stores WHERE store_id = @sid;
+                ";
+                cmd.Parameters.AddWithValue("sid", storeId);
+                cmd.ExecuteNonQuery();
+                tx.Commit();
+                return Ok(new { success = true, message = $"Store {storeId} deleted" });
+            }
+            catch (Exception ex)
+            {
+                tx.Rollback();
+                return StatusCode(500, new { success = false, error = ex.Message });
+            }
+        }
+
+        [HttpGet("cashier-performance")]
+        public IActionResult GetCashierPerformance([FromQuery] string? storeId = null, [FromQuery] string? range = null)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            var tf = TimeframeClause(range, "s.sale_date", cmd);
+            if (string.IsNullOrEmpty(range) || range == "all") tf = "";
+            cmd.CommandText = $@"
+                SELECT COALESCE(NULLIF(s.cashier_name,''), NULLIF(u.full_name,''), NULLIF(u.username,''), 'Cashier #' || COALESCE(s.user_id::text,'Unknown')) AS cashier,
+                       COUNT(*) AS total_sales,
+                       COALESCE(SUM(s.grand_total),0) AS total_revenue,
+                       COALESCE(AVG(s.grand_total),0) AS avg_transaction,
+                       COUNT(*) FILTER (WHERE s.payment_method = 'Cash') AS cash_count,
+                       COUNT(*) FILTER (WHERE s.payment_method = 'E-Wallet') AS ewallet_count,
+                       COUNT(*) FILTER (WHERE s.payment_method = 'Credit') AS credit_count
+                FROM sales s
+                LEFT JOIN users u ON s.user_id = u.pos_id AND s.store_id = u.store_id
+                WHERE s.is_voided = false {StoreFilter(storeId, "s")}{tf}
+                GROUP BY COALESCE(NULLIF(s.cashier_name,''), NULLIF(u.full_name,''), NULLIF(u.username,''), 'Cashier #' || COALESCE(s.user_id::text,'Unknown'))
+                ORDER BY total_revenue DESC";
+            if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
+            var data = new List<object>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                data.Add(new {
+                    cashier = reader.IsDBNull(0) ? "Unknown" : reader.GetString(0),
+                    totalSales = reader.GetInt32(1),
+                    totalRevenue = reader.GetDecimal(2),
+                    avgTransaction = reader.GetDecimal(3),
+                    cashCount = reader.GetInt32(4),
+                    ewalletCount = reader.GetInt32(5),
+                    creditCount = reader.GetInt32(6)
+                });
+            return Ok(data);
+        }
+
+        [HttpGet("peak-hours")]
+        public IActionResult GetPeakHours([FromQuery] string? storeId = null, [FromQuery] string? range = null)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            var tf = TimeframeClause(range, "sale_date", cmd);
+            if (string.IsNullOrEmpty(range) || range == "all") tf = "";
+            cmd.CommandText = $@"
+                SELECT EXTRACT(HOUR FROM sale_date)::int AS hour,
+                       COUNT(*) AS sales_count,
+                       COALESCE(SUM(grand_total),0) AS revenue
+                FROM sales
+                WHERE is_voided = false {StoreFilter(storeId, "sales")}{tf}
+                GROUP BY EXTRACT(HOUR FROM sale_date)
+                ORDER BY hour";
+            if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
+            var data = new List<object>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                data.Add(new {
+                    hour = reader.GetInt32(0),
+                    salesCount = reader.GetInt32(1),
+                    revenue = reader.GetDecimal(2)
+                });
+            return Ok(data);
+        }
+
+        [HttpGet("sale-profits")]
+        public IActionResult GetSaleProfits([FromQuery] int limit = 100, [FromQuery] string? storeId = null, [FromQuery] string? range = null)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            var tf = TimeframeClause(range, "s.sale_date", cmd);
+            if (string.IsNullOrEmpty(range) || range == "all") tf = "";
+            cmd.CommandText = $@"
+                SELECT 
+                    s.invoice_no,
+                    s.sale_date,
+                    COALESCE(SUM(si.total_price), 0) AS revenue,
+                    COALESCE(SUM(si.quantity * si.qty_per_unit * p.cost), 0) AS total_cost,
+                    COALESCE(SUM(si.total_price), 0) - COALESCE(SUM(si.quantity * si.qty_per_unit * p.cost), 0) AS profit,
+                    CASE WHEN COALESCE(SUM(si.total_price), 0) > 0 THEN ROUND((COALESCE(SUM(si.total_price), 0) - COALESCE(SUM(si.quantity * si.qty_per_unit * p.cost), 0)) / COALESCE(SUM(si.total_price), 0) * 100, 1) ELSE 0 END AS margin_pct,
+                    COALESCE(NULLIF(s.cashier_name,''), NULLIF(u.full_name,''), NULLIF(u.username,''), 'Cashier #' || COALESCE(s.user_id::text,'')) AS cashier,
+                    s.store_id
+                FROM sales s
+                LEFT JOIN sale_items si ON si.sale_id = s.pos_id AND si.store_id = s.store_id AND si.is_voided = false
+                LEFT JOIN products p ON si.product_id = p.pos_id AND si.store_id = p.store_id
+                LEFT JOIN users u ON s.user_id = u.pos_id AND s.store_id = u.store_id
+                WHERE s.is_voided = false {StoreFilter(storeId, "s")}{tf}
+                GROUP BY s.invoice_no, s.sale_date, s.cashier_name, s.user_id, u.full_name, u.username, s.store_id
+                ORDER BY s.sale_date DESC
+                LIMIT @limit";
+            cmd.Parameters.AddWithValue("limit", limit);
+            if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
+            var data = new List<object>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                data.Add(new {
+                    invoiceNo = reader.GetString(0),
+                    saleDate = reader.GetDateTime(1),
+                    revenue = reader.GetDecimal(2),
+                    cost = reader.GetDecimal(3),
+                    profit = reader.GetDecimal(4),
+                    marginPct = reader.GetDecimal(5),
+                    cashier = reader.IsDBNull(6) ? "" : reader.GetString(6),
+                    storeId = reader.GetString(7)
+                });
+            return Ok(data);
+        }
+
+        [HttpGet("profit-summary")]
+        public IActionResult GetProfitSummary([FromQuery] string? storeId = null, [FromQuery] string? range = null)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
+            var tfSales = TimeframeClause(range, "sale_date", cmd);
+            var tfExp = TimeframeClause(range, "timestamp", cmd);
+            if (string.IsNullOrEmpty(range) || range == "all") { tfSales = ""; tfExp = ""; }
+
+            var itemsJoin = $"FROM sale_items si JOIN sales s ON si.sale_id = s.pos_id AND si.store_id = s.store_id";
+            cmd.CommandText = $@"
+                SELECT
+                    (SELECT COALESCE(SUM(si.total_price),0) {itemsJoin} WHERE s.is_voided = false AND si.is_voided = false {StoreFilter(storeId, "s")}{tfSales.Replace("sale_date","s.sale_date")}) AS total_revenue,
+                    (SELECT COALESCE(SUM(amount),0) FROM expenses WHERE 1=1 {StoreFilter(storeId, "expenses")}{tfExp}) AS total_expenses,
+                    (SELECT COALESCE(SUM(si.total_price - (si.quantity * si.qty_per_unit * p.cost)),0)
+                     {itemsJoin}
+                     JOIN products p ON si.product_id = p.pos_id AND si.store_id = p.store_id
+                     WHERE s.is_voided = false AND si.is_voided = false {StoreFilter(storeId, "s")}{tfSales.Replace("sale_date","s.sale_date")}) AS gross_profit,
+                    (SELECT COUNT(*) FROM sales WHERE is_voided = true {StoreFilter(storeId, "sales")}{tfSales}) AS voided_count,
+                    (SELECT COUNT(*) FROM sales WHERE is_voided = false {StoreFilter(storeId, "sales")}{tfSales}) AS valid_count,
+                    (SELECT COALESCE(AVG(si.total_price),0) {itemsJoin} WHERE s.is_voided = false AND si.is_voided = false {StoreFilter(storeId, "s")}{tfSales.Replace("sale_date","s.sale_date")}) AS avg_transaction,
+                    (SELECT COALESCE(MAX(si.total_price),0) {itemsJoin} WHERE s.is_voided = false AND si.is_voided = false {StoreFilter(storeId, "s")}{tfSales.Replace("sale_date","s.sale_date")}) AS max_transaction,
+                    (SELECT COALESCE(MIN(si.total_price),0) {itemsJoin} WHERE s.is_voided = false AND si.is_voided = false {StoreFilter(storeId, "s")}{tfSales.Replace("sale_date","s.sale_date")}) AS min_transaction
+            ";
+            var row = cmd.ExecuteReader();
+            row.Read();
+            var revenue = row.GetDecimal(0);
+            var expenses = row.GetDecimal(1);
+            var grossProfit = row.GetDecimal(2);
+            var voidedCount = row.GetInt32(3);
+            var validCount = row.GetInt32(4);
+            var avgTx = row.GetDecimal(5);
+            var maxTx = row.GetDecimal(6);
+            var minTx = row.GetDecimal(7);
+            var totalCount = voidedCount + validCount;
+            var voidRate = totalCount > 0 ? Math.Round((decimal)voidedCount / totalCount * 100, 1) : 0;
+            var netProfit = revenue - expenses;
+            var margin = revenue > 0 ? Math.Round(netProfit / revenue * 100, 1) : 0;
+            var grossMargin = revenue > 0 ? Math.Round(grossProfit / revenue * 100, 1) : 0;
+
+            return Ok(new {
+                totalRevenue = revenue,
+                totalExpenses = expenses,
+                netProfit = netProfit,
+                netMargin = margin,
+                grossProfit = grossProfit,
+                grossMargin = grossMargin,
+                voidedCount = voidedCount,
+                validCount = validCount,
+                voidRate = voidRate,
+                avgTransaction = avgTx,
+                maxTransaction = maxTx,
+                minTransaction = minTx
+            });
+        }
+
+        [HttpGet("sale-items")]
+        public IActionResult GetSaleItems([FromQuery] string invoiceNo, [FromQuery] string? storeId = null)
+        {
+            if (string.IsNullOrEmpty(invoiceNo)) return BadRequest("invoiceNo required");
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT si.product_name, si.barcode, si.quantity, si.price, si.total_price,
+                       COALESCE(p.cost, 0) AS cost, si.qty_per_unit,
+                       si.quantity * si.qty_per_unit * COALESCE(p.cost, 0) AS total_cost,
+                       si.total_price - (si.quantity * si.qty_per_unit * COALESCE(p.cost, 0)) AS profit,
+                       p.pos_id AS product_pos_id, si.store_id
+                FROM sale_items si
+                JOIN sales s ON si.sale_id = s.pos_id AND si.store_id = s.store_id
+                LEFT JOIN products p ON si.product_id = p.pos_id AND si.store_id = p.store_id
+                WHERE s.invoice_no = @inv AND si.is_voided = false
+                ORDER BY si.product_name";
+            cmd.Parameters.AddWithValue("inv", invoiceNo);
+            var data = new List<object>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                data.Add(new {
+                    productName = reader.GetString(0),
+                    barcode = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                    quantity = reader.GetInt32(2),
+                    price = reader.GetDecimal(3),
+                    totalPrice = reader.GetDecimal(4),
+                    unitCost = reader.GetDecimal(5),
+                    qtyPerUnit = reader.GetInt32(6),
+                    totalCost = reader.GetDecimal(7),
+                    profit = reader.GetDecimal(8),
+                    productPosId = reader.IsDBNull(9) ? 0 : reader.GetInt32(9)
+                });
+            return Ok(data);
+        }
+
+        [HttpGet("debug-missing-profits")]
+        public IActionResult DebugMissingProfits([FromQuery] string? storeId = null)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
+            cmd.CommandText = $@"
+                SELECT s.invoice_no, s.grand_total, 
+                       (SELECT COUNT(*) FROM sale_items si WHERE si.sale_id = s.pos_id AND si.store_id = s.store_id) as item_count
+                FROM sales s
+                WHERE s.is_voided = false {StoreFilter(storeId, "s")}
+                AND s.sale_date::date = CURRENT_DATE
+                ORDER BY s.invoice_no";
+            var data = new List<object>();
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+                data.Add(new { invoiceNo = r.GetString(0), total = r.GetDecimal(1), itemCount = r.GetInt32(2) });
+            return Ok(data);
+        }
+
+        [HttpGet("debug-gross-profit")]
+        public IActionResult DebugGrossProfit([FromQuery] string? storeId = null)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
+            
+            // Get product & customer counts
+            int productCount = 0, customerAll = 0, customerActive = 0;
+            using (var c2 = conn.CreateCommand())
+            {
+                c2.CommandText = "SELECT COUNT(*) FROM products";
+                productCount = Convert.ToInt32(c2.ExecuteScalar());
+            }
+            using (var c2 = conn.CreateCommand())
+            {
+                c2.CommandText = "SELECT COUNT(*) FROM customers";
+                customerAll = Convert.ToInt32(c2.ExecuteScalar());
+            }
+            using (var c2 = conn.CreateCommand())
+            {
+                c2.CommandText = "SELECT COUNT(*) FROM customers WHERE is_active = true";
+                customerActive = Convert.ToInt32(c2.ExecuteScalar());
+            }
+
+            cmd.CommandText = $@"
+                SELECT 
+                    COUNT(*) as total_sale_items,
+                    COUNT(p.id) as matched_products,
+                    COUNT(*) - COUNT(p.id) as unmatched_items,
+                    COALESCE(SUM(si.total_price),0) as total_revenue,
+                    COALESCE(SUM(si.quantity * si.qty_per_unit * p.cost),0) as total_cogs,
+                    COALESCE(SUM(si.total_price - (si.quantity * si.qty_per_unit * p.cost)),0) as gross_profit
+                FROM sale_items si
+                JOIN sales s ON si.sale_id = s.pos_id AND si.store_id = s.store_id
+                LEFT JOIN products p ON si.product_id = p.pos_id AND si.store_id = p.store_id
+                WHERE s.is_voided = false AND si.is_voided = false {StoreFilter(storeId, "s")}
+            ";
+            
+            using var reader = cmd.ExecuteReader();
+            reader.Read();
+            return Ok(new {
+                totalSaleItems = reader.GetInt32(0),
+                matchedProducts = reader.GetInt32(1),
+                unmatchedItems = reader.GetInt32(2),
+                totalRevenue = reader.GetDecimal(3),
+                totalCOGS = reader.GetDecimal(4),
+                grossProfit = reader.GetDecimal(5),
+                totalProducts = productCount,
+                totalCustomersAll = customerAll,
+                totalCustomersActive = customerActive
+            });
+        }
+
         [HttpGet("version")]
         public IActionResult GetVersion()
         {
-            return Ok(new { version = "1.0.6", buildDate = "2026-06-05", changes = "Invoice prefix, timeframe dashboard, credit sales card, SYNC TODAY fix" });
+            return Ok(new { version = "1.0.15", buildDate = "2026-06-07", changes = "Download master catalog + incremental sync + unit support", downloadUrl = "https://api-production-99fb.up.railway.app/updates/JumongPosV1.01.exe" });
         }
+
+        [HttpGet("products/master")]
+        public IActionResult GetMasterProducts()
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT id, name, barcode, category, price, cost, stock_qty, is_active
+                FROM master_products WHERE is_active = true ORDER BY name";
+            using var reader = cmd.ExecuteReader();
+            var products = new List<object>();
+            while (reader.Read())
+                products.Add(new {
+                    id = reader.GetInt32(0),
+                    name = reader.GetString(1),
+                    barcode = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                    category = reader.IsDBNull(3) ? "" : reader.GetString(3),
+                    price = reader.GetDecimal(4),
+                    cost = reader.GetDecimal(5),
+                    stockQty = reader.GetInt32(6)
+                });
+            return Ok(products);
+        }
+
+        [HttpGet("products/master/{id}/units")]
+        public IActionResult GetMasterProductUnits(int id)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT id, product_id, unit_name, price, cost, qty_per_unit, is_default
+                FROM master_product_units WHERE product_id = @pid ORDER BY is_default DESC, unit_name";
+            cmd.Parameters.AddWithValue("pid", id);
+            using var reader = cmd.ExecuteReader();
+            var units = new List<object>();
+            while (reader.Read())
+                units.Add(new {
+                    id = reader.GetInt32(0),
+                    productId = reader.GetInt32(1),
+                    unitName = reader.GetString(2),
+                    price = reader.GetDecimal(3),
+                    cost = reader.GetDecimal(4),
+                    qtyPerUnit = reader.GetInt32(5),
+                    isDefault = reader.GetBoolean(6)
+                });
+            return Ok(units);
+        }
+
+        [HttpGet("products/master/download")]
+        public IActionResult DownloadMasterCatalog()
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT mp.id, mp.name, mp.barcode, mp.category, mp.price, mp.cost, mp.stock_qty,
+                       COALESCE(json_agg(
+                           json_build_object('unitName', mpu.unit_name, 'price', mpu.price, 'cost', mpu.cost, 'qtyPerUnit', mpu.qty_per_unit, 'isDefault', mpu.is_default)
+                           ORDER BY mpu.is_default DESC, mpu.unit_name
+                       ) FILTER (WHERE mpu.id IS NOT NULL), '[]') AS units
+                FROM master_products mp
+                LEFT JOIN master_product_units mpu ON mpu.product_id = mp.id
+                WHERE mp.is_active = true
+                GROUP BY mp.id ORDER BY mp.name";
+            using var reader = cmd.ExecuteReader();
+            var products = new List<object>();
+            while (reader.Read())
+                    products.Add(new {
+                    id = reader.GetInt32(0),
+                    name = reader.GetString(1),
+                    barcode = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                    category = reader.IsDBNull(3) ? "" : reader.GetString(3),
+                    price = reader.GetDecimal(4),
+                    cost = reader.GetDecimal(5),
+                    stockQty = reader.GetInt32(6),
+                    units = reader.IsDBNull(7) ? null : System.Text.Json.JsonSerializer.Deserialize<object>(reader.GetString(7))
+                });
+            return Ok(products);
+        }
+
+        [HttpPost("products/master/seed")]
+        public IActionResult SeedMasterProducts([FromBody] List<SeedProductDto> products)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var tx = conn.BeginTransaction();
+            try
+            {
+                foreach (var p in products)
+                {
+                    using var cmd = new NpgsqlCommand(@"
+                        INSERT INTO master_products (name, barcode, category, price, cost, stock_qty)
+                        VALUES (@name, @barcode, @cat, @price, @cost, @qty) RETURNING id", conn, tx);
+                    cmd.Parameters.AddWithValue("name", p.Name);
+                    cmd.Parameters.AddWithValue("barcode", (object?)p.Barcode ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("cat", p.Category ?? "");
+                    cmd.Parameters.AddWithValue("price", p.Price);
+                    cmd.Parameters.AddWithValue("cost", p.Cost);
+                    cmd.Parameters.AddWithValue("qty", p.StockQty);
+                    var productId = Convert.ToInt32(cmd.ExecuteScalar());
+
+                    if (p.Units != null)
+                    {
+                        foreach (var u in p.Units)
+                        {
+                            using var ucmd = new NpgsqlCommand(@"
+                                INSERT INTO master_product_units (product_id, unit_name, price, cost, qty_per_unit, is_default)
+                                VALUES (@pid, @un, @pr, @co, @qpu, @def)", conn, tx);
+                            ucmd.Parameters.AddWithValue("pid", productId);
+                            ucmd.Parameters.AddWithValue("un", u.UnitName);
+                            ucmd.Parameters.AddWithValue("pr", u.Price);
+                            ucmd.Parameters.AddWithValue("co", u.Cost);
+                            ucmd.Parameters.AddWithValue("qpu", u.QtyPerUnit);
+                            ucmd.Parameters.AddWithValue("def", u.IsDefault);
+                            ucmd.ExecuteNonQuery();
+                        }
+                    }
+                }
+                tx.Commit();
+                return Ok(new { success = true, count = products.Count });
+            }
+            catch (Exception ex)
+            {
+                tx.Rollback();
+                return StatusCode(500, new { success = false, error = ex.Message });
+            }
+        }
+
+        [HttpPost("products/master")]
+        public IActionResult CreateMasterProduct([FromBody] SeedProductDto p)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var tx = conn.BeginTransaction();
+            try
+            {
+                using var cmd = new NpgsqlCommand(@"
+                    INSERT INTO master_products (name, barcode, category, price, cost, stock_qty)
+                    VALUES (@n, @b, @c, @p, @co, 0) RETURNING id", conn, tx);
+                cmd.Parameters.AddWithValue("n", p.Name);
+                cmd.Parameters.AddWithValue("b", (object?)p.Barcode ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("c", p.Category ?? "");
+                cmd.Parameters.AddWithValue("p", p.Price);
+                cmd.Parameters.AddWithValue("co", p.Cost);
+                var id = Convert.ToInt32(cmd.ExecuteScalar());
+
+                if (p.Units != null)
+                {
+                    foreach (var u in p.Units)
+                    {
+                        using var ucmd = new NpgsqlCommand(@"
+                            INSERT INTO master_product_units (product_id, unit_name, price, cost, qty_per_unit, is_default)
+                            VALUES (@pid, @un, @pr, @co, @qpu, @def)", conn, tx);
+                        ucmd.Parameters.AddWithValue("pid", id);
+                        ucmd.Parameters.AddWithValue("un", u.UnitName);
+                        ucmd.Parameters.AddWithValue("pr", u.Price);
+                        ucmd.Parameters.AddWithValue("co", u.Cost);
+                        ucmd.Parameters.AddWithValue("qpu", u.QtyPerUnit);
+                        ucmd.Parameters.AddWithValue("def", u.IsDefault);
+                        ucmd.ExecuteNonQuery();
+                    }
+                }
+                tx.Commit();
+                return Ok(new { success = true, id });
+            }
+            catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
+        }
+
+        [HttpPut("products/master/{id}")]
+        public IActionResult UpdateMasterProduct(int id, [FromBody] SeedProductDto p)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var tx = conn.BeginTransaction();
+            try
+            {
+                using var cmd = new NpgsqlCommand(@"
+                    UPDATE master_products SET name=@n, barcode=@b, category=@c, price=@p, cost=@co
+                    WHERE id=@id", conn, tx);
+                cmd.Parameters.AddWithValue("n", p.Name);
+                cmd.Parameters.AddWithValue("b", (object?)p.Barcode ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("c", p.Category ?? "");
+                cmd.Parameters.AddWithValue("p", p.Price);
+                cmd.Parameters.AddWithValue("co", p.Cost);
+                cmd.Parameters.AddWithValue("id", id);
+                cmd.ExecuteNonQuery();
+
+                using var del = new NpgsqlCommand("DELETE FROM master_product_units WHERE product_id = @pid", conn, tx);
+                del.Parameters.AddWithValue("pid", id);
+                del.ExecuteNonQuery();
+
+                if (p.Units != null)
+                {
+                    foreach (var u in p.Units)
+                    {
+                        using var ucmd = new NpgsqlCommand(@"
+                            INSERT INTO master_product_units (product_id, unit_name, price, cost, qty_per_unit, is_default)
+                            VALUES (@pid, @un, @pr, @co, @qpu, @def)", conn, tx);
+                        ucmd.Parameters.AddWithValue("pid", id);
+                        ucmd.Parameters.AddWithValue("un", u.UnitName);
+                        ucmd.Parameters.AddWithValue("pr", u.Price);
+                        ucmd.Parameters.AddWithValue("co", u.Cost);
+                        ucmd.Parameters.AddWithValue("qpu", u.QtyPerUnit);
+                        ucmd.Parameters.AddWithValue("def", u.IsDefault);
+                        ucmd.ExecuteNonQuery();
+                    }
+                }
+                tx.Commit();
+                return Ok(new { success = true });
+            }
+            catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
+        }
+
+        [HttpDelete("products/master/{id}")]
+        public IActionResult DeleteMasterProduct(int id)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "UPDATE master_products SET is_active = false WHERE id = @id";
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.ExecuteNonQuery();
+            return Ok(new { success = true });
+        }
+    }
+
+    public class SeedProductDto
+    {
+        public string Name { get; set; } = "";
+        public string? Barcode { get; set; }
+        public string? Category { get; set; }
+        public decimal Price { get; set; }
+        public decimal Cost { get; set; }
+        public int StockQty { get; set; }
+        public List<SeedProductUnitDto>? Units { get; set; }
+    }
+
+    public class SeedProductUnitDto
+    {
+        public string UnitName { get; set; } = "Piece";
+        public decimal Price { get; set; }
+        public decimal Cost { get; set; }
+        public int QtyPerUnit { get; set; } = 1;
+        public bool IsDefault { get; set; }
     }
 
     public class RenameStoreRequest

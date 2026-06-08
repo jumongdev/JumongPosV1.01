@@ -70,6 +70,7 @@ public class DatabaseHelper
                 UserId INTEGER,
                 IsVoided INTEGER NOT NULL DEFAULT 0,
                 VoidedAt TEXT,
+                Synced INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY (CustomerId) REFERENCES Customers(Id),
                 FOREIGN KEY (UserId) REFERENCES Users(Id)
             );
@@ -221,6 +222,13 @@ public class DatabaseHelper
             using var alter = new SQLiteCommand("ALTER TABLE Sales ADD COLUMN CashPaid REAL NOT NULL DEFAULT 0", conn);
             alter.ExecuteNonQuery();
             alter.CommandText = "ALTER TABLE Sales ADD COLUMN EwPaid REAL NOT NULL DEFAULT 0";
+            alter.ExecuteNonQuery();
+        }
+
+        using var checkSynced = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('Sales') WHERE name = 'Synced'", conn);
+        if (Convert.ToInt32(checkSynced.ExecuteScalar()) == 0)
+        {
+            using var alter = new SQLiteCommand("ALTER TABLE Sales ADD COLUMN Synced INTEGER NOT NULL DEFAULT 0", conn);
             alter.ExecuteNonQuery();
         }
 

@@ -22,6 +22,7 @@ public class Sale
     public string CashierName { get; set; } = "";
     public bool IsVoided { get; set; }
     public string? VoidedAt { get; set; }
+    public bool Synced { get; set; }
     public decimal EffectiveTotal { get; set; }
     public List<SaleItem> Items { get; set; } = new();
 

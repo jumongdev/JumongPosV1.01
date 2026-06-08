@@ -10,6 +10,16 @@ public class PrinterService
         return PrinterSettings.InstalledPrinters.Cast<string>().ToList();
     }
 
+    private static void ExtendPaperIfNeeded(PrintDocument doc, int totalLines, int lineHeight = 14)
+    {
+        var needed = (totalLines * lineHeight + 10) * 100 / 96;
+        if (needed > doc.DefaultPageSettings.PaperSize.Height)
+        {
+            var ps = doc.DefaultPageSettings.PaperSize;
+            doc.DefaultPageSettings.PaperSize = new PaperSize(ps.PaperName, ps.Width, needed);
+        }
+    }
+
     public static void PrintReceipt(Sale sale, string cashierName = "Admin", Customer? customer = null)
     {
         var printerName = GetSetting("PrinterName");
@@ -32,6 +42,7 @@ public class PrinterService
         if (lineChars > 48) lineChars = 48;
 
         var lines = BuildReceiptLines(sale, cashierName, customer, lineChars);
+        ExtendPaperIfNeeded(doc, lines.Count);
 
         doc.PrintPage += (sender, e) =>
         {
@@ -212,6 +223,7 @@ public class PrinterService
 
         var lines = BuildEndShiftReportLines(totalSales, totalCash, totalEWallet, totalCredit, totalVoided,
             cashOnHand, difference, cashierName, gcashTxns, creditCustomers, paperW);
+        ExtendPaperIfNeeded(doc, lines.Count);
 
         doc.PrintPage += (sender, e) =>
         {
@@ -343,6 +355,7 @@ public class PrinterService
         if (lineChars > 48) lineChars = 48;
 
         var lines = BuildAuditEndShiftReportLines(cashOnHand, difference, cashierName, timestamp, notes, totalSales, totalCash, totalEWallet, totalCredit, totalVoided, expenses, gcashTxns, creditCustomers, creditPayments, lineChars, denom1000, denom500, denom200, denom100, denom50, denom20, denomCoins);
+        ExtendPaperIfNeeded(doc, lines.Count, 16);
 
         doc.PrintPage += (sender, e) =>
         {
@@ -525,6 +538,7 @@ public class PrinterService
         if (lineChars > 48) lineChars = 48;
 
         var lines = BuildBlindEndShiftSlipLines(cashOnHand, cashierName, timestamp, notes, lineChars);
+        ExtendPaperIfNeeded(doc, lines.Count);
 
         doc.PrintPage += (sender, e) =>
         {
@@ -640,6 +654,7 @@ public class PrinterService
         lines.Add(new LineEntry { Text = new string('=', lineChars), Align = TextAlign.Center, Spacing = 20 });
         lines.Add(new LineEntry { Text = "STOCK RECEIVED", Align = TextAlign.Center, Bold = true, Spacing = 18 });
         lines.Add(new LineEntry { Text = "", Spacing = 8 });
+        ExtendPaperIfNeeded(doc, lines.Count);
 
         doc.PrintPage += (sender, e) =>
         {
@@ -748,6 +763,7 @@ public class PrinterService
         lines.Add(new LineEntry { Text = new string('=', lineChars), Align = TextAlign.Center, Spacing = 20 });
         lines.Add(new LineEntry { Text = $"Total: {receivingOnly.Sum(t => t.QuantityAdded)} items", Bold = true, Spacing = 14 });
         lines.Add(new LineEntry { Text = "", Spacing = 8 });
+        ExtendPaperIfNeeded(doc, lines.Count);
 
         doc.PrintPage += (sender, e) =>
         {

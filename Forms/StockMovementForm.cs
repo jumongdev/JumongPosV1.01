@@ -10,11 +10,13 @@ public partial class StockMovementForm : Form
 {
     private readonly Product _product;
     private readonly User? _currentUser;
+    private readonly bool _isAdmin;
 
     public StockMovementForm(Product product, User? currentUser = null)
     {
         _product = product;
         _currentUser = currentUser;
+        _isAdmin = currentUser?.Role == "Admin";
         InitializeComponent();
         DebugHelper.AddFormLabel(this);
     }
@@ -65,9 +67,11 @@ public partial class StockMovementForm : Form
         var btnAdjust = new Button { Text = "APPLY ADJUSTMENT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentGreen, ForeColor = Color.White, Location = new Point(475, 30), Size = new Size(150, 28), Cursor = Cursors.Hand };
         btnAdjust.Click += btnAdjust_Click;
         pnlAdjust.Controls.AddRange(new Control[] { lblAdjTitle, lblQty, numAdjustQty, lblReason, txtAdjustReason, btnAdjust });
+        pnlAdjust.Visible = _isAdmin;
 
-        // ── TRAIL GRID ──
-        pnlGrid = new Panel { Location = new Point(margin, margin + 75), Size = new Size(100, 100), BackColor = panelBg };
+        var trailTop = _isAdmin ? margin + 75 : margin;
+        var trailSizeH = _isAdmin ? 100 : 100;
+        pnlGrid = new Panel { Location = new Point(margin, trailTop), Size = new Size(100, trailSizeH), BackColor = panelBg };
         pnlGrid.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlGrid.Width - 1, pnlGrid.Height - 1); };
 
         var lblGridTitle = new Label { Text = "STOCK TRAIL HISTORY", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(12, 8), Size = new Size(200, 20) };
@@ -194,8 +198,8 @@ public partial class StockMovementForm : Form
     {
         var margin = 10;
         var w = Math.Max(pnlMain.ClientSize.Width - margin * 2, 100);
-        var adjustH = 65;
-        var gridY = margin + adjustH + margin;
+        var adjustH = _isAdmin ? 65 : 0;
+        var gridY = _isAdmin ? margin + adjustH + margin : margin;
         var gridH = Math.Max(pnlMain.ClientSize.Height - gridY - margin, 50);
 
         pnlAdjust.Location = new Point(margin, margin);

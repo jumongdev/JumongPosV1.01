@@ -298,7 +298,8 @@ public class SaleService
             ReferenceNo = rdr["ReferenceNo"]?.ToString() ?? "",
             IsVoided = rdr["IsVoided"] != DBNull.Value && Convert.ToBoolean(rdr["IsVoided"]),
             VoidedAt = rdr["VoidedAt"]?.ToString(),
-            EffectiveTotal = Convert.ToDecimal(rdr["EffectiveTotal"])
+            EffectiveTotal = Convert.ToDecimal(rdr["EffectiveTotal"]),
+            Synced = rdr["Synced"] != DBNull.Value && Convert.ToInt32(rdr["Synced"]) == 1
         };
     }
 
@@ -514,6 +515,14 @@ public class SaleService
 
             trans.Commit();
             _ = SyncService.SyncVoidLog(new VoidLog { SaleId = saleId, SaleItemId = itemId, Action = "VoidItem", Reason = reason, InvoiceNo = invoiceNo, ProductName = productName, Quantity = qty, Amount = total, UserId = voidedByUserId, UserName = voidedByUserName, CreatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") });
+            // Re-sync the sale so cloud knows which items are voided
+            try
+            {
+                var updatedSale = GetById(saleId);
+                if (updatedSale != null && updatedSale.Items.Count > 0)
+                    _ = SyncService.SyncSale(updatedSale, updatedSale.Items);
+            }
+            catch { }
         }
         catch
         {

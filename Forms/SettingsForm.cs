@@ -378,9 +378,10 @@ public partial class SettingsForm : Form
             btnSyncToday.Click += btnSyncToday_Click;
             btnSyncLog = new Button { Text = "\uD83D\uDCCB VIEW SYNC LOG", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(72, 126, 176), ForeColor = Color.White, Location = new Point(315, 143), Size = new Size(140, 35), Cursor = Cursors.Hand };
             btnSyncLog.Click += btnSyncLog_Click;
-            btnUpdate = new Button { Text = "\u2B07 UPDATE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(155, 89, 182), ForeColor = Color.White, Location = new Point(460, 143), Size = new Size(120, 35), Cursor = Cursors.Hand };
+            btnUpdate = new Button { Text = "\u2B07 UPDATE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(155, 89, 182), ForeColor = Color.White, Location = new Point(460, 143), Size = new Size(100, 35), Cursor = Cursors.Hand };
             btnUpdate.Click += btnUpdate_Click;
-            pnlCloud.Controls.AddRange(new Control[] { lblCloudHeader, lblCloudApi, txtCloudApiUrl, lblStoreIdLabel, lblStoreId, lblStoreNameLabel, txtStoreName, btnSyncAll, btnSyncToday, btnSyncLog, btnUpdate });
+            var lblVersion = new Label { Text = $"v{AppVersion.Current}", Font = new Font("Segoe UI", 8F), ForeColor = dimText, Location = new Point(565, 152), Size = new Size(60, 20) };
+            pnlCloud.Controls.AddRange(new Control[] { lblCloudHeader, lblCloudApi, txtCloudApiUrl, lblStoreIdLabel, lblStoreId, lblStoreNameLabel, txtStoreName, btnSyncAll, btnSyncToday, btnSyncLog, btnUpdate, lblVersion });
             pnlScroll.Controls.Add(pnlCloud);
             y += 210;
         }
@@ -406,26 +407,36 @@ public partial class SettingsForm : Form
             var dailyCloses = DailyCloseService.GetHistory();
             var stockTrails = StockService.GetTrail(limit: 10000);
             var creditTxns = CreditService.GetAll();
+            var sales = SaleService.GetSales();
 
             var total = 0;
+            var saleCount = 0;
             foreach (var p in products)
-            { await SyncService.SyncProduct(p); await Task.Delay(50); total++; }
+            { await SyncService.SyncProduct(p); await Task.Delay(20); total++; }
             foreach (var c in customers)
-            { await SyncService.SyncCustomer(c); await Task.Delay(50); total++; }
+            { await SyncService.SyncCustomer(c); await Task.Delay(20); total++; }
             foreach (var u in users)
-            { await SyncService.SyncUser(u); await Task.Delay(50); total++; }
+            { await SyncService.SyncUser(u); await Task.Delay(20); total++; }
             foreach (var exp in expenses)
-            { await SyncService.SyncExpense(exp); await Task.Delay(50); total++; }
+            { await SyncService.SyncExpense(exp); await Task.Delay(20); total++; }
             foreach (var v in voids)
-            { await SyncService.SyncVoidLog(v); await Task.Delay(50); total++; }
+            { await SyncService.SyncVoidLog(v); await Task.Delay(20); total++; }
             foreach (var d in dailyCloses)
-            { await SyncService.SyncDailyClose(d); await Task.Delay(50); total++; }
+            { await SyncService.SyncDailyClose(d); await Task.Delay(20); total++; }
             foreach (var t in stockTrails)
-            { await SyncService.SyncStockTrail(t); await Task.Delay(50); total++; }
+            { await SyncService.SyncStockTrail(t); await Task.Delay(20); total++; }
             foreach (var ctxn in creditTxns)
-            { await SyncService.SyncCreditTransaction(ctxn); await Task.Delay(50); total++; }
+            { await SyncService.SyncCreditTransaction(ctxn); await Task.Delay(20); total++; }
+            foreach (var s in sales)
+            {
+                var items = SaleService.GetSaleItems(s.Id);
+                await SyncService.SyncSale(s, items);
+                await Task.Delay(50);
+                saleCount++;
+                total += 1 + items.Count;
+            }
 
-            MessageBox.Show($"Synced: {total} records\n- {products.Count} products\n- {customers.Count} customers\n- {users.Count} users\n- {expenses.Count} expenses\n- {voids.Count} voids\n- {dailyCloses.Count} shifts\n- {stockTrails.Count} stock trails\n- {creditTxns.Count} credit transactions\n\nSales sync automatically on every new transaction.", "Sync Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show($"Synced: {total} records\n- {products.Count} products\n- {customers.Count} customers\n- {users.Count} users\n- {expenses.Count} expenses\n- {voids.Count} voids\n- {dailyCloses.Count} shifts\n- {stockTrails.Count} stock trails\n- {creditTxns.Count} credit transactions\n- {sales.Count} sales (+ items)", "Sync Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {
@@ -451,15 +462,19 @@ public partial class SettingsForm : Form
             var todayEnd = today + " 23:59:59";
 
             var sales = SaleService.GetSales(from: DateTime.Parse(todayStart), to: DateTime.Parse(todayEnd));
+            var unsyncedSales = new List<Sale>();
             foreach (var s in sales)
+            {
                 s.Items = SaleService.GetSaleItems(s.Id);
+                if (!s.Synced) unsyncedSales.Add(s);
+            }
             var expenses = ExpenseService.GetExpensesBetween(todayStart, DateTime.Parse(todayEnd));
             var voids = SaleService.GetVoidLogs().Where(v => v.CreatedAt?.StartsWith(today) == true).ToList();
             var stockTrails = StockService.GetTrail(limit: 10000).Where(t => t.CreatedAt?.StartsWith(today) == true).ToList();
             var creditTxns = CreditService.GetAll().Where(ct => ct.CreatedAt?.StartsWith(today) == true).ToList();
 
             var total = 0;
-            foreach (var s in sales)
+            foreach (var s in unsyncedSales)
             { await SyncService.SyncSale(s, s.Items); total++; }
             foreach (var exp in expenses)
             { await SyncService.SyncExpense(exp); total++; }
@@ -470,7 +485,7 @@ public partial class SettingsForm : Form
             foreach (var ctxn in creditTxns)
             { await SyncService.SyncCreditTransaction(ctxn); total++; }
 
-            MessageBox.Show($"Synced today: {total} records\n- {sales.Count} sales\n- {expenses.Count} expenses\n- {voids.Count} voids\n- {stockTrails.Count} stock trails\n- {creditTxns.Count} credit transactions", "Sync Today Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show($"Synced today: {total} records\n- {unsyncedSales.Count} unsynced sales (of {sales.Count} total)\n- {expenses.Count} expenses\n- {voids.Count} voids\n- {stockTrails.Count} stock trails\n- {creditTxns.Count} credit transactions", "Sync Today Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {
@@ -540,7 +555,7 @@ public partial class SettingsForm : Form
     {
         btnUpdate.Enabled = false;
         btnUpdate.Text = "CHECKING...";
-        var (available, version, changes) = await UpdateService.CheckUpdate();
+        var (available, version, changes, downloadUrl) = await UpdateService.CheckUpdate();
         if (!available)
         {
             MessageBox.Show("You're on the latest version.", "Up to Date", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -554,7 +569,7 @@ public partial class SettingsForm : Form
 
         btnUpdate.Text = "DOWNLOADING...";
         var progress = new Progress<int>(p => btnUpdate.Text = $"DOWNLOADING {p}%");
-        var ok = await UpdateService.DownloadAndUpdate(progress);
+        var ok = await UpdateService.DownloadAndUpdate(downloadUrl ?? "", progress);
         if (!ok)
         {
             MessageBox.Show("Download failed. Check your connection and try again.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);

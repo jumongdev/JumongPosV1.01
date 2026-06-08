@@ -188,7 +188,7 @@ public static class SyncService
                 QtyPerUnit = i.QtyPerUnit
             }).ToList()
         };
-        await PostAsync("/sales", payload);
+        await PostAsync("/sales", payload, sale.Id);
     }
 
     public static async Task SyncVoidLog(VoidLog log)
@@ -300,7 +300,7 @@ public static class SyncService
         await PostAsync("/expenses", data);
     }
 
-    private static async Task PostAsync(string endpoint, object data)
+    private static async Task PostAsync(string endpoint, object data, int? saleId = null)
     {
         try
         {
@@ -313,6 +313,7 @@ public static class SyncService
             if (response.IsSuccessStatusCode)
             {
                 LogSync(endpoint, "OK", "");
+                if (saleId.HasValue) MarkSynced(saleId.Value);
             }
             else
             {
@@ -331,6 +332,19 @@ public static class SyncService
             }
             catch { }
         }
+    }
+
+    private static void MarkSynced(int saleId)
+    {
+        try
+        {
+            using var conn = DatabaseHelper.GetConnection();
+            conn.Open();
+            using var cmd = new SQLiteCommand("UPDATE Sales SET Synced = 1 WHERE Id = @id", conn);
+            cmd.Parameters.AddWithValue("@id", saleId);
+            cmd.ExecuteNonQuery();
+        }
+        catch { }
     }
 
     private static string ToUtcString(string? localTime)
@@ -432,5 +446,119 @@ public static class SyncService
             cmd.ExecuteNonQuery();
         }
         catch { }
+    }
+
+    public static async Task<int> DownloadMasterCatalog(IProgress<string>? progress = null)
+    {
+        var added = 0; var updated = 0;
+        try
+        {
+            var url = ApiUrl.TrimEnd('/') + "/dashboard/products/master/download";
+            progress?.Report("Downloading master catalog...");
+            var json = await _client.GetStringAsync(url);
+            var products = JsonSerializer.Deserialize<List<JsonElement>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (products == null || products.Count == 0) return 0;
+
+            using var conn = DatabaseHelper.GetConnection();
+            conn.Open();
+
+            foreach (var p in products)
+            {
+                var name = p.GetProperty("name").GetString() ?? "";
+                var barcode = p.TryGetProperty("barcode", out var bc) ? bc.GetString() : null;
+                var category = p.TryGetProperty("category", out var cat) ? cat.GetString() : "";
+                var price = p.GetProperty("price").GetDecimal();
+                var cost = p.GetProperty("cost").GetDecimal();
+
+                // Check if product exists locally (by barcode, then name)
+                var existingId = 0;
+                if (!string.IsNullOrEmpty(barcode))
+                {
+                    using var chk = new SQLiteCommand("SELECT Id FROM Products WHERE Barcode = @b AND IsActive = 1 LIMIT 1", conn);
+                    chk.Parameters.AddWithValue("@b", barcode);
+                    var val = chk.ExecuteScalar();
+                    if (val != null) existingId = Convert.ToInt32(val);
+                }
+                if (existingId == 0)
+                {
+                    using var chk = new SQLiteCommand("SELECT Id FROM Products WHERE Name = @n AND IsActive = 1 LIMIT 1", conn);
+                    chk.Parameters.AddWithValue("@n", name);
+                    var val = chk.ExecuteScalar();
+                    if (val != null) existingId = Convert.ToInt32(val);
+                }
+
+                if (existingId > 0)
+                {
+                    // Update existing product
+                    using var upd = new SQLiteCommand("UPDATE Products SET Name=@n, Category=@c, Price=@p, Cost=@co, ModifiedBy='cloud' WHERE Id=@id", conn);
+                    upd.Parameters.AddWithValue("@n", name);
+                    upd.Parameters.AddWithValue("@c", category ?? "");
+                    upd.Parameters.AddWithValue("@p", price);
+                    upd.Parameters.AddWithValue("@co", cost);
+                    upd.Parameters.AddWithValue("@id", existingId);
+                    upd.ExecuteNonQuery();
+
+                    // Delete old units and re-insert
+                    using var del = new SQLiteCommand("DELETE FROM ProductUnits WHERE ProductId = @pid", conn);
+                    del.Parameters.AddWithValue("@pid", existingId);
+                    del.ExecuteNonQuery();
+
+                    if (p.TryGetProperty("units", out var uEl) && uEl.ValueKind == JsonValueKind.Array)
+                        InsertUnits(conn, existingId, uEl);
+
+                    updated++;
+                }
+                else
+                {
+                    // Insert new product
+                    using var ins = new SQLiteCommand(@"
+                        INSERT INTO Products (Name, Barcode, Category, Price, Cost, StockQty, IsActive, CreatedAt, ModifiedBy, SourceId)
+                        VALUES (@n, @b, @c, @p, @co, 0, 1, datetime('now','localtime'), 'cloud', 'master')", conn);
+                    ins.Parameters.AddWithValue("@n", name);
+                    ins.Parameters.AddWithValue("@b", (object?)barcode ?? DBNull.Value);
+                    ins.Parameters.AddWithValue("@c", category ?? "");
+                    ins.Parameters.AddWithValue("@p", price);
+                    ins.Parameters.AddWithValue("@co", cost);
+                    ins.ExecuteNonQuery();
+
+                    using var getId = new SQLiteCommand("SELECT last_insert_rowid()", conn);
+                    var localId = Convert.ToInt32(getId.ExecuteScalar());
+
+                    if (p.TryGetProperty("units", out var uEl) && uEl.ValueKind == JsonValueKind.Array)
+                        InsertUnits(conn, localId, uEl);
+
+                    added++;
+                }
+
+                if ((added + updated) % 50 == 0) progress?.Report($"Processed {added + updated} products...");
+            }
+
+            progress?.Report($"Complete! {added} added, {updated} updated.");
+        }
+        catch (Exception ex) { progress?.Report($"Error: {ex.Message}"); }
+        return added + updated;
+    }
+
+    private static void InsertUnits(SQLiteConnection conn, int productId, JsonElement unitsEl)
+    {
+        foreach (var u in unitsEl.EnumerateArray())
+        {
+            var unitName = u.GetProperty("unitName").GetString() ?? "Piece";
+            var uPrice = u.GetProperty("price").GetDecimal();
+            var uCost = u.GetProperty("cost").GetDecimal();
+            var qtyPerUnit = u.GetProperty("qtyPerUnit").GetInt32();
+            var isDefault = u.GetProperty("isDefault").GetBoolean();
+
+            using var ucmd = new SQLiteCommand(@"
+                INSERT INTO ProductUnits (ProductId, UnitName, Price, Cost, QtyPerUnit, IsDefault)
+                VALUES (@pid, @un, @pr, @co, @qpu, @def)", conn);
+            ucmd.Parameters.AddWithValue("@pid", productId);
+            ucmd.Parameters.AddWithValue("@un", unitName);
+            ucmd.Parameters.AddWithValue("@pr", uPrice);
+            ucmd.Parameters.AddWithValue("@co", uCost);
+            ucmd.Parameters.AddWithValue("@qpu", qtyPerUnit);
+            ucmd.Parameters.AddWithValue("@def", isDefault ? 1 : 0);
+            ucmd.ExecuteNonQuery();
+        }
     }
 }
