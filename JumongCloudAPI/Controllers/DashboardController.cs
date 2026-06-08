@@ -616,7 +616,7 @@ public class DashboardController : ControllerBase
         [HttpGet("version")]
         public IActionResult GetVersion()
         {
-            return Ok(new { version = "1.0.15", buildDate = "2026-06-07", changes = "Download master catalog + incremental sync + unit support", downloadUrl = "https://api-production-99fb.up.railway.app/updates/JumongPosV1.01.exe" });
+            return Ok(new { version = "1.0.16", buildDate = "2026-06-08", changes = "Void re-sync fix + expense details + voided amount card + PH timezone", downloadUrl = "https://api-production-99fb.up.railway.app/updates/JumongPosV1.01.exe" });
         }
 
         [HttpGet("products/master")]
