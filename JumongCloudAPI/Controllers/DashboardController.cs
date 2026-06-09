@@ -616,7 +616,7 @@ public class DashboardController : ControllerBase
         [HttpGet("version")]
         public IActionResult GetVersion()
         {
-            return Ok(new { version = "1.0.17", buildDate = "2026-06-09", changes = "Default API URL → DigitalOcean + warehouse system + PWA ordering", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.17/JumongPosV1.01.exe" });
+            return Ok(new { version = "1.0.18", buildDate = "2026-06-09", changes = "Fix GitHub API User-Agent, default URL → DO", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.18/JumongPosV1.01.exe" });
         }
 
         [HttpGet("products/master")]
