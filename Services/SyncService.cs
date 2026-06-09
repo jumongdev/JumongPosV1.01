@@ -89,7 +89,7 @@ public static class SyncService
                 if (!string.IsNullOrEmpty(val)) return val;
             }
             catch { }
-            return "https://api-production-99fb.up.railway.app/api";
+            return "https://jumong-pos-api-p285q.ondigitalocean.app/api";
         }
     }
 

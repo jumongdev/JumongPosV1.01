@@ -12,7 +12,11 @@ public static class UpdateService
     {
         try
         {
-            var json = await _client.GetStringAsync($"https://api.github.com/repos/{Repo}/releases/latest");
+            var req = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{Repo}/releases/latest");
+            req.Headers.UserAgent.ParseAdd("JumongPOS/1.0");
+            var resp = await _client.SendAsync(req);
+            resp.EnsureSuccessStatusCode();
+            var json = await resp.Content.ReadAsStringAsync();
             var doc = JsonDocument.Parse(json);
             var tag = doc.RootElement.GetProperty("tag_name").GetString() ?? "";
             var version = tag.TrimStart('v');
