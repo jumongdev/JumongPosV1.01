@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Jumong Order</title>
+<link rel="manifest" href="manifest.json">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a1a;--surface:#14142d;--border:#282850;--text:#e6e6f5;--muted:#8c8caa;--accent:#00f5ff;--accent2:#2828a0;--green:#2ecc71;--red:#e74c3c;--orange:#f39c12}
+body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.header{background:var(--surface);padding:12px 16px;border-bottom:2px solid var(--border);text-align:center}
+.header h1{color:var(--accent);font-size:1.2em}
+.header p{color:var(--muted);font-size:0.8em;margin-top:4px}
+.container{padding:12px 16px;max-width:800px;margin:0 auto}
+.card{background:var(--surface);border-radius:8px;border:1px solid var(--border);padding:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.card-name{flex:1;font-size:0.9em}
+.card-price{text-align:right;font-size:0.8em;color:var(--muted)}
+.card-qty{display:flex;align-items:center;gap:6px}
+.card-qty button{background:var(--accent2);border:none;color:#fff;width:28px;height:28px;border-radius:4px;font-size:1em;cursor:pointer}
+.card-qty input{width:40px;text-align:center;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px;border-radius:4px;font-size:0.9em}
+.search-bar{width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:8px;font-size:0.95em;margin-bottom:12px}
+.cart-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:2px solid var(--accent);padding:10px 16px;display:flex;justify-content:space-between;align-items:center}
+.cart-bar .total{font-size:1.1em;font-weight:bold;color:var(--accent)}
+.cart-bar button{background:var(--accent);color:var(--bg);border:none;padding:10px 24px;border-radius:6px;font-weight:bold;font-size:0.95em;cursor:pointer}
+.cart-bar button:disabled{opacity:0.3;cursor:default}
+.cat-tabs{display:flex;gap:4px;overflow-x:auto;margin-bottom:12px;padding-bottom:4px}
+.cat-tabs button{white-space:nowrap;padding:6px 14px;background:var(--surface);border:1px solid var(--border);color:var(--muted);border-radius:12px;cursor:pointer;font-size:0.8em}
+.cat-tabs button.active{background:var(--accent2);color:#fff;border-color:var(--accent)}
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:999;justify-content:center;align-items:center}
+.modal-overlay.show{display:flex}
+.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;max-width:400px;width:90%;max-height:80vh;overflow:auto;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,0.5)}
+.modal-box h3{color:var(--accent);margin-bottom:12px}
+.modal-box input,.modal-box textarea{width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;margin-bottom:8px;font-size:0.9em}
+.modal-box textarea{height:60px;resize:none}
+.modal-box button{width:100%;padding:10px;border:none;border-radius:6px;font-weight:bold;cursor:pointer;margin-top:4px}
+.btn-primary{background:var(--accent);color:var(--bg)}
+.btn-secondary{background:var(--accent2);color:#fff}
+.btn-danger{background:var(--red);color:#fff}
+.hidden{display:none}
+.tab-bar{display:flex;margin-bottom:12px;gap:4px}
+.tab-bar button{flex:1;padding:8px;background:var(--surface);border:1px solid var(--border);color:var(--muted);border-radius:6px;cursor:pointer;font-weight:bold}
+.tab-bar button.active{background:var(--accent2);color:#fff;border-color:var(--accent)}
+.order-item{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:8px}
+.order-item .oi-header{display:flex;justify-content:space-between;margin-bottom:4px}
+.order-item .oi-status{font-size:0.75em;padding:2px 8px;border-radius:4px;font-weight:bold}
+.oi-pending{background:#3a2a0a;color:var(--orange)}
+.oi-processing{background:#0a2a3a;color:#2980b9}
+.oi-shipped{background:#0a3a1a;color:var(--green)}
+.oi-delivered{background:#0a3a1a;color:var(--green)}
+.empty{padding:40px;text-align:center;color:var(--muted);font-size:0.9em}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>JUMONG ORDER</h1>
+  <p id="clientInfo">Warehouse Ordering</p>
+</div>
+
+<div class="tab-bar" style="padding:12px 16px 0;max-width:800px;margin:0 auto">
+  <button class="active" onclick="switchTab('catalog',this)">CATALOG</button>
+  <button onclick="switchTab('orders',this)">MY ORDERS</button>
+  <button onclick="switchTab('cart',this)" id="cartTabBtn">CART (<span id="cartCount">0</span>)</button>
+</div>
+
+<div class="container" id="catalogTab">
+  <input class="search-bar" placeholder="Search products..." oninput="filterCatalog(this.value)">
+  <div class="cat-tabs" id="catTabs"></div>
+  <div id="catalogList"></div>
+</div>
+
+<div class="container hidden" id="ordersTab">
+  <div id="ordersList"></div>
+</div>
+
+<div class="container hidden" id="cartTab">
+  <div id="cartList"></div>
+</div>
+
+<div class="cart-bar" id="cartBar">
+  <span class="total" id="cartTotal">₱0.00</span>
+  <button id="checkoutBtn" onclick="showCheckout()">PLACE ORDER</button>
+</div>
+
+<div class="modal-overlay" id="clientModal"><div class="modal-box">
+  <h3>Your Information</h3>
+  <input id="ciName" placeholder="Your Name / Store Name">
+  <input id="ciContact" placeholder="Contact Number">
+  <textarea id="ciAddress" placeholder="Delivery Address"></textarea>
+  <select id="ciType" style="width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;margin-bottom:8px;font-size:0.9em">
+    <option value="pos">POS Store</option>
+    <option value="external">External Client</option>
+  </select>
+  <button class="btn-primary" onclick="saveClient()">CONTINUE</button>
+  <p style="color:var(--muted);font-size:0.75em;margin-top:8px">Required to place orders. Saved locally.</p>
+</div></div>
+
+<div class="modal-overlay" id="confirmModal"><div class="modal-box">
+  <h3>Confirm Order</h3>
+  <div id="confirmItems"></div>
+  <p style="margin:8px 0;font-weight:bold;color:var(--accent);font-size:1.1em" id="confirmTotal"></p>
+  <textarea id="orderNotes" placeholder="Notes (optional)"></textarea>
+  <button class="btn-primary" onclick="placeOrder()">CONFIRM ORDER</button>
+  <button class="btn-secondary" onclick="document.getElementById('confirmModal').classList.remove('show')">CANCEL</button>
+</div></div>
+
+<div class="modal-overlay" id="successModal"><div class="modal-box" style="text-align:center">
+  <h3 style="color:var(--green)">&#10003; Order Placed!</h3>
+  <p style="margin:12px 0;color:var(--muted)" id="successMsg">Your order has been submitted.</p>
+  <button class="btn-primary" onclick="closeSuccess()">OK</button>
+</div></div>
+
+<script>
+const API='https://api-production-99fb.up.railway.app/api/dashboard';
+var products=[],cart=[],categories=[],clientId=0,currentTab='catalog';
+
+function fmt(n){return Number(n||0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function esc(s){return(s+'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+document.addEventListener('DOMContentLoaded',function(){
+  var cid=localStorage.getItem('whClientId');
+  if(cid){clientId=parseInt(cid);var n=localStorage.getItem('whClientName')||'Client';document.getElementById('clientInfo').textContent=n}
+  else setTimeout(function(){document.getElementById('clientModal').classList.add('show')},500)
+  loadCatalog();
+  loadOrders();
+  updateCart();
+  setInterval(function(){if(currentTab==='orders')loadOrders()},30000)
+});
+
+function switchTab(t,b){currentTab=t;document.querySelectorAll('.tab-bar button').forEach(function(x){x.classList.remove('active')});b.classList.add('active');document.getElementById('catalogTab').classList.toggle('hidden',t!=='catalog');document.getElementById('ordersTab').classList.toggle('hidden',t!=='orders');document.getElementById('cartTab').classList.toggle('hidden',t!=='cart');document.getElementById('cartBar').classList.toggle('hidden',t==='orders')}
+
+function saveClient(){var n=document.getElementById('ciName').value;if(!n){alert('Name required');return}var data={name:n,contact:document.getElementById('ciContact').value,address:document.getElementById('ciAddress').value,storeType:document.getElementById('ciType').value};fetch(API+'/warehouse/clients',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(function(r){return r.json()}).then(function(j){clientId=j.id;localStorage.setItem('whClientId',j.id);localStorage.setItem('whClientName',n);document.getElementById('clientInfo').textContent=n;document.getElementById('clientModal').classList.remove('show')}).catch(function(e){alert('Error: '+e.message)})}
+
+async function loadCatalog(){try{var d=await(await fetch(API+'/warehouse/products')).json();products=d;categories=[];d.forEach(function(x){if(x.category&&categories.indexOf(x.category)<0)categories.push(x.category)});categories.sort();renderCatalog(d)}catch(e){document.getElementById('catalogList').innerHTML='<div class="empty">Failed to load catalog</div>'}}
+
+function renderCatalog(data){var ct=document.getElementById('catTabs');ct.innerHTML='<button class="active" onclick="filterCat(\'\',this)">All</button>'+categories.map(function(c){return'<button onclick="filterCat(\''+c+'\',this)">'+c+'</button>'}).join('');var list=document.getElementById('catalogList');if(!data.length){list.innerHTML='<div class="empty">No products available</div>';return}list.innerHTML=data.map(function(x){var inCart=cart.find(function(c){return c.id===x.id});var qty=inCart?inCart.qty:0;return'<div class="card" data-cat="'+(x.category||'')+'"><div class="card-name"><strong>'+esc(x.name)+'</strong><br><span style="font-size:0.75em;color:var(--muted)">Box: &#8369;'+fmt(x.boxPrice)+' ('+x.boxQty+'pcs) | Piece: &#8369;'+fmt(x.piecePrice)+' | Stock: '+x.stockQty+'</span></div><div class="card-qty"><button onclick="addToCart('+x.id+')">+</button><input type="number" value="'+qty+'" min="0" onchange="setCartQty('+x.id+',this.value)" id="qty_'+x.id+'"><button onclick="decCart('+x.id+')">-</button></div></div>'}).join('')}
+
+function filterCat(cat,b){document.querySelectorAll('.cat-tabs button').forEach(function(x){x.classList.remove('active')});b.classList.add('active');if(!cat)renderCatalog(products);else renderCatalog(products.filter(function(x){return x.category===cat}))}
+
+function filterCatalog(q){var d=products.filter(function(x){return x.name.toLowerCase().includes(q.toLowerCase())||(x.barcode&&x.barcode.includes(q))});renderCatalog(d)}
+
+function addToCart(id){var p=products.find(function(x){return x.id===id});if(!p)return;var c=cart.find(function(x){return x.id===id});if(c){c.qty++}else{cart.push({id:p.id,name:p.name,boxPrice:p.boxPrice,boxQty:p.boxQty,piecePrice:p.piecePrice,qty:1})}updateCart()}
+
+function decCart(id){var c=cart.find(function(x){return x.id===id});if(!c)return;c.qty--;if(c.qty<=0)cart=cart.filter(function(x){return x.id!==id});updateCart()}
+
+function setCartQty(id,q){q=parseInt(q)||0;var c=cart.find(function(x){return x.id===id});if(c){if(q<=0)cart=cart.filter(function(x){return x.id!==id});else c.qty=q}else if(q>0){var p=products.find(function(x){return x.id===id});if(p)cart.push({id:p.id,name:p.name,boxPrice:p.boxPrice,boxQty:p.boxQty,piecePrice:p.piecePrice,qty:q})}updateCart()}
+
+function updateCart(){cart.forEach(function(x){var inp=document.getElementById('qty_'+x.id);if(inp)inp.value=x.qty});document.getElementById('cartCount').textContent=cart.length;var total=cart.reduce(function(s,x){return s+Math.max(x.boxPrice,x.piecePrice)*x.qty},0);document.getElementById('cartTotal').textContent='&#8369;'+fmt(total);renderCart()}
+
+function renderCart(){var list=document.getElementById('cartList');if(!cart.length){list.innerHTML='<div class="empty">Cart is empty</div>';document.getElementById('checkoutBtn').disabled=true;return}document.getElementById('checkoutBtn').disabled=false;list.innerHTML=cart.map(function(x,i){return'<div class="card"><div class="card-name"><strong>'+esc(x.name)+'</strong><br><span style="font-size:0.75em;color:var(--muted)">&#8369;'+fmt(Math.max(x.boxPrice,x.piecePrice))+' x '+x.qty+'</span></div><div class="card-qty"><button onclick="decCart('+x.id+')">-</button><span>'+x.qty+'</span><button onclick="addToCart('+x.id+')">+</button><button onclick="removeFromCart('+x.id+')" style="background:var(--red)">X</button></div></div>'}).join('')}
+
+function removeFromCart(id){cart=cart.filter(function(x){return x.id!==id});updateCart()}
+
+function showCheckout(){if(!clientId){document.getElementById('clientModal').classList.add('show');return}if(!cart.length){alert('Cart is empty');return}var list=document.getElementById('confirmItems');list.innerHTML=cart.map(function(x){return'<div style="display:flex;justify-content:space-between;margin:4px 0;font-size:0.9em"><span>'+esc(x.name)+' x'+x.qty+'</span><span>&#8369;'+fmt(Math.max(x.boxPrice,x.piecePrice)*x.qty)+'</span></div>'}).join('');var total=cart.reduce(function(s,x){return s+Math.max(x.boxPrice,x.piecePrice)*x.qty},0);document.getElementById('confirmTotal').textContent='Total: &#8369;'+fmt(total);document.getElementById('confirmModal').classList.add('show')}
+
+async function placeOrder(){var items=cart.map(function(x){return{productId:x.id,productName:x.name,unitType:'box',qty:x.qty,price:Math.max(x.boxPrice,x.piecePrice),totalPrice:Math.max(x.boxPrice,x.piecePrice)*x.qty}});var data={clientId:clientId,clientName:localStorage.getItem('whClientName')||'Client',notes:document.getElementById('orderNotes').value,items:items};try{var r=await fetch(API+'/warehouse/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});var j=await r.json();if(!r.ok)throw new Error(j.error||'Failed');cart=[];updateCart();document.getElementById('confirmModal').classList.remove('show');document.getElementById('orderNotes').value='';document.getElementById('successMsg').textContent='Order #'+j.id+' placed! Total: &#8369;'+fmt(j.totalAmount)+'. We will process it shortly.';document.getElementById('successModal').classList.add('show');loadOrders()}catch(e){alert('Order failed: '+e.message)}}
+
+function closeSuccess(){document.getElementById('successModal').classList.remove('show');switchTab('orders',document.querySelector('.tab-bar button:nth-child(2)'))}
+
+async function loadOrders(){try{var d=await(await fetch(API+'/warehouse/orders?clientId='+clientId)).json();var list=document.getElementById('ordersList');if(!d||!d.length){list.innerHTML='<div class="empty">No orders yet</div>';return}list.innerHTML=d.map(function(x){var dt=new Date(x.createdAt);var sc='oi-'+x.status;return'<div class="order-item"><div class="oi-header"><span>#'+x.id+'</span><span class="oi-status '+sc+'">'+x.status.toUpperCase()+'</span></div><div style="font-size:0.85em;color:var(--muted)">'+dt.toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})+'</div><div style="margin-top:4px;font-weight:bold;color:var(--accent)">&#8369;'+fmt(x.totalAmount)+'</div><div style="font-size:0.8em;color:var(--muted)">'+(x.notes||'')+'</div></div>'}).join('')}catch(e){}}
+</script>
+</body>
+</html>

@@ -916,13 +916,15 @@ public class DashboardController : ControllerBase
         }
 
         [HttpGet("warehouse/orders")]
-        public IActionResult WhGetOrders([FromQuery] string? status = null)
+        public IActionResult WhGetOrders([FromQuery] string? status = null, [FromQuery] int? clientId = null)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            var filter = string.IsNullOrEmpty(status) ? "" : " WHERE o.status = @st";
-            cmd.CommandText = $"SELECT o.id, o.client_id, o.client_name, o.status, o.notes, o.total_amount, o.created_at, o.updated_at FROM wh_orders o{filter} ORDER BY o.created_at DESC LIMIT 200";
-            if (!string.IsNullOrEmpty(status)) cmd.Parameters.AddWithValue("st", status);
+            var filters = new List<string>();
+            if (!string.IsNullOrEmpty(status)) { filters.Add("o.status = @st"); cmd.Parameters.AddWithValue("st", status); }
+            if (clientId.HasValue) { filters.Add("o.client_id = @ci"); cmd.Parameters.AddWithValue("ci", clientId.Value); }
+            var where = filters.Count > 0 ? " WHERE " + string.Join(" AND ", filters) : "";
+            cmd.CommandText = $"SELECT o.id, o.client_id, o.client_name, o.status, o.notes, o.total_amount, o.created_at, o.updated_at FROM wh_orders o{where} ORDER BY o.created_at DESC LIMIT 200";
             var data = new List<object>();
             using var r = cmd.ExecuteReader();
             while (r.Read()) data.Add(new { id = r.GetInt32(0), clientId = r.GetInt32(1), clientName = r.GetString(2), status = r.GetString(3), notes = r.IsDBNull(4) ? "" : r.GetString(4), totalAmount = r.GetDecimal(5), createdAt = r.GetDateTime(6), updatedAt = r.GetDateTime(7) });
