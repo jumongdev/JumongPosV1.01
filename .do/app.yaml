@@ -1,0 +1,29 @@
+name: jumong-pos-api
+region: sgp1
+services:
+- name: api
+  github:
+    branch: master
+    repo: jumongdev/JumongPosV1.01
+    deploy_on_push: true
+  dockerfile_path: JumongCloudAPI/Dockerfile
+  source_dir: JumongCloudAPI
+  http_port: 8080
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  health_check:
+    http_path: /api/dashboard/version
+    initial_delay_seconds: 30
+  envs:
+  - key: PORT
+    value: "8080"
+    scope: RUN_TIME
+  - key: DATABASE_URL
+    value: ${jumong-pos-db.DATABASE_URL}
+    scope: RUN_TIME
+databases:
+- name: jumong-pos-db
+  engine: PG
+  version: "18"
+  production: false
+  db_name: jumongpos
