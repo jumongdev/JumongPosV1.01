@@ -333,5 +333,56 @@ public static class PgDatabaseHelper
             CREATE INDEX IF NOT EXISTS idx_master_product_units_product_id ON master_product_units(product_id);
         ";
         masterCmd.ExecuteNonQuery();
+
+        // Warehouse / ordering system
+        using var whCmd = conn.CreateCommand();
+        whCmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS wh_products (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                barcode TEXT,
+                category TEXT DEFAULT '',
+                box_price NUMERIC NOT NULL DEFAULT 0,
+                box_cost NUMERIC NOT NULL DEFAULT 0,
+                box_qty INTEGER NOT NULL DEFAULT 1,
+                piece_price NUMERIC NOT NULL DEFAULT 0,
+                stock_qty INTEGER NOT NULL DEFAULT 0,
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE TABLE IF NOT EXISTS wh_clients (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                contact TEXT DEFAULT '',
+                address TEXT DEFAULT '',
+                store_type TEXT NOT NULL DEFAULT 'pos',
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE TABLE IF NOT EXISTS wh_orders (
+                id SERIAL PRIMARY KEY,
+                client_id INTEGER NOT NULL REFERENCES wh_clients(id),
+                client_name TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                notes TEXT DEFAULT '',
+                total_amount NUMERIC NOT NULL DEFAULT 0,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE TABLE IF NOT EXISTS wh_order_items (
+                id SERIAL PRIMARY KEY,
+                order_id INTEGER NOT NULL REFERENCES wh_orders(id) ON DELETE CASCADE,
+                product_id INTEGER NOT NULL REFERENCES wh_products(id),
+                product_name TEXT NOT NULL,
+                unit_type TEXT NOT NULL DEFAULT 'box',
+                qty INTEGER NOT NULL DEFAULT 1,
+                price NUMERIC NOT NULL DEFAULT 0,
+                total_price NUMERIC NOT NULL DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_wh_orders_client ON wh_orders(client_id);
+            CREATE INDEX IF NOT EXISTS idx_wh_orders_status ON wh_orders(status);
+            CREATE INDEX IF NOT EXISTS idx_wh_order_items_order ON wh_order_items(order_id);
+        ";
+        whCmd.ExecuteNonQuery();
     }
 }

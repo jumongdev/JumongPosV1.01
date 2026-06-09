@@ -109,6 +109,10 @@
 - [x] Fixed `btnNew` null ref in `ProductsForm`
 - [x] Fixed `VoidLogForm` missing model using
 - [x] Fixed VoidLogForm action color check ("VoidItem" instead of "VOID_ITEM")
+- [x] Void re-sync: voided items now trigger sale re-sync to cloud (v1.0.16)
+- [x] Cloud revenue: changed from `s.grand_total` to item-level sums excluding voided items
+- [x] PH timezone: `SET TIMEZONE TO 'Asia/Manila'` for all cloud queries
+- [x] Update source: migrated from Railway to GitHub Releases to avoid dependency
 
 ### Debug Site Map
 - [x] `Helpers/DebugHelper.cs` — static helper adds form-name label to bottom-right of any form
@@ -126,11 +130,41 @@
 - [x] After `ConfirmReceiving()`, dialog asks "Print receiving receipt?"
 - [x] HISTORY dialog has green PRINT button to print currently filtered trail entries
 
+### Cloud Dashboard (v4)
+- [x] Dashboard v4: loading spinners, error toasts, connection indicator, last-refresh timestamp
+- [x] Date range picker, search/filter, CSV export, collapsible panels, pagination
+- [x] Sale Profit Breakdown panel (per-invoice revenue, cost, profit, margin)
+- [x] Cashier Performance table with payment method breakdown
+- [x] Peak Hours 24-hour bar chart
+- [x] Product Management panel (CRUD for master products with units)
+- [x] Expense Details panel (individual entries with descriptions)
+- [x] Voided Amount card in summary
+- [x] Click invoice number to see per-item breakdown with cost/profit/margin
+- [x] PH timezone: all date filters use Asia/Manila
+- [x] Revenue uses item-level sums (excludes voided items)
+- [x] RENAME button removed
+
+### Local App Features (v1.0.16)
+- [x] CHECK COST tool — grid view with filter buttons (Cost=0, Cost=Price, Cost>Price)
+- [x] DOWNLOAD MASTER button — pulls 618 products with 717 units from cloud
+- [x] Incremental download — matches by barcode, updates existing, adds new
+- [x] SYNC ALL now includes sales (push historical sales to cloud)
+- [x] Void re-sync — voiding items triggers sale re-sync to cloud
+- [x] Update from GitHub Releases (no Railway dependency)
+
 ### Deployment
 - [x] Target: `bin\Release\net8.0-windows\win-x64\JumongPosV1.01.exe`
-- [x] Self-contained publish: single exe (74MB), no .NET install needed
-- [x] Distribution zip: `JumongPosV1.01_Release.zip` (69MB)
+- [x] Self-contained publish: single exe (168MB), no .NET install needed
 - [x] Release mode builds cleanly with no warnings
+- [x] Updates distributed via GitHub Releases (v1.0.16+)
+
+### Master Product Catalog (Cloud PostgreSQL)
+- [x] `master_products` table — 618 products seeded from HQ client DB
+- [x] `master_product_units` table — 717 units (multi-pack pricing)
+- [x] API: GET /api/dashboard/products/master/download (products + units in one call)
+- [x] API: POST /api/dashboard/products/master (create product with units)
+- [x] API: PUT /api/dashboard/products/master/{id} (update product with units)
+- [x] API: DELETE /api/dashboard/products/master/{id} (soft delete)
 
 ## Pending / Upcoming Tasks
 
@@ -145,6 +179,10 @@
 - **E-Wallet:** Always exact amount, no change, read-only tendered field
 - **Role-Based History:** Admin sees all columns; Cashier sees only non-financial columns
 - **DB Recovery:** Restore creates safety backup before overwriting
+- **Update Distribution:** GitHub Releases (v1.0.16+), no Railway dependency
+- **Cloud Revenue:** Item-level sums with `si.is_voided = false`, not `s.grand_total`
+- **Time Zone:** All cloud queries use `SET TIMEZONE TO 'Asia/Manila'`
+- **Master Catalog:** Cloud PostgreSQL as source of truth for products; stores pull via DOWNLOAD MASTER
 
 ## Files Created
 - `Models/AuditLog.cs`
@@ -159,9 +197,13 @@
 - `AuditLogService.Log()`: standalone logging (own connection)
 - `AuditLogService.LogTransaction()`: participates in caller's transaction
 - `ExpenseService.SaveExpense()`: accepts optional `receiptImage` path
-- `SaleService.VoidSale/VoidItem`: require `voidedByUserId`, `voidedByUserName`
+- `SaleService.VoidSale/VoidItem`: require `voidedByUserId`, `voidedByUserName` + re-sync sale to cloud
 - All forms use `Shown` event for initial layout calculation
 - `PrinterService.PrintAuditEndShiftReport` handles 4-section audit slip
 - `PrinterService.PrintStockReceiving` prints receiving receipt for confirmed items
 - `PrinterService.PrintStockReceivingHistory` prints trail history from filter results
 - `EmailService.SendEndShiftReport` sends styled HTML with full variance breakdown
+- `UpdateService.CheckUpdate()` queries GitHub Releases API directly (no cloud dependency)
+- Cloud revenue queries use `SUM(si.total_price)` with `si.is_voided = false` (not `s.grand_total`)
+- All cloud date comparisons use `SET TIMEZONE TO 'Asia/Manila'` at connection level
+- Master catalog endpoints: `/api/dashboard/products/master/*`

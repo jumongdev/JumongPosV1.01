@@ -1,21 +1,26 @@
 using System.Diagnostics;
-using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace JumongPosV1._01.Services;
 
 public static class UpdateService
 {
     private static readonly HttpClient _client = new() { Timeout = TimeSpan.FromMinutes(5) };
+    private const string Repo = "jumongdev/JumongPosV1.01";
 
     public static async Task<(bool available, string? version, string? changes, string? downloadUrl)> CheckUpdate()
     {
         try
         {
-            var info = await _client.GetFromJsonAsync<UpdateInfo>("https://api-production-99fb.up.railway.app/api/dashboard/version");
-            if (info == null) return (false, null, null, null);
+            var json = await _client.GetStringAsync($"https://api.github.com/repos/{Repo}/releases/latest");
+            var doc = JsonDocument.Parse(json);
+            var tag = doc.RootElement.GetProperty("tag_name").GetString() ?? "";
+            var version = tag.TrimStart('v');
+            var body = doc.RootElement.GetProperty("body").GetString() ?? "";
+            var downloadUrl = $"https://github.com/{Repo}/releases/download/{tag}/JumongPosV1.01.exe";
 
             var currentVer = AppVersion.Current;
-            return (string.Compare(info.Version, currentVer, StringComparison.Ordinal) > 0, info.Version, info.Changes, info.DownloadUrl);
+            return (string.Compare(version, currentVer, StringComparison.Ordinal) > 0, version, body, downloadUrl);
         }
         catch { return (false, null, null, null); }
     }
@@ -70,13 +75,5 @@ public static class UpdateService
             return true;
         }
         catch { return false; }
-    }
-
-    private class UpdateInfo
-    {
-        public string Version { get; set; } = "";
-        public string BuildDate { get; set; } = "";
-        public string Changes { get; set; } = "";
-        public string DownloadUrl { get; set; } = "";
     }
 }
