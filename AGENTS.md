@@ -1,7 +1,7 @@
 # JumongPOS - Build & Deploy Guide
 
 ## Version
-**Current:** 1.0.19
+**Current:** 1.0.20
 
 ## Client App (WinForms)
 
