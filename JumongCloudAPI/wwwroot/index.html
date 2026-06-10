@@ -6,6 +6,14 @@
 <title>Jumong POS - Cloud Dashboard</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
+.sidebar{position:fixed;top:0;left:0;bottom:0;width:200px;background:var(--surface);border-right:2px solid var(--border);z-index:200;padding-top:60px;overflow-y:auto;transition:transform .3s}
+.sidebar a{display:block;padding:10px 16px;color:var(--muted);text-decoration:none;font-size:0.82em;border-left:3px solid transparent;cursor:pointer}
+.sidebar a:hover{color:var(--text);background:var(--hover);border-left-color:var(--accent2)}
+.sidebar a.active{color:var(--accent);border-left-color:var(--accent);background:var(--hover)}
+.sidebar .section{color:var(--dim);font-size:0.65em;text-transform:uppercase;letter-spacing:1px;padding:16px 16px 4px;font-weight:bold}
+.main-content{margin-left:200px;transition:margin-left .3s}
+.menu-toggle{display:none;background:transparent;border:none;color:var(--text);font-size:1.2em;cursor:pointer;margin-right:8px}
+@media(max-width:768px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.main-content{margin-left:0}.menu-toggle{display:inline-block}}
 :root{--bg:#0a0a1a;--surface:#14142d;--border:#282850;--text:#e6e6f5;--muted:#8c8caa;--dim:#5c5c8a;--accent:#00f5ff;--accent2:#2828a0;--green:#2ecc71;--red:#e74c3c;--orange:#f39c12;--blue:#2980b9;--hover:#1a1a3a}
 body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 .header{background:var(--surface);padding:12px 24px;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--border);gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:100}
@@ -121,8 +129,21 @@ tr:hover{background:var(--hover)}
 </head>
 <body>
 
+<div class="sidebar" id="sidebar">
+  <div class="section">Overview</div>
+  <a class="active" data-section="dashboard" onclick="switchSection('dashboard',this)">Dashboard</a>
+  <a data-section="products" onclick="switchSection('products',this)">Products</a>
+  <a data-section="warehouse" onclick="switchSection('warehouse',this)">Warehouse</a>
+  <a data-section="sales" onclick="switchSection('sales',this)">Sales</a>
+  <a data-section="cashiers" onclick="switchSection('cashiers',this)">Cashiers</a>
+  <a data-section="expenses" onclick="switchSection('expenses',this)">Expenses</a>
+  <a data-section="shifts" onclick="switchSection('shifts',this)">Shifts</a>
+  <a data-section="stock" onclick="switchSection('stock',this)">Stock</a>
+</div>
+<div class="main-content" id="mainContent">
+
 <div class="header">
-  <h1><span class="live-dot" id="liveDot"></span>JUMONG POS DASHBOARD <span style="font-size:0.45em;color:var(--dim);margin-left:6px">v4</span></h1>
+  <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">&#9776;</button><h1><span class="live-dot" id="liveDot"></span>JUMONG POS DASHBOARD <span style="font-size:0.45em;color:var(--dim);margin-left:6px">v4</span></h1>
   <div class="header-actions">
     <span class="conn-status online" id="connStatus">ONLINE</span>
     <span class="last-refresh" id="lastRefresh"></span>
@@ -326,7 +347,9 @@ tr:hover{background:var(--hover)}
 
 <div class="modal-overlay" id="saleItemsModal" onclick="if(event.target===this)this.classList.remove('show')"><div class="modal-box"><div class="modal-header"><h3 id="saleItemsTitle">Sale Items</h3><button class="modal-close" onclick="document.getElementById('saleItemsModal').classList.remove('show')">&times;</button></div><div class="modal-body" id="saleItemsBody"></div></div></div>
 
-<div class="toast-container" id="toastContainer"></div>
+    <div class="toast-container" id="toastContainer"></div>
+
+</div>
 
 <script>
 const API='/api/dashboard';
@@ -820,6 +843,17 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshAll
 })();
 
 var _whTab='products',_whData=[];
+
+function switchSection(section,el){
+  document.querySelectorAll('.sidebar a').forEach(function(x){x.classList.remove('active')});
+  el.classList.add('active');
+  document.getElementById('sidebar').classList.remove('open');
+  var hide = ['panelTrends','panelPeakHours','panelSaleProfits','panelRecentSales','panelTopProducts','panelCashiers','panelExpenses','panelShiftHistory','panelReceiving','panelStock','panelProducts','panelWarehouse'];
+  var show = {'dashboard':['panelTrends','panelPeakHours','panelSaleProfits','panelRecentSales','panelTopProducts','panelCashiers','panelExpenses','panelShiftHistory','panelReceiving','panelStock'],'products':['panelProducts'],'warehouse':['panelWarehouse'],'sales':['panelRecentSales','panelSaleProfits','panelTopProducts'],'cashiers':['panelCashiers'],'expenses':['panelExpenses'],'shifts':['panelShiftHistory'],'stock':['panelReceiving','panelStock']};
+  hide.forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='none'});
+  if(show[section])show[section].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display=''});
+}
+window.onload=function(){switchSection('dashboard',document.querySelector('.sidebar a.active'))};
 
 function switchWhTab(t,b){_whTab=t;document.querySelectorAll('#whTabs .tab').forEach(function(x){x.classList.remove('active')});b.classList.add('active');document.getElementById('whAddBtn').style.display=t==='orders'?'none':'inline-block';whLoad()}
 function whLoad(){if(_whTab==='products')whLoadProducts();else if(_whTab==='clients')whLoadClients();else if(_whTab==='orders')whLoadOrders()}
