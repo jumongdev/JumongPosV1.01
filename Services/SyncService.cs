@@ -285,6 +285,10 @@ public static class SyncService
 
     public static async Task SyncExpense(Expense expense)
     {
+        var offset = TimeZoneInfo.Local.BaseUtcOffset;
+        var ts = expense.Timestamp.Length > 19
+            ? expense.Timestamp
+            : expense.Timestamp + " " + (offset.Hours >= 0 ? "+" : "") + offset.ToString("hh\\:mm");
         var data = new[]
         {
             new {
@@ -294,10 +298,7 @@ public static class SyncService
                 Description = expense.Description,
                 ReferenceNo = (string?)expense.ReferenceNo,
                 CashierUsername = expense.CashierUsername,
-                var offset = TimeZoneInfo.Local.BaseUtcOffset;
-                Timestamp = expense.Timestamp.Length > 19
-                    ? expense.Timestamp
-                    : expense.Timestamp + " " + (offset.Hours >= 0 ? "+" : "") + offset.ToString("hh\\:mm"),
+                Timestamp = ts,
                 ReceiptImage = expense.ReceiptImage
             }
         };
