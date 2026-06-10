@@ -588,20 +588,7 @@ public partial class ProductsForm : Form
             UpdateStats();
         };
 
-        var btnSyncCloud = new Button { Text = "\u2601 SYNC TO CLOUD", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Location = new Point(1100, 12), Size = new Size(140, 28), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(0, 195, 255), ForeColor = Color.FromArgb(10, 10, 26), Cursor = Cursors.Hand };
-        btnSyncCloud.Click += async (_, _) =>
-        {
-            btnSyncCloud.Enabled = false;
-            btnSyncCloud.Text = "SYNCING...";
-            var products = ProductService.GetAll();
-            var count = 0;
-            foreach (var p in products) { await SyncService.SyncProduct(p); count++; }
-            MessageBox.Show($"Synced {count} products to cloud.", "Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            btnSyncCloud.Enabled = true;
-            btnSyncCloud.Text = "\u2601 SYNC TO CLOUD";
-        };
-
-        pnlToolbar.Controls.AddRange(new Control[] { lblPageTitle, lblSearchIcon, txtSearch, lblCatFilter, cmbFilterCategory, btnCheckCost, btnDownload, btnSyncCloud });
+        pnlToolbar.Controls.AddRange(new Control[] { lblPageTitle, lblSearchIcon, txtSearch, lblCatFilter, cmbFilterCategory, btnCheckCost, btnDownload });
 
         // ── METRICS BAR ──
         var pnlMetrics = new Panel { Dock = DockStyle.Top, Height = 35, BackColor = canvasBg };
