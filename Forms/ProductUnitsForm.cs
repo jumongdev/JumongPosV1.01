@@ -49,7 +49,6 @@ public partial class ProductUnitsForm : Form
             _selected = u;
             txtUnitName.Text = u.UnitName;
             txtPrice.Text = u.Price.ToString("N2");
-            txtCost.Text = u.Cost.ToString("N2");
             nudQtyPerUnit.Value = u.QtyPerUnit;
             chkDefault.Checked = u.IsDefault;
             btnDelete.Enabled = true;
@@ -61,7 +60,6 @@ public partial class ProductUnitsForm : Form
         _selected = null;
         txtUnitName.Clear();
         txtPrice.Clear();
-        txtCost.Clear();
         nudQtyPerUnit.Value = 1;
         chkDefault.Checked = false;
         btnDelete.Enabled = false;
@@ -85,8 +83,9 @@ public partial class ProductUnitsForm : Form
         u.ProductId = _productId;
         u.UnitName = txtUnitName.Text.Trim();
         u.Price = decimal.TryParse(txtPrice.Text, out var p) ? p : 0;
-        u.Cost = decimal.TryParse(txtCost.Text, out var c) ? c : 0;
         u.QtyPerUnit = (int)nudQtyPerUnit.Value;
+        var product = ProductService.GetById(_productId);
+        u.Cost = u.QtyPerUnit * (product?.Cost ?? 0);
         u.IsDefault = chkDefault.Checked;
 
         ProductUnitService.Save(u);
@@ -156,8 +155,6 @@ public partial class ProductUnitsForm : Form
         var y = 245;
         AddField("Unit Name:", ref txtUnitName, ref y, inputBg, inputFg, dimText);
         AddField("Price:", ref txtPrice, ref y, inputBg, inputFg, dimText);
-        AddField("Cost:", ref txtCost, ref y, inputBg, inputFg, dimText);
-
         var lblQty = new Label
         {
             Text = "Qty Per Unit:",
@@ -280,7 +277,6 @@ public partial class ProductUnitsForm : Form
     private DataGridView dgvUnits = null!;
     private TextBox txtUnitName = null!;
     private TextBox txtPrice = null!;
-    private TextBox txtCost = null!;
     private NumericUpDown nudQtyPerUnit = null!;
     private CheckBox chkDefault = null!;
     private Button btnNew = null!, btnSave = null!, btnDelete = null!, btnClose = null!;

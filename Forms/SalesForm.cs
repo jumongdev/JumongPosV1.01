@@ -453,7 +453,7 @@ public partial class SalesForm : Form
                 QtyPerUnit = qtyPerUnit,
                 Quantity = quantity,
                 TotalPrice = price * quantity,
-                UnitCost = unit?.Cost ?? product.Cost
+                UnitCost = product.Cost * qtyPerUnit
             });
         }
         RefreshCart();
