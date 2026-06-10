@@ -443,14 +443,13 @@ public class DashboardController : ControllerBase
                     s.invoice_no,
                     s.sale_date,
                     COALESCE(SUM(si.total_price), 0) AS revenue,
-                    COALESCE(SUM(si.quantity * si.qty_per_unit * p.cost), 0) AS total_cost,
-                    COALESCE(SUM(si.total_price), 0) - COALESCE(SUM(si.quantity * si.qty_per_unit * p.cost), 0) AS profit,
-                    CASE WHEN COALESCE(SUM(si.total_price), 0) > 0 THEN ROUND((COALESCE(SUM(si.total_price), 0) - COALESCE(SUM(si.quantity * si.qty_per_unit * p.cost), 0)) / COALESCE(SUM(si.total_price), 0) * 100, 1) ELSE 0 END AS margin_pct,
+                    COALESCE(SUM(si.unit_cost * si.quantity), 0) AS total_cost,
+                    COALESCE(SUM(si.total_price), 0) - COALESCE(SUM(si.unit_cost * si.quantity), 0) AS profit,
+                    CASE WHEN COALESCE(SUM(si.total_price), 0) > 0 THEN ROUND((COALESCE(SUM(si.total_price), 0) - COALESCE(SUM(si.unit_cost * si.quantity), 0)) / COALESCE(SUM(si.total_price), 0) * 100, 1) ELSE 0 END AS margin_pct,
                     COALESCE(NULLIF(s.cashier_name,''), NULLIF(u.full_name,''), NULLIF(u.username,''), 'Cashier #' || COALESCE(s.user_id::text,'')) AS cashier,
                     s.store_id
                 FROM sales s
                 LEFT JOIN sale_items si ON si.sale_id = s.pos_id AND si.store_id = s.store_id AND si.is_voided = false
-                LEFT JOIN products p ON si.product_id = p.pos_id AND si.store_id = p.store_id
                 LEFT JOIN users u ON s.user_id = u.pos_id AND s.store_id = u.store_id
                 WHERE s.is_voided = false {StoreFilter(storeId, "s")}{tf}
                 GROUP BY s.invoice_no, s.sale_date, s.cashier_name, s.user_id, u.full_name, u.username, s.store_id
@@ -489,7 +488,7 @@ public class DashboardController : ControllerBase
                 SELECT
                     (SELECT COALESCE(SUM(si.total_price),0) {itemsJoin} WHERE s.is_voided = false AND si.is_voided = false {StoreFilter(storeId, "s")}{tfSales.Replace("sale_date","s.sale_date")}) AS total_revenue,
                     (SELECT COALESCE(SUM(amount),0) FROM expenses WHERE 1=1 {StoreFilter(storeId, "expenses")}{tfExp}) AS total_expenses,
-                    (SELECT COALESCE(SUM(si.total_price - (si.quantity * si.qty_per_unit * p.cost)),0)
+                    (SELECT COALESCE(SUM(si.total_price - (si.unit_cost * si.quantity)),0)
                      {itemsJoin}
                      JOIN products p ON si.product_id = p.pos_id AND si.store_id = p.store_id
                      WHERE s.is_voided = false AND si.is_voided = false {StoreFilter(storeId, "s")}{tfSales.Replace("sale_date","s.sale_date")}) AS gross_profit,
@@ -539,9 +538,9 @@ public class DashboardController : ControllerBase
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 SELECT si.product_name, si.barcode, si.quantity, si.price, si.total_price,
-                       COALESCE(p.cost, 0) AS cost, si.qty_per_unit,
-                       si.quantity * si.qty_per_unit * COALESCE(p.cost, 0) AS total_cost,
-                       si.total_price - (si.quantity * si.qty_per_unit * COALESCE(p.cost, 0)) AS profit,
+                       COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0) AS unit_cost, si.qty_per_unit,
+                       si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0) AS total_cost,
+                       si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS profit,
                        p.pos_id AS product_pos_id, si.store_id
                 FROM sale_items si
                 JOIN sales s ON si.sale_id = s.pos_id AND si.store_id = s.store_id
@@ -618,8 +617,8 @@ public class DashboardController : ControllerBase
                     COUNT(p.id) as matched_products,
                     COUNT(*) - COUNT(p.id) as unmatched_items,
                     COALESCE(SUM(si.total_price),0) as total_revenue,
-                    COALESCE(SUM(si.quantity * si.qty_per_unit * p.cost),0) as total_cogs,
-                    COALESCE(SUM(si.total_price - (si.quantity * si.qty_per_unit * p.cost)),0) as gross_profit
+                    COALESCE(SUM(si.quantity * si.unit_cost),0) as total_cogs,
+                    COALESCE(SUM(si.total_price - (si.quantity * si.unit_cost)),0) as gross_profit
                 FROM sale_items si
                 JOIN sales s ON si.sale_id = s.pos_id AND si.store_id = s.store_id
                 LEFT JOIN products p ON si.product_id = p.pos_id AND si.store_id = p.store_id

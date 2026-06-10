@@ -98,9 +98,9 @@ public class SyncController : ControllerBase
             foreach (var item in payload.Items)
             {
                 using var icmd = new NpgsqlCommand(
-                    $"INSERT INTO sale_items (pos_id, store_id, sale_id, product_id, product_name, barcode, price, quantity, total_price, is_voided, unit_name, qty_per_unit, synced_at) " +
-                    $"VALUES (@p0,'{sid}',@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,NOW()) " +
-                    $"ON CONFLICT (store_id, pos_id) DO UPDATE SET sale_id=@p1, product_id=@p2, product_name=@p3, barcode=@p4, price=@p5, quantity=@p6, total_price=@p7, is_voided=@p8, unit_name=@p9, qty_per_unit=@p10, synced_at=NOW()",
+                    $"INSERT INTO sale_items (pos_id, store_id, sale_id, product_id, product_name, barcode, price, quantity, total_price, is_voided, unit_name, qty_per_unit, unit_cost, synced_at) " +
+                    $"VALUES (@p0,'{sid}',@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,NOW()) " +
+                    $"ON CONFLICT (store_id, pos_id) DO UPDATE SET sale_id=@p1, product_id=@p2, product_name=@p3, barcode=@p4, price=@p5, quantity=@p6, total_price=@p7, is_voided=@p8, unit_name=@p9, qty_per_unit=@p10, unit_cost=@p11, synced_at=NOW()",
                     conn, tx);
                 icmd.Parameters.AddWithValue("p0", item.PosId);
                 icmd.Parameters.AddWithValue("p1", payload.Sale.PosId);
@@ -113,6 +113,7 @@ public class SyncController : ControllerBase
                 icmd.Parameters.AddWithValue("p8", item.IsVoided);
                 icmd.Parameters.AddWithValue("p9", item.UnitName);
                 icmd.Parameters.AddWithValue("p10", item.QtyPerUnit);
+                icmd.Parameters.AddWithValue("p11", item.UnitCost);
                 icmd.ExecuteNonQuery();
             }
 
@@ -266,4 +267,5 @@ public class SyncSaleItemDto
     public bool IsVoided { get; set; }
     public string UnitName { get; set; } = "";
     public int QtyPerUnit { get; set; } = 1;
+    public decimal UnitCost { get; set; }
 }

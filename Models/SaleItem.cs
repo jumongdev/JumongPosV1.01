@@ -12,5 +12,6 @@ public class SaleItem
     public decimal TotalPrice { get; set; }
     public string UnitName { get; set; } = "";
     public int QtyPerUnit { get; set; } = 1;
+    public decimal UnitCost { get; set; }
     public bool IsVoided { get; set; }
 }

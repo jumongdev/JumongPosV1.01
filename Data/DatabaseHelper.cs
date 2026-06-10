@@ -146,6 +146,12 @@ public class DatabaseHelper
             using var alter = new SQLiteCommand("ALTER TABLE SaleItems ADD COLUMN UnitName TEXT NOT NULL DEFAULT ''", conn);
             alter.ExecuteNonQuery();
         }
+        using var checkUc = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('SaleItems') WHERE name = 'UnitCost'", conn);
+        if (Convert.ToInt32(checkUc.ExecuteScalar()) == 0)
+        {
+            using var alter = new SQLiteCommand("ALTER TABLE SaleItems ADD COLUMN UnitCost REAL NOT NULL DEFAULT 0", conn);
+            alter.ExecuteNonQuery();
+        }
         using var checkQty = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('SaleItems') WHERE name = 'QtyPerUnit'", conn);
         if (Convert.ToInt32(checkQty.ExecuteScalar()) == 0)
         {

@@ -248,6 +248,11 @@ public static class PgDatabaseHelper
         ";
         try { backfill.ExecuteNonQuery(); } catch { }
 
+        // Migration: add unit_cost to sale_items
+        using var ucMig = conn.CreateCommand();
+        ucMig.CommandText = "ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS unit_cost NUMERIC NOT NULL DEFAULT 0";
+        try { ucMig.ExecuteNonQuery(); } catch { }
+
         // Recreate unique constraints with store_id
         using var dropCmd = conn.CreateCommand();
         dropCmd.CommandText = @"

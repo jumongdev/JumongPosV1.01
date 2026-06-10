@@ -60,8 +60,20 @@ public class SaleService
 
             foreach (var item in sale.Items)
             {
-                var itemSql = @"INSERT INTO SaleItems (SaleId, ProductId, ProductName, Barcode, Price, Quantity, TotalPrice, UnitName, QtyPerUnit)
-                                VALUES (@sid, @pid, @pn, @bc, @pr, @qty, @tot, @un, @qpu)";
+                // Determine unit cost: use ProductUnit cost if unit has its own, else product base cost
+                var unitCost = item.UnitCost;
+                if (unitCost == 0)
+                {
+                    using var getCost = new SQLiteCommand("SELECT COALESCE((SELECT pu.Cost FROM ProductUnits pu WHERE pu.ProductId = @pid2 AND pu.UnitName = @un2 LIMIT 1), p.Cost) FROM Products p WHERE p.Id = @pid3", conn);
+                    getCost.Parameters.AddWithValue("@pid2", item.ProductId);
+                    getCost.Parameters.AddWithValue("@un2", item.UnitName);
+                    getCost.Parameters.AddWithValue("@pid3", item.ProductId);
+                    var result = getCost.ExecuteScalar();
+                    unitCost = result != null ? Convert.ToDecimal(result) : 0;
+                }
+
+                var itemSql = @"INSERT INTO SaleItems (SaleId, ProductId, ProductName, Barcode, Price, Quantity, TotalPrice, UnitName, QtyPerUnit, UnitCost)
+                                VALUES (@sid, @pid, @pn, @bc, @pr, @qty, @tot, @un, @qpu, @uc)";
                 using var itemCmd = new SQLiteCommand(itemSql, conn);
                 itemCmd.Parameters.AddWithValue("@sid", saleId);
                 itemCmd.Parameters.AddWithValue("@pid", item.ProductId);
@@ -72,6 +84,7 @@ public class SaleService
                 itemCmd.Parameters.AddWithValue("@tot", item.TotalPrice);
                 itemCmd.Parameters.AddWithValue("@un", item.UnitName);
                 itemCmd.Parameters.AddWithValue("@qpu", item.QtyPerUnit);
+                itemCmd.Parameters.AddWithValue("@uc", unitCost);
                 itemCmd.ExecuteNonQuery();
                 using var itemIdCmd = new SQLiteCommand("SELECT last_insert_rowid()", conn);
                 item.Id = Convert.ToInt32(itemIdCmd.ExecuteScalar());
@@ -272,6 +285,7 @@ public class SaleService
                 TotalPrice = Convert.ToDecimal(rdr["TotalPrice"]),
                 UnitName = rdr["UnitName"].ToString() ?? "",
                 QtyPerUnit = rdr["QtyPerUnit"] != DBNull.Value ? Convert.ToInt32(rdr["QtyPerUnit"]) : 1,
+                UnitCost = rdr["UnitCost"] != DBNull.Value ? Convert.ToDecimal(rdr["UnitCost"]) : 0,
                 IsVoided = rdr["IsVoided"] != DBNull.Value && Convert.ToBoolean(rdr["IsVoided"])
             });
         }
