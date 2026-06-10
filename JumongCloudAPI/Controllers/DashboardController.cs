@@ -641,10 +641,27 @@ public class DashboardController : ControllerBase
             });
         }
 
+        [HttpPost("backfill-unit-cost")]
+        public IActionResult BackfillUnitCost()
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                UPDATE sale_items si
+                SET unit_cost = p.cost
+                FROM products p
+                WHERE si.product_id = p.pos_id
+                  AND si.store_id = p.store_id
+                  AND (si.unit_cost IS NULL OR si.unit_cost = 0)
+                  AND (p.cost IS NOT NULL AND p.cost > 0)";
+            var updated = cmd.ExecuteNonQuery();
+            return Ok(new { fixed = updated, message = $"Backfilled {updated} sale_items with product cost" });
+        }
+
         [HttpGet("version")]
         public IActionResult GetVersion()
         {
-            return Ok(new { version = "1.0.18", buildDate = "2026-06-09", changes = "Fix GitHub API User-Agent, default URL → DO", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.18/JumongPosV1.01.exe" });
+            return Ok(new { version = "1.0.19", buildDate = "2026-06-10", changes = "Fix profit calc: fallback to p.cost when unit_cost=0", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.19/JumongPosV1.01.exe" });
         }
 
         [HttpGet("products/master")]
