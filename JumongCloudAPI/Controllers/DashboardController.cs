@@ -641,23 +641,6 @@ public class DashboardController : ControllerBase
             });
         }
 
-        [HttpPost("backfill-unit-cost")]
-        public IActionResult BackfillUnitCost()
-        {
-            using var conn = Data.PgDatabaseHelper.GetConnection();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
-                UPDATE sale_items si
-                SET unit_cost = p.cost
-                FROM products p
-                WHERE si.product_id = p.pos_id
-                  AND si.store_id = p.store_id
-                  AND (si.unit_cost IS NULL OR si.unit_cost = 0)
-                  AND (p.cost IS NOT NULL AND p.cost > 0)";
-            var updated = cmd.ExecuteNonQuery();
-            return Ok(new { fixed = updated, message = $"Backfilled {updated} sale_items with product cost" });
-        }
-
         [HttpGet("version")]
         public IActionResult GetVersion()
         {
