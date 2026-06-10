@@ -391,8 +391,7 @@ public partial class SettingsForm : Form
             var txtStoreName = new TextBox { Location = new Point(180, cy), Size = new Size(350, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = SyncService.StoreName, PlaceholderText = "e.g. Main Branch" };
             txtStoreName.TextChanged += (_, _) => SyncService.StoreName = txtStoreName.Text;
             var lblStoreNameLabel = new Label { Text = "Store Name:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, cy), Size = new Size(140, 25) };
-
-            cy = 40;
+            cy += 42;
             var btnX = 15;
             var btnW = 210;
             var btnH = 36;
@@ -414,7 +413,7 @@ public partial class SettingsForm : Form
             btnUpdate = MakeBtn("\u2B07 UPDATE APP", btnX, cy, Color.FromArgb(155, 89, 182), btnUpdate_Click);
             var desc5 = MakeDesc($"Check GitHub for new version (current: v{AppVersion.Current})", descX, cy);
 
-            MakeSection("CLOUD SYNC", 290, new Control[] {
+            MakeSection("CLOUD SYNC", 350, new Control[] {
                 lblCloudApi, txtCloudApiUrl, lblStoreIdLabel, lblStoreId,
                 lblStoreNameLabel, txtStoreName,
                 btnSyncAll, desc1, btnSyncToday, desc2, btnSyncFromCloud, desc3,
