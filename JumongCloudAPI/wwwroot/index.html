@@ -781,7 +781,6 @@ function renderUnits(units){
     return'<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">'+
       '<input placeholder="Name" style="width:100px;background:var(--hover);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:0.78em" value="'+esc(u.unitName)+'" data-u="name" data-idx="'+i+'">'+
       '<input placeholder="Price" style="width:80px;background:var(--hover);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:0.78em" value="'+u.price+'" data-u="price" data-idx="'+i+'">'+
-      '<input placeholder="Cost" style="width:80px;background:var(--hover);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:0.78em" value="'+u.cost+'" data-u="cost" data-idx="'+i+'">'+
       '<input placeholder="Qty/Unit" style="width:60px;background:var(--hover);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:0.78em" value="'+u.qtyPerUnit+'" data-u="qpu" data-idx="'+i+'">'+
       '<label style="font-size:0.7em;color:var(--muted)"><input type="checkbox" '+(u.isDefault?'checked':'')+' data-u="def" data-idx="'+i+'"> Default</label>'+
       '<button class="btn btn-sm btn-outline btn-danger" onclick="this.parentElement.remove()" style="padding:2px 6px;font-size:0.7em">X</button></div>';
@@ -790,12 +789,11 @@ function renderUnits(units){
 
 function addUnitRow(){
   var c=document.getElementById('peUnits');
-  var idx=c?c.querySelectorAll('[data-u]').length/5:0;
+  var idx=c?c.querySelectorAll('[data-u]').length/4:0;
   var div=document.createElement('div');
   div.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:4px';
   div.innerHTML='<input placeholder="Name" style="width:100px;background:var(--hover);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:0.78em" value="" data-u="name" data-idx="'+idx+'">'+
     '<input placeholder="Price" style="width:80px;background:var(--hover);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:0.78em" value="0" data-u="price" data-idx="'+idx+'">'+
-    '<input placeholder="Cost" style="width:80px;background:var(--hover);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:0.78em" value="0" data-u="cost" data-idx="'+idx+'">'+
     '<input placeholder="Qty/Unit" style="width:60px;background:var(--hover);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:0.78em" value="1" data-u="qpu" data-idx="'+idx+'">'+
     '<label style="font-size:0.7em;color:var(--muted)"><input type="checkbox" data-u="def" data-idx="'+idx+'"> Default</label>'+
     '<button class="btn btn-sm btn-outline btn-danger" onclick="this.parentElement.remove()" style="padding:2px 6px;font-size:0.7em">X</button>';
@@ -811,11 +809,11 @@ function collectUnits(){
     if(!map[idx])map[idx]={};
     if(el.dataset.u==='name')map[idx].unitName=el.value||'Piece';
     if(el.dataset.u==='price')map[idx].price=parseFloat(el.value)||0;
-    if(el.dataset.u==='cost')map[idx].cost=parseFloat(el.value)||0;
     if(el.dataset.u==='qpu')map[idx].qtyPerUnit=parseInt(el.value)||1;
     if(el.dataset.u==='def')map[idx].isDefault=el.checked;
   });
-  for(var k in map)if(map[k].unitName)units.push(map[k]);
+  var baseCost=parseFloat(document.getElementById('peCost').value)||0;
+  for(var k in map){if(map[k].unitName){map[k].cost=(map[k].qtyPerUnit||1)*baseCost;units.push(map[k])}}
   return units;
 }
 
