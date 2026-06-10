@@ -61,6 +61,16 @@ git push origin master
 | `JumongCloudAPI/DashboardController.cs` | 3 queries now fallback to `p.cost` when `unit_cost = 0` |
 | PostgreSQL | Backfilled 36,002 historic sale_items with product costs |
 
+## New Feature: Sync From Cloud (v1.0.19)
+
+**Settings > SYNC FROM CLOUD** downloads the master catalog from the cloud API and updates:
+- **Price, Cost, Category, Name** — overwritten from cloud
+- **ProductUnits** — synced (deleted + re-inserted)
+- **StockQty** — NOT changed (keeps local inventory)
+- **New products** — added with StockQty=0
+
+Backend: `GET /api/dashboard/products/master/download` returns all master products with units.
+
 ## Common Tasks
 
 ### Run SQL query on cloud DB
