@@ -12,6 +12,7 @@ public partial class SettingsForm : Form
 {
     private readonly User _currentUser;
     private readonly Dictionary<string, string> _originalSettings = new();
+    private Panel _pnlScroll = null!;
 
     public SettingsForm(User user)
     {
@@ -234,26 +235,14 @@ public partial class SettingsForm : Form
 
     private void btnAuditLog_Click(object? sender, EventArgs e)
     {
-        var canvasBg = Color.FromArgb(10, 10, 26);
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var borderColor = Color.FromArgb(40, 40, 70);
-        var accentBlue = Color.FromArgb(72, 126, 176);
-
-        using var form = new Form { Text = "Audit Log — Settings Changes", WindowState = FormWindowState.Maximized, StartPosition = FormStartPosition.CenterScreen, FormBorderStyle = FormBorderStyle.Sizable, MaximizeBox = true, BackColor = canvasBg };
-        var pnlToolbar = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = panelBg };
-        pnlToolbar.Paint += (s, ev) => { using var pen = new Pen(borderColor, 1); ev.Graphics.DrawLine(pen, 0, pnlToolbar.Height - 1, pnlToolbar.Width, pnlToolbar.Height - 1); };
-        var lblTitle = new Label { Text = "\uD83D\uDCDD AUDIT LOG", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(20, 12), Size = new Size(250, 28) };
-        pnlToolbar.Controls.Add(lblTitle);
-
-        var dgv = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = panelBg, BorderStyle = BorderStyle.None, GridColor = Color.FromArgb(40, 40, 70), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = neonTitle, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = Color.FromArgb(230, 230, 245), SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) } };
+        using var form = new Form { Text = "Audit Log — Settings Changes", WindowState = FormWindowState.Maximized, StartPosition = FormStartPosition.CenterScreen, FormBorderStyle = FormBorderStyle.Sizable, MaximizeBox = true };
+        var dgv = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells };
         dgv.DataSource = AuditLogService.GetHistory();
-
-        var btnClose = new Button { Text = "CLOSE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(20, 10), Size = new Size(100, 30), BackColor = accentBlue, ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+        var btnClose = new Button { Text = "CLOSE", Location = new Point(20, 10), Size = new Size(100, 30), Cursor = Cursors.Hand };
         btnClose.Click += (_, __) => form.Close();
-        var pnlBtn = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = canvasBg };
+        var pnlBtn = new Panel { Dock = DockStyle.Top, Height = 50 };
         pnlBtn.Controls.Add(btnClose);
-        form.Controls.AddRange(new Control[] { dgv, pnlBtn, pnlToolbar });
+        form.Controls.AddRange(new Control[] { dgv, pnlBtn });
         form.ShowDialog();
     }
 
@@ -285,113 +274,187 @@ public partial class SettingsForm : Form
         btnSave.Click += btnSave_Click;
         pnlToolbar.Controls.AddRange(new Control[] { lblPageTitle, btnSave });
 
-        var pnlScroll = new Panel { Dock = DockStyle.Fill, BackColor = canvasBg, AutoScroll = true };
-        var margin = 10;
-        var y = margin;
-        var left = margin;
-        var mid = 180;
-        var fw = 280;
+        _pnlScroll = new Panel { Dock = DockStyle.Fill, BackColor = canvasBg, AutoScroll = true };
+        var left = 20;
+        var pnlW = 700;
+        var gap = 15;
+        var y = gap;
 
-        // ── RECEIPT SETUP ──
-        var pnlReceipt = new Panel { Location = new Point(left, y), Size = new Size(600, 280), BackColor = panelBg };
-        pnlReceipt.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlReceipt.Width - 1, pnlReceipt.Height - 1); };
-        var lblReceiptHeader = new Label { Text = "RECEIPT SETUP", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(15, 10), Size = new Size(200, 20) };
-        var ry = 35;
-        var lblPrinter = new Label { Text = "Receipt Printer:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ry), Size = new Size(140, 25) };
-        cmbPrinter = new ComboBox { Location = new Point(mid, ry), Size = new Size(fw, 25), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = inputBg, ForeColor = inputFg, FlatStyle = FlatStyle.Flat };
-        ry += 35;
-        var lblCo = new Label { Text = "Company Name:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ry), Size = new Size(140, 25) };
-        txtCompanyName = new TextBox { Location = new Point(mid, ry), Size = new Size(fw, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F) };
-        ry += 35;
-        var lblAddr = new Label { Text = "Address:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ry), Size = new Size(140, 25) };
-        txtAddress = new TextBox { Location = new Point(mid, ry), Size = new Size(fw, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F) };
-        ry += 35;
-        var lblMob = new Label { Text = "Mobile No:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ry), Size = new Size(140, 25) };
-        txtMobile = new TextBox { Location = new Point(mid, ry), Size = new Size(fw, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F) };
-        ry += 35;
-        var lblFt = new Label { Text = "Footer Message:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ry), Size = new Size(140, 25) };
-        txtFooter = new TextBox { Location = new Point(mid, ry), Size = new Size(fw, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = "Thank You! Come Again!" };
-        ry += 35;
-        var lblPaper = new Label { Text = "Paper Size:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ry), Size = new Size(140, 25) };
-        cmbPaperSize = new ComboBox { Location = new Point(mid, ry), Size = new Size(100, 25), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = inputBg, ForeColor = inputFg, FlatStyle = FlatStyle.Flat };
-        var lblMl = new Label { Text = "Left Margin:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(300, ry), Size = new Size(80, 25) };
-        numMarginLeft = new NumericUpDown { Location = new Point(380, ry), Size = new Size(60, 25), Minimum = 0, Maximum = 30, Value = 5, BackColor = inputBg, ForeColor = inputFg };
-        ry += 35;
-        var lblMr = new Label { Text = "Right Margin:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ry), Size = new Size(140, 25) };
-        numMarginRight = new NumericUpDown { Location = new Point(mid, ry), Size = new Size(60, 25), Minimum = 0, Maximum = 30, Value = 2, BackColor = inputBg, ForeColor = inputFg };
-        pnlReceipt.Controls.AddRange(new Control[] { lblReceiptHeader, lblPrinter, cmbPrinter, lblCo, txtCompanyName, lblAddr, txtAddress, lblMob, txtMobile, lblFt, txtFooter, lblPaper, cmbPaperSize, lblMl, numMarginLeft, lblMr, numMarginRight });
-        pnlScroll.Controls.Add(pnlReceipt);
-        y += 290;
-
-        // ── DATA MANAGEMENT ──
-        if (_currentUser.Role == "Admin")
+        // Helper to create a section
+        Panel MakeSection(string title, int height, Control[] controls)
         {
-            var pnlData = new Panel { Location = new Point(left, y), Size = new Size(600, 195), BackColor = panelBg };
-            pnlData.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlData.Width - 1, pnlData.Height - 1); };
-            var lblDataHeader = new Label { Text = "DATA MANAGEMENT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(15, 10), Size = new Size(200, 20) };
-            btnExportProducts = new Button { Text = "\uD83D\uDCE4 EXPORT PRODUCTS", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(15, 40), Size = new Size(180, 35), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentBlue, ForeColor = Color.White, Cursor = Cursors.Hand };
-            btnExportProducts.Click += btnExportProducts_Click;
-            btnImportAndSync = new Button { Text = "\uD83D\uDCE5 IMPORT & SYNC PROD", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(210, 40), Size = new Size(180, 35), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentRed, ForeColor = Color.White, Cursor = Cursors.Hand };
-            btnImportAndSync.Click += btnImportAndSync_Click;
-            btnBackupDb = new Button { Text = "\uD83D\uDCBE BACKUP DATABASE", Font = new Font("Segoe UI", 8F, FontStyle.Bold), Location = new Point(15, 85), Size = new Size(180, 35), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentGreen, ForeColor = Color.White, Cursor = Cursors.Hand };
-            btnBackupDb.Click += btnBackupDb_Click;
-            btnRestoreDb = new Button { Text = "\uD83D\uDD04 RESTORE DATABASE", Font = new Font("Segoe UI", 8F, FontStyle.Bold), Location = new Point(210, 85), Size = new Size(180, 35), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(243, 156, 18), ForeColor = Color.White, Cursor = Cursors.Hand };
-            btnRestoreDb.Click += btnRestoreDb_Click;
-            btnAuditLog = new Button { Text = "\uD83D\uDCDD AUDIT LOG", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(15, 130), Size = new Size(180, 35), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(155, 89, 182), ForeColor = Color.White, Cursor = Cursors.Hand };
-            btnAuditLog.Click += btnAuditLog_Click;
-            pnlData.Controls.AddRange(new Control[] { lblDataHeader, btnExportProducts, btnImportAndSync, btnBackupDb, btnRestoreDb, btnAuditLog });
-            pnlScroll.Controls.Add(pnlData);
-            y += 205;
-
-            // ── DISPLAY SETUP ──
-            var pnlDisplay = new Panel { Location = new Point(left, y), Size = new Size(600, 210), BackColor = panelBg };
-            pnlDisplay.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlDisplay.Width - 1, pnlDisplay.Height - 1); };
-            var lblDisplayHeader = new Label { Text = "DISPLAY SETUP", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(15, 10), Size = new Size(200, 20) };
-            var lblPos = new Label { Text = "POS Screen:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, 40), Size = new Size(140, 25) };
-            cmbPosScreen = new ComboBox { Location = new Point(mid, 40), Size = new Size(fw, 25), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = inputBg, ForeColor = inputFg, FlatStyle = FlatStyle.Flat };
-            var lblCust = new Label { Text = "Customer Display:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, 75), Size = new Size(140, 25) };
-            cmbCustomerScreen = new ComboBox { Location = new Point(mid, 75), Size = new Size(fw, 25), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = inputBg, ForeColor = inputFg, FlatStyle = FlatStyle.Flat };
-            var lblEmailSched = new Label { Text = "Email Report Hour:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, 110), Size = new Size(140, 25) };
-            numEmailScheduleHour = new NumericUpDown { Location = new Point(mid, 110), Size = new Size(60, 25), Minimum = 0, Maximum = 23, BackColor = inputBg, ForeColor = inputFg };
-            var lblEmailSchedHint = new Label { Text = "(0-23, e.g. 20 = 8PM. Daily auto-email)", Font = new Font("Segoe UI", 8F), ForeColor = dimText, Location = new Point(mid + 70, 113), Size = new Size(260, 20) };
-            chkEnableOnlineOrders = new CheckBox { Text = "Enable Online Ordering", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, 140), Size = new Size(200, 25), FlatStyle = FlatStyle.Flat };
-            chkCustomerDisplay = new CheckBox { Text = "Enable Customer Display", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(220, 140), Size = new Size(200, 25), FlatStyle = FlatStyle.Flat };
-            var lblRestart = new Label { Text = "Screen changes take effect after restart.", Font = new Font("Segoe UI", 8F), ForeColor = dimText, Location = new Point(15, 165), Size = new Size(380, 20) };
-            pnlDisplay.Controls.AddRange(new Control[] { lblDisplayHeader, lblPos, cmbPosScreen, lblCust, cmbCustomerScreen, lblEmailSched, numEmailScheduleHour, lblEmailSchedHint, chkEnableOnlineOrders, chkCustomerDisplay, lblRestart });
-            pnlScroll.Controls.Add(pnlDisplay);
-            y += 220;
-
-            // ── CLOUD SYNC ──
-            var pnlCloud = new Panel { Location = new Point(left, y), Size = new Size(600, 230), BackColor = panelBg };
-            pnlCloud.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlCloud.Width - 1, pnlCloud.Height - 1); };
-            var lblCloudHeader = new Label { Text = "CLOUD SYNC", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(15, 10), Size = new Size(200, 20) };
-            var lblCloudApi = new Label { Text = "API URL:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, 40), Size = new Size(140, 25) };
-            txtCloudApiUrl = new TextBox { Location = new Point(mid, 40), Size = new Size(fw, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = "https://api-production-99fb.up.railway.app/api" };
-            var lblStoreIdLabel = new Label { Text = "Store ID:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, 75), Size = new Size(140, 25) };
-            lblStoreId = new Label { Text = SyncService.StoreId, Font = new Font("Consolas", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 245, 255), Location = new Point(mid, 75), Size = new Size(fw, 25), TextAlign = ContentAlignment.MiddleLeft };
-            var lblStoreNameLabel = new Label { Text = "Store Name:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, 108), Size = new Size(140, 25) };
-            var txtStoreName = new TextBox { Location = new Point(mid, 108), Size = new Size(fw, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = SyncService.StoreName, PlaceholderText = "e.g. Main Branch" };
-            txtStoreName.TextChanged += (_, _) => SyncService.StoreName = txtStoreName.Text;
-            btnSyncAll = new Button { Text = "\u2601 SYNC ALL TO CLOUD", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(0, 245, 255), ForeColor = Color.FromArgb(10, 10, 26), Location = new Point(15, 143), Size = new Size(180, 35), Cursor = Cursors.Hand };
-            btnSyncAll.Click += btnSyncAll_Click;
-            btnSyncToday = new Button { Text = "\u2601 SYNC TODAY", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(46, 204, 113), ForeColor = Color.White, Location = new Point(205, 143), Size = new Size(100, 35), Cursor = Cursors.Hand };
-            btnSyncToday.Click += btnSyncToday_Click;
-            btnSyncLog = new Button { Text = "\uD83D\uDCCB VIEW SYNC LOG", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(72, 126, 176), ForeColor = Color.White, Location = new Point(315, 143), Size = new Size(140, 35), Cursor = Cursors.Hand };
-            btnSyncLog.Click += btnSyncLog_Click;
-            btnSyncFromCloud = new Button { Text = "\u2B06 SYNC FROM CLOUD", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(241, 196, 15), ForeColor = Color.FromArgb(10, 10, 26), Location = new Point(15, 185), Size = new Size(180, 35), Cursor = Cursors.Hand };
-            btnSyncFromCloud.Click += btnSyncFromCloud_Click;
-            btnUpdate = new Button { Text = "\u2B07 UPDATE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(155, 89, 182), ForeColor = Color.White, Location = new Point(205, 185), Size = new Size(100, 35), Cursor = Cursors.Hand };
-            btnUpdate.Click += btnUpdate_Click;
-            var lblVersion = new Label { Text = $"v{AppVersion.Current}", Font = new Font("Segoe UI", 8F), ForeColor = dimText, Location = new Point(310, 195), Size = new Size(60, 20) };
-            pnlCloud.Controls.AddRange(new Control[] { lblCloudHeader, lblCloudApi, txtCloudApiUrl, lblStoreIdLabel, lblStoreId, lblStoreNameLabel, txtStoreName, btnSyncAll, btnSyncToday, btnSyncLog, btnSyncFromCloud, btnUpdate, lblVersion });
-            pnlScroll.Controls.Add(pnlCloud);
-            y += 210;
+            var p = new Panel { Location = new Point(left, y), Size = new Size(pnlW, height), BackColor = panelBg };
+            p.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, p.Width - 1, p.Height - 1); };
+            var lbl = new Label { Text = title, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(15, 10), Size = new Size(400, 22) };
+            p.Controls.Add(lbl);
+            p.Controls.AddRange(controls);
+            _pnlScroll.Controls.Add(p);
+            y += height + gap;
+            return p;
         }
 
-        Controls.AddRange(new Control[] { pnlToolbar, pnlScroll });
+        Button MakeBtn(string text, int x, int y, Color color, EventHandler click)
+        {
+            var b = new Button
+            {
+                Text = text,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                FlatStyle = FlatStyle.Flat,
+                FlatAppearance = { BorderSize = 0 },
+                BackColor = color,
+                ForeColor = Color.White,
+                Location = new Point(x, y),
+                Size = new Size(200, 36),
+                Cursor = Cursors.Hand,
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            b.Click += click;
+            return b;
+        }
 
-        Shown += (_, _) => ResizeLayout(pnlReceipt, pnlScroll);
-        Resize += (_, _) => ResizeLayout(pnlReceipt, pnlScroll);
+        Label MakeDesc(string text, int x, int y)
+        {
+            return new Label { Text = text, Font = new Font("Segoe UI", 8F), ForeColor = dimText, Location = new Point(x, y), Size = new Size(400, 30), Padding = new Padding(0, 4, 0, 0) };
+        }
+
+        // ═══════════════════════════════════════════
+        // 1. RECEIPT SETUP
+        // ═══════════════════════════════════════════
+        var ry = 40;
+        cmbPrinter = new ComboBox { Location = new Point(180, ry), Size = new Size(260, 25), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = inputBg, ForeColor = inputFg, FlatStyle = FlatStyle.Flat };
+        var lblPrinter = new Label { Text = "Receipt Printer:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ry), Size = new Size(140, 25) };
+        ry += 32;
+        txtCompanyName = new TextBox { Location = new Point(180, ry), Size = new Size(260, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F) };
+        var lblCo = new Label { Text = "Company Name:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ry), Size = new Size(140, 25) };
+        ry += 32;
+        txtAddress = new TextBox { Location = new Point(180, ry), Size = new Size(260, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F) };
+        var lblAddr = new Label { Text = "Address:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ry), Size = new Size(140, 25) };
+        ry += 32;
+        txtMobile = new TextBox { Location = new Point(180, ry), Size = new Size(260, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F) };
+        var lblMob = new Label { Text = "Mobile No:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ry), Size = new Size(140, 25) };
+        ry += 32;
+        txtFooter = new TextBox { Location = new Point(180, ry), Size = new Size(260, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = "Thank You! Come Again!" };
+        var lblFt = new Label { Text = "Footer Message:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ry), Size = new Size(140, 25) };
+        ry += 32;
+        cmbPaperSize = new ComboBox { Location = new Point(180, ry), Size = new Size(100, 25), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = inputBg, ForeColor = inputFg, FlatStyle = FlatStyle.Flat };
+        var lblPaper = new Label { Text = "Paper Size:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ry), Size = new Size(140, 25) };
+        numMarginLeft = new NumericUpDown { Location = new Point(380, ry), Size = new Size(60, 25), Minimum = 0, Maximum = 30, Value = 5, BackColor = inputBg, ForeColor = inputFg };
+        var lblMl = new Label { Text = "Left Margin:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(290, ry), Size = new Size(80, 25) };
+        ry += 32;
+        numMarginRight = new NumericUpDown { Location = new Point(180, ry), Size = new Size(60, 25), Minimum = 0, Maximum = 30, Value = 2, BackColor = inputBg, ForeColor = inputFg };
+        var lblMr = new Label { Text = "Right Margin:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ry), Size = new Size(140, 25) };
+        MakeSection("RECEIPT SETUP", 270, new Control[] {
+            lblPrinter, cmbPrinter, lblCo, txtCompanyName, lblAddr, txtAddress,
+            lblMob, txtMobile, lblFt, txtFooter, lblPaper, cmbPaperSize,
+            lblMl, numMarginLeft, lblMr, numMarginRight
+        });
+
+        // ═══════════════════════════════════════════
+        // 2. DISPLAY SETUP
+        // ═══════════════════════════════════════════
+        if (_currentUser.Role == "Admin")
+        {
+            var dy = 40;
+            cmbPosScreen = new ComboBox { Location = new Point(180, dy), Size = new Size(260, 25), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = inputBg, ForeColor = inputFg, FlatStyle = FlatStyle.Flat };
+            var lblPos = new Label { Text = "POS Screen:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, dy), Size = new Size(140, 25) };
+            dy += 32;
+            cmbCustomerScreen = new ComboBox { Location = new Point(180, dy), Size = new Size(260, 25), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = inputBg, ForeColor = inputFg, FlatStyle = FlatStyle.Flat };
+            var lblCust = new Label { Text = "Customer Display:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, dy), Size = new Size(140, 25) };
+            dy += 32;
+            numEmailScheduleHour = new NumericUpDown { Location = new Point(180, dy), Size = new Size(60, 25), Minimum = 0, Maximum = 23, BackColor = inputBg, ForeColor = inputFg };
+            var lblEmailSched = new Label { Text = "Email Report Hour:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, dy), Size = new Size(140, 25) };
+            var lblEmailSchedHint = new Label { Text = "(24hr, e.g. 20 = 8PM - daily auto-email)", Font = new Font("Segoe UI", 8F), ForeColor = dimText, Location = new Point(250, dy + 3), Size = new Size(250, 20) };
+            dy += 32;
+            chkEnableOnlineOrders = new CheckBox { Text = "Enable Online Ordering", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, dy), Size = new Size(200, 25), FlatStyle = FlatStyle.Flat };
+            chkCustomerDisplay = new CheckBox { Text = "Enable Customer Display", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(220, dy), Size = new Size(200, 25), FlatStyle = FlatStyle.Flat };
+            dy += 32;
+            var lblRestart = new Label { Text = "Screen changes take effect after restart.", Font = new Font("Segoe UI", 8F), ForeColor = dimText, Location = new Point(15, dy), Size = new Size(380, 20) };
+            MakeSection("DISPLAY SETUP", 205, new Control[] {
+                lblPos, cmbPosScreen, lblCust, cmbCustomerScreen,
+                lblEmailSched, numEmailScheduleHour, lblEmailSchedHint,
+                chkEnableOnlineOrders, chkCustomerDisplay, lblRestart
+            });
+        }
+
+        // ═══════════════════════════════════════════
+        // 3. CLOUD SYNC
+        // ═══════════════════════════════════════════
+        if (_currentUser.Role == "Admin")
+        {
+            var cy = 40;
+            txtCloudApiUrl = new TextBox { Location = new Point(180, cy), Size = new Size(350, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = "https://api-production-99fb.up.railway.app/api" };
+            var lblCloudApi = new Label { Text = "API URL:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, cy), Size = new Size(140, 25) };
+            cy += 32;
+            lblStoreId = new Label { Text = SyncService.StoreId, Font = new Font("Consolas", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 245, 255), Location = new Point(180, cy), Size = new Size(350, 25), TextAlign = ContentAlignment.MiddleLeft };
+            var lblStoreIdLabel = new Label { Text = "Store ID:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, cy), Size = new Size(140, 25) };
+            cy += 32;
+            var txtStoreName = new TextBox { Location = new Point(180, cy), Size = new Size(350, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = SyncService.StoreName, PlaceholderText = "e.g. Main Branch" };
+            txtStoreName.TextChanged += (_, _) => SyncService.StoreName = txtStoreName.Text;
+            var lblStoreNameLabel = new Label { Text = "Store Name:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, cy), Size = new Size(140, 25) };
+
+            cy = 40;
+            var btnX = 15;
+            var btnW = 210;
+            var btnH = 36;
+            var descX = btnX + btnW + 10;
+
+            btnSyncAll = MakeBtn("\u2601 SYNC ALL TO CLOUD", btnX, cy, Color.FromArgb(0, 195, 255), btnSyncAll_Click);
+            var desc1 = MakeDesc("Upload all data (products, customers, sales, expenses, etc.) to cloud server", descX, cy);
+            cy += 42;
+            btnSyncToday = MakeBtn("\u2601 SYNC TODAY ONLY", btnX, cy, accentGreen, btnSyncToday_Click);
+            var desc2 = MakeDesc("Upload only today's unsynced sales, expenses, voids, and stock trails", descX, cy);
+            cy += 42;
+            btnSyncFromCloud = MakeBtn("\u2B06 SYNC FROM CLOUD", btnX, cy, Color.FromArgb(241, 196, 15), btnSyncFromCloud_Click);
+            btnSyncFromCloud.ForeColor = Color.FromArgb(10, 10, 26);
+            var desc3 = MakeDesc("Download master catalog prices & costs from cloud (stock quantity unchanged)", descX, cy);
+            cy += 42;
+            btnSyncLog = MakeBtn("\uD83D\uDCCB VIEW SYNC LOG", btnX, cy, accentBlue, btnSyncLog_Click);
+            var desc4 = MakeDesc("View history of all sync operations and any errors", descX, cy);
+            cy += 42;
+            btnUpdate = MakeBtn("\u2B07 UPDATE APP", btnX, cy, Color.FromArgb(155, 89, 182), btnUpdate_Click);
+            var desc5 = MakeDesc($"Check GitHub for new version (current: v{AppVersion.Current})", descX, cy);
+
+            MakeSection("CLOUD SYNC", 290, new Control[] {
+                lblCloudApi, txtCloudApiUrl, lblStoreIdLabel, lblStoreId,
+                lblStoreNameLabel, txtStoreName,
+                btnSyncAll, desc1, btnSyncToday, desc2, btnSyncFromCloud, desc3,
+                btnSyncLog, desc4, btnUpdate, desc5
+            });
+        }
+
+        // ═══════════════════════════════════════════
+        // 4. DATA MANAGEMENT
+        // ═══════════════════════════════════════════
+        if (_currentUser.Role == "Admin")
+        {
+            var dy = 40;
+            var btnX = 15;
+            var btnW = 210;
+            var btnH = 36;
+            var descX = btnX + btnW + 10;
+
+            btnExportProducts = MakeBtn("\uD83D\uDCE4 EXPORT PRODUCTS", btnX, dy, accentBlue, btnExportProducts_Click);
+            var d1 = MakeDesc("Save products list to a JSON file for backup or transfer", descX, dy);
+            dy += 42;
+            btnImportAndSync = MakeBtn("\uD83D\uDCE5 IMPORT & SYNC PROD", btnX, dy, accentRed, btnImportAndSync_Click);
+            var d2 = MakeDesc("Update products from JSON file (updates price/cost/category, adds new)", descX, dy);
+            dy += 42;
+            btnBackupDb = MakeBtn("\uD83D\uDCBE BACKUP DATABASE", btnX, dy, accentGreen, btnBackupDb_Click);
+            var d3 = MakeDesc("Create a full backup of the local database", descX, dy);
+            dy += 42;
+            btnRestoreDb = MakeBtn("\uD83D\uDD04 RESTORE DATABASE", btnX, dy, Color.FromArgb(243, 156, 18), btnRestoreDb_Click);
+            var d4 = MakeDesc("Restore database from a backup file (app will restart)", descX, dy);
+            dy += 42;
+            btnAuditLog = MakeBtn("\uD83D\uDCDD AUDIT LOG", btnX, dy, Color.FromArgb(155, 89, 182), btnAuditLog_Click);
+            var d5 = MakeDesc("View history of all setting changes for security tracking", descX, dy);
+
+            MakeSection("DATA MANAGEMENT", 255, new Control[] {
+                btnExportProducts, d1, btnImportAndSync, d2,
+                btnBackupDb, d3, btnRestoreDb, d4, btnAuditLog, d5
+            });
+        }
+
+        Controls.AddRange(new Control[] { pnlToolbar, _pnlScroll });
     }
 
     private async void btnSyncAll_Click(object? sender, EventArgs e)
@@ -575,12 +638,12 @@ public partial class SettingsForm : Form
         {
             MessageBox.Show("You're on the latest version.", "Up to Date", MessageBoxButtons.OK, MessageBoxIcon.Information);
             btnUpdate.Enabled = true;
-            btnUpdate.Text = "\u2B07 UPDATE";
+            btnUpdate.Text = "\u2B07 UPDATE APP";
             return;
         }
 
         var result = MessageBox.Show($"New version {version} available!\n\nChanges: {changes}\n\nDownload and install update?", "Update Available", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-        if (result != DialogResult.Yes) { btnUpdate.Enabled = true; btnUpdate.Text = "\u2B07 UPDATE"; return; }
+        if (result != DialogResult.Yes) { btnUpdate.Enabled = true; btnUpdate.Text = "\u2B07 UPDATE APP"; return; }
 
         btnUpdate.Text = "DOWNLOADING...";
         var progress = new Progress<int>(p => btnUpdate.Text = $"DOWNLOADING {p}%");
@@ -589,21 +652,11 @@ public partial class SettingsForm : Form
         {
             MessageBox.Show("Download failed. Check your connection and try again.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             btnUpdate.Enabled = true;
-            btnUpdate.Text = "\u2B07 UPDATE";
+            btnUpdate.Text = "\u2B07 UPDATE APP";
         }
     }
 
-    private void ResizeLayout(Panel pnlReceipt, Panel pnlScroll)
-    {
-        var margin = 10;
-        var w = pnlScroll.ClientSize.Width - margin * 2;
-        pnlReceipt.Width = w;
-        foreach (Control ctrl in pnlScroll.Controls)
-        {
-            if (ctrl is Panel p && p != pnlReceipt) p.Width = w;
-        }
-    }
-
+    private Button btnSave = new();
     private ComboBox cmbPrinter = null!;
     private TextBox txtCompanyName = new();
     private TextBox txtAddress = new();
@@ -612,22 +665,21 @@ public partial class SettingsForm : Form
     private ComboBox cmbPaperSize = new();
     private NumericUpDown numMarginLeft = new();
     private NumericUpDown numMarginRight = new();
-    private Button btnSave = new();
-    private Button btnExportProducts = new();
-    private Button btnImportAndSync = new();
-    private Button btnBackupDb = new();
-    private Button btnRestoreDb = new();
-    private Button btnAuditLog = new();
-    private ComboBox cmbPosScreen = new();
-    private ComboBox cmbCustomerScreen = new();
+    private ComboBox cmbPosScreen = null!;
+    private ComboBox cmbCustomerScreen = null!;
     private NumericUpDown numEmailScheduleHour = new();
     private CheckBox chkEnableOnlineOrders = new();
     private CheckBox chkCustomerDisplay = new();
     private TextBox txtCloudApiUrl = new();
     private Label lblStoreId = new();
-    private Button btnSyncAll = new();
-    private Button btnSyncToday = new();
-    private Button btnSyncLog = new();
-    private Button btnSyncFromCloud = new();
-    private Button btnUpdate = new();
+    private Button btnSyncAll = null!;
+    private Button btnSyncToday = null!;
+    private Button btnSyncLog = null!;
+    private Button btnSyncFromCloud = null!;
+    private Button btnUpdate = null!;
+    private Button btnExportProducts = null!;
+    private Button btnImportAndSync = null!;
+    private Button btnBackupDb = null!;
+    private Button btnRestoreDb = null!;
+    private Button btnAuditLog = null!;
 }
