@@ -362,7 +362,7 @@ public partial class SettingsForm : Form
             y += 220;
 
             // ── CLOUD SYNC ──
-            var pnlCloud = new Panel { Location = new Point(left, y), Size = new Size(600, 195), BackColor = panelBg };
+            var pnlCloud = new Panel { Location = new Point(left, y), Size = new Size(600, 230), BackColor = panelBg };
             pnlCloud.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlCloud.Width - 1, pnlCloud.Height - 1); };
             var lblCloudHeader = new Label { Text = "CLOUD SYNC", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(15, 10), Size = new Size(200, 20) };
             var lblCloudApi = new Label { Text = "API URL:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, 40), Size = new Size(140, 25) };
@@ -378,10 +378,12 @@ public partial class SettingsForm : Form
             btnSyncToday.Click += btnSyncToday_Click;
             btnSyncLog = new Button { Text = "\uD83D\uDCCB VIEW SYNC LOG", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(72, 126, 176), ForeColor = Color.White, Location = new Point(315, 143), Size = new Size(140, 35), Cursor = Cursors.Hand };
             btnSyncLog.Click += btnSyncLog_Click;
-            btnUpdate = new Button { Text = "\u2B07 UPDATE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(155, 89, 182), ForeColor = Color.White, Location = new Point(460, 143), Size = new Size(100, 35), Cursor = Cursors.Hand };
+            btnSyncFromCloud = new Button { Text = "\u2B06 SYNC FROM CLOUD", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(241, 196, 15), ForeColor = Color.FromArgb(10, 10, 26), Location = new Point(15, 185), Size = new Size(180, 35), Cursor = Cursors.Hand };
+            btnSyncFromCloud.Click += btnSyncFromCloud_Click;
+            btnUpdate = new Button { Text = "\u2B07 UPDATE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(155, 89, 182), ForeColor = Color.White, Location = new Point(205, 185), Size = new Size(100, 35), Cursor = Cursors.Hand };
             btnUpdate.Click += btnUpdate_Click;
-            var lblVersion = new Label { Text = $"v{AppVersion.Current}", Font = new Font("Segoe UI", 8F), ForeColor = dimText, Location = new Point(565, 152), Size = new Size(60, 20) };
-            pnlCloud.Controls.AddRange(new Control[] { lblCloudHeader, lblCloudApi, txtCloudApiUrl, lblStoreIdLabel, lblStoreId, lblStoreNameLabel, txtStoreName, btnSyncAll, btnSyncToday, btnSyncLog, btnUpdate, lblVersion });
+            var lblVersion = new Label { Text = $"v{AppVersion.Current}", Font = new Font("Segoe UI", 8F), ForeColor = dimText, Location = new Point(310, 195), Size = new Size(60, 20) };
+            pnlCloud.Controls.AddRange(new Control[] { lblCloudHeader, lblCloudApi, txtCloudApiUrl, lblStoreIdLabel, lblStoreId, lblStoreNameLabel, txtStoreName, btnSyncAll, btnSyncToday, btnSyncLog, btnSyncFromCloud, btnUpdate, lblVersion });
             pnlScroll.Controls.Add(pnlCloud);
             y += 210;
         }
@@ -551,6 +553,19 @@ public partial class SettingsForm : Form
         form.ShowDialog();
     }
 
+    private async void btnSyncFromCloud_Click(object? sender, EventArgs e)
+    {
+        btnSyncFromCloud.Enabled = false;
+        btnSyncFromCloud.Text = "SYNCING...";
+        var progress = new Progress<string>(m => { if (m.StartsWith("Complete") || m.StartsWith("Error")) btnSyncFromCloud.Text = "\u2B06 SYNC FROM CLOUD"; });
+        var count = await SyncService.DownloadMasterCatalog(progress);
+        if (count > 0)
+            MessageBox.Show($"Synced {count} products from cloud.\nPrice, Cost, and Units updated.\nStock was NOT changed.", "Sync Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        else
+            MessageBox.Show("No updates from cloud.", "Sync Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        btnSyncFromCloud.Enabled = true;
+    }
+
     private async void btnUpdate_Click(object? sender, EventArgs e)
     {
         btnUpdate.Enabled = false;
@@ -613,5 +628,6 @@ public partial class SettingsForm : Form
     private Button btnSyncAll = new();
     private Button btnSyncToday = new();
     private Button btnSyncLog = new();
+    private Button btnSyncFromCloud = new();
     private Button btnUpdate = new();
 }
