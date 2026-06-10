@@ -777,7 +777,13 @@ function renderUnits(units){
   var c=document.getElementById('peUnits');
   if(!c)return;
   if(!units||!units.length){c.innerHTML='<div class="empty-state" style="padding:10px">No units. Add one above.</div>';return}
-  c.innerHTML=units.map(function(u,i){
+  var hdr='<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:0.7em;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">'+
+    '<span style="width:100px">Name</span>'+
+    '<span style="width:80px">Price</span>'+
+    '<span style="width:60px">Qty</span>'+
+    '<span style="width:50px">Default</span>'+
+    '<span style="width:30px"></span></div>';
+  c.innerHTML=hdr+units.map(function(u,i){
     return'<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">'+
       '<input placeholder="Name" style="width:100px;background:var(--hover);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:0.78em" value="'+esc(u.unitName)+'" data-u="name" data-idx="'+i+'">'+
       '<input placeholder="Price" style="width:80px;background:var(--hover);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:0.78em" value="'+u.price+'" data-u="price" data-idx="'+i+'">'+
