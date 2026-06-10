@@ -130,15 +130,12 @@ tr:hover{background:var(--hover)}
 <body>
 
 <div class="sidebar" id="sidebar">
-  <div class="section">Overview</div>
-  <a class="active" data-section="dashboard" onclick="switchSection('dashboard',this)">Dashboard</a>
-  <a data-section="products" onclick="switchSection('products',this)">Products</a>
-  <a data-section="warehouse" onclick="switchSection('warehouse',this)">Warehouse</a>
-  <a data-section="sales" onclick="switchSection('sales',this)">Sales</a>
-  <a data-section="cashiers" onclick="switchSection('cashiers',this)">Cashiers</a>
-  <a data-section="expenses" onclick="switchSection('expenses',this)">Expenses</a>
-  <a data-section="shifts" onclick="switchSection('shifts',this)">Shifts</a>
-  <a data-section="stock" onclick="switchSection('stock',this)">Stock</a>
+  <a class="active" data-section="dashboard" onclick="switchSection('dashboard',this)">&#128202; Dashboard</a>
+  <a data-section="products" onclick="switchSection('products',this)">&#128230; Product List</a>
+  <a data-section="available" onclick="switchSection('available',this)">&#128200; Available Stock</a>
+  <a data-section="warehouse" onclick="switchSection('warehouse',this)">&#128230; Warehouse</a>
+  <a data-section="customers" onclick="switchSection('customers',this)">&#128101; Customers</a>
+  <a data-section="users" onclick="switchSection('users',this)">&#128295; Users & Stores</a>
 </div>
 <div class="main-content" id="mainContent">
 
@@ -318,6 +315,32 @@ tr:hover{background:var(--hover)}
     </div>
     <div class="panel-body">
       <div style="overflow-x:auto"><table><thead><tr><th>ID</th><th>Name</th><th>Barcode</th><th>Category</th><th>Price</th><th>Cost</th><th>Margin</th><th>Units</th><th>Actions</th></tr></thead><tbody id="masterProductsBody"><tr><td colspan="9"><div class="loading-spinner"><div class="spinner"></div></div></td></tr></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-2" style="padding-bottom:16px">
+  </div>
+</div>
+
+<div class="grid grid-2" style="padding-bottom:16px">
+  <div class="panel full-width" id="panelCustomers">
+    <div class="panel-header" onclick="togglePanel('panelCustomers')">
+      <h3><span class="collapse-icon">&#9660;</span> CUSTOMERS</h3>
+    </div>
+    <div class="panel-body">
+      <div style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Loyalty</th><th>Credit Balance</th><th>Store</th></tr></thead><tbody id="customersBody"><tr><td colspan="6"><div class="loading-spinner"><div class="spinner"></div></div></td></tr></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-2" style="padding-bottom:16px">
+  <div class="panel full-width" id="panelUsers">
+    <div class="panel-header" onclick="togglePanel('panelUsers')">
+      <h3><span class="collapse-icon">&#9660;</span> USERS & STORES</h3>
+    </div>
+    <div class="panel-body">
+      <div style="overflow-x:auto"><table><thead><tr><th>Username</th><th>Full Name</th><th>Role</th><th>Active</th><th>Store ID</th></tr></thead><tbody id="usersBody"><tr><td colspan="5"><div class="loading-spinner"><div class="spinner"></div></div></td></tr></tbody></table></div>
     </div>
   </div>
 </div>
@@ -848,10 +871,12 @@ function switchSection(section,el){
   document.querySelectorAll('.sidebar a').forEach(function(x){x.classList.remove('active')});
   el.classList.add('active');
   document.getElementById('sidebar').classList.remove('open');
-  var hide = ['panelTrends','panelPeakHours','panelSaleProfits','panelRecentSales','panelTopProducts','panelCashiers','panelExpenses','panelShiftHistory','panelReceiving','panelStock','panelProducts','panelWarehouse'];
-  var show = {'dashboard':['panelTrends','panelPeakHours','panelSaleProfits','panelRecentSales','panelTopProducts','panelCashiers','panelExpenses','panelShiftHistory','panelReceiving','panelStock'],'products':['panelProducts'],'warehouse':['panelWarehouse'],'sales':['panelRecentSales','panelSaleProfits','panelTopProducts'],'cashiers':['panelCashiers'],'expenses':['panelExpenses'],'shifts':['panelShiftHistory'],'stock':['panelReceiving','panelStock']};
+  var hide = ['summaryCards','profitCards','panelTrends','panelPeakHours','panelSaleProfits','panelRecentSales','panelTopProducts','panelCashiers','panelExpenses','panelShiftHistory','panelReceiving','panelStock','panelProducts','panelWarehouse','panelCustomers','panelUsers'];
+  var show = {'dashboard':['summaryCards','profitCards','panelTrends','panelPeakHours','panelSaleProfits','panelRecentSales','panelTopProducts','panelCashiers','panelExpenses','panelShiftHistory','panelReceiving','panelStock'],'products':['panelProducts'],'available':['panelStock','panelReceiving'],'warehouse':['panelWarehouse'],'customers':['panelCustomers'],'users':['panelUsers']};
   hide.forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='none'});
   if(show[section])show[section].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display=''});
+  if(section==='customers')loadCustomers();
+  if(section==='users')loadUsers();
 }
 window.onload=function(){switchSection('dashboard',document.querySelector('.sidebar a.active'))};
 
@@ -865,6 +890,8 @@ function whEdit(id){var p=_whData.find(function(x){return x.id===id});if(!p)retu
 function whViewOrder(id){fetchJSON(API+'/warehouse/orders/'+id).then(function(items){var ov=document.getElementById('whModal'),bd=document.getElementById('whModalBody'),tl=document.getElementById('whModalTitle');tl.textContent='Order #'+id;if(!items||!items.length){bd.innerHTML='<div class="empty-state">No items</div>';ov.classList.add('show');return}bd.innerHTML='<table><thead><tr><th>Product</th><th>Unit</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>'+items.map(function(x){return'<tr><td>'+x.productName+'</td><td>'+x.unitType+'</td><td>'+x.qty+'</td><td>&#8369;'+fmt(x.price)+'</td><td>&#8369;'+fmt(x.totalPrice)+'</td></tr>'}).join('')+'</tbody></table><div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-sm btn-outline" onclick="document.getElementById(\'whModal\').classList.remove(\'show\')">CLOSE</button></div>';ov.classList.add('show')})}
 async function whSave(id){if(_whTab==='products'){var data={name:document.getElementById('wfn').value,barcode:document.getElementById('wfb').value,category:document.getElementById('wfc').value,boxPrice:parseFloat(document.getElementById('wfbp').value)||0,boxCost:parseFloat(document.getElementById('wfbc').value)||0,boxQty:parseInt(document.getElementById('wfbq').value)||1,piecePrice:parseFloat(document.getElementById('wfpp').value)||0};try{if(id){await fetch(API+'/warehouse/products/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})}else{var r=await fetch(API+'/warehouse/products',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});var j=await r.json();id=j.id}if(document.getElementById('wfst')){var st=parseInt(document.getElementById('wfst').value)||0;await fetch(API+'/warehouse/products/'+id+'/stock',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({stockQty:st})})}toast('Product saved','success');document.getElementById('whModal').classList.remove('show');whLoadProducts()}catch(e){toast('Error: '+e.message,'error')}}else if(_whTab==='clients'){var data={name:document.getElementById('wfn').value,contact:document.getElementById('wfb').value,address:document.getElementById('wfc').value,storeType:document.getElementById('wfct').value||'pos'};try{await fetch(API+'/warehouse/clients',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});toast('Client saved','success');document.getElementById('whModal').classList.remove('show');whLoadClients()}catch(e){toast('Error: '+e.message,'error')}}}
 document.getElementById('whAddBtn').onclick=whAddNew;
+async function loadCustomers(){try{var d=await fetchJSON(API+'/customers?'+storeParam());if(!d.length){document.getElementById('customersBody').innerHTML='<tr><td colspan="6" class="empty-state">No customers</td></tr>';return}document.getElementById('customersBody').innerHTML=d.map(function(x){return'<tr><td>'+esc(x.name)+'</td><td>'+(x.phone||'')+'</td><td>'+(x.email||'')+'</td><td>'+x.loyaltyPoints+'</td><td class="red">&#8369;'+fmt(x.creditBalance)+'</td><td><span class="store-badge">'+shortStore(x.storeId,_storeMap[x.storeId])+'</span></td></tr>'}).join('')}catch(e){document.getElementById('customersBody').innerHTML='<tr><td colspan="6">Failed</td></tr>'}}
+async function loadUsers(){try{var d=await fetchJSON(API+'/users?'+storeParam());if(!d.length){document.getElementById('usersBody').innerHTML='<tr><td colspan="5" class="empty-state">No users</td></tr>';return}document.getElementById('usersBody').innerHTML=d.map(function(x){return'<tr><td>'+esc(x.username)+'</td><td>'+(x.fullName||'')+'</td><td>'+x.role+'</td><td>'+(x.isActive?'<span class="green">Active</span>':'<span class="red">Inactive</span>')+'</td><td><span class="store-badge">'+shortStore(x.storeId,_storeMap[x.storeId])+'</span></td></tr>'}).join('')}catch(e){document.getElementById('usersBody').innerHTML='<tr><td colspan="5">Failed</td></tr>'}}
 </script>
 </body>
 </html>

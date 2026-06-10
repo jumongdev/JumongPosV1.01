@@ -174,6 +174,34 @@ public class DashboardController : ControllerBase
             return Ok(data);
         }
 
+        [HttpGet("customers")]
+        public IActionResult GetCustomers([FromQuery] string? storeId = null)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $@"SELECT c.pos_id, c.name, c.phone, c.email, c.loyalty_points, c.credit_balance, c.credit_limit, c.is_active, c.created_at, c.store_id
+                FROM customers c WHERE 1=1 {StoreFilter(storeId, "c")} ORDER BY c.name LIMIT 500";
+            if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
+            var data = new List<object>();
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) data.Add(new { posId = r.GetInt32(0), name = r.GetString(1), phone = r.IsDBNull(2) ? "" : r.GetString(2), email = r.IsDBNull(3) ? "" : r.GetString(3), loyaltyPoints = r.GetInt32(4), creditBalance = r.GetDecimal(5), creditLimit = r.GetDecimal(6), isActive = r.GetBoolean(7), storeId = r.GetString(9) });
+            return Ok(data);
+        }
+
+        [HttpGet("users")]
+        public IActionResult GetUsers([FromQuery] string? storeId = null)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $@"SELECT u.pos_id, u.username, u.role, u.full_name, u.is_active, u.store_id
+                FROM users u WHERE 1=1 {StoreFilter(storeId, "u")} ORDER BY u.username LIMIT 200";
+            if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
+            var data = new List<object>();
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) data.Add(new { posId = r.GetInt32(0), username = r.GetString(1), role = r.GetString(2), fullName = r.IsDBNull(3) ? "" : r.GetString(3), isActive = r.GetBoolean(4), storeId = r.GetString(5) });
+            return Ok(data);
+        }
+
         [HttpGet("expenses-summary")]
         public IActionResult GetExpensesSummary([FromQuery] string? storeId = null, [FromQuery] string? range = null)
         {
