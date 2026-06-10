@@ -71,6 +71,19 @@ git push origin master
 
 Backend: `GET /api/dashboard/products/master/download` returns all master products with units.
 
+## Unified Product Management (v1.0.21)
+
+**Products page** now has local creation/editing **removed** for all users:
+- All product management done via **cloud master catalog**
+- Local app only: **VIEW STOCK MOV'T**, **DOWNLOAD MASTER**, **CHECK COST**
+- Unit cost auto-calculated as `baseCost × QtyPerUnit`
+- Cost field removed from unit form (just enter Name, Price, Qty)
+
+Flow:
+1. Admin manages products in cloud (master_products)
+2. Stores click **DOWNLOAD MASTER** (Products) or **SYNC FROM CLOUD** (Settings)
+3. Prices, costs, categories, and units synced — stock unchanged
+
 ## Common Tasks
 
 ### Run SQL query on cloud DB
