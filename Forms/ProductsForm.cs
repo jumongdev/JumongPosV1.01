@@ -677,17 +677,15 @@ public partial class ProductsForm : Form
 
         pnlRight.Controls.AddRange(new Control[] { lblFormTitle, btnStockMovement, btnNew, btnEdit, btnUnits, btnSave, btnCancel, btnDelete, btnPrintChecklist });
 
-        // Restrict product editing to Admin only
-        if (_currentUser?.Role != "Admin")
-        {
-            btnNew.Visible = false;
-            btnEdit.Visible = false;
-            btnUnits.Visible = false;
-            btnSave.Visible = false;
-            btnCancel.Visible = false;
-            btnDelete.Visible = false;
-            btnStockMovement.Text = "\uD83D\uDCC8 VIEW STOCK MOV'T";
-        }
+        // Product creation/editing only via cloud master catalog
+        btnNew.Visible = false;
+        btnEdit.Visible = false;
+        btnUnits.Visible = false;
+        btnSave.Visible = false;
+        btnCancel.Visible = false;
+        btnDelete.Visible = false;
+        btnPrintChecklist.Visible = false;
+        btnStockMovement.Text = "\uD83D\uDCC8 VIEW STOCK MOV'T";
 
         pnlMain.Controls.AddRange(new Control[] { pnlLeft, pnlRight });
         Controls.Clear();
