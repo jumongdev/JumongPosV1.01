@@ -294,7 +294,10 @@ public static class SyncService
                 Description = expense.Description,
                 ReferenceNo = (string?)expense.ReferenceNo,
                 CashierUsername = expense.CashierUsername,
-                Timestamp = DateTime.TryParse(expense.Timestamp, out var et) ? et.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss") : expense.Timestamp,
+                var offset = TimeZoneInfo.Local.BaseUtcOffset;
+                Timestamp = expense.Timestamp.Length > 19
+                    ? expense.Timestamp
+                    : expense.Timestamp + " " + (offset.Hours >= 0 ? "+" : "") + offset.ToString("hh\\:mm"),
                 ReceiptImage = expense.ReceiptImage
             }
         };
