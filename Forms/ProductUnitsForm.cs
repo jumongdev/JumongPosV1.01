@@ -28,8 +28,7 @@ public partial class ProductUnitsForm : Form
         dgvUnits.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Id", HeaderText = "ID", Width = 40 });
         dgvUnits.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "UnitName", HeaderText = "Unit", Width = 100 });
         dgvUnits.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Price", HeaderText = "Price", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2" } });
-        dgvUnits.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Cost", HeaderText = "Cost", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2" } });
-        dgvUnits.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "QtyPerUnit", HeaderText = "Qty/Unit", Width = 80 });
+        dgvUnits.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "QtyPerUnit", HeaderText = "Qty", Width = 60 });
         dgvUnits.Columns.Add(new DataGridViewCheckBoxColumn { DataPropertyName = "IsDefault", HeaderText = "Default", Width = 65 });
         dgvUnits.DataSource = list;
         dgvUnits.RowHeadersVisible = false;
@@ -118,6 +117,7 @@ public partial class ProductUnitsForm : Form
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
+        ControlBox = false;
         BackColor = canvasBg;
 
         lblTitle = new Label
