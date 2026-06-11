@@ -128,7 +128,7 @@ public partial class StockReceivingForm : Form
 
     private void ShowTrail()
     {
-        using var form = new Form { Text = "Stock Receiving History", Size = new Size(950, 500), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = Color.FromArgb(10, 10, 26) };
+        using var form = new Form { Text = "Stock Receiving History", Size = new Size(1050, 550), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = Color.FromArgb(10, 10, 26) };
         var pnlToolbar = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = Color.FromArgb(20, 20, 40) };
         var searchBox = new TextBox { Location = new Point(15, 12), Size = new Size(150, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = Color.FromArgb(30, 30, 55), ForeColor = Color.FromArgb(230, 230, 245) };
         var dtpDate = new DateTimePicker { Location = new Point(175, 12), Size = new Size(130, 25), Format = DateTimePickerFormat.Short, Value = DateTime.Today };
@@ -137,7 +137,17 @@ public partial class StockReceivingForm : Form
         var lblTitle = new Label { Text = "\uD83D\uDCE6 RECEIVING HISTORY", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 245, 255), Location = new Point(490, 12), Size = new Size(300, 28) };
         pnlToolbar.Controls.AddRange(new Control[] { searchBox, dtpDate, btnFilter, btnPrint, lblTitle });
 
-        var dgv = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = Color.FromArgb(20, 20, 40), BorderStyle = BorderStyle.None, GridColor = Color.FromArgb(40, 40, 70), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = Color.FromArgb(0, 245, 255), Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = Color.FromArgb(230, 230, 245), SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) } };
+        var dgv = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = Color.FromArgb(20, 20, 40), BorderStyle = BorderStyle.None, GridColor = Color.FromArgb(40, 40, 70), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = Color.FromArgb(0, 245, 255), Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 32, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = Color.FromArgb(230, 230, 245), SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White }, RowTemplate = { Height = 30 }, AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) } };
+
+        dgv.AutoGenerateColumns = false;
+        dgv.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "DATE/TIME", DataPropertyName = "CreatedAt", Width = 150 });
+        dgv.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "PRODUCT NAME", DataPropertyName = "ProductName", Width = 180, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
+        dgv.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "BARCODE", DataPropertyName = "Barcode", Width = 110 });
+        dgv.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "BEFORE", DataPropertyName = "StockBefore", Width = 70, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter } });
+        dgv.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "QTY", DataPropertyName = "QuantityAdded", Width = 70, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, Font = new Font("Segoe UI", 9F, FontStyle.Bold) } });
+        dgv.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "AFTER", DataPropertyName = "StockAfter", Width = 70, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter } });
+        dgv.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "REFERENCE", DataPropertyName = "Reference", Width = 150 });
+        dgv.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "CASHIER", DataPropertyName = "UserName", Width = 100 });
 
         List<StockTrail>? _trailData = null;
 
@@ -152,8 +162,7 @@ public partial class StockReceivingForm : Form
             else
                 data = StockService.GetTrailByDateRange(from, to);
             _trailData = data;
-            dgv.DataSource = _trailData.Select(t => new { t.CreatedAt, t.ProductName, t.Barcode, t.StockBefore, t.QuantityAdded, t.StockAfter, t.Reference, t.UserName }).ToList();
-            if (dgv.Columns["ProductName"] != null) { dgv.Columns["ProductName"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; }
+            dgv.DataSource = data;
         }
 
         btnFilter.Click += (_, _) => LoadTrail();
@@ -169,8 +178,7 @@ public partial class StockReceivingForm : Form
                 MessageBox.Show("No data to print.", "Print", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         };
-        form.Controls.AddRange(new Control[] { dgv, pnlToolbar });
-        form.Controls.SetChildIndex(pnlToolbar, 0);
+        form.Controls.AddRange(new Control[] { pnlToolbar, dgv });
         LoadTrail();
         form.ShowDialog();
     }
