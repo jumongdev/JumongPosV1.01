@@ -115,6 +115,8 @@ public static class SyncService
 
     public static async Task SyncCustomer(Customer customer)
     {
+        var offset = TimeZoneInfo.Local.BaseUtcOffset;
+        var ts = customer.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss") + " " + (offset.Hours >= 0 ? "+" : "") + offset.ToString("hh\\:mm");
         var data = new[]
         {
             new {
@@ -127,7 +129,7 @@ public static class SyncService
                 CreditBalance = customer.CreditBalance,
                 CreditLimit = customer.CreditLimit,
                 Address = customer.Address,
-                CreatedAt = customer.CreatedAt.ToString("o"),
+                CreatedAt = ts,
                 ModifiedBy = customer.ModifiedBy
             }
         };
@@ -260,11 +262,13 @@ public static class SyncService
 
     public static async Task SyncDailyClose(DailyClose dc)
     {
+        var offset = TimeZoneInfo.Local.BaseUtcOffset;
+        var cd = dc.CloseDate.Length > 19 ? dc.CloseDate : dc.CloseDate + " " + (offset.Hours >= 0 ? "+" : "") + offset.ToString("hh\\:mm");
         var data = new[]
         {
             new {
                 PosId = dc.Id,
-                CloseDate = dc.CloseDate,
+                CloseDate = cd,
                 TotalSales = dc.TotalSales,
                 TotalCash = dc.TotalCash,
                 TotalEwallet = dc.TotalEWallet,
