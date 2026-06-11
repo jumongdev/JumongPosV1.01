@@ -355,9 +355,9 @@ public static class SyncService
     private static string ToUtcString(string? localTime)
     {
         if (string.IsNullOrEmpty(localTime)) return "";
-        if (DateTime.TryParse(localTime, out var dt))
-            return dt.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss");
-        return localTime;
+        if (localTime.Length > 19) return localTime;
+        var offset = TimeZoneInfo.Local.BaseUtcOffset;
+        return localTime + " " + (offset.Hours >= 0 ? "+" : "") + offset.ToString("hh\\:mm");
     }
 
     private static void LogSync(string endpoint, string status, string error)
