@@ -852,7 +852,8 @@ function esc(s){return(s+'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace
 
 async function saveMasterProduct(id){
   var name=document.getElementById('peName').value;if(!name){toast('Name required','error');return}
-  var imageData=_pendingImageData||(p&&p.imageData?p.imageData:'');
+  var imgEl=document.querySelector('#peImagePreview img');
+  var imageData=imgEl?imgEl.src:'';
   var data={name:name,barcode:document.getElementById('peBarcode').value,category:document.getElementById('peCategory').value,price:parseFloat(document.getElementById('pePrice').value)||0,cost:parseFloat(document.getElementById('peCost').value)||0,imageData:imageData,units:collectUnits()};
   var api=API+'/products/master';
   try{
