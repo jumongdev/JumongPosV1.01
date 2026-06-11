@@ -314,7 +314,7 @@ tr:hover{background:var(--hover)}
       </div>
     </div>
     <div class="panel-body">
-      <div style="overflow-x:auto"><table><thead><tr><th>ID</th><th>Name</th><th>Barcode</th><th>Category</th><th>Price</th><th>Cost</th><th>Margin</th><th>Units</th><th>Actions</th></tr></thead><tbody id="masterProductsBody"><tr><td colspan="9"><div class="loading-spinner"><div class="spinner"></div></div></td></tr></tbody></table></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>ID</th><th>Image</th><th>Name</th><th>Barcode</th><th>Category</th><th>Price</th><th>Cost</th><th>Margin</th><th>Units</th><th>Actions</th></tr></thead><tbody id="masterProductsBody"><tr><td colspan="10"><div class="loading-spinner"><div class="spinner"></div></div></td></tr></tbody></table></div>
     </div>
   </div>
 </div>
@@ -739,15 +739,15 @@ async function loadMasterProducts(){
   try{
     setLoading('masterProductsBody');
     _masterProducts=await fetchJSON(API+'/products/master/download');
-    if(!_masterProducts.length){setEmpty('masterProductsBody','No master products',9);return}
+    if(!_masterProducts.length){setEmpty('masterProductsBody','No master products',10);return}
     document.getElementById('masterProductsBody').innerHTML=_masterProducts.map(function(x,i){
       var margin=x.price>0?((x.price-x.cost)/x.price*100).toFixed(1):'0.0';
       var mc=margin>20?'green':margin>0?'orange':'red';
       var uc=x.units&&x.units.length||0;
-      var img=x.imageData?'<img src="'+x.imageData+'" style="width:36px;height:36px;object-fit:cover;border-radius:4px;vertical-align:middle">':'';
-      return'<tr data-row><td>'+x.id+'</td><td>'+img+' '+x.name+'</td><td>'+(x.barcode||'')+'</td><td>'+(x.category||'')+'</td><td>&#8369;'+fmt(x.price)+'</td><td class="red">&#8369;'+fmt(x.cost)+'</td><td class="'+mc+'">'+margin+'%</td><td>'+uc+'</td><td><button class="btn btn-sm btn-outline" onclick="showProductEditor('+x.id+')">EDIT</button> <button class="btn btn-sm btn-outline btn-danger" onclick="deleteMasterProduct('+x.id+')">DEL</button></td></tr>';
+      var img=x.imageData?'<img src="'+x.imageData+'" style="width:36px;height:36px;object-fit:cover;border-radius:4px;vertical-align:middle" title="Has Image">':'';
+      return'<tr data-row><td>'+x.id+'</td><td style="text-align:center">'+img+'</td><td>'+x.name+'</td><td>'+(x.barcode||'')+'</td><td>'+(x.category||'')+'</td><td>&#8369;'+fmt(x.price)+'</td><td class="red">&#8369;'+fmt(x.cost)+'</td><td class="'+mc+'">'+margin+'%</td><td>'+uc+'</td><td><button class="btn btn-sm btn-outline" onclick="showProductEditor('+x.id+')">EDIT</button> <button class="btn btn-sm btn-outline btn-danger" onclick="deleteMasterProduct('+x.id+')">DEL</button></td></tr>';
     }).join('');
-  }catch(e){setEmpty('masterProductsBody','Failed to load products',9)}
+  }catch(e){setEmpty('masterProductsBody','Failed to load products',10)}
 }
 
 function showProductEditor(id){
