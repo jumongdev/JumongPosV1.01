@@ -756,7 +756,7 @@ function showProductEditor(id){
   var html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'+
     '<div><label style="color:var(--muted);font-size:0.75em">NAME</label><input id="peName" class="panel-search" style="width:100%;margin:0" value="'+(p?esc(p.name):'')+'"></div>'+
     '<div><label style="color:var(--muted);font-size:0.75em">BARCODE</label><input id="peBarcode" class="panel-search" style="width:100%;margin:0" value="'+(p?esc(p.barcode||''):'')+'"></div>'+
-    '<div><label style="color:var(--muted);font-size:0.75em">CATEGORY</label><input id="peCategory" class="panel-search" style="width:100%;margin:0" value="'+(p?esc(p.category||''):'')+'"></div>'+
+    '<div><label style="color:var(--muted);font-size:0.75em">CATEGORY</label><select id="peCategory" class="panel-search" style="width:100%;margin:0;background:var(--hover);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:0.82em"><option value="">— Select —</option></select></div>'+
     '<div><label style="color:var(--muted);font-size:0.75em">PRICE</label><input id="pePrice" class="panel-search" style="width:100%;margin:0" value="'+(p?p.price:'')+'"></div>'+
     '<div><label style="color:var(--muted);font-size:0.75em">COST</label><input id="peCost" class="panel-search" style="width:100%;margin:0" value="'+(p?p.cost:'')+'"></div>'+
   '</div>'+
@@ -771,6 +771,16 @@ function showProductEditor(id){
   bd.innerHTML=html;
   ov.classList.add('show');
   renderUnits(p&&p.units?p.units:null);
+  fetchJSON(API+'/products/categories').then(function(cats){
+    var sel=document.getElementById('peCategory');
+    if(!sel)return;
+    cats.forEach(function(c){
+      var opt=document.createElement('option');
+      opt.value=c;opt.textContent=c;
+      if(p&&p.category===c)opt.selected=true;
+      sel.appendChild(opt);
+    });
+  }).catch(function(){});
 }
 
 function renderUnits(units){

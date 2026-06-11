@@ -694,6 +694,18 @@ public class DashboardController : ControllerBase
             return Ok(units);
         }
 
+        [HttpGet("products/categories")]
+        public IActionResult GetCategories()
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT DISTINCT category FROM master_products WHERE category IS NOT NULL AND category != '' ORDER BY category";
+            var list = new List<string>();
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) list.Add(r.GetString(0));
+            return Ok(list);
+        }
+
         [HttpGet("products/master/download")]
         public IActionResult DownloadMasterCatalog()
         {
