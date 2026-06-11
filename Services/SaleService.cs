@@ -102,8 +102,8 @@ public class SaleService
                 updCmd.ExecuteNonQuery();
 
                 using var trail = new SQLiteCommand(
-                    "INSERT INTO StockTrail (ProductId, ProductName, Barcode, QuantityAdded, StockBefore, StockAfter, Reference, UserId, InvoiceNo, CustomerName) " +
-                    "VALUES (@pid, @pn, @bc, @qa, @sb, @sa, @ref, @uid, @inv, @cust)", conn);
+                    "INSERT INTO StockTrail (ProductId, ProductName, Barcode, QuantityAdded, StockBefore, StockAfter, Reference, UserId, UserName, InvoiceNo, CustomerName) " +
+                    "VALUES (@pid, @pn, @bc, @qa, @sb, @sa, @ref, @uid, @un, @inv, @cust)", conn);
                 trail.Parameters.AddWithValue("@pid", item.ProductId);
                 trail.Parameters.AddWithValue("@pn", item.ProductName);
                 trail.Parameters.AddWithValue("@bc", item.Barcode ?? "");
@@ -112,6 +112,7 @@ public class SaleService
                 trail.Parameters.AddWithValue("@sa", stockAfter);
                 trail.Parameters.AddWithValue("@ref", sale.InvoiceNo);
                 trail.Parameters.AddWithValue("@uid", sale.UserId ?? 0);
+                trail.Parameters.AddWithValue("@un", sale.CashierName);
                 trail.Parameters.AddWithValue("@inv", sale.InvoiceNo);
                 trail.Parameters.AddWithValue("@cust", sale.CustomerName ?? "Walk-in");
                 trail.ExecuteNonQuery();
@@ -360,8 +361,8 @@ public class SaleService
                 log.ExecuteNonQuery();
 
                 using var trail = new SQLiteCommand(
-                    "INSERT INTO StockTrail (ProductId, ProductName, Barcode, QuantityAdded, StockBefore, StockAfter, Reference, UserId, InvoiceNo, CustomerName) " +
-                    "VALUES (@pid, @pn, @bc, @qa, @sb, @sa, @ref, @uid, @inv, @cust)", conn);
+                    "INSERT INTO StockTrail (ProductId, ProductName, Barcode, QuantityAdded, StockBefore, StockAfter, Reference, UserId, UserName, InvoiceNo, CustomerName) " +
+                    "VALUES (@pid, @pn, @bc, @qa, @sb, @sa, @ref, @uid, @un, @inv, @cust)", conn);
                 trail.Parameters.AddWithValue("@pid", item.ProductId);
                 trail.Parameters.AddWithValue("@pn", item.ProductName);
                 trail.Parameters.AddWithValue("@bc", item.Barcode ?? "");
@@ -370,6 +371,7 @@ public class SaleService
                 trail.Parameters.AddWithValue("@sa", stockBefore + deductQty);
                 trail.Parameters.AddWithValue("@ref", $"{sale.InvoiceNo} - void ({reason})");
                 trail.Parameters.AddWithValue("@uid", sale.UserId ?? 0);
+                trail.Parameters.AddWithValue("@un", voidedByUserName);
                 trail.Parameters.AddWithValue("@inv", sale.InvoiceNo);
                 trail.Parameters.AddWithValue("@cust", "");
                 trail.ExecuteNonQuery();
@@ -473,8 +475,8 @@ public class SaleService
             restock.ExecuteNonQuery();
 
             using var trail = new SQLiteCommand(
-                "INSERT INTO StockTrail (ProductId, ProductName, Barcode, QuantityAdded, StockBefore, StockAfter, Reference, UserId, InvoiceNo, CustomerName) " +
-                "VALUES (@pid, @pn, @bc, @qa, @sb, @sa, @ref, @uid, @inv, @cust)", conn);
+                "INSERT INTO StockTrail (ProductId, ProductName, Barcode, QuantityAdded, StockBefore, StockAfter, Reference, UserId, UserName, InvoiceNo, CustomerName) " +
+                "VALUES (@pid, @pn, @bc, @qa, @sb, @sa, @ref, @uid, @un, @inv, @cust)", conn);
             trail.Parameters.AddWithValue("@pid", productId);
             trail.Parameters.AddWithValue("@pn", productName);
             trail.Parameters.AddWithValue("@bc", barcode);
@@ -483,6 +485,7 @@ public class SaleService
             trail.Parameters.AddWithValue("@sa", stockBefore + restockQty);
             trail.Parameters.AddWithValue("@ref", $"{invoiceNo} - void ({reason})");
             trail.Parameters.AddWithValue("@uid", userId);
+            trail.Parameters.AddWithValue("@un", voidedByUserName);
             trail.Parameters.AddWithValue("@inv", invoiceNo);
             trail.Parameters.AddWithValue("@cust", "");
             trail.ExecuteNonQuery();
