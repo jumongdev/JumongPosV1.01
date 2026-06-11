@@ -456,7 +456,7 @@ public partial class SettingsForm : Form
         Controls.AddRange(new Control[] { pnlToolbar, _pnlScroll });
     }
 
-    private static void ShowSyncProgress(string title, Func<IProgress<string>, Task<int>> work)
+    private static void ShowSyncProgress(string title, Func<IProgress<string>, int> work)
     {
         var form = new Form
         {
@@ -491,12 +491,9 @@ public partial class SettingsForm : Form
         form.Show();
     }
 
-    private async void btnSyncAll_Click(object? sender, EventArgs e)
+    private void btnSyncAll_Click(object? sender, EventArgs e)
     {
-        btnSyncAll.Enabled = false;
-        btnSyncToday.Enabled = false;
-        btnSyncAll.Text = "SYNCING...";
-        try
+        ShowSyncProgress("Syncing All To Cloud...", p =>
         {
             var products = ProductService.GetAll();
             var customers = CustomerService.GetAll();
@@ -507,95 +504,45 @@ public partial class SettingsForm : Form
             var stockTrails = StockService.GetTrail(limit: 10000);
             var creditTxns = CreditService.GetAll();
             var sales = SaleService.GetSales();
-
-            var total = 0;
-            var saleCount = 0;
-            foreach (var p in products)
-            { await SyncService.SyncProduct(p); await Task.Delay(20); total++; }
-            foreach (var c in customers)
-            { await SyncService.SyncCustomer(c); await Task.Delay(20); total++; }
-            foreach (var u in users)
-            { await SyncService.SyncUser(u); await Task.Delay(20); total++; }
-            foreach (var exp in expenses)
-            { await SyncService.SyncExpense(exp); await Task.Delay(20); total++; }
-            foreach (var v in voids)
-            { await SyncService.SyncVoidLog(v); await Task.Delay(20); total++; }
-            foreach (var d in dailyCloses)
-            { await SyncService.SyncDailyClose(d); await Task.Delay(20); total++; }
-            foreach (var t in stockTrails)
-            { await SyncService.SyncStockTrail(t); await Task.Delay(20); total++; }
-            foreach (var ctxn in creditTxns)
-            { await SyncService.SyncCreditTransaction(ctxn); await Task.Delay(20); total++; }
-            foreach (var s in sales)
-            {
-                var items = SaleService.GetSaleItems(s.Id);
-                await SyncService.SyncSale(s, items);
-                await Task.Delay(50);
-                saleCount++;
-                total += 1 + items.Count;
-            }
-
-            MessageBox.Show($"Synced: {total} records\n- {products.Count} products\n- {customers.Count} customers\n- {users.Count} users\n- {expenses.Count} expenses\n- {voids.Count} voids\n- {dailyCloses.Count} shifts\n- {stockTrails.Count} stock trails\n- {creditTxns.Count} credit transactions\n- {sales.Count} sales (+ items)", "Sync Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Sync failed: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-        finally
-        {
-            btnSyncAll.Enabled = true;
-            btnSyncToday.Enabled = true;
-            btnSyncAll.Text = "\u2601 SYNC ALL TO CLOUD";
-        }
+            var total = products.Count + customers.Count + users.Count + expenses.Count + voids.Count + dailyCloses.Count + stockTrails.Count + creditTxns.Count + sales.Count;
+            var done = 0;
+            foreach (var x in products) { p.Report($"Products: {++done}/{total}"); SyncService.SyncProduct(x).Wait(); Thread.Sleep(20); }
+            foreach (var x in customers) { p.Report($"Customers: {++done}/{total}"); SyncService.SyncCustomer(x).Wait(); Thread.Sleep(20); }
+            foreach (var x in users) { p.Report($"Users: {++done}/{total}"); SyncService.SyncUser(x).Wait(); Thread.Sleep(20); }
+            foreach (var x in expenses) { p.Report($"Expenses: {++done}/{total}"); SyncService.SyncExpense(x).Wait(); Thread.Sleep(20); }
+            foreach (var x in voids) { p.Report($"Voids: {++done}/{total}"); SyncService.SyncVoidLog(x).Wait(); Thread.Sleep(20); }
+            foreach (var x in dailyCloses) { p.Report($"Shifts: {++done}/{total}"); SyncService.SyncDailyClose(x).Wait(); Thread.Sleep(20); }
+            foreach (var x in stockTrails) { p.Report($"Stock: {++done}/{total}"); SyncService.SyncStockTrail(x).Wait(); Thread.Sleep(20); }
+            foreach (var x in creditTxns) { p.Report($"Credit: {++done}/{total}"); SyncService.SyncCreditTransaction(x).Wait(); Thread.Sleep(20); }
+            foreach (var s in sales) { p.Report($"Sales: {++done}/{total} (+ items)"); var items = SaleService.GetSaleItems(s.Id); SyncService.SyncSale(s, items).Wait(); Thread.Sleep(50); done += items.Count; }
+            return total;
+        });
     }
 
-    private async void btnSyncToday_Click(object? sender, EventArgs e)
+    private void btnSyncToday_Click(object? sender, EventArgs e)
     {
-        btnSyncAll.Enabled = false;
-        btnSyncToday.Enabled = false;
-        btnSyncToday.Text = "SYNCING...";
-        try
+        ShowSyncProgress("Syncing Today...", p =>
         {
             var today = DateTime.Now.ToString("yyyy-MM-dd");
             var todayStart = today + " 00:00:00";
             var todayEnd = today + " 23:59:59";
-
             var sales = SaleService.GetSales(from: DateTime.Parse(todayStart), to: DateTime.Parse(todayEnd));
             var unsyncedSales = new List<Sale>();
-            foreach (var s in sales)
-            {
-                s.Items = SaleService.GetSaleItems(s.Id);
-                if (!s.Synced) unsyncedSales.Add(s);
-            }
+            foreach (var s in sales) { s.Items = SaleService.GetSaleItems(s.Id); if (!s.Synced) unsyncedSales.Add(s); }
             var expenses = ExpenseService.GetExpensesBetween(todayStart, DateTime.Parse(todayEnd));
             var voids = SaleService.GetVoidLogs().Where(v => v.CreatedAt?.StartsWith(today) == true).ToList();
             var stockTrails = StockService.GetTrail(limit: 10000).Where(t => t.CreatedAt?.StartsWith(today) == true).ToList();
             var creditTxns = CreditService.GetAll().Where(ct => ct.CreatedAt?.StartsWith(today) == true).ToList();
-
-            var total = 0;
-            foreach (var s in unsyncedSales)
-            { await SyncService.SyncSale(s, s.Items); total++; }
-            foreach (var exp in expenses)
-            { await SyncService.SyncExpense(exp); total++; }
-            foreach (var v in voids)
-            { await SyncService.SyncVoidLog(v); total++; }
-            foreach (var t in stockTrails)
-            { await SyncService.SyncStockTrail(t); total++; }
-            foreach (var ctxn in creditTxns)
-            { await SyncService.SyncCreditTransaction(ctxn); total++; }
-
-            MessageBox.Show($"Synced today: {total} records\n- {unsyncedSales.Count} unsynced sales (of {sales.Count} total)\n- {expenses.Count} expenses\n- {voids.Count} voids\n- {stockTrails.Count} stock trails\n- {creditTxns.Count} credit transactions", "Sync Today Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Sync failed: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-        finally
-        {
-            btnSyncAll.Enabled = true;
-            btnSyncToday.Enabled = true;
-            btnSyncToday.Text = "\u2601 SYNC TODAY";
-        }
+            var total = unsyncedSales.Count + expenses.Count + voids.Count + stockTrails.Count + creditTxns.Count;
+            var done = 0;
+            if (total == 0) { p.Report("Nothing to sync today."); Thread.Sleep(1500); return 0; }
+            foreach (var x in unsyncedSales) { p.Report($"Sales: {++done}/{total}"); SyncService.SyncSale(x, x.Items).Wait(); }
+            foreach (var x in expenses) { p.Report($"Expenses: {++done}/{total}"); SyncService.SyncExpense(x).Wait(); }
+            foreach (var x in voids) { p.Report($"Voids: {++done}/{total}"); SyncService.SyncVoidLog(x).Wait(); }
+            foreach (var x in stockTrails) { p.Report($"Stock: {++done}/{total}"); SyncService.SyncStockTrail(x).Wait(); }
+            foreach (var x in creditTxns) { p.Report($"Credit: {++done}/{total}"); SyncService.SyncCreditTransaction(x).Wait(); }
+            return total;
+        });
     }
 
     private void btnSyncLog_Click(object? sender, EventArgs e)
