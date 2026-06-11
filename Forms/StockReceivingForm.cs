@@ -128,7 +128,7 @@ public partial class StockReceivingForm : Form
 
     private void ShowTrail()
     {
-        using var form = new Form { Text = "Stock Receiving History", Size = new Size(1050, 550), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = Color.FromArgb(10, 10, 26) };
+        using var form = new Form { Text = "Stock Receiving History", WindowState = FormWindowState.Maximized, StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = Color.FromArgb(10, 10, 26) };
         var pnlToolbar = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = Color.FromArgb(20, 20, 40) };
         var searchBox = new TextBox { Location = new Point(15, 12), Size = new Size(150, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = Color.FromArgb(30, 30, 55), ForeColor = Color.FromArgb(230, 230, 245) };
         var dtpDate = new DateTimePicker { Location = new Point(175, 12), Size = new Size(130, 25), Format = DateTimePickerFormat.Short, Value = DateTime.Today };
