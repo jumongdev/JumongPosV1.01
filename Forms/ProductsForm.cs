@@ -728,7 +728,7 @@ public partial class ProductsForm : Form
         var margin = 10;
         var availH = ClientSize.Height - 50 - 35 - margin * 4;
         var availW = ClientSize.Width - margin * 3;
-        var leftW = (int)(availW * 0.64);
+        var leftW = (int)(availW * 0.78);
         var rightW = availW - leftW;
 
         pnlLeft.Location = new Point(margin, margin);
