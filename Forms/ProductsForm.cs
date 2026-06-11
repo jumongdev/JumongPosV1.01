@@ -265,14 +265,7 @@ public partial class ProductsForm : Form
         txtCost.BackColor = inputBg;
         txtStock.BackColor = Color.FromArgb(20, 20, 35);
 
-        btnEdit.Visible = readOnly && _selected != null;
-        btnUnits.Visible = readOnly && _selected != null;
-        btnStockMovement.Visible = readOnly && _selected != null;
-        btnCancel.Visible = !readOnly;
-        btnSave.Visible = !readOnly;
-        btnDelete.Visible = !readOnly && _selected != null;
-        btnNew.Visible = readOnly;
-        btnPrintChecklist.Visible = readOnly;
+        btnStockMovement.Visible = true;
     }
 
     private void dgvProducts_SelectionChanged(object? sender, EventArgs e)
