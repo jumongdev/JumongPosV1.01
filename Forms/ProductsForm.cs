@@ -568,17 +568,34 @@ public partial class ProductsForm : Form
         btnCheckCost.Click += btnCheckCost_Click;
 
         var btnDownload = new Button { Text = "DOWNLOAD MASTER", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Location = new Point(940, 12), Size = new Size(150, 28), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(72, 126, 176), ForeColor = Color.White, Cursor = Cursors.Hand };
-        btnDownload.Click += async (_, _) =>
+        btnDownload.Click += (_, _) =>
         {
-            btnDownload.Enabled = false;
-            btnDownload.Text = "DOWNLOADING...";
-            var progress = new Progress<string>(msg => btnDownload.Text = msg.Length < 25 ? msg : "DOWNLOADING...");
-            var count = await SyncService.DownloadMasterCatalog(progress);
-            MessageBox.Show($"Downloaded {count} products from master catalog.", "Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            btnDownload.Enabled = true;
-            btnDownload.Text = "DOWNLOAD MASTER";
-            LoadProducts();
-            UpdateStats();
+            var form = new Form
+            {
+                Text = "Downloading Master...",
+                Size = new Size(380, 110),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                ControlBox = false,
+                TopMost = true,
+                BackColor = Color.FromArgb(20, 20, 40)
+            };
+            var lbl = new Label { Text = "Downloading...", Location = new Point(15, 50), Size = new Size(350, 22), ForeColor = Color.FromArgb(0, 245, 255) };
+            form.Controls.Add(new Label { Text = "Preparing...", Location = new Point(15, 15), Size = new Size(350, 28), ForeColor = Color.FromArgb(230, 230, 245) });
+            form.Controls.Add(lbl);
+            form.Load += async (_, __) =>
+            {
+                var p = new Progress<string>(m => { try { form.Invoke(() => lbl.Text = m); } catch { } });
+                var count = await SyncService.DownloadMasterCatalog(p);
+                try { form.Invoke(() => { lbl.Text = "Complete! " + count + " items."; }); } catch { }
+                await Task.Delay(1500);
+                try { form.Close(); } catch { }
+                _suppressSearch = true;
+                LoadProducts();
+                UpdateStats();
+                _suppressSearch = false;
+            };
+            form.Show();
         };
 
         pnlToolbar.Controls.AddRange(new Control[] { lblPageTitle, lblSearchIcon, txtSearch, lblCatFilter, cmbFilterCategory, btnCheckCost, btnDownload });
