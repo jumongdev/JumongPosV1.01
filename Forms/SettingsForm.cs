@@ -456,6 +456,41 @@ public partial class SettingsForm : Form
         Controls.AddRange(new Control[] { pnlToolbar, _pnlScroll });
     }
 
+    private static void ShowSyncProgress(string title, Func<IProgress<string>, Task<int>> work)
+    {
+        var form = new Form
+        {
+            Text = title,
+            Size = new Size(380, 110),
+            StartPosition = FormStartPosition.CenterScreen,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            ControlBox = false,
+            ShowInTaskbar = false,
+            TopMost = true,
+            BackColor = Color.FromArgb(20, 20, 40),
+            ForeColor = Color.FromArgb(230, 230, 245)
+        };
+        var bar = new ProgressBar { Location = new Point(15, 15), Size = new Size(350, 28), Style = ProgressBarStyle.Continuous, ForeColor = Color.FromArgb(46, 204, 113) };
+        var lbl = new Label { Text = "Preparing...", Location = new Point(15, 50), Size = new Size(350, 22), ForeColor = Color.FromArgb(0, 245, 255) };
+        form.Controls.AddRange(new Control[] { bar, lbl });
+        form.Load += async (_, _) =>
+        {
+            var progress = new Progress<string>(m =>
+            {
+                try { form.Invoke(() => { lbl.Text = m; }); } catch { }
+            });
+            try
+            {
+                var count = await Task.Run(() => work(progress));
+                try { form.Invoke(() => { lbl.Text = "Complete! " + count + " items. Closing..."; }); } catch { }
+            }
+            catch (Exception ex) { try { form.Invoke(() => { lbl.Text = "Error: " + ex.Message; }); } catch { } }
+            await Task.Delay(1500);
+            try { form.Close(); } catch { }
+        };
+        form.Show();
+    }
+
     private async void btnSyncAll_Click(object? sender, EventArgs e)
     {
         btnSyncAll.Enabled = false;
