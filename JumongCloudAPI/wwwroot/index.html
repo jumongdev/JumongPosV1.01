@@ -770,6 +770,7 @@ function showProductEditor(id){
     '<button class="btn btn-sm btn-outline" onclick="document.getElementById(\'productEditor\').classList.remove(\'show\')">CANCEL</button>'+
     '<button class="btn btn-sm" onclick="saveMasterProduct('+(p?id:'')+')">SAVE</button>'+
   '</div>';
+  _pendingImageData='';
   bd.innerHTML=html;
   ov.classList.add('show');
   renderUnits(p&&p.units?p.units:null);
@@ -835,12 +836,14 @@ function collectUnits(){
   return units;
 }
 
+var _pendingImageData='';
 function previewProductImage(e){
   var file=e.target.files[0];if(!file)return;
   var reader=new FileReader();
   reader.onload=function(ev){
     var prev=document.getElementById('peImagePreview');
     if(prev)prev.innerHTML='<img src="'+ev.target.result+'" style="max-height:80px;max-width:100%;border-radius:4px">';
+    _pendingImageData=ev.target.result;
   };
   reader.readAsDataURL(file);
 }
@@ -849,14 +852,14 @@ function esc(s){return(s+'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace
 
 async function saveMasterProduct(id){
   var name=document.getElementById('peName').value;if(!name){toast('Name required','error');return}
-  var fileInput=document.getElementById('peImage');
-  var imageData=fileInput&&fileInput.files&&fileInput.files[0]?'':(p&&p.imageData?p.imageData:'');
+  var imageData=_pendingImageData||(p&&p.imageData?p.imageData:'');
   var data={name:name,barcode:document.getElementById('peBarcode').value,category:document.getElementById('peCategory').value,price:parseFloat(document.getElementById('pePrice').value)||0,cost:parseFloat(document.getElementById('peCost').value)||0,imageData:imageData,units:collectUnits()};
   var api=API+'/products/master';
   try{
     var r,j;
     if(id){r=await fetch(api+'/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});j=await r.json();if(!r.ok)throw new Error(j.error||'Failed');toast('Product updated','success')}
     else{r=await fetch(api,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});j=await r.json();if(!r.ok)throw new Error(j.error||'Failed');toast('Product created','success')}
+    _pendingImageData='';
     document.getElementById('productEditor').classList.remove('show');
     loadMasterProducts();
   }catch(e){toast('Save failed: '+e.message,'error')}
