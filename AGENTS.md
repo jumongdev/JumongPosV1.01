@@ -26,16 +26,17 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 │   ├── ExpenseService.cs       # Expense CRUD
 │   ├── DataExporter.cs         # Import/Export JSON
 │   ├── MigrationService.cs     # Old DB migration tool
-│   ├── AppVersion.cs           # Current = "1.0.21"
+│   ├── AppVersion.cs           # Current = "1.0.24"
 │   └── ... (PrinterService, EmailService, etc.)
 ├── Forms/
 │   ├── MainForm.cs             # Sidebar navigation (POS, Products, Reports, Settings...)
 │   ├── SalesForm.cs            # Point-of-sale cart UI
 │   ├── ProductsForm.cs         # Product list + detail panel (now view-only)
 │   ├── ProductUnitsForm.cs     # Unit manager (Name, Price, Qty only — Cost auto)
-│   ├── SettingsForm.cs         # Organized sections with descriptions
+│   ├── SettingsForm.cs         # Organized sections with descriptions + progress popup
 │   ├── ReportsForm.cs          # Sales reports
-│   ├── StockMovementForm.cs    # Stock trail viewer
+│   ├── StockMovementForm.cs    # Stock trail viewer (with TYPE column)
+│   ├── StockReceivingForm.cs   # Stock receiving + history (maximized)
 │   └── ... (PaymentForm, EndShiftForm, CustomersForm, etc.)
 ├── JumongCloudAPI/             # ASP.NET Core Web API
 │   ├── Program.cs              # Entry point, CORS, DB init
@@ -50,7 +51,10 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 └── publish/
     ├── v1.0.19/  (exe)
     ├── v1.0.20/  (exe)
-    └── v1.0.21/  (exe) — current
+    ├── v1.0.21/  (exe)
+    ├── v1.0.22/  (exe)
+    ├── v1.0.23/  (exe)
+    └── v1.0.24/  (exe) — current
 ```
 
 ## Tech Stack
@@ -84,7 +88,7 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 ### Profit/Margin Fix (v1.0.18 → v1.0.19)
 | File | Change |
 |---|---|
-| `Forms/SalesForm.cs:456` | Sets `UnitCost = unit?.Cost ?? product.Cost` when adding item to cart |
+| `Forms/SalesForm.cs:456` | Sets `UnitCost = product.Cost * qtyPerUnit` when adding item to cart |
 | `JumongCloudAPI/DashboardController.cs` | 3 queries (`sale-profits`, `profit-summary`, debug) now use `COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)` as fallback when unit_cost = 0 |
 | `JumongCloudAPI/Data/PgDatabaseHelper.cs` | Migration: `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS unit_cost` |
 | PostgreSQL data | Backfilled 36,002 historic sale_items with product costs |
@@ -96,52 +100,72 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 | `Forms/SettingsForm.cs` | Added **SYNC FROM CLOUD** button with description label |
 | `JumongCloudAPI/DashboardController.cs` | `GET /products/master/download` endpoint returns all master_products with units as JSON |
 
-### Expense Timezone Fix (v1.0.19 → v1.0.20)
-| File | Change |
-|---|---|
-| `Services/SyncService.cs:286-302` | `SyncExpense()` now sends local time with `+08:00` offset instead of converting to UTC (was: `et.ToUniversalTime()`, now: `expense.Timestamp + " +08:00"`) |
-
 ### Settings Page Redesign (v1.0.20)
 | File | Change |
 |---|---|
 | `Forms/SettingsForm.cs` | Complete rewrite: organized into 4 sections (RECEIPT SETUP, DISPLAY SETUP, CLOUD SYNC, DATA MANAGEMENT), each button has a gray description text explaining its purpose, fixed scrolling/overlapping |
 
+### Timezone Consistency Fix (v1.0.21 → v1.0.22)
+| File | Change |
+|---|---|
+| `Services/SyncService.cs` | **`ToUtcString()`** renamed behavior: appends local offset `+08:00` instead of converting to UTC. Affects: StockTrail, VoidLog, CreditTransaction, DailyClose |
+| `Services/SyncService.cs` | **`SyncExpense()`**: sends local time with `+08:00` offset (removed `.ToUniversalTime()`) |
+| `Services/SyncService.cs` | **`SyncCustomer()`**: sends `CreatedAt` with `+08:00` offset (was missing timezone) |
+| `Services/SyncService.cs` | **`SyncDailyClose()`**: `CloseDate` now sent with `+08:00` offset |
+| PostgreSQL data | Backfilled 21,590 historical records (stock_trails, void_logs, credit_txns, expenses) to Philippine time (+8 hours) |
+
 ### Unified Product Management (v1.0.21)
 | File | Change |
 |---|---|
-| `Forms/ProductsForm.cs` | **New/Edit/Units/Delete/Save/Cancel buttons hidden for ALL users** — product creation only via cloud master catalog. Added SYNC TO CLOUD button (later removed). Only VIEW STOCK MOV'T, DOWNLOAD MASTER, CHECK COST remain. |
+| `Forms/ProductsForm.cs` | **New/Edit/Units/Delete/Save/Cancel buttons hidden for ALL users** — product creation only via cloud master catalog. Only VIEW STOCK MOV'T, DOWNLOAD MASTER, CHECK COST remain. Grid widened to 78%, name column auto-fills. |
 | `Forms/ProductUnitsForm.cs` | **Cost field removed** from input form and DataGridView. Cost auto-calculated as `baseCost × QtyPerUnit`. **ControlBox = false** (cannot close via X button, only Close button). Column headers added. |
-| `Forms/SalesForm.cs:456` | `UnitCost` changed from `unit?.Cost ?? product.Cost` to `product.Cost * qtyPerUnit` (consistent with auto-calc approach) |
+| `Forms/SalesForm.cs:456` | `UnitCost` changed from `unit?.Cost ?? product.Cost` to `product.Cost * qtyPerUnit` |
 | `JumongCloudAPI/wwwroot/index.html` | Cloud dashboard unit form: **Cost input removed**, auto-calculates as `baseCost × QtyPerUnit` in `collectUnits()`. Column headers (Name, Price, Qty, Default) added. |
+
+### Progress Popups & Stock Movement Improvements (v1.0.23 → v1.0.24)
+| File | Change |
+|---|---|
+| `Forms/SettingsForm.cs` | Added `ShowSyncProgress()` — non-modal progress popup. Wired to ALL sync buttons (SYNC ALL, SYNC TODAY, SYNC FROM CLOUD). |
+| `Forms/ProductsForm.cs` | DOWNLOAD MASTER now shows progress popup |
+| `Forms/StockMovementForm.cs` | TYPE column now shows meaningful values: **Stock Receiving**, **Sale**, **Void/Return**, **Adjustment** |
+| `Forms/SaleService.cs` | All StockTrail INSERTs now include **UserName** (cashier name) for sales and voids |
+| `Forms/StockReceivingForm.cs` | Stock Receiving History opens **maximized**, proper column headers with names, dock order fixed |
 
 ### Master Catalog Updates
 | Action | Detail |
 |---|---|
-| Added 3 missing products | DEL MONTE TOMATO SAUCE, POTATO CRISPS BACON & CHEESE, SAN MIG LIGHT 330ML — copied from HQ store to master_products |
+| Added 3 missing products | DEL MONTE TOMATO SAUCE, POTATO CRISPS BACON & CHEESE, SAN MIG LIGHT 330ML |
 | Added default 'pc' units | For the 3 new master products |
-| Master count | Now **621** products (matching HQ) |
+| Synced prices/costs | Master updated to match HQ store (5 products adjusted) |
+| Master count | **621** products (matching HQ) |
 
-## Current App Behavior by Role
+## Current App Behavior
 
 ### Products Page
 | Feature | Any User |
 |---|---|
-| View product list | ✅ |
-| View product details (right panel) | ✅ (read-only) |
+| View product list | ✅ (78% width, name auto-fills) |
+| View product details (right panel) | ✅ (read-only, 22% width) |
 | CHECK COST | ✅ |
-| VIEW STOCK MOV'T | ✅ |
-| DOWNLOAD MASTER | ✅ |
-| + NEW / EDIT / UNITS | ❌ hidden for ALL |
-| DELETE / SAVE / CANCEL | ❌ hidden for ALL |
+| VIEW STOCK MOV'T | ✅ (TYPE column: Sale/Receiving/Void/Adjustment) |
+| DOWNLOAD MASTER | ✅ (with progress popup) |
+| + NEW / EDIT / UNITS / DELETE / SAVE / CANCEL | ❌ hidden for ALL |
 
 ### Settings Page
-| Button | Description |
+| Button | Description | Progress |
+|---|---|---|
+| SYNC ALL TO CLOUD | Upload all data (products, sales, expenses, etc.) | ✅ Non-modal popup |
+| SYNC TODAY ONLY | Upload today's unsynced data | ✅ Non-modal popup |
+| SYNC FROM CLOUD | Download master catalog (stock unchanged) | ✅ Non-modal popup |
+| VIEW SYNC LOG | History of sync operations | — |
+| UPDATE APP | Check GitHub for new version | — |
+
+### Stock Movement / Receiving
+| Feature | Detail |
 |---|---|
-| SYNC ALL TO CLOUD | Upload all data (products, sales, expenses, etc.) to cloud |
-| SYNC TODAY ONLY | Upload today's unsynced data |
-| SYNC FROM CLOUD | Download master catalog prices & costs (stock unchanged) |
-| VIEW SYNC LOG | History of sync operations |
-| UPDATE APP | Check GitHub for new version |
+| Stock Movement TYPE | Sale, Stock Receiving, Void/Return, Adjustment |
+| Cashier recorded | ✅ UserName now saved for sales and voids |
+| Receiving History | Opens maximized, column headers, docked properly |
 
 ## Build & Deploy
 
@@ -178,5 +202,6 @@ Use a temp .NET project with Npgsql. Add machine IP to firewall first:
 2. **Unit Cost = baseCost × QtyPerUnit** — auto-calculated, no manual entry
 3. **Product management only via cloud master catalog** — local creation/editing disabled
 4. **SYNC FROM CLOUD** updates Price/Cost/Category/Units but NEVER changes StockQty
-5. **Expense timestamps** send local time with `+08:00` offset (Philippines timezone)
+5. **All timestamps** send local time with `+08:00` offset (Philippines timezone) — never convert to UTC
 6. **Profit queries** in cloud API fallback to `p.cost` when `sale_items.unit_cost = 0`
+7. **Sync progress** shown via non-modal popup — user can continue working while syncing
