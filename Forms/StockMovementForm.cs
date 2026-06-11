@@ -127,8 +127,12 @@ public partial class StockMovementForm : Form
                 }
                 if (e.ColumnIndex == _dgv.Columns["TYPE"]?.Index)
                 {
-                    e.Value = st.QuantityAdded >= 0 ? "Stock Receiving" : (string.IsNullOrWhiteSpace(st.CustomerName) ? "Walk-in" : st.CustomerName);
-                    e.CellStyle!.ForeColor = string.IsNullOrWhiteSpace(st.CustomerName) ? dimText : Color.FromArgb(243, 156, 18);
+                    if (st.QuantityAdded > 0)
+                        e.Value = st.Reference.StartsWith("Adjustment") ? "Adjustment" : "Stock Receiving";
+                    else
+                        e.Value = !string.IsNullOrEmpty(st.InvoiceNo) ? "Sale" :
+                                  st.Reference.Contains("void", StringComparison.OrdinalIgnoreCase) ? "Void/Return" :
+                                  !string.IsNullOrWhiteSpace(st.CustomerName) ? st.CustomerName : "Walk-in";
                 }
             }
         };
