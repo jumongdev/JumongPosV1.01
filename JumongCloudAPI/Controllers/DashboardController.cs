@@ -653,7 +653,7 @@ public class DashboardController : ControllerBase
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                SELECT id, name, barcode, category, price, cost, stock_qty, is_active
+                SELECT id, name, barcode, category, price, cost, stock_qty, image_data, is_active
                 FROM master_products WHERE is_active = true ORDER BY name";
             using var reader = cmd.ExecuteReader();
             var products = new List<object>();
@@ -665,7 +665,8 @@ public class DashboardController : ControllerBase
                     category = reader.IsDBNull(3) ? "" : reader.GetString(3),
                     price = reader.GetDecimal(4),
                     cost = reader.GetDecimal(5),
-                    stockQty = reader.GetInt32(6)
+                    stockQty = reader.GetInt32(6),
+                    imageData = reader.IsDBNull(7) ? "" : reader.GetString(7)
                 });
             return Ok(products);
         }
@@ -712,7 +713,7 @@ public class DashboardController : ControllerBase
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                SELECT mp.id, mp.name, mp.barcode, mp.category, mp.price, mp.cost, mp.stock_qty,
+                SELECT mp.id, mp.name, mp.barcode, mp.category, mp.price, mp.cost, mp.stock_qty, mp.image_data,
                        COALESCE(json_agg(
                            json_build_object('unitName', mpu.unit_name, 'price', mpu.price, 'cost', mpu.cost, 'qtyPerUnit', mpu.qty_per_unit, 'isDefault', mpu.is_default)
                            ORDER BY mpu.is_default DESC, mpu.unit_name
@@ -732,7 +733,8 @@ public class DashboardController : ControllerBase
                     price = reader.GetDecimal(4),
                     cost = reader.GetDecimal(5),
                     stockQty = reader.GetInt32(6),
-                    units = reader.IsDBNull(7) ? null : System.Text.Json.JsonSerializer.Deserialize<object>(reader.GetString(7))
+                    imageData = reader.IsDBNull(7) ? "" : reader.GetString(7),
+                    units = reader.IsDBNull(8) ? null : System.Text.Json.JsonSerializer.Deserialize<object>(reader.GetString(8))
                 });
             return Ok(products);
         }
@@ -747,14 +749,15 @@ public class DashboardController : ControllerBase
                 foreach (var p in products)
                 {
                     using var cmd = new NpgsqlCommand(@"
-                        INSERT INTO master_products (name, barcode, category, price, cost, stock_qty)
-                        VALUES (@name, @barcode, @cat, @price, @cost, @qty) RETURNING id", conn, tx);
+                        INSERT INTO master_products (name, barcode, category, price, cost, stock_qty, image_data)
+                        VALUES (@name, @barcode, @cat, @price, @cost, @qty, @img) RETURNING id", conn, tx);
                     cmd.Parameters.AddWithValue("name", p.Name);
                     cmd.Parameters.AddWithValue("barcode", (object?)p.Barcode ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("cat", p.Category ?? "");
                     cmd.Parameters.AddWithValue("price", p.Price);
                     cmd.Parameters.AddWithValue("cost", p.Cost);
                     cmd.Parameters.AddWithValue("qty", p.StockQty);
+                    cmd.Parameters.AddWithValue("img", p.ImageData ?? "");
                     var productId = Convert.ToInt32(cmd.ExecuteScalar());
 
                     if (p.Units != null)
@@ -792,13 +795,14 @@ public class DashboardController : ControllerBase
             try
             {
                 using var cmd = new NpgsqlCommand(@"
-                    INSERT INTO master_products (name, barcode, category, price, cost, stock_qty)
-                    VALUES (@n, @b, @c, @p, @co, 0) RETURNING id", conn, tx);
+                    INSERT INTO master_products (name, barcode, category, price, cost, stock_qty, image_data)
+                    VALUES (@n, @b, @c, @p, @co, 0, @img) RETURNING id", conn, tx);
                 cmd.Parameters.AddWithValue("n", p.Name);
                 cmd.Parameters.AddWithValue("b", (object?)p.Barcode ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("c", p.Category ?? "");
                 cmd.Parameters.AddWithValue("p", p.Price);
                 cmd.Parameters.AddWithValue("co", p.Cost);
+                cmd.Parameters.AddWithValue("img", p.ImageData ?? "");
                 var id = Convert.ToInt32(cmd.ExecuteScalar());
 
                 if (p.Units != null)
@@ -831,13 +835,14 @@ public class DashboardController : ControllerBase
             try
             {
                 using var cmd = new NpgsqlCommand(@"
-                    UPDATE master_products SET name=@n, barcode=@b, category=@c, price=@p, cost=@co
+                    UPDATE master_products SET name=@n, barcode=@b, category=@c, price=@p, cost=@co, image_data=@img
                     WHERE id=@id", conn, tx);
                 cmd.Parameters.AddWithValue("n", p.Name);
                 cmd.Parameters.AddWithValue("b", (object?)p.Barcode ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("c", p.Category ?? "");
                 cmd.Parameters.AddWithValue("p", p.Price);
                 cmd.Parameters.AddWithValue("co", p.Cost);
+                cmd.Parameters.AddWithValue("img", p.ImageData ?? "");
                 cmd.Parameters.AddWithValue("id", id);
                 cmd.ExecuteNonQuery();
 
@@ -1042,6 +1047,7 @@ public class DashboardController : ControllerBase
         public decimal Price { get; set; }
         public decimal Cost { get; set; }
         public int StockQty { get; set; }
+        public string? ImageData { get; set; }
         public List<SeedProductUnitDto>? Units { get; set; }
     }
 

@@ -253,6 +253,11 @@ public static class PgDatabaseHelper
         ucMig.CommandText = "ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS unit_cost NUMERIC NOT NULL DEFAULT 0";
         try { ucMig.ExecuteNonQuery(); } catch { }
 
+        // Migration: add image_data to master_products
+        using var imgMig = conn.CreateCommand();
+        imgMig.CommandText = "ALTER TABLE master_products ADD COLUMN IF NOT EXISTS image_data TEXT DEFAULT ''";
+        try { imgMig.ExecuteNonQuery(); } catch { }
+
         // Recreate unique constraints with store_id
         using var dropCmd = conn.CreateCommand();
         dropCmd.CommandText = @"

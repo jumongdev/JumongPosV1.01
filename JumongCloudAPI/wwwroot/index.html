@@ -744,7 +744,8 @@ async function loadMasterProducts(){
       var margin=x.price>0?((x.price-x.cost)/x.price*100).toFixed(1):'0.0';
       var mc=margin>20?'green':margin>0?'orange':'red';
       var uc=x.units&&x.units.length||0;
-      return'<tr data-row><td>'+x.id+'</td><td>'+x.name+'</td><td>'+(x.barcode||'')+'</td><td>'+(x.category||'')+'</td><td>&#8369;'+fmt(x.price)+'</td><td class="red">&#8369;'+fmt(x.cost)+'</td><td class="'+mc+'">'+margin+'%</td><td>'+uc+'</td><td><button class="btn btn-sm btn-outline" onclick="showProductEditor('+x.id+')">EDIT</button> <button class="btn btn-sm btn-outline btn-danger" onclick="deleteMasterProduct('+x.id+')">DEL</button></td></tr>';
+      var img=x.imageData?'<img src="'+x.imageData+'" style="width:36px;height:36px;object-fit:cover;border-radius:4px;vertical-align:middle">':'';
+      return'<tr data-row><td>'+x.id+'</td><td>'+img+' '+x.name+'</td><td>'+(x.barcode||'')+'</td><td>'+(x.category||'')+'</td><td>&#8369;'+fmt(x.price)+'</td><td class="red">&#8369;'+fmt(x.cost)+'</td><td class="'+mc+'">'+margin+'%</td><td>'+uc+'</td><td><button class="btn btn-sm btn-outline" onclick="showProductEditor('+x.id+')">EDIT</button> <button class="btn btn-sm btn-outline btn-danger" onclick="deleteMasterProduct('+x.id+')">DEL</button></td></tr>';
     }).join('');
   }catch(e){setEmpty('masterProductsBody','Failed to load products',9)}
 }
@@ -759,6 +760,7 @@ function showProductEditor(id){
     '<div><label style="color:var(--muted);font-size:0.75em">CATEGORY</label><select id="peCategory" class="panel-search" style="width:100%;margin:0;background:var(--hover);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:0.82em"><option value="">— Select —</option></select></div>'+
     '<div><label style="color:var(--muted);font-size:0.75em">PRICE</label><input id="pePrice" class="panel-search" style="width:100%;margin:0" value="'+(p?p.price:'')+'"></div>'+
     '<div><label style="color:var(--muted);font-size:0.75em">COST</label><input id="peCost" class="panel-search" style="width:100%;margin:0" value="'+(p?p.cost:'')+'"></div>'+
+    '<div><label style="color:var(--muted);font-size:0.75em">IMAGE</label><input type="file" id="peImage" accept="image/*" style="width:100%;margin:0;background:var(--hover);border:1px solid var(--border);color:var(--text);padding:3px;border-radius:4px;font-size:0.82em" onchange="previewProductImage(event)"><div id="peImagePreview" style="margin-top:4px;max-height:80px;overflow:hidden">'+(p&&p.imageData?'<img src="'+p.imageData+'" style="max-height:80px;max-width:100%;border-radius:4px">':'')+'</div></div>'+
   '</div>'+
   '<div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:10px">'+
     '<h4 style="color:var(--accent);font-size:0.8em;margin-bottom:8px">UNITS <button class="btn btn-sm btn-outline" onclick="addUnitRow()">+ ADD UNIT</button></h4>'+
@@ -833,11 +835,23 @@ function collectUnits(){
   return units;
 }
 
+function previewProductImage(e){
+  var file=e.target.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    var prev=document.getElementById('peImagePreview');
+    if(prev)prev.innerHTML='<img src="'+ev.target.result+'" style="max-height:80px;max-width:100%;border-radius:4px">';
+  };
+  reader.readAsDataURL(file);
+}
+
 function esc(s){return(s+'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 
 async function saveMasterProduct(id){
   var name=document.getElementById('peName').value;if(!name){toast('Name required','error');return}
-  var data={name:name,barcode:document.getElementById('peBarcode').value,category:document.getElementById('peCategory').value,price:parseFloat(document.getElementById('pePrice').value)||0,cost:parseFloat(document.getElementById('peCost').value)||0,units:collectUnits()};
+  var fileInput=document.getElementById('peImage');
+  var imageData=fileInput&&fileInput.files&&fileInput.files[0]?'':(p&&p.imageData?p.imageData:'');
+  var data={name:name,barcode:document.getElementById('peBarcode').value,category:document.getElementById('peCategory').value,price:parseFloat(document.getElementById('pePrice').value)||0,cost:parseFloat(document.getElementById('peCost').value)||0,imageData:imageData,units:collectUnits()};
   var api=API+'/products/master';
   try{
     var r,j;
