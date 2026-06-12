@@ -26,7 +26,7 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 │   ├── ExpenseService.cs       # Expense CRUD
 │   ├── DataExporter.cs         # Import/Export JSON
 │   ├── MigrationService.cs     # Old DB migration tool
-│   ├── AppVersion.cs           # Current = "1.0.24"
+│       ├── AppVersion.cs           # Current = "1.0.25"
 │   └── ... (PrinterService, EmailService, etc.)
 ├── Forms/
 │   ├── MainForm.cs             # Sidebar navigation (POS, Products, Reports, Settings...)
@@ -122,6 +122,19 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 | `Forms/SalesForm.cs:456` | `UnitCost` changed from `unit?.Cost ?? product.Cost` to `product.Cost * qtyPerUnit` |
 | `JumongCloudAPI/wwwroot/index.html` | Cloud dashboard unit form: **Cost input removed**, auto-calculates as `baseCost × QtyPerUnit` in `collectUnits()`. Column headers (Name, Price, Qty, Default) added. |
 
+### Timezone Simplification (v1.0.25)
+| File | Change |
+|---|---|
+| `Services/SyncService.cs` | **Simplified timezone**: removed ALL `ToUniversalTime()` and `+08:00` offset logic. Sends raw local time string. Cloud has `SET TIMEZONE TO 'Asia/Manila'` so PostgreSQL handles conversion automatically. |
+| `Services/SyncService.cs` | `ToUtcString()` now returns local time as-is without offset append |
+| `Forms/StockReceivingForm.cs` | Fixed toolbar overlap: `BringToFront()` on toolbar |
+| `JumongCloudAPI/wwwroot/index.html` | Cloud dashboard: limit dropdown (50/100/200/500) for stock receiving, removed pagination |
+| `JumongCloudAPI/wwwroot/index.html` | Added **Image** column to master products table with upload support |
+| `JumongCloudAPI/DashboardController.cs` | Added `GET /products/categories` endpoint, `imageData` to product CRUD |
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs` | Migration: `image_data TEXT` added to `master_products` |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | Version endpoint updated to 1.0.25 |
+| PostgreSQL data | Additional backfill: **22,226** total records fixed to PH time |
+
 ### Progress Popups & Stock Movement Improvements (v1.0.23 → v1.0.24)
 | File | Change |
 |---|---|
@@ -202,6 +215,6 @@ Use a temp .NET project with Npgsql. Add machine IP to firewall first:
 2. **Unit Cost = baseCost × QtyPerUnit** — auto-calculated, no manual entry
 3. **Product management only via cloud master catalog** — local creation/editing disabled
 4. **SYNC FROM CLOUD** updates Price/Cost/Category/Units but NEVER changes StockQty
-5. **All timestamps** send local time with `+08:00` offset (Philippines timezone) — never convert to UTC
+5. **All timestamps** send raw local time string (no offset) — cloud `SET TIMEZONE TO 'Asia/Manila'` handles conversion
 6. **Profit queries** in cloud API fallback to `p.cost` when `sale_items.unit_cost = 0`
 7. **Sync progress** shown via non-modal popup — user can continue working while syncing
