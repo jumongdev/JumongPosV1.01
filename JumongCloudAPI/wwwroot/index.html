@@ -542,7 +542,7 @@ async function loadStores(){
   }catch(e){}
 }
 
-function onStoreChange(){refreshAll()}
+function onStoreChange(){refreshAll();if(document.getElementById('receivingBody').querySelector('[data-row]'))loadReceiving();if(document.getElementById('stockStatusBody').querySelector('[data-row]'))loadStockStatus()}
 
  async function loadSummary(){
   try{
@@ -899,6 +899,8 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshAll
 (async()=>{
   await loadStores();
   await refreshAll();
+  loadReceiving();
+  loadStockStatus();
   loadMasterProducts();
   whLoad();
   startAutoRefresh();
