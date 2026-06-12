@@ -279,6 +279,12 @@ tr:hover{background:var(--hover)}
       <h3><span class="collapse-icon">&#9660;</span> RECENT STOCK RECEIVING</h3>
       <div class="panel-actions">
         <input class="panel-search" placeholder="Search..." oninput="filterTable('receivingBody',this.value)" onclick="event.stopPropagation()">
+        <select id="recLimit" style="background:var(--hover);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:0.82em" onchange="loadReceiving()">
+          <option value="50">50</option>
+          <option value="100" selected>100</option>
+          <option value="200">200</option>
+          <option value="500">500</option>
+        </select>
         <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();loadReceiving()">LOAD</button>
         <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();exportCSV('receiving')">CSV</button>
       </div>
@@ -722,7 +728,8 @@ async function loadStockStatus(){
 async function loadReceiving(){
   try{
     setLoading('receivingBody');
-    const d=await fetchJSON(API+'/recent-receiving?limit=50'+filterParams());
+    var limit=document.getElementById('recLimit')?document.getElementById('recLimit').value:50;
+    const d=await fetchJSON(API+'/recent-receiving?limit='+limit+filterParams());
     _cache.receiving=d;
     if(!d.length){setEmpty('receivingBody','No receiving data',9);return}
     document.getElementById('receivingBody').innerHTML=d.map(x=>{
