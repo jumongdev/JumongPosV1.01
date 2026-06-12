@@ -644,7 +644,7 @@ public class DashboardController : ControllerBase
         [HttpGet("version")]
         public IActionResult GetVersion()
         {
-            return Ok(new { version = "1.0.19", buildDate = "2026-06-10", changes = "Fix profit calc: fallback to p.cost when unit_cost=0", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.19/JumongPosV1.01.exe" });
+            return Ok(new { version = "1.0.24", buildDate = "2026-06-12", changes = "Sync timezone fix, progress popups, stock movement improvements", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.24/JumongPosV1.01.exe" });
         }
 
         [HttpGet("products/master")]
