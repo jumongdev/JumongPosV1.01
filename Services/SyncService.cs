@@ -115,8 +115,6 @@ public static class SyncService
 
     public static async Task SyncCustomer(Customer customer)
     {
-        var offset = TimeZoneInfo.Local.BaseUtcOffset;
-        var ts = customer.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss") + " " + (offset.Hours >= 0 ? "+" : "") + offset.ToString("hh\\:mm");
         var data = new[]
         {
             new {
@@ -129,7 +127,7 @@ public static class SyncService
                 CreditBalance = customer.CreditBalance,
                 CreditLimit = customer.CreditLimit,
                 Address = customer.Address,
-                CreatedAt = ts,
+                CreatedAt = customer.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
                 ModifiedBy = customer.ModifiedBy
             }
         };
@@ -262,13 +260,11 @@ public static class SyncService
 
     public static async Task SyncDailyClose(DailyClose dc)
     {
-        var offset = TimeZoneInfo.Local.BaseUtcOffset;
-        var cd = dc.CloseDate.Length > 19 ? dc.CloseDate : dc.CloseDate + " " + (offset.Hours >= 0 ? "+" : "") + offset.ToString("hh\\:mm");
         var data = new[]
         {
             new {
                 PosId = dc.Id,
-                CloseDate = cd,
+                CloseDate = dc.CloseDate,
                 TotalSales = dc.TotalSales,
                 TotalCash = dc.TotalCash,
                 TotalEwallet = dc.TotalEWallet,
@@ -360,8 +356,7 @@ public static class SyncService
     {
         if (string.IsNullOrEmpty(localTime)) return "";
         if (localTime.Length > 19) return localTime;
-        var offset = TimeZoneInfo.Local.BaseUtcOffset;
-        return localTime + " " + (offset.Hours >= 0 ? "+" : "") + offset.ToString("hh\\:mm");
+        return localTime;
     }
 
     private static void LogSync(string endpoint, string status, string error)
