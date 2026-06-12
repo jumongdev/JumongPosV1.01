@@ -178,7 +178,9 @@ public partial class StockReceivingForm : Form
                 MessageBox.Show("No data to print.", "Print", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         };
-        form.Controls.AddRange(new Control[] { pnlToolbar, dgv });
+        form.Controls.Add(dgv);
+        form.Controls.Add(pnlToolbar);
+        pnlToolbar.BringToFront();
         LoadTrail();
         form.ShowDialog();
     }
