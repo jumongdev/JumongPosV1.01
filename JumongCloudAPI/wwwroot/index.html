@@ -728,6 +728,7 @@ async function loadStockStatus(){
 async function loadReceiving(){
   try{
     setLoading('receivingBody');
+    document.getElementById('receivingPagination').innerHTML='';
     var limit=document.getElementById('recLimit')?document.getElementById('recLimit').value:50;
     const d=await fetchJSON(API+'/recent-receiving?limit='+limit+filterParams());
     _cache.receiving=d;
@@ -737,7 +738,6 @@ async function loadReceiving(){
       const storeBadge='<span class="store-badge">'+shortStore(x.storeId,_storeMap[x.storeId])+'</span>';
       return`<tr data-row><td>${x.productName}</td><td>${x.barcode||''}</td><td>${x.quantityAdded}</td><td>${x.stockBefore}</td><td class="green">${x.stockAfter}</td><td>${x.reference||''}</td><td>${x.userName||''}</td><td>${storeBadge}</td><td>${dt.toLocaleDateString('en-PH')} ${dt.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'})}</td></tr>`;
     }).join('');
-    paginateRows('receivingBody','receivingPagination',0);
   }catch(e){setEmpty('receivingBody','Failed to load receiving',9)}
 }
 
