@@ -542,7 +542,7 @@ async function loadStores(){
   }catch(e){}
 }
 
-function onStoreChange(){refreshAll();if(document.getElementById('receivingBody').querySelector('[data-row]'))loadReceiving();if(document.getElementById('stockStatusBody').querySelector('[data-row]'))loadStockStatus()}
+function onStoreChange(){refreshAll()}
 
  async function loadSummary(){
   try{
