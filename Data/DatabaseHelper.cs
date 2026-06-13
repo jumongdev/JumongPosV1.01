@@ -402,6 +402,14 @@ public class DatabaseHelper
             alter.ExecuteNonQuery();
         }
 
+        // Migrate: add image_data to Products
+        using var checkImg = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('Products') WHERE name = 'image_data'", conn);
+        if (Convert.ToInt32(checkImg.ExecuteScalar()) == 0)
+        {
+            using var alter = new SQLiteCommand("ALTER TABLE Products ADD COLUMN image_data TEXT", conn);
+            alter.ExecuteNonQuery();
+        }
+
         // Migrate: add ModifiedBy to Customers
         using var checkCMod = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('Customers') WHERE name = 'ModifiedBy'", conn);
         if (Convert.ToInt32(checkCMod.ExecuteScalar()) == 0)

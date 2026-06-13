@@ -498,25 +498,42 @@ public partial class SalesForm : Form
                 Cursor = canAdd ? Cursors.Hand : Cursors.Default
             };
 
-            Color iconBg, iconFg;
-            if (isOut) { iconBg = CRedLight; iconFg = CRedDark; }
-            else if (isLow) { iconBg = Color.FromArgb(255, 243, 205); iconFg = Color.FromArgb(243, 156, 18); }
-            else { iconBg = CBlueLight; iconFg = CBlueMid; }
-            var icon = new Panel
+            Control icon;
+            if (!string.IsNullOrWhiteSpace(prod.ImageData))
             {
-                Location = new Point(10, 8),
-                Size = new Size(30, 30),
-                BackColor = iconBg
-            };
-            var iconLbl = new Label
+                Image? img = null;
+                try { img = Image.FromStream(new MemoryStream(Convert.FromBase64String(prod.ImageData))); } catch { }
+                var pb = new PictureBox
+                {
+                    Location = new Point(10, 8),
+                    Size = new Size(30, 30),
+                    SizeMode = PictureBoxSizeMode.Zoom,
+                    Image = img
+                };
+                icon = pb;
+            }
+            else
             {
-                Text = "\u25a0",
-                Font = new Font("Segoe UI", 8F),
-                ForeColor = iconFg,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Dock = DockStyle.Fill
-            };
-            icon.Controls.Add(iconLbl);
+                Color iconBg, iconFg;
+                if (isOut) { iconBg = CRedLight; iconFg = CRedDark; }
+                else if (isLow) { iconBg = Color.FromArgb(255, 243, 205); iconFg = Color.FromArgb(243, 156, 18); }
+                else { iconBg = CBlueLight; iconFg = CBlueMid; }
+                var panel = new Panel
+                {
+                    Location = new Point(10, 8),
+                    Size = new Size(30, 30),
+                    BackColor = iconBg
+                };
+                panel.Controls.Add(new Label
+                {
+                    Text = "\u25a0",
+                    Font = new Font("Segoe UI", 8F),
+                    ForeColor = iconFg,
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    Dock = DockStyle.Fill
+                });
+                icon = panel;
+            }
 
             var stockLabel = isOut ? "Out of stock" : (isLow ? $"Low stock ({prod.StockQty})" : $"{prod.StockQty} in stock");
             var lblName = new Label

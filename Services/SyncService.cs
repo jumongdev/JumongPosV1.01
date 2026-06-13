@@ -493,12 +493,14 @@ public static class SyncService
 
                 if (existingId > 0)
                 {
+                    var imageData = p.TryGetProperty("imageData", out var img) ? img.GetString() : null;
                     // Update existing product
-                    using var upd = new SQLiteCommand("UPDATE Products SET Name=@n, Category=@c, Price=@p, Cost=@co, ModifiedBy='cloud' WHERE Id=@id", conn);
+                    using var upd = new SQLiteCommand("UPDATE Products SET Name=@n, Category=@c, Price=@p, Cost=@co, image_data=@img, ModifiedBy='cloud' WHERE Id=@id", conn);
                     upd.Parameters.AddWithValue("@n", name);
                     upd.Parameters.AddWithValue("@c", category ?? "");
                     upd.Parameters.AddWithValue("@p", price);
                     upd.Parameters.AddWithValue("@co", cost);
+                    upd.Parameters.AddWithValue("@img", (object?)imageData ?? DBNull.Value);
                     upd.Parameters.AddWithValue("@id", existingId);
                     upd.ExecuteNonQuery();
 
@@ -514,15 +516,17 @@ public static class SyncService
                 }
                 else
                 {
+                    var imageData = p.TryGetProperty("imageData", out var img) ? img.GetString() : null;
                     // Insert new product
                     using var ins = new SQLiteCommand(@"
-                        INSERT INTO Products (Name, Barcode, Category, Price, Cost, StockQty, IsActive, CreatedAt, ModifiedBy, SourceId)
-                        VALUES (@n, @b, @c, @p, @co, 0, 1, datetime('now','localtime'), 'cloud', 'master')", conn);
+                        INSERT INTO Products (Name, Barcode, Category, Price, Cost, StockQty, IsActive, CreatedAt, ModifiedBy, SourceId, image_data)
+                        VALUES (@n, @b, @c, @p, @co, 0, 1, datetime('now','localtime'), 'cloud', 'master', @img)", conn);
                     ins.Parameters.AddWithValue("@n", name);
                     ins.Parameters.AddWithValue("@b", (object?)barcode ?? DBNull.Value);
                     ins.Parameters.AddWithValue("@c", category ?? "");
                     ins.Parameters.AddWithValue("@p", price);
                     ins.Parameters.AddWithValue("@co", cost);
+                    ins.Parameters.AddWithValue("@img", (object?)imageData ?? DBNull.Value);
                     ins.ExecuteNonQuery();
 
                     using var getId = new SQLiteCommand("SELECT last_insert_rowid()", conn);

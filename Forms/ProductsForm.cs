@@ -282,8 +282,21 @@ public partial class ProductsForm : Form
             txtStock.Text = p.StockQty.ToString();
             lblFormTitle.Text = $"EDIT: {p.Name}";
             lblFormTitle.ForeColor = Color.FromArgb(46, 204, 113);
+            _picProduct.Image = Base64ToImage(p.ImageData);
             SetReadOnly(true);
         }
+    }
+
+    private static Image? Base64ToImage(string? data)
+    {
+        if (string.IsNullOrWhiteSpace(data)) return null;
+        try
+        {
+            var bytes = Convert.FromBase64String(data);
+            using var ms = new MemoryStream(bytes);
+            return Image.FromStream(ms);
+        }
+        catch { return null; }
     }
 
     private void btnNew_Click(object? sender, EventArgs e)
@@ -657,6 +670,17 @@ public partial class ProductsForm : Form
         AddField("COST", ref txtCost, ref y, pnlRight, inputBg, inputFg, dimText, HorizontalAlignment.Right);
         AddField("STOCK", ref txtStock, ref y, pnlRight, Color.FromArgb(20, 20, 35), Color.FromArgb(140, 140, 170), dimText, HorizontalAlignment.Right);
 
+        _picProduct = new PictureBox
+        {
+            Location = new Point(110, y + 4),
+            Size = new Size(120, 120),
+            SizeMode = PictureBoxSizeMode.Zoom,
+            BackColor = Color.FromArgb(20, 20, 35),
+            BorderStyle = BorderStyle.FixedSingle
+        };
+        pnlRight.Controls.Add(_picProduct);
+        y += 128;
+
         btnStockMovement = new Button { Text = "\uD83D\uDCC8 STOCK MOV'T", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Location = new Point(15, y), Size = new Size(200, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentBlue, ForeColor = Color.White, Cursor = Cursors.Hand };
         btnStockMovement.Click += (_, _) => { if (_selected == null) return; using var form = new StockMovementForm(_selected, _currentUser); form.ShowDialog(); };
         pnlRight.Controls.Add(btnStockMovement);
@@ -749,4 +773,5 @@ public partial class ProductsForm : Form
     private Button btnNew = null!, btnEdit = null!, btnUnits = null!, btnStockMovement = null!, btnCancel = null!, btnSave = null!, btnDelete = null!;
     private Button btnPrintChecklist = null!;
     private Label lblFormTitle = null!;
+    private PictureBox _picProduct = null!;
 }

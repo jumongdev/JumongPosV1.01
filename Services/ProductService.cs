@@ -206,7 +206,8 @@ public class ProductService
             Cost = Convert.ToDecimal(rdr["Cost"]),
             StockQty = Convert.ToInt32(rdr["StockQty"]),
             IsActive = Convert.ToBoolean(rdr["IsActive"]),
-            CreatedAt = DateTime.Parse(rdr["CreatedAt"].ToString()!)
+            CreatedAt = DateTime.Parse(rdr["CreatedAt"].ToString()!),
+            ImageData = rdr["image_data"]?.ToString() ?? ""
         };
     }
 }

@@ -12,6 +12,7 @@ public class Product
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public string ModifiedBy { get; set; } = string.Empty;
+    public string ImageData { get; set; } = "";
 
     public string DisplayWithStock => $"{Name}  —  Stock: {StockQty} pcs";
     public string DisplayWithPrice => $"{Name}  [{Barcode}]  \u20b1{Price:N2}  |  Stock: {StockQty}";
