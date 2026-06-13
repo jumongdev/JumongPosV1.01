@@ -422,7 +422,61 @@ public class SaleService
             }
 
             trans.Commit();
-            _ = SyncService.SyncSale(sale, sale.Items);
+            var updatedSale = GetById(saleId);
+            if (updatedSale != null)
+            {
+                _ = SyncService.SyncSale(updatedSale, updatedSale.Items);
+                try
+                {
+                    using var sc = DatabaseHelper.GetConnection();
+                    sc.Open();
+                    var voidLogs = new SQLiteCommand("SELECT * FROM VoidLog WHERE SaleId = @sid ORDER BY Id", sc);
+                    voidLogs.Parameters.AddWithValue("@sid", saleId);
+                    using var vlRdr = voidLogs.ExecuteReader();
+                    while (vlRdr.Read())
+                    {
+                        _ = SyncService.SyncVoidLog(new VoidLog
+                        {
+                            Id = Convert.ToInt32(vlRdr["Id"]),
+                            SaleId = Convert.ToInt32(vlRdr["SaleId"]),
+                            SaleItemId = vlRdr["SaleItemId"] != DBNull.Value ? Convert.ToInt32(vlRdr["SaleItemId"]) : null,
+                            Action = vlRdr["Action"].ToString() ?? "",
+                            Reason = vlRdr["Reason"].ToString() ?? "",
+                            InvoiceNo = vlRdr["InvoiceNo"].ToString() ?? "",
+                            ProductName = (vlRdr["ProductName"]?.ToString()) ?? "",
+                            Quantity = Convert.ToInt32(vlRdr["Quantity"]),
+                            Amount = Convert.ToDecimal(vlRdr["Amount"]),
+                            UserId = Convert.ToInt32(vlRdr["UserId"]),
+                            UserName = vlRdr["UserName"]?.ToString() ?? "",
+                            CreatedAt = vlRdr["CreatedAt"]?.ToString() ?? ""
+                        });
+                    }
+
+                    var trails = new SQLiteCommand("SELECT * FROM StockTrail WHERE InvoiceNo = @inv AND QuantityAdded > 0 ORDER BY Id", sc);
+                    trails.Parameters.AddWithValue("@inv", updatedSale.InvoiceNo);
+                    using var trRdr = trails.ExecuteReader();
+                    while (trRdr.Read())
+                    {
+                        _ = SyncService.SyncStockTrail(new StockTrail
+                        {
+                            Id = Convert.ToInt32(trRdr["Id"]),
+                            ProductId = Convert.ToInt32(trRdr["ProductId"]),
+                            ProductName = trRdr["ProductName"]?.ToString() ?? "",
+                            Barcode = trRdr["Barcode"]?.ToString() ?? "",
+                            QuantityAdded = Convert.ToDecimal(trRdr["QuantityAdded"]),
+                            StockBefore = Convert.ToInt32(trRdr["StockBefore"]),
+                            StockAfter = Convert.ToInt32(trRdr["StockAfter"]),
+                            Reference = trRdr["Reference"]?.ToString() ?? "",
+                            InvoiceNo = trRdr["InvoiceNo"]?.ToString() ?? "",
+                            CustomerName = trRdr["CustomerName"]?.ToString() ?? "",
+                            UserId = Convert.ToInt32(trRdr["UserId"]),
+                            UserName = trRdr["UserName"]?.ToString() ?? "",
+                            CreatedAt = trRdr["CreatedAt"]?.ToString() ?? ""
+                        });
+                    }
+                }
+                catch { }
+            }
         }
         catch
         {
@@ -532,6 +586,7 @@ public class SaleService
 
             trans.Commit();
             _ = SyncService.SyncVoidLog(new VoidLog { SaleId = saleId, SaleItemId = itemId, Action = "VoidItem", Reason = reason, InvoiceNo = invoiceNo, ProductName = productName, Quantity = qty, Amount = total, UserId = voidedByUserId, UserName = voidedByUserName, CreatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") });
+            _ = SyncService.SyncStockTrail(new StockTrail { ProductId = productId, ProductName = productName, Barcode = barcode, QuantityAdded = restockQty, StockBefore = stockBefore, StockAfter = stockBefore + restockQty, Reference = $"{invoiceNo} - void ({reason})", UserId = userId, UserName = voidedByUserName, InvoiceNo = invoiceNo, CustomerName = "", CreatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") });
             // Re-sync the sale so cloud knows which items are voided
             try
             {
