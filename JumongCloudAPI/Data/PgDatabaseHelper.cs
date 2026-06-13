@@ -394,5 +394,15 @@ public static class PgDatabaseHelper
             CREATE INDEX IF NOT EXISTS idx_wh_order_items_order ON wh_order_items(order_id);
         ";
         whCmd.ExecuteNonQuery();
+
+        // Warehouse migration: link to master catalog and stores
+        using var whMig = conn.CreateCommand();
+        whMig.CommandText = @"
+            ALTER TABLE wh_products ADD COLUMN IF NOT EXISTS master_product_id INTEGER REFERENCES master_products(id);
+            ALTER TABLE wh_clients ADD COLUMN IF NOT EXISTS store_id TEXT NOT NULL DEFAULT '';
+            ALTER TABLE wh_order_items ADD COLUMN IF NOT EXISTS base_qty INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE wh_order_items ADD COLUMN IF NOT EXISTS base_unit_name TEXT NOT NULL DEFAULT 'Piece';
+        ";
+        whMig.ExecuteNonQuery();
     }
 }

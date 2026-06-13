@@ -71,6 +71,82 @@ public partial class StockReceivingForm : Form
         lblNewStock.Text = (_currentProduct.StockQty + (int)numQty.Value).ToString();
     }
 
+    private async Task CheckPendingTransfers()
+    {
+        btnCheckTransfers.Enabled = false;
+        btnCheckTransfers.Text = "Loading...";
+        try
+        {
+            var transfers = await SyncService.GetPendingTransfersAsync();
+            btnCheckTransfers.Text = "\uD83D\uDCE5 CHECK PENDING TRANSFERS";
+            btnCheckTransfers.Enabled = true;
+
+            if (transfers == null || transfers.Count == 0)
+            {
+                MessageBox.Show("No pending transfers from warehouse.", "Pending Transfers", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using var picker = new Form { Text = "Pending Warehouse Transfers", Size = new Size(750, 500), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = Color.FromArgb(10, 10, 26) };
+            var pnl = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(10, 10, 26) };
+            var lbl = new Label { Text = "Select a transfer to receive:", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 245, 255), Location = new Point(12, 10), Size = new Size(700, 25) };
+
+            var dgv = new DataGridView { Location = new Point(12, 42), Size = new Size(710, 370), ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = Color.FromArgb(20, 20, 40), BorderStyle = BorderStyle.None, GridColor = Color.FromArgb(40, 40, 70), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = Color.FromArgb(0, 245, 255), Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = Color.FromArgb(230, 230, 245), SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) } };
+            dgv.DataSource = transfers.Select(t => new { t.OrderId, t.ClientName, Total = t.TotalAmount.ToString("N2"), Notes = t.Notes ?? "", Date = t.CreatedAt.ToString("yyyy-MM-dd HH:mm") }).ToList();
+            if (dgv.Columns["OrderId"] != null) { dgv.Columns["OrderId"].Width = 60; }
+            if (dgv.Columns["ClientName"] != null) { dgv.Columns["ClientName"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; }
+
+            var btnReceive = new Button { Text = "RECEIVE SELECTED", Font = new Font("Segoe UI", 10F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(46, 204, 113), ForeColor = Color.White, Location = new Point(280, 422), Size = new Size(180, 35), Cursor = Cursors.Hand };
+            btnReceive.Click += async (s, ev) =>
+            {
+                if (dgv.SelectedRows.Count == 0) return;
+                var orderId = (int)dgv.SelectedRows[0].Cells[0].Value;
+                btnReceive.Enabled = false;
+                btnReceive.Text = "Processing...";
+
+                var items = await SyncService.MarkTransferReceivedAsync(orderId);
+                if (items == null || items.Count == 0)
+                {
+                    MessageBox.Show("Failed to receive transfer or no items found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    btnReceive.Enabled = true;
+                    btnReceive.Text = "RECEIVE SELECTED";
+                    return;
+                }
+
+                var matched = 0;
+                foreach (var item in items)
+                {
+                    var product = StockService.Search(item.ProductName).FirstOrDefault() ??
+                                  (!string.IsNullOrEmpty(item.Barcode) ? StockService.GetByBarcode(item.Barcode) : null);
+                    if (product == null) continue;
+
+                    var existingIdx = _pending.FindIndex(p => p.ProductId == product.Id);
+                    if (existingIdx >= 0) { var old = _pending[existingIdx]; _pending[existingIdx] = (old.ProductId, old.ProductName, old.Barcode, old.StockBefore, old.Qty + item.BaseQty); }
+                    else _pending.Add((product.Id, product.Name, product.Barcode, product.StockQty, item.BaseQty));
+                    matched++;
+                }
+
+                picker.Close();
+                RefreshPendingGrid();
+                txtReference.Text = "WH-Transfer #" + orderId;
+                MessageBox.Show($"{matched} of {items.Count} item(s) received from transfer #{orderId}.", "Transfer Received", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            };
+
+            pnl.Controls.AddRange(new Control[] { lbl, dgv, btnReceive });
+            picker.Controls.Add(pnl);
+            picker.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error checking transfers: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            btnCheckTransfers.Text = "\uD83D\uDCE5 CHECK PENDING TRANSFERS";
+            btnCheckTransfers.Enabled = true;
+        }
+    }
+
     private void AddCurrentToList()
     {
         if (_currentProduct == null || (int)numQty.Value <= 0) return;
@@ -208,7 +284,10 @@ public partial class StockReceivingForm : Form
         var pnlToolbar = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = panelBg };
         pnlToolbar.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawLine(pen, 0, pnlToolbar.Height - 1, pnlToolbar.Width, pnlToolbar.Height - 1); };
         var lblPageTitle = new Label { Text = "\uD83D\uDCE6 STOCK RECEIVING", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(20, 12), Size = new Size(250, 28) };
+        btnCheckTransfers = new Button { Text = "\uD83D\uDCE5 CHECK PENDING TRANSFERS", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentGreen, ForeColor = Color.White, Location = new Point(280, 10), Size = new Size(200, 28), Cursor = Cursors.Hand };
+        btnCheckTransfers.Click += async (_, _) => await CheckPendingTransfers();
         pnlToolbar.Controls.Add(lblPageTitle);
+        pnlToolbar.Controls.Add(btnCheckTransfers);
 
         var pnlMain = new Panel { Dock = DockStyle.Fill, BackColor = canvasBg };
         var margin = 10;
@@ -311,5 +390,5 @@ public partial class StockReceivingForm : Form
     private DataGridView dgvPending = null!;
     private Label lblCount = null!;
     private TextBox txtReference = null!;
-    private Button btnConfirm = null!, btnTrail = null!;
+    private Button btnConfirm = null!, btnTrail = null!, btnCheckTransfers = null!;
 }

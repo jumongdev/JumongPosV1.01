@@ -158,6 +158,23 @@
 - [x] Release mode builds cleanly with no warnings
 - [x] Updates distributed via GitHub Releases (v1.0.16+)
 
+### Warehouse Transfer System (v1.0.26)
+- [x] Cloud DB: added `master_product_id` to `wh_products`, `store_id` to `wh_clients`, `base_qty` + `base_unit_name` to `wh_order_items`
+- [x] Cloud API: `POST /warehouse/products/from-master/{masterId}` — create warehouse product from master catalog
+- [x] Cloud API: `GET /warehouse/transfers/pending?storeId=X` — list shipped orders for a POS store
+- [x] Cloud API: `PUT /warehouse/orders/{id}/receive` — mark order received + return items for stock adding
+- [x] Cloud API: `WhUpdateOrderStatus` auto-deducts warehouse stock when status set to "shipped"
+- [x] Cloud API: `WhGetClients` supports `storeId` filter; `WhCreateClient` includes `store_id`
+- [x] Cloud API: `WhCreateOrder` auto-calculates `base_qty` from unit type × box_qty_per_unit
+- [x] Dashboard UI: **FROM MASTER** button imports products from master catalog into warehouse
+- [x] Dashboard UI: **NEW ORDER** flow — select client, add items (box/piece), auto-calculates base qty
+- [x] Dashboard UI: **PROCESS** / **SHIP** action buttons on orders with status workflow
+- [x] Desktop: `SyncService.GetPendingTransfersAsync()` — fetches shipped transfers from cloud
+- [x] Desktop: `SyncService.MarkTransferReceivedAsync(orderId)` — marks received + returns items
+- [x] Desktop: `StockReceivingForm` **CHECK PENDING TRANSFERS** button — fetch, select, receive, auto-populate
+- [x] Desktop: `PendingTransfer` and `TransferItem` model classes
+- [x] Stock always tracked in base units (pieces) — no conversion errors when receiving
+
 ### Master Product Catalog (Cloud PostgreSQL)
 - [x] `master_products` table — 618 products seeded from HQ client DB
 - [x] `master_product_units` table — 717 units (multi-pack pricing)
@@ -183,6 +200,8 @@
 - **Cloud Revenue:** Item-level sums with `si.is_voided = false`, not `s.grand_total`
 - **Time Zone:** All cloud queries use `SET TIMEZONE TO 'Asia/Manila'`
 - **Master Catalog:** Cloud PostgreSQL as source of truth for products; stores pull via DOWNLOAD MASTER
+- **Warehouse Transfers:** Products flow master → warehouse → order (shipped) → POS client receives. All stock tracked in base units (pieces) to prevent unit mismatch.
+- **Transfer Status Flow:** pending → processing → shipped → received. Shipped deducts warehouse stock; received triggers POS stock receiving sync.
 
 ## Files Created
 - `Models/AuditLog.cs`

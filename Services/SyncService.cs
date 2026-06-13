@@ -565,4 +565,52 @@ public static class SyncService
             ucmd.ExecuteNonQuery();
         }
     }
+
+    public static async Task<List<PendingTransfer>?> GetPendingTransfersAsync()
+    {
+        try
+        {
+            var url = ApiUrl.TrimEnd('/') + $"/dashboard/warehouse/transfers/pending?storeId={StoreId}";
+            var json = await _client.GetStringAsync(url);
+            return JsonSerializer.Deserialize<List<PendingTransfer>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch { return null; }
+    }
+
+    public static async Task<List<TransferItem>?> MarkTransferReceivedAsync(int orderId)
+    {
+        try
+        {
+            var url = ApiUrl.TrimEnd('/') + $"/dashboard/warehouse/orders/{orderId}/receive";
+            var response = await _client.PutAsync(url, null);
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<JsonElement>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (result.TryGetProperty("items", out var itemsEl))
+                    return JsonSerializer.Deserialize<List<TransferItem>>(itemsEl.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+        }
+        catch { }
+        return null;
+    }
+}
+
+public class PendingTransfer
+{
+    public int OrderId { get; set; }
+    public int ClientId { get; set; }
+    public string ClientName { get; set; } = "";
+    public string Notes { get; set; } = "";
+    public decimal TotalAmount { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public class TransferItem
+{
+    public string ProductName { get; set; } = "";
+    public int BaseQty { get; set; }
+    public string BaseUnitName { get; set; } = "Piece";
+    public string Barcode { get; set; } = "";
+    public int MasterProductId { get; set; }
 }

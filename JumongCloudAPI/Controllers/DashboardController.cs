@@ -939,14 +939,16 @@ public class DashboardController : ControllerBase
         }
 
         [HttpGet("warehouse/clients")]
-        public IActionResult WhGetClients()
+        public IActionResult WhGetClients([FromQuery] string? storeId = null)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT id, name, contact, address, store_type FROM wh_clients WHERE is_active = true ORDER BY name";
+            var storeFilter = string.IsNullOrEmpty(storeId) ? "" : " AND store_id = @sid";
+            cmd.CommandText = $"SELECT id, name, contact, address, store_type, store_id FROM wh_clients WHERE is_active = true{storeFilter} ORDER BY name";
+            if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("sid", storeId);
             var data = new List<object>();
             using var r = cmd.ExecuteReader();
-            while (r.Read()) data.Add(new { id = r.GetInt32(0), name = r.GetString(1), contact = r.IsDBNull(2) ? "" : r.GetString(2), address = r.IsDBNull(3) ? "" : r.GetString(3), storeType = r.GetString(4) });
+            while (r.Read()) data.Add(new { id = r.GetInt32(0), name = r.GetString(1), contact = r.IsDBNull(2) ? "" : r.GetString(2), address = r.IsDBNull(3) ? "" : r.GetString(3), storeType = r.GetString(4), storeId = r.IsDBNull(5) ? "" : r.GetString(5) });
             return Ok(data);
         }
 
@@ -955,9 +957,24 @@ public class DashboardController : ControllerBase
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "INSERT INTO wh_clients (name, contact, address, store_type) VALUES (@n, @ct, @a, @st) RETURNING id";
-            cmd.Parameters.AddWithValue("n", c.Name); cmd.Parameters.AddWithValue("ct", c.Contact ?? ""); cmd.Parameters.AddWithValue("a", c.Address ?? ""); cmd.Parameters.AddWithValue("st", c.StoreType ?? "pos");
+            cmd.CommandText = "INSERT INTO wh_clients (name, contact, address, store_type, store_id) VALUES (@n, @ct, @a, @st, @sid) RETURNING id";
+            cmd.Parameters.AddWithValue("n", c.Name); cmd.Parameters.AddWithValue("ct", c.Contact ?? ""); cmd.Parameters.AddWithValue("a", c.Address ?? ""); cmd.Parameters.AddWithValue("st", c.StoreType ?? "pos"); cmd.Parameters.AddWithValue("sid", c.StoreId ?? "");
             return Ok(new { id = Convert.ToInt32(cmd.ExecuteScalar()) });
+        }
+
+        [HttpPost("warehouse/products/from-master/{masterId}")]
+        public IActionResult WhAddFromMaster(int masterId)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO wh_products (name, barcode, category, box_price, box_cost, box_qty, piece_price, stock_qty, master_product_id)
+                SELECT name, barcode, category, price * 12, cost * 12, 12, price, 0, id
+                FROM master_products WHERE id = @mid AND is_active = true RETURNING id";
+            cmd.Parameters.AddWithValue("mid", masterId);
+            var result = cmd.ExecuteScalar();
+            if (result == null) return NotFound(new { error = "Master product not found" });
+            return Ok(new { id = Convert.ToInt32(result) });
         }
 
         [HttpGet("warehouse/orders")]
@@ -981,11 +998,28 @@ public class DashboardController : ControllerBase
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT product_name, unit_type, qty, price, total_price FROM wh_order_items WHERE order_id = @oid ORDER BY product_name";
+            cmd.CommandText = @"
+                SELECT oi.product_name, oi.unit_type, oi.qty, oi.price, oi.total_price,
+                       oi.base_qty, oi.base_unit_name, oi.product_id,
+                       COALESCE(mp.id, 0) AS master_id
+                FROM wh_order_items oi
+                LEFT JOIN wh_products wp ON oi.product_id = wp.id
+                LEFT JOIN master_products mp ON wp.master_product_id = mp.id
+                WHERE oi.order_id = @oid ORDER BY oi.product_name";
             cmd.Parameters.AddWithValue("oid", id);
             var items = new List<object>();
             using var r = cmd.ExecuteReader();
-            while (r.Read()) items.Add(new { productName = r.GetString(0), unitType = r.GetString(1), qty = r.GetInt32(2), price = r.GetDecimal(3), totalPrice = r.GetDecimal(4) });
+            while (r.Read()) items.Add(new {
+                productName = r.GetString(0),
+                unitType = r.GetString(1),
+                qty = r.GetInt32(2),
+                price = r.GetDecimal(3),
+                totalPrice = r.GetDecimal(4),
+                baseQty = r.GetInt32(5),
+                baseUnitName = r.GetString(6),
+                productId = r.GetInt32(7),
+                masterId = r.GetInt32(8)
+            });
             return Ok(items);
         }
 
@@ -1005,8 +1039,11 @@ public class DashboardController : ControllerBase
                 {
                     foreach (var item in o.Items)
                     {
-                        using var icmd = new NpgsqlCommand("INSERT INTO wh_order_items (order_id, product_id, product_name, unit_type, qty, price, total_price) VALUES (@oi, @pi, @pn, @ut, @q, @pr, @tp)", conn, tx);
-                        icmd.Parameters.AddWithValue("oi", orderId); icmd.Parameters.AddWithValue("pi", item.ProductId); icmd.Parameters.AddWithValue("pn", item.ProductName); icmd.Parameters.AddWithValue("ut", item.UnitType ?? "box"); icmd.Parameters.AddWithValue("q", item.Qty); icmd.Parameters.AddWithValue("pr", item.Price); icmd.Parameters.AddWithValue("tp", item.TotalPrice);
+                        var baseQty = (item.BaseQty > 0) ? item.BaseQty : (item.Qty * (item.BoxQtyPerUnit > 0 ? item.BoxQtyPerUnit : 1));
+                        var baseUnit = !string.IsNullOrEmpty(item.BaseUnitName) ? item.BaseUnitName : "Piece";
+
+                        using var icmd = new NpgsqlCommand("INSERT INTO wh_order_items (order_id, product_id, product_name, unit_type, qty, price, total_price, base_qty, base_unit_name) VALUES (@oi, @pi, @pn, @ut, @q, @pr, @tp, @bq, @bun)", conn, tx);
+                        icmd.Parameters.AddWithValue("oi", orderId); icmd.Parameters.AddWithValue("pi", item.ProductId); icmd.Parameters.AddWithValue("pn", item.ProductName); icmd.Parameters.AddWithValue("ut", item.UnitType ?? "box"); icmd.Parameters.AddWithValue("q", item.Qty); icmd.Parameters.AddWithValue("pr", item.Price); icmd.Parameters.AddWithValue("tp", item.TotalPrice); icmd.Parameters.AddWithValue("bq", baseQty); icmd.Parameters.AddWithValue("bun", baseUnit);
                         icmd.ExecuteNonQuery();
                         total += item.TotalPrice;
                     }
@@ -1028,15 +1065,86 @@ public class DashboardController : ControllerBase
             cmd.CommandText = "UPDATE wh_orders SET status = @st, updated_at = NOW() WHERE id = @id";
             cmd.Parameters.AddWithValue("st", s.Status); cmd.Parameters.AddWithValue("id", id);
             cmd.ExecuteNonQuery();
+
+            if (s.Status == "shipped")
+            {
+                using var ded = conn.CreateCommand();
+                ded.CommandText = @"
+                    UPDATE wh_products SET stock_qty = stock_qty - COALESCE((
+                        SELECT SUM(oi.base_qty) FROM wh_order_items oi WHERE oi.order_id = @oid AND oi.product_id = wh_products.id
+                    ), 0)
+                    WHERE id IN (SELECT DISTINCT product_id FROM wh_order_items WHERE order_id = @oid)";
+                ded.Parameters.AddWithValue("oid", id);
+                ded.ExecuteNonQuery();
+            }
+
             return Ok(new { success = true });
+        }
+
+        [HttpGet("warehouse/transfers/pending")]
+        public IActionResult WhGetPendingTransfers([FromQuery] string? storeId = null, [FromQuery] int? clientId = null)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            var filters = "o.status = 'shipped'";
+            if (!string.IsNullOrEmpty(storeId)) { filters += " AND c.store_id = @sid"; cmd.Parameters.AddWithValue("sid", storeId); }
+            if (clientId.HasValue) { filters += " AND o.client_id = @ci"; cmd.Parameters.AddWithValue("ci", clientId.Value); }
+            cmd.CommandText = $@"
+                SELECT o.id, o.client_id, o.client_name, o.notes, o.total_amount, o.created_at
+                FROM wh_orders o
+                JOIN wh_clients c ON o.client_id = c.id
+                WHERE {filters} ORDER BY o.created_at DESC LIMIT 50";
+            var data = new List<object>();
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) data.Add(new {
+                orderId = r.GetInt32(0), clientId = r.GetInt32(1), clientName = r.GetString(2),
+                notes = r.IsDBNull(3) ? "" : r.GetString(3), totalAmount = r.GetDecimal(4), createdAt = r.GetDateTime(5)
+            });
+            return Ok(data);
+        }
+
+        [HttpPut("warehouse/orders/{id}/receive")]
+        public IActionResult WhReceiveOrder(int id)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var tx = conn.BeginTransaction();
+            try
+            {
+                using var cmd = conn.CreateCommand(); cmd.Transaction = tx;
+                cmd.CommandText = "UPDATE wh_orders SET status = 'received', updated_at = NOW() WHERE id = @id AND status = 'shipped'";
+                cmd.Parameters.AddWithValue("id", id);
+                var rows = cmd.ExecuteNonQuery();
+                if (rows == 0) { tx.Rollback(); return BadRequest(new { error = "Order not found or not in shipped status" }); }
+
+                using var itemsCmd = conn.CreateCommand(); itemsCmd.Transaction = tx;
+                itemsCmd.CommandText = @"
+                    SELECT oi.product_name, oi.base_qty, oi.base_unit_name, wp.barcode, wp.master_product_id
+                    FROM wh_order_items oi
+                    LEFT JOIN wh_products wp ON oi.product_id = wp.id
+                    WHERE oi.order_id = @oid";
+                itemsCmd.Parameters.AddWithValue("oid", id);
+                var items = new List<object>();
+                using var r = itemsCmd.ExecuteReader();
+                while (r.Read()) items.Add(new {
+                    productName = r.GetString(0),
+                    baseQty = r.GetInt32(1),
+                    baseUnitName = r.GetString(2),
+                    barcode = r.IsDBNull(3) ? "" : r.GetString(3),
+                    masterProductId = r.IsDBNull(4) ? 0 : r.GetInt32(4)
+                });
+
+                tx.Commit();
+                return Ok(new { success = true, orderId = id, items });
+            }
+            catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
         }
     }
 
     public class WhProductDto { public string Name { get; set; } = ""; public string? Barcode { get; set; } public string? Category { get; set; } public decimal BoxPrice { get; set; } public decimal BoxCost { get; set; } public int BoxQty { get; set; } = 1; public decimal PiecePrice { get; set; } }
     public class WhStockDto { public int StockQty { get; set; } }
-    public class WhClientDto { public string Name { get; set; } = ""; public string? Contact { get; set; } public string? Address { get; set; } public string? StoreType { get; set; } }
+    public class WhClientDto { public string Name { get; set; } = ""; public string? Contact { get; set; } public string? Address { get; set; } public string? StoreType { get; set; } public string? StoreId { get; set; } }
     public class WhOrderDto { public int ClientId { get; set; } public string? ClientName { get; set; } public string? Notes { get; set; } public List<WhOrderItemDto>? Items { get; set; } }
-    public class WhOrderItemDto { public int ProductId { get; set; } public string ProductName { get; set; } = ""; public string? UnitType { get; set; } public int Qty { get; set; } public decimal Price { get; set; } public decimal TotalPrice { get; set; } }
+    public class WhOrderItemDto { public int ProductId { get; set; } public string ProductName { get; set; } = ""; public string? UnitType { get; set; } public int Qty { get; set; } public decimal Price { get; set; } public decimal TotalPrice { get; set; } public int BaseQty { get; set; } public string? BaseUnitName { get; set; } public int BoxQtyPerUnit { get; set; } = 1; }
     public class WhStatusDto { public string Status { get; set; } = ""; }
 
     public class SeedProductDto
