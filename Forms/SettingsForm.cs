@@ -87,7 +87,7 @@ public partial class SettingsForm : Form
         var enableCustDisplay = GetSetting(conn, "EnableCustomerDisplay") ?? "true";
         chkCustomerDisplay.Checked = enableCustDisplay == "true";
         _originalSettings["EnableCustomerDisplay"] = enableCustDisplay;
-        var cloudUrl = GetSetting(conn, "CloudApiUrl") ?? "https://api-production-99fb.up.railway.app/api";
+        var cloudUrl = GetSetting(conn, "CloudApiUrl") ?? "https://jumong-pos-api-p285q.ondigitalocean.app/api";
         txtCloudApiUrl.Text = cloudUrl;
         _originalSettings["CloudApiUrl"] = cloudUrl;
     }
@@ -394,7 +394,7 @@ public partial class SettingsForm : Form
         if (_currentUser.Role == "Admin")
         {
             var cy = 40;
-            txtCloudApiUrl = new TextBox { Location = new Point(180, cy), Size = new Size(350, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = "https://api-production-99fb.up.railway.app/api" };
+            txtCloudApiUrl = new TextBox { Location = new Point(180, cy), Size = new Size(350, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = "https://jumong-pos-api-p285q.ondigitalocean.app/api" };
             var lblCloudApi = new Label { Text = "API URL:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, cy), Size = new Size(140, 25) };
             cy += 32;
             lblStoreId = new Label { Text = SyncService.StoreId, Font = new Font("Consolas", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 245, 255), Location = new Point(180, cy), Size = new Size(350, 25), TextAlign = ContentAlignment.MiddleLeft };

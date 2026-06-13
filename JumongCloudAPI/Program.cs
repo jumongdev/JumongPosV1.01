@@ -9,7 +9,7 @@ var connStr = Environment.GetEnvironmentVariable("DATABASE_URL") ??
     builder.Configuration.GetConnectionString("Postgres") ??
     "Host=localhost;Database=jumongpos;Username=postgres;Password=postgres";
 
-// Railway gives postgres:// format, Npgsql needs Host= format
+// DigitalOcean gives postgres:// format, Npgsql needs Host= format
 if (connStr.StartsWith("postgres://") || connStr.StartsWith("postgresql://"))
 {
     var uri = new Uri(connStr);
