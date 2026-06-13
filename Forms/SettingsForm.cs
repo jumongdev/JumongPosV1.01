@@ -434,7 +434,59 @@ public partial class SettingsForm : Form
         }
 
         // ═══════════════════════════════════════════
-        // 4. DATA MANAGEMENT
+        // 4. EMAIL SETUP
+        // ═══════════════════════════════════════════
+        if (_currentUser.Role == "Admin")
+        {
+            var ey = 40;
+            var ReadSetting = (string key) =>
+            {
+                using var sConn = DatabaseHelper.GetConnection();
+                sConn.Open();
+                using var sCmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = @k", sConn);
+                sCmd.Parameters.AddWithValue("@k", key);
+                return sCmd.ExecuteScalar()?.ToString() ?? "";
+            };
+            var SaveSetting = (string key, string val) =>
+            {
+                using var sConn = DatabaseHelper.GetConnection();
+                sConn.Open();
+                using var sCmd = new SQLiteCommand("INSERT OR REPLACE INTO Settings (Key, Value) VALUES (@k, @v)", sConn);
+                sCmd.Parameters.AddWithValue("@k", key);
+                sCmd.Parameters.AddWithValue("@v", val);
+                sCmd.ExecuteNonQuery();
+            };
+
+            var lblSmtpHost = new Label { Text = "SMTP Host:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ey), Size = new Size(140, 25) };
+            var txtSmtpHost = new TextBox { Location = new Point(180, ey), Size = new Size(200, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = ReadSetting("SmtpHost") };
+            txtSmtpHost.TextChanged += (_, _) => SaveSetting("SmtpHost", txtSmtpHost.Text);
+            ey += 30;
+            var lblSmtpPort = new Label { Text = "SMTP Port:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ey), Size = new Size(140, 25) };
+            var numSmtpPort = new NumericUpDown { Location = new Point(180, ey), Size = new Size(80, 25), Minimum = 1, Maximum = 65535, Value = int.TryParse(ReadSetting("SmtpPort"), out var sp) ? sp : 587, BackColor = inputBg, ForeColor = inputFg, BorderStyle = BorderStyle.FixedSingle };
+            numSmtpPort.ValueChanged += (_, _) => SaveSetting("SmtpPort", ((int)numSmtpPort.Value).ToString());
+            ey += 30;
+            var lblSmtpUser = new Label { Text = "SMTP User:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ey), Size = new Size(140, 25) };
+            var txtSmtpUser = new TextBox { Location = new Point(180, ey), Size = new Size(200, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = ReadSetting("SmtpUser") };
+            txtSmtpUser.TextChanged += (_, _) => SaveSetting("SmtpUser", txtSmtpUser.Text);
+            ey += 30;
+            var lblSmtpPass = new Label { Text = "SMTP Pass:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ey), Size = new Size(140, 25) };
+            var txtSmtpPass = new TextBox { Location = new Point(180, ey), Size = new Size(200, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), UseSystemPasswordChar = true, Text = ReadSetting("SmtpPass") };
+            txtSmtpPass.TextChanged += (_, _) => SaveSetting("SmtpPass", txtSmtpPass.Text);
+            ey += 30;
+            var lblSmtpTo = new Label { Text = "Recipient Email:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ey), Size = new Size(140, 25) };
+            var txtSmtpTo = new TextBox { Location = new Point(180, ey), Size = new Size(200, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = ReadSetting("SmtpTo") };
+            txtSmtpTo.TextChanged += (_, _) => SaveSetting("SmtpTo", txtSmtpTo.Text);
+            ey += 36;
+
+            MakeSection("EMAIL SETUP", ey - 36, new Control[] {
+                lblSmtpHost, txtSmtpHost, lblSmtpPort, numSmtpPort,
+                lblSmtpUser, txtSmtpUser, lblSmtpPass, txtSmtpPass,
+                lblSmtpTo, txtSmtpTo
+            });
+        }
+
+        // ═══════════════════════════════════════════
+        // 5. DATA MANAGEMENT
         // ═══════════════════════════════════════════
         if (_currentUser.Role == "Admin")
         {

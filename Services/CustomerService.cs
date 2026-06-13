@@ -161,6 +161,16 @@ public class CustomerService
         return deleted;
     }
 
+    public static void UpdateLoyaltyPoints(int customerId, int points)
+    {
+        using var conn = DatabaseHelper.GetConnection();
+        conn.Open();
+        using var cmd = new SQLiteCommand("UPDATE Customers SET LoyaltyPoints = @pts WHERE Id = @id", conn);
+        cmd.Parameters.AddWithValue("@pts", points);
+        cmd.Parameters.AddWithValue("@id", customerId);
+        cmd.ExecuteNonQuery();
+    }
+
     public static void UpdateCreditBalance(int customerId, decimal newBalance)
     {
         using var conn = DatabaseHelper.GetConnection();

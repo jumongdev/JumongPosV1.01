@@ -21,6 +21,22 @@ public class EmailService
         _smtpUser = "admin@jumongdev.com";
         _smtpPass = "swgtjgflwszvtssi";
         _recipient = "admin@jumongdev.com";
+        try
+        {
+            using var conn = DatabaseHelper.GetConnection();
+            conn.Open();
+            var host = GetSetting(conn, "SmtpHost");
+            var port = GetSetting(conn, "SmtpPort");
+            var user = GetSetting(conn, "SmtpUser");
+            var pass = GetSetting(conn, "SmtpPass");
+            var to   = GetSetting(conn, "SmtpTo");
+            if (!string.IsNullOrWhiteSpace(host)) _smtpHost = host;
+            if (!string.IsNullOrWhiteSpace(port) && int.TryParse(port, out var p)) _smtpPort = p;
+            if (!string.IsNullOrWhiteSpace(user)) _smtpUser = user;
+            if (!string.IsNullOrWhiteSpace(pass)) _smtpPass = pass;
+            if (!string.IsNullOrWhiteSpace(to)) _recipient = to;
+        }
+        catch { }
     }
 
     private static string? GetSetting(System.Data.SQLite.SQLiteConnection conn, string key)
@@ -30,7 +46,21 @@ public class EmailService
         return cmd.ExecuteScalar()?.ToString();
     }
 
-    public bool IsConfigured => true;
+    public bool IsConfigured
+    {
+        get
+        {
+            try
+            {
+                using var conn = DatabaseHelper.GetConnection();
+                conn.Open();
+                var host = GetSetting(conn, "SmtpHost");
+                var user = GetSetting(conn, "SmtpUser");
+                return !string.IsNullOrWhiteSpace(host) && !string.IsNullOrWhiteSpace(user);
+            }
+            catch { return false; }
+        }
+    }
 
     public string? SendEndShiftReport(decimal totalSales, decimal totalCash, decimal totalEWallet,
         decimal totalCredit, decimal totalVoided, decimal cashOnHand, decimal difference, string cashierName,

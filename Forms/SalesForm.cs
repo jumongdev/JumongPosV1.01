@@ -17,6 +17,8 @@ public partial class SalesForm : Form
     private readonly CustomerDisplayForm _customerDisplay;
     private bool _displayVisible = true;
     private System.Windows.Forms.Timer _barcodeTimer = null!;
+    private decimal _discountPercent;
+    private decimal _taxRate;
 
     private static readonly Color CTopbar      = Color.FromArgb(26, 26, 46);
     private static readonly Color CTopbarChip  = Color.FromArgb(37, 37, 64);
@@ -59,6 +61,15 @@ public partial class SalesForm : Form
             ProcessBarcodeInput();
         };
         DebugHelper.AddFormLabel(this);
+        try
+        {
+            using var trConn = DatabaseHelper.GetConnection();
+            trConn.Open();
+            using var trCmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'TaxRate'", trConn);
+            var val = trCmd.ExecuteScalar()?.ToString();
+            if (decimal.TryParse(val, out var tr) && tr > 0) _taxRate = tr;
+        }
+        catch { }
     }
 
     protected override void OnLoad(EventArgs e)
@@ -662,12 +673,20 @@ public partial class SalesForm : Form
 
     private void UpdateTotals()
     {
-        var grandTotal = _cart.Sum(x => x.TotalPrice);
-        var totalQty   = _cart.Sum(x => x.Quantity);
-        lblSubTotal.Text    = $"\u20b1{grandTotal:N2}";
-        lblGrandTotal.Text  = $"\u20b1{grandTotal:N2}";
-        btnPay.Text         = $"Charge  \u20b1{grandTotal:N2}";
-        lblCartMeta.Text    = $"{_cart.Count} item(s)  ·  {totalQty} pcs  ·  click qty to edit";
+        var subTotal = _cart.Sum(x => x.TotalPrice);
+        var discountAmt = subTotal * _discountPercent / 100;
+        var afterDiscount = subTotal - discountAmt;
+        var taxAmt = afterDiscount * _taxRate / 100;
+        var grandTotal = afterDiscount + taxAmt;
+        var totalQty = _cart.Sum(x => x.Quantity);
+        lblSubTotal.Text = $"\u20b1{subTotal:N2}";
+        lblDiscountVal.Text = _discountPercent > 0 ? $"-{discountAmt:N2} ({_discountPercent}%)" : "—";
+        lblDiscountVal.ForeColor = _discountPercent > 0 ? Color.FromArgb(231, 76, 60) : CTextHint;
+        lblTaxVal.Text = _taxRate > 0 ? $"\u20b1{taxAmt:N2}" : "—";
+        lblTaxVal.ForeColor = _taxRate > 0 ? Color.FromArgb(243, 156, 18) : CTextHint;
+        lblGrandTotal.Text = $"\u20b1{grandTotal:N2}";
+        btnPay.Text = $"Charge  \u20b1{grandTotal:N2}";
+        lblCartMeta.Text = $"{_cart.Count} item(s)  ·  {totalQty} pcs  ·  click qty to edit";
     }
 
     private void btnRemove_Click(object? sender, EventArgs e)
@@ -776,7 +795,11 @@ public partial class SalesForm : Form
             return;
         }
 
-        var grandTotal = _cart.Sum(x => x.TotalPrice);
+        var subTotal = _cart.Sum(x => x.TotalPrice);
+        var discountAmt = subTotal * _discountPercent / 100;
+        var afterDiscount = subTotal - discountAmt;
+        var taxAmt = afterDiscount * _taxRate / 100;
+        var grandTotal = afterDiscount + taxAmt;
         using var payForm = new PaymentForm(grandTotal, _selectedCustomer);
         if (payForm.ShowDialog() != DialogResult.OK) return;
 
@@ -784,9 +807,9 @@ public partial class SalesForm : Form
         {
             InvoiceNo     = SaleService.GenerateInvoiceNo(),
             SaleDate      = DateTime.Now,
-            SubTotal      = grandTotal,
-            Discount      = 0,
-            Tax           = 0,
+            SubTotal      = subTotal,
+            Discount      = discountAmt,
+            Tax           = taxAmt,
             GrandTotal    = grandTotal,
             AmountPaid    = payForm.AmountPaid,
             Change        = payForm.Change,
@@ -803,6 +826,16 @@ public partial class SalesForm : Form
         };
 
         var saleId = SaleService.SaveSale(sale);
+
+        if (_selectedCustomer != null)
+        {
+            var ptsEarned = (int)(grandTotal / 100);
+            var ptsUsed = payForm.PointsUsed;
+            var newPts = _selectedCustomer.LoyaltyPoints + ptsEarned - ptsUsed;
+            if (newPts < 0) newPts = 0;
+            _selectedCustomer.LoyaltyPoints = newPts;
+            CustomerService.UpdateLoyaltyPoints(_selectedCustomer.Id, newPts);
+        }
 
         if (payForm.PaymentMethod == "Credit" && _selectedCustomer != null)
         {
@@ -1185,9 +1218,43 @@ public partial class SalesForm : Form
         {
             Text = "Discount",
             Font = new Font("Segoe UI", 10F),
+            ForeColor = CTextMuted,
+            Cursor = Cursors.Hand
+        };
+        lblDiscountLbl.Click += (_, _) =>
+        {
+            var input = Microsoft.VisualBasic.Interaction.InputBox("Enter discount percentage:", "Discount", _discountPercent > 0 ? _discountPercent.ToString("0.#") : "0", -1, -1);
+            if (decimal.TryParse(input, out var p) && p >= 0 && p <= 100)
+            {
+                _discountPercent = p;
+                UpdateTotals();
+            }
+        };
+        lblDiscountVal = new Label
+        {
+            Text = "—",
+            Font = new Font("Segoe UI", 10F),
+            ForeColor = CTextHint,
+            TextAlign = ContentAlignment.MiddleRight,
+            Cursor = Cursors.Hand
+        };
+        lblDiscountVal.Click += (_, _) =>
+        {
+            var input = Microsoft.VisualBasic.Interaction.InputBox("Enter discount percentage:", "Discount", _discountPercent > 0 ? _discountPercent.ToString("0.#") : "0", -1, -1);
+            if (decimal.TryParse(input, out var p) && p >= 0 && p <= 100)
+            {
+                _discountPercent = p;
+                UpdateTotals();
+            }
+        };
+
+        var lblTaxLbl = new Label
+        {
+            Text = "Tax",
+            Font = new Font("Segoe UI", 10F),
             ForeColor = CTextMuted
         };
-        var lblDiscountVal = new Label
+        lblTaxVal = new Label
         {
             Text = "—",
             Font = new Font("Segoe UI", 10F),
@@ -1215,6 +1282,7 @@ public partial class SalesForm : Form
             sep1,
             lblSubTotalLbl, lblSubTotal,
             lblDiscountLbl, lblDiscountVal,
+            lblTaxLbl, lblTaxVal,
             sep2,
             btnPay
         });
@@ -1380,6 +1448,8 @@ public partial class SalesForm : Form
     private Label lblCustomerInfo = null!;
     private Label lblOrderChip = null!;
     private Label lblCartMeta = null!;
+    private Label lblDiscountVal = null!;
+    private Label lblTaxVal = null!;
     private TextBox txtBarcode = null!;
     private TextBox txtSearch = null!;
     private DataGridView dgvCart = null!;

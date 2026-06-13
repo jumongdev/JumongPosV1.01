@@ -7,6 +7,10 @@ public partial class PaymentForm : Form
 {
     private readonly decimal _grandTotal;
     private readonly Customer? _customer;
+    private readonly int _loyaltyPointsAvailable;
+    private decimal _effectiveTotal;
+    private int _pointsToUse;
+    private Label lblPointsInfo = null!;
 
     public decimal AmountPaid    { get; private set; }
     public decimal Change        { get; private set; }
@@ -15,6 +19,7 @@ public partial class PaymentForm : Form
     public decimal CashPaid      { get; private set; }
     public decimal EwPaid        { get; private set; }
     public string  EwReferenceNo { get; private set; } = "";
+    public int     PointsUsed    { get; private set; }
 
     private static readonly Color CSurface    = Color.FromArgb(244, 245, 250);
     private static readonly Color CCard       = Color.White;
@@ -41,12 +46,37 @@ public partial class PaymentForm : Form
     {
         _grandTotal = grandTotal;
         _customer   = customer;
+        _loyaltyPointsAvailable = customer?.LoyaltyPoints ?? 0;
+        _effectiveTotal = grandTotal;
+        _pointsToUse = 0;
         InitializeComponent();
         lblTotalAmount.Text = $"\u20b1{grandTotal:N2}";
+        UpdatePointsDisplay();
         SelectMethod("Cash");
         KeyPreview = true;
         KeyDown += PaymentForm_KeyDown;
         DebugHelper.AddFormLabel(this);
+    }
+
+    private void UpdatePointsDisplay()
+    {
+        if (_loyaltyPointsAvailable > 0)
+        {
+            var ptsText = $"\u2B50 {_loyaltyPointsAvailable:N0} pts available";
+            if (_pointsToUse > 0)
+                ptsText += $"  |  Using {_pointsToUse:N0} pts = -\u20b1{_pointsToUse:N2}";
+            lblPointsInfo.Text = ptsText + "  (click to redeem)";
+            lblPointsInfo.Cursor = Cursors.Hand;
+            lblPointsInfo.ForeColor = CAmberDark;
+        }
+        else
+        {
+            lblPointsInfo.Text = "";
+            lblPointsInfo.Cursor = Cursors.Default;
+        }
+        _effectiveTotal = _grandTotal - _pointsToUse;
+        if (_effectiveTotal < 0) _effectiveTotal = 0;
+        lblTotalAmount.Text = $"\u20b1{_effectiveTotal:N2}";
     }
 
     private void PaymentForm_KeyDown(object? sender, KeyEventArgs e)
@@ -121,6 +151,7 @@ public partial class PaymentForm : Form
         pnlSplit.Visible   = method == "Split";
         pnlCredit.Visible  = method == "Credit";
 
+        var total = _effectiveTotal;
         switch (method)
         {
             case "Cash":
@@ -129,13 +160,13 @@ public partial class PaymentForm : Form
                 lblChangePill.BackColor = CGreenLight;
                 lblChangePill.ForeColor = CGreenDark;
                 btnConfirm.BackColor = CGreenMid;
-                btnConfirm.Text = $"Charge  \u20b1{_grandTotal:N2}";
+                btnConfirm.Text = $"Charge  \u20b1{total:N2}";
                 break;
 
             case "E-Wallet":
                 txtEwRef.Text = "";
                 btnConfirm.BackColor = CBlueMid;
-                btnConfirm.Text = $"Confirm e-wallet  \u20b1{_grandTotal:N2}";
+                btnConfirm.Text = $"Confirm e-wallet  \u20b1{total:N2}";
                 break;
 
             case "Split":
@@ -143,13 +174,13 @@ public partial class PaymentForm : Form
                 txtSplitEw.Text   = "0.00";
                 txtSplitEwRef.Text = "";
                 UpdateSplitSummary();
-                btnConfirm.Text = $"Confirm split  \u20b1{_grandTotal:N2}";
+                btnConfirm.Text = $"Confirm split  \u20b1{total:N2}";
                 break;
 
             case "Credit":
-                lblCreditInfo.Text = $"Charge \u20b1{_grandTotal:N2} to {_customer?.Name ?? "Customer"}'s credit.";
+                lblCreditInfo.Text = $"Charge \u20b1{total:N2} to {_customer?.Name ?? "Customer"}'s credit.";
                 btnConfirm.BackColor = CAmberMid;
-                btnConfirm.Text = $"Confirm credit  \u20b1{_grandTotal:N2}";
+                btnConfirm.Text = $"Confirm credit  \u20b1{total:N2}";
                 break;
         }
 
@@ -164,7 +195,7 @@ public partial class PaymentForm : Form
             lblChange.Text = "\u20b10.00";
             return;
         }
-        var change = paid - _grandTotal;
+        var change = paid - _effectiveTotal;
         lblChange.Text = change >= 0
             ? $"\u20b1{change:N2}"
             : $"-\u20b1{(-change):N2}";
@@ -177,17 +208,18 @@ public partial class PaymentForm : Form
         decimal.TryParse(txtSplitCash.Text, out var cash);
         decimal.TryParse(txtSplitEw.Text, out var ew);
         var total    = cash + ew;
-        var isEnough = total >= _grandTotal && total > 0;
+        var effective = _effectiveTotal;
+        var isEnough = total >= effective && total > 0;
 
         if (isEnough)
         {
-            lblSplitStatus.Text      = $"Change: \u20b1{(total - _grandTotal):N2}";
+            lblSplitStatus.Text      = $"Change: \u20b1{(total - effective):N2}";
             lblSplitStatus.ForeColor = CGreenDark;
             lblSplitStatus.BackColor = CGreenLight;
         }
         else
         {
-            var shortfall = _grandTotal - total;
+            var shortfall = effective - total;
             lblSplitStatus.Text      = total > 0 ? $"Short: \u20b1{shortfall:N2}" : $"Enter amounts";
             lblSplitStatus.ForeColor = Color.FromArgb(163, 45, 45);
             lblSplitStatus.BackColor = Color.FromArgb(252, 235, 235);
@@ -198,17 +230,18 @@ public partial class PaymentForm : Form
 
     private void btnConfirm_Click(object? sender, EventArgs e)
     {
+        var total = _effectiveTotal;
         switch (_activeMethod)
         {
             case "Cash":
-                if (!decimal.TryParse(txtCashAmount.Text, out var paid) || paid < _grandTotal)
+                if (!decimal.TryParse(txtCashAmount.Text, out var paid) || paid < total)
                 {
-                    MessageBox.Show($"Amount must be at least \u20b1{_grandTotal:N2}.", "Invalid Amount",
+                    MessageBox.Show($"Amount must be at least \u20b1{total:N2}.", "Invalid Amount",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
                 AmountPaid = paid;
-                Change = paid - _grandTotal;
+                Change = paid - total;
                 PaymentMethod = "Cash";
                 ReferenceNo = "";
                 break;
@@ -220,7 +253,7 @@ public partial class PaymentForm : Form
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
-                AmountPaid = _grandTotal;
+                AmountPaid = total;
                 Change = 0;
                 PaymentMethod = "E-Wallet";
                 ReferenceNo = txtEwRef.Text.Trim();
@@ -237,10 +270,10 @@ public partial class PaymentForm : Form
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
-                if (splitTotal < _grandTotal)
+                if (splitTotal < total)
                 {
                     MessageBox.Show(
-                        $"Insufficient payment.\nTotal entered: \u20b1{splitTotal:N2}\nBalance due: \u20b1{_grandTotal:N2}\nShort: \u20b1{(_grandTotal - splitTotal):N2}",
+                        $"Insufficient payment.\nTotal entered: \u20b1{splitTotal:N2}\nBalance due: \u20b1{total:N2}\nShort: \u20b1{(total - splitTotal):N2}",
                         "Insufficient", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
@@ -254,13 +287,13 @@ public partial class PaymentForm : Form
                 EwPaid        = splitEw;
                 EwReferenceNo = txtSplitEwRef.Text.Trim();
                 AmountPaid    = splitTotal;
-                Change        = splitTotal - _grandTotal;
+                Change        = splitTotal - total;
                 PaymentMethod = "Split";
                 ReferenceNo   = EwReferenceNo;
                 break;
 
             case "Credit":
-                AmountPaid    = _grandTotal;
+                AmountPaid    = total;
                 Change        = 0;
                 PaymentMethod = "Credit";
                 ReferenceNo   = "";
@@ -270,6 +303,7 @@ public partial class PaymentForm : Form
                 return;
         }
 
+        PointsUsed = _pointsToUse;
         DialogResult = DialogResult.OK;
         Close();
     }
@@ -409,7 +443,7 @@ public partial class PaymentForm : Form
             return b;
         }
 
-        var btnExact = MakeTender("Exact", 16,  () => { txtCashAmount.Text = _grandTotal.ToString("0.00"); });
+        var btnExact = MakeTender("Exact", 16,  () => { txtCashAmount.Text = _effectiveTotal <= 0 ? "0.00" : _effectiveTotal.ToString("0.00"); });
         var btn500   = MakeTender("\u20b1500",  112, () => { txtCashAmount.Text = "500"; });
         var btn1000  = MakeTender("\u20b11,000",208, () => { txtCashAmount.Text = "1000"; });
 
@@ -576,10 +610,39 @@ public partial class PaymentForm : Form
         };
         pnlCredit.Controls.Add(lblCreditInfo);
 
+        lblPointsInfo = new Label
+        {
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            ForeColor = CAmberDark,
+            BackColor = CCard,
+            Location = new Point(0, 434),
+            Size = new Size(420, 26),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Cursor = Cursors.Default
+        };
+        lblPointsInfo.Click += (_, _) =>
+        {
+            if (_loyaltyPointsAvailable <= 0) return;
+            var maxPts = Math.Min(_loyaltyPointsAvailable, (int)_grandTotal);
+            var input = Microsoft.VisualBasic.Interaction.InputBox(
+                $"You have {_loyaltyPointsAvailable:N0} points.\nEnter points to redeem (1 pt = ₱1, max {maxPts}):",
+                "Redeem Points", "0", -1, -1);
+            if (int.TryParse(input, out var pts) && pts > 0 && pts <= maxPts)
+            {
+                _pointsToUse = pts;
+                UpdatePointsDisplay();
+                SelectMethod(_activeMethod);
+            }
+            else if (!string.IsNullOrEmpty(input))
+            {
+                MessageBox.Show($"Enter a value between 1 and {maxPts}.", "Invalid", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        };
+
         btnConfirm = new Button
         {
             Text = $"Charge  \u20b1{_grandTotal:N2}",
-            Location = new Point(16, 534),
+            Location = new Point(16, 474),
             Size = new Size(388, 50),
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
@@ -594,7 +657,7 @@ public partial class PaymentForm : Form
         {
             pnlHeader, pnlTotalBlock, pnlMethodBlock,
             pnlCash, pnlEwallet, pnlSplit, pnlCredit,
-            btnConfirm
+            lblPointsInfo, btnConfirm
         });
     }
 

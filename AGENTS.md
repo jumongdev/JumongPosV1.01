@@ -26,7 +26,7 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 │   ├── ExpenseService.cs       # Expense CRUD
 │   ├── DataExporter.cs         # Import/Export JSON
 │   ├── MigrationService.cs     # Old DB migration tool
-│       ├── AppVersion.cs           # Current = "1.0.28"
+│       ├── AppVersion.cs           # Current = "1.0.29"
 │   └── ... (PrinterService, EmailService, etc.)
 ├── Forms/
 │   ├── MainForm.cs             # Sidebar navigation (POS, Products, Reports, Settings...)
@@ -57,7 +57,8 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
     ├── v1.0.24/  (exe)
     ├── v1.0.26/  (exe)
     ├── v1.0.27/  (exe)
-    └── v1.0.28/  (exe) — current
+    └── v1.0.28/  (exe)
+    └── v1.0.29/  (exe) — current
 ```
 
 ## Tech Stack
@@ -179,6 +180,46 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 | 8 | `Forms/SettingsForm.cs` | **MEDIUM** Wrapped `btnSyncFromCloud_Click` in try-catch to prevent `async void` crash |
 | 9 | `Forms/SalesForm.cs` | **LOW** Removed unused `_lastBarcodeKeystroke` field |
 | 10 | `Forms/SettingsForm.cs` | **LOW** Changed `.Wait()` → `await` and `Thread.Sleep` → `Task.Delay` in sync methods; `ShowSyncProgress` now accepts `Func<..., Task<int>>` |
+
+### v1.0.29 — Tax, Discount, SMTP Config & Loyalty Points
+
+#### Tax Support
+| File | Change |
+|---|---|
+| `Services/DatabaseHelper.cs` | Added `TaxRate` setting seed to Settings table on DB init |
+| `Services/SaleService.cs` | `SaveSale()` now reads `TaxRate` from Settings, stores `Tax` on Sale |
+| `Forms/SalesForm.cs` | `UpdateTotals()` computes tax from `_taxRate` setting; shows tax line in cart footer UI |
+| `Forms/SalesForm.cs` | `btnPay_Click()` computes and passes `taxAmt` to the Sale object |
+| `Models/Sale.cs` | Added `Tax` property |
+| `Models/SaleItem.cs` | Added `Tax` property (per-item) |
+| `Services/PrinterService.cs` | Receipt prints tax line |
+| `Services/SyncService.cs` | `SyncSale()` includes Tax in synced JSON |
+
+#### Discount Engine
+| File | Change |
+|---|---|
+| `Forms/SalesForm.cs` | Added `_discountPercent` field; `lblDiscountVal` click opens InputBox for discount % |
+| `Forms/SalesForm.cs` | `UpdateTotals()` applies discount before tax |
+| `Forms/SalesForm.cs` | `btnPay_Click()` passes `discountAmt` to Sale |
+| `Models/Sale.cs` | Added `Discount` property |
+| `Services/PrinterService.cs` | Receipt prints discount line (when > 0) |
+| `Services/SyncService.cs` | `SyncSale()` includes discount in synced JSON |
+| `Data/DatabaseHelper.cs` | Added `DiscountPercent` setting seed |
+
+#### Configurable SMTP
+| File | Change |
+|---|---|
+| `Forms/SettingsForm.cs` | Added EMAIL SETUP section with SMTP Host, Port, User, Pass, Recipient fields; saved to Settings table |
+| `Services/EmailService.cs` | Constructor reads SMTP settings from Settings table (falls back to hardcoded defaults) |
+| `Services/EmailService.cs` | `IsConfigured` now checks for configured SMTP host + user |
+
+#### Loyalty Points
+| File | Change |
+|---|---|
+| `Services/CustomerService.cs` | Added `UpdateLoyaltyPoints(id, points)` method |
+| `Forms/PaymentForm.cs` | Added points redemption UI: shows available points, click to redeem, deducts from grand total |
+| `Forms/PaymentForm.cs` | Added `PointsUsed` public property, uses `_effectiveTotal` for all payment calculations |
+| `Forms/SalesForm.cs` | `btnPay_Click()` awards 1 point per ₱100 spent and deducts redeemed points after payment |
 
 ## Current App Behavior
 
