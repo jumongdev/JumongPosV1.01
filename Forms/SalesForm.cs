@@ -799,10 +799,16 @@ public partial class SalesForm : Form
             _selectedCustomer.CreditBalance += grandTotal;
         }
 
-        if (MessageBox.Show("Print receipt?", "Receipt", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
         {
-            var cashierName = _currentUser?.FullName ?? _currentUser?.Username ?? "Admin";
-            PrinterService.PrintReceipt(sale, cashierName, _selectedCustomer);
+            using var psConn = DatabaseHelper.GetConnection();
+            psConn.Open();
+            using var psCmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'PrintReceipt'", psConn);
+            var printSetting = psCmd.ExecuteScalar()?.ToString() ?? "True";
+            if (printSetting == "True")
+            {
+                var cashierName = _currentUser?.FullName ?? _currentUser?.Username ?? "Admin";
+                PrinterService.PrintReceipt(sale, cashierName, _selectedCustomer);
+            }
         }
 
         if (_selectedCustomer != null && !string.IsNullOrWhiteSpace(_selectedCustomer.Email)
@@ -1114,6 +1120,7 @@ public partial class SalesForm : Form
         _pnlCart.Controls.AddRange(new Control[] { pnlCartHeader, dgvCart, pnlActions, pnlShortcuts });
 
         btnRemove = new Button { Visible = false };
+        btnRemove.Click += btnRemove_Click;
 
         _pnlTotals = new Panel { BackColor = CCard };
         _pnlTotals.Paint += (s, e) =>

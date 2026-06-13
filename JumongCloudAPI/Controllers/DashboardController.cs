@@ -644,7 +644,7 @@ public class DashboardController : ControllerBase
         [HttpGet("version")]
         public IActionResult GetVersion()
         {
-            return Ok(new { version = "1.0.27", buildDate = "2026-06-13", changes = "Auto-poll transfers, dashboard print, low stock alerts, email receipt", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.27/JumongPosV1.01.exe" });
+            return Ok(new { version = "1.0.28", buildDate = "2026-06-13", changes = "Quick fixes: btnRemove wired, PrintReceipt setting, PendingTransfer models extracted", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.28/JumongPosV1.01.exe" });
         }
 
         [HttpGet("products/master")]

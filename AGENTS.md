@@ -26,7 +26,7 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 │   ├── ExpenseService.cs       # Expense CRUD
 │   ├── DataExporter.cs         # Import/Export JSON
 │   ├── MigrationService.cs     # Old DB migration tool
-│       ├── AppVersion.cs           # Current = "1.0.27"
+│       ├── AppVersion.cs           # Current = "1.0.28"
 │   └── ... (PrinterService, EmailService, etc.)
 ├── Forms/
 │   ├── MainForm.cs             # Sidebar navigation (POS, Products, Reports, Settings...)
@@ -56,7 +56,8 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
     ├── v1.0.23/  (exe)
     ├── v1.0.24/  (exe)
     ├── v1.0.26/  (exe)
-    └── v1.0.27/  (exe) — current
+    ├── v1.0.27/  (exe)
+    └── v1.0.28/  (exe) — current
 ```
 
 ## Tech Stack
@@ -156,6 +157,14 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 | `Forms/SalesForm.cs` | `RebuildSearchPanel()` shows 3 states: green (in stock), orange (low stock ≤ threshold), red (out of stock); `btnPay_Click()` prompts to email receipt to customer |
 | `Forms/SettingsForm.cs` | Added Low Stock Threshold NumericUpDown in DISPLAY SETUP section, persists to Settings table |
 | `Services/EmailService.cs` | Added `SendReceipt(Sale, Customer, List<SaleItem>)` — generates HTML receipt and sends to customer email |
+
+### v1.0.28 Changes
+| File | Change |
+|---|---|
+| `Forms/SalesForm.cs:1117` | Wired up `btnRemove` — dead handler connected (`btnRemove.Click += btnRemove_Click`) |
+| `Forms/SalesForm.cs:793` | Replaced print prompt with `PrintReceipt` setting — auto-prints if `"True"`, skips if `"False"`, no dialog |
+| `Models/PendingTransfer.cs` | Created — extracted `PendingTransfer` and `TransferItem` classes from SyncService.cs |
+| `Services/SyncService.cs` | Removed duplicate `PendingTransfer` / `TransferItem` class definitions |
 
 ## Current App Behavior
 
