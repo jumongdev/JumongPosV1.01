@@ -486,7 +486,120 @@ public partial class SettingsForm : Form
         }
 
         // ═══════════════════════════════════════════
-        // 5. DATA MANAGEMENT
+        // 5. CLOUD DATABASE (PostgreSQL)
+        // ═══════════════════════════════════════════
+        if (_currentUser.Role == "Admin")
+        {
+            var ReadPgSetting = (string key) =>
+            {
+                using var sConn = DatabaseHelper.GetConnection();
+                sConn.Open();
+                using var sCmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = @k", sConn);
+                sCmd.Parameters.AddWithValue("@k", key);
+                return sCmd.ExecuteScalar()?.ToString() ?? "";
+            };
+            var SavePgSetting = (string key, string val) =>
+            {
+                using var sConn = DatabaseHelper.GetConnection();
+                sConn.Open();
+                using var sCmd = new SQLiteCommand("INSERT OR REPLACE INTO Settings (Key, Value) VALUES (@k, @v)", sConn);
+                sCmd.Parameters.AddWithValue("@k", key);
+                sCmd.Parameters.AddWithValue("@v", val);
+                sCmd.ExecuteNonQuery();
+            };
+
+            var py = 40;
+            var txtPgHost = new TextBox { Location = new Point(180, py), Size = new Size(200, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = ReadPgSetting("PgHost") };
+            txtPgHost.TextChanged += (_, _) => SavePgSetting("PgHost", txtPgHost.Text);
+            var lblPgHost = new Label { Text = "PG Host:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, py), Size = new Size(140, 25) };
+            py += 30;
+            var txtPgPort = new TextBox { Location = new Point(180, py), Size = new Size(80, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = ReadPgSetting("PgPort") == "" ? "5432" : ReadPgSetting("PgPort") };
+            txtPgPort.TextChanged += (_, _) => SavePgSetting("PgPort", txtPgPort.Text);
+            var lblPgPort = new Label { Text = "PG Port:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, py), Size = new Size(140, 25) };
+            py += 30;
+            var txtPgDb = new TextBox { Location = new Point(180, py), Size = new Size(200, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = ReadPgSetting("PgDatabase") };
+            txtPgDb.TextChanged += (_, _) => SavePgSetting("PgDatabase", txtPgDb.Text);
+            var lblPgDb = new Label { Text = "PG Database:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, py), Size = new Size(140, 25) };
+            py += 30;
+            var txtPgUser = new TextBox { Location = new Point(180, py), Size = new Size(200, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = ReadPgSetting("PgUser") };
+            txtPgUser.TextChanged += (_, _) => SavePgSetting("PgUser", txtPgUser.Text);
+            var lblPgUser = new Label { Text = "PG User:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, py), Size = new Size(140, 25) };
+            py += 30;
+            var txtPgPass = new TextBox { Location = new Point(180, py), Size = new Size(200, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), UseSystemPasswordChar = true, Text = ReadPgSetting("PgPass") };
+            txtPgPass.TextChanged += (_, _) => SavePgSetting("PgPass", txtPgPass.Text);
+            var lblPgPass = new Label { Text = "PG Password:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, py), Size = new Size(140, 25) };
+            py += 30;
+            var chkPgSsl = new CheckBox { Text = "Use SSL", Location = new Point(180, py), Size = new Size(160, 25), Font = new Font("Segoe UI", 9F), ForeColor = dimText, Checked = ReadPgSetting("PgSsl") == "True" };
+            chkPgSsl.CheckedChanged += (_, _) => SavePgSetting("PgSsl", chkPgSsl.Checked ? "True" : "False");
+            py += 34;
+
+            var testResult = new Label { Text = "", Font = new Font("Segoe UI", 9F), ForeColor = Color.FromArgb(46, 204, 113), Location = new Point(180, py), Size = new Size(200, 25) };
+            var btnTestPg = MakeBtn("\uD83D\uDD0C TEST CONNECTION", 15, py, Color.FromArgb(52, 152, 219), null!);
+            btnTestPg.Click += (_, _) =>
+            {
+                testResult.Text = "Testing...";
+                testResult.ForeColor = Color.FromArgb(241, 196, 15);
+                try
+                {
+                    var ok = CloudDatabaseHelper.TestConnection();
+                    testResult.Text = ok ? "Connected!" : "Failed";
+                    testResult.ForeColor = ok ? Color.FromArgb(46, 204, 113) : Color.FromArgb(231, 76, 60);
+                }
+                catch (Exception ex)
+                {
+                    testResult.Text = ex.Message.Substring(0, Math.Min(40, ex.Message.Length));
+                    testResult.ForeColor = Color.FromArgb(231, 76, 60);
+                }
+            };
+            py += 36;
+
+            var btnMigrate = MakeBtn("\u2191 MIGRATE TO CLOUD DB", 15, py, Color.FromArgb(155, 89, 182), null!);
+            var migrateDesc = MakeDesc("Copy existing Products, Customers, Users to PostgreSQL", 15 + 210 + 10, py);
+            btnMigrate.Click += (_, _) =>
+            {
+                if (!CloudDatabaseHelper.TestConnection())
+                {
+                    MessageBox.Show("Cannot connect to PostgreSQL. Check your settings above.", "Connection Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                ShowSyncProgress("Migrating To Cloud DB...", async p =>
+                {
+                    var count = 0;
+                    p.Report("Migrating products...");
+                    foreach (var prod in ProductService.GetAll())
+                    {
+                        await ProductService.TryWriteToPgAsync(prod);
+                        count++;
+                    }
+                    p.Report($"Migrated {count} products. Migrating customers...");
+                    count = 0;
+                    foreach (var cust in CustomerService.GetAll())
+                    {
+                        await CustomerService.TryWriteToPgAsync(cust);
+                        count++;
+                    }
+                    p.Report($"Migrated {count} customers. Migrating users...");
+                    count = 0;
+                    foreach (var user in UserService.GetAll())
+                    {
+                        await UserService.TryWriteToPgAsync(user);
+                        count++;
+                    }
+                    p.Report($"Migrated {count} users. Done!");
+                    return count;
+                });
+            };
+            py += 42;
+
+            MakeSection("CLOUD DATABASE", py - 40, new Control[] {
+                lblPgHost, txtPgHost, lblPgPort, txtPgPort, lblPgDb, txtPgDb,
+                lblPgUser, txtPgUser, lblPgPass, txtPgPass, chkPgSsl,
+                btnTestPg, testResult, btnMigrate, migrateDesc
+            });
+        }
+
+        // ═══════════════════════════════════════════
+        // 6. DATA MANAGEMENT
         // ═══════════════════════════════════════════
         if (_currentUser.Role == "Admin")
         {

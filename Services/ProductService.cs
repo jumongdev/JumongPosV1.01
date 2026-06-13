@@ -1,49 +1,114 @@
+using System.Data;
 using System.Data.SQLite;
 using JumongPosV1._01.Data;
 using JumongPosV1._01.Models;
+using Npgsql;
 
 namespace JumongPosV1._01.Services;
 
 public class ProductService
 {
+    private static string StoreId => SyncService.StoreId;
+
+    public static async Task TryWriteToPgAsync(Product p)
+    {
+        if (!CloudDatabaseHelper.IsConfigured) return;
+        try
+        {
+            using var pgConn = CloudDatabaseHelper.GetConnection()!;
+            await pgConn.OpenAsync();
+            await CloudDatabaseHelper.EnsureSchemaAsync(pgConn);
+            var sql = @"INSERT INTO products (pos_id, store_id, name, barcode, category, price, cost, stock_qty, is_active, image_data)
+                        VALUES (@pid, @sid, @n, @b, @c, @p, @co, @s, @a, @img)
+                        ON CONFLICT (store_id, pos_id) DO UPDATE SET
+                            name=@n, barcode=@b, category=@c, price=@p, cost=@co, stock_qty=@s, is_active=@a, image_data=@img";
+            using var cmd = new NpgsqlCommand(sql, pgConn);
+            cmd.Parameters.AddWithValue("pid", p.Id);
+            cmd.Parameters.AddWithValue("sid", StoreId);
+            cmd.Parameters.AddWithValue("n", p.Name);
+            cmd.Parameters.AddWithValue("b", (object?)p.Barcode ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("c", p.Category);
+            cmd.Parameters.AddWithValue("p", p.Price);
+            cmd.Parameters.AddWithValue("co", p.Cost);
+            cmd.Parameters.AddWithValue("s", p.StockQty);
+            cmd.Parameters.AddWithValue("a", p.IsActive ? 1 : 0);
+            cmd.Parameters.AddWithValue("img", (object?)p.ImageData ?? DBNull.Value);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch { }
+    }
+
     public static List<Product> GetAll()
     {
         var list = new List<Product>();
+        if (CloudDatabaseHelper.IsConfigured)
+        {
+            try
+            {
+                using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                pgConn.Open();
+                using var cmd = new NpgsqlCommand("SELECT * FROM products WHERE is_active = 1 ORDER BY name", pgConn);
+                using var rdr = cmd.ExecuteReader();
+                while (rdr.Read())
+                    list.Add(MapPg(rdr));
+                if (list.Count > 0) return list;
+            }
+            catch { }
+        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var sql = "SELECT * FROM Products WHERE IsActive = 1 ORDER BY Name";
-        using var cmd = new SQLiteCommand(sql, conn);
-        using var rdr = cmd.ExecuteReader();
-        while (rdr.Read())
-        {
-            list.Add(Map(rdr));
-        }
+        using var cmd2 = new SQLiteCommand("SELECT * FROM Products WHERE IsActive = 1 ORDER BY Name", conn);
+        using var rdr2 = cmd2.ExecuteReader();
+        while (rdr2.Read()) list.Add(Map(rdr2));
         return list;
     }
 
     public static Product? GetById(int id)
     {
+        if (CloudDatabaseHelper.IsConfigured)
+        {
+            try
+            {
+                using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                pgConn.Open();
+                using var cmd = new NpgsqlCommand("SELECT * FROM products WHERE pos_id = @id AND store_id = @sid", pgConn);
+                cmd.Parameters.AddWithValue("id", id);
+                cmd.Parameters.AddWithValue("sid", StoreId);
+                using var rdr = cmd.ExecuteReader();
+                if (rdr.Read()) return MapPg(rdr);
+            }
+            catch { }
+        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var sql = "SELECT * FROM Products WHERE Id = @id";
-        using var cmd = new SQLiteCommand(sql, conn);
-        cmd.Parameters.AddWithValue("@id", id);
-        using var rdr = cmd.ExecuteReader();
-        if (rdr.Read())
-            return Map(rdr);
+        using var cmd2 = new SQLiteCommand("SELECT * FROM Products WHERE Id = @id", conn);
+        cmd2.Parameters.AddWithValue("@id", id);
+        using var rdr2 = cmd2.ExecuteReader();
+        if (rdr2.Read()) return Map(rdr2);
         return null;
     }
 
     public static Product? GetByBarcode(string barcode)
     {
+        if (CloudDatabaseHelper.IsConfigured)
+        {
+            try
+            {
+                using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                pgConn.Open();
+                using var cmd = new NpgsqlCommand("SELECT * FROM products WHERE barcode = @b AND is_active = 1", pgConn);
+                cmd.Parameters.AddWithValue("b", barcode);
+                using var rdr = cmd.ExecuteReader();
+                if (rdr.Read()) return MapPg(rdr);
+            }
+            catch { }
+        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var sql = "SELECT * FROM Products WHERE Barcode = @barcode AND IsActive = 1";
-        using var cmd = new SQLiteCommand(sql, conn);
-        cmd.Parameters.AddWithValue("@barcode", barcode);
-        using var rdr = cmd.ExecuteReader();
-        if (rdr.Read())
-            return Map(rdr);
+        using var cmd2 = new SQLiteCommand("SELECT * FROM Products WHERE Barcode = @barcode AND IsActive = 1", conn);
+        cmd2.Parameters.AddWithValue("@barcode", barcode);
+        using var rdr2 = cmd2.ExecuteReader();
+        if (rdr2.Read()) return Map(rdr2);
         return null;
     }
 
@@ -95,47 +160,89 @@ public class ProductService
             cmd.Parameters.AddWithValue("@mb", modifiedBy);
             cmd.ExecuteNonQuery();
         }
+        _ = TryWriteToPgAsync(p);
         _ = SyncService.SyncProduct(p);
     }
 
     public static List<string> GetCategories()
     {
-        var list = new List<string>();
+        if (CloudDatabaseHelper.IsConfigured)
+        {
+            try
+            {
+                var list = new List<string>();
+                using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                pgConn.Open();
+                using var cmd = new NpgsqlCommand("SELECT DISTINCT category FROM products WHERE is_active = 1 AND category != '' ORDER BY category", pgConn);
+                using var rdr = cmd.ExecuteReader();
+                while (rdr.Read()) list.Add(rdr.GetString(0));
+                if (list.Count > 0) return list;
+            }
+            catch { }
+        }
+        var list2 = new List<string>();
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var sql = "SELECT DISTINCT Category FROM Products WHERE IsActive = 1 AND Category != '' ORDER BY Category";
-        using var cmd = new SQLiteCommand(sql, conn);
-        using var rdr = cmd.ExecuteReader();
-        while (rdr.Read())
-            list.Add(rdr.GetString(0));
-        return list;
+        using var cmd2 = new SQLiteCommand("SELECT DISTINCT Category FROM Products WHERE IsActive = 1 AND Category != '' ORDER BY Category", conn);
+        using var rdr2 = cmd2.ExecuteReader();
+        while (rdr2.Read())
+            list2.Add(rdr2.GetString(0));
+        return list2;
     }
 
     public static List<Product> Search(string keyword, string? category = null, string? stockFilter = null)
     {
         var list = new List<Product>();
+        if (CloudDatabaseHelper.IsConfigured)
+        {
+            try
+            {
+                using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                pgConn.Open();
+                var sql = "SELECT * FROM products WHERE is_active = 1";
+                if (!string.IsNullOrEmpty(keyword))
+                    sql += " AND (name ILIKE @q OR barcode ILIKE @q)";
+                if (!string.IsNullOrEmpty(category))
+                    sql += " AND category = @cat";
+                if (stockFilter == "low")
+                    sql += " AND stock_qty > 0 AND stock_qty <= @thresh";
+                else if (stockFilter == "out")
+                    sql += " AND stock_qty = 0";
+                sql += " ORDER BY name";
+                using var cmd = new NpgsqlCommand(sql, pgConn);
+                if (!string.IsNullOrEmpty(keyword))
+                    cmd.Parameters.AddWithValue("q", $"%{keyword}%");
+                if (!string.IsNullOrEmpty(category))
+                    cmd.Parameters.AddWithValue("cat", category);
+                if (stockFilter == "low")
+                    cmd.Parameters.AddWithValue("thresh", GetLowStockThreshold());
+                using var rdr = cmd.ExecuteReader();
+                while (rdr.Read()) list.Add(MapPg(rdr));
+                if (list.Count > 0) return list;
+            }
+            catch { }
+        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var sql = "SELECT * FROM Products WHERE IsActive = 1";
+        var sql2 = "SELECT * FROM Products WHERE IsActive = 1";
         if (!string.IsNullOrEmpty(keyword))
-            sql += " AND (Name LIKE @q OR Barcode LIKE @q)";
+            sql2 += " AND (Name LIKE @q OR Barcode LIKE @q)";
         if (!string.IsNullOrEmpty(category))
-            sql += " AND Category = @cat";
+            sql2 += " AND Category = @cat";
         if (stockFilter == "low")
-            sql += $" AND StockQty > 0 AND StockQty <= @thresh";
+            sql2 += " AND StockQty > 0 AND StockQty <= @thresh";
         else if (stockFilter == "out")
-            sql += " AND StockQty = 0";
-        sql += " ORDER BY Name";
-        using var cmd = new SQLiteCommand(sql, conn);
+            sql2 += " AND StockQty = 0";
+        sql2 += " ORDER BY Name";
+        using var cmd2 = new SQLiteCommand(sql2, conn);
         if (!string.IsNullOrEmpty(keyword))
-            cmd.Parameters.AddWithValue("@q", $"%{keyword}%");
+            cmd2.Parameters.AddWithValue("@q", $"%{keyword}%");
         if (!string.IsNullOrEmpty(category))
-            cmd.Parameters.AddWithValue("@cat", category);
+            cmd2.Parameters.AddWithValue("@cat", category);
         if (stockFilter == "low")
-            cmd.Parameters.AddWithValue("@thresh", GetLowStockThreshold());
-        using var rdr = cmd.ExecuteReader();
-        while (rdr.Read())
-            list.Add(Map(rdr));
+            cmd2.Parameters.AddWithValue("@thresh", GetLowStockThreshold());
+        using var rdr2 = cmd2.ExecuteReader();
+        while (rdr2.Read()) list.Add(Map(rdr2));
         return list;
     }
 
@@ -155,32 +262,63 @@ public class ProductService
 
     public static (int total, int lowStock, int outOfStock) GetStockStats()
     {
+        if (CloudDatabaseHelper.IsConfigured)
+        {
+            try
+            {
+                using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                pgConn.Open();
+                var threshold = GetLowStockThreshold();
+                var cmd = new NpgsqlCommand("SELECT COUNT(*), SUM(CASE WHEN stock_qty = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN stock_qty > 0 AND stock_qty <= @thresh THEN 1 ELSE 0 END) FROM products WHERE is_active = 1", pgConn);
+                cmd.Parameters.AddWithValue("thresh", threshold);
+                using var rdr = cmd.ExecuteReader();
+                if (rdr.Read())
+                {
+                    var total = Convert.ToInt32(rdr[0]);
+                    var outOf = rdr[1] != DBNull.Value ? Convert.ToInt32(rdr[1]) : 0;
+                    var low = rdr[2] != DBNull.Value ? Convert.ToInt32(rdr[2]) : 0;
+                    return (total, low, outOf);
+                }
+            }
+            catch { }
+        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var threshold = GetLowStockThreshold();
-        var total = 0; var low = 0; var outOf = 0;
-        var cmd = new SQLiteCommand("SELECT COUNT(*), SUM(CASE WHEN StockQty = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN StockQty > 0 AND StockQty <= @thresh THEN 1 ELSE 0 END) FROM Products WHERE IsActive = 1", conn);
-        cmd.Parameters.AddWithValue("@thresh", threshold);
-        using var rdr = cmd.ExecuteReader();
-        if (rdr.Read())
+        var threshold2 = GetLowStockThreshold();
+        var total2 = 0; var low2 = 0; var outOf2 = 0;
+        var cmd2 = new SQLiteCommand("SELECT COUNT(*), SUM(CASE WHEN StockQty = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN StockQty > 0 AND StockQty <= @thresh THEN 1 ELSE 0 END) FROM Products WHERE IsActive = 1", conn);
+        cmd2.Parameters.AddWithValue("@thresh", threshold2);
+        using var rdr2 = cmd2.ExecuteReader();
+        if (rdr2.Read())
         {
-            total = Convert.ToInt32(rdr[0]);
-            outOf = rdr[1] != DBNull.Value ? Convert.ToInt32(rdr[1]) : 0;
-            low = rdr[2] != DBNull.Value ? Convert.ToInt32(rdr[2]) : 0;
+            total2 = Convert.ToInt32(rdr2[0]);
+            outOf2 = rdr2[1] != DBNull.Value ? Convert.ToInt32(rdr2[1]) : 0;
+            low2 = rdr2[2] != DBNull.Value ? Convert.ToInt32(rdr2[2]) : 0;
         }
-        return (total, low, outOf);
+        return (total2, low2, outOf2);
     }
 
     public static (decimal retailValue, decimal costValue) GetStockValues()
     {
+        if (CloudDatabaseHelper.IsConfigured)
+        {
+            try
+            {
+                using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                pgConn.Open();
+                var cmd = new NpgsqlCommand("SELECT COALESCE(SUM(stock_qty * price), 0), COALESCE(SUM(stock_qty * cost), 0) FROM products WHERE is_active = 1", pgConn);
+                using var rdr = cmd.ExecuteReader();
+                if (rdr.Read())
+                    return (Convert.ToDecimal(rdr[0]), Convert.ToDecimal(rdr[1]));
+            }
+            catch { }
+        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var cmd = new SQLiteCommand("SELECT COALESCE(SUM(StockQty * Price), 0), COALESCE(SUM(StockQty * Cost), 0) FROM Products WHERE IsActive = 1", conn);
-        using var rdr = cmd.ExecuteReader();
-        if (rdr.Read())
-        {
-            return (Convert.ToDecimal(rdr[0]), Convert.ToDecimal(rdr[1]));
-        }
+        var cmd2 = new SQLiteCommand("SELECT COALESCE(SUM(StockQty * Price), 0), COALESCE(SUM(StockQty * Cost), 0) FROM Products WHERE IsActive = 1", conn);
+        using var rdr2 = cmd2.ExecuteReader();
+        if (rdr2.Read())
+            return (Convert.ToDecimal(rdr2[0]), Convert.ToDecimal(rdr2[1]));
         return (0, 0);
     }
 
@@ -192,6 +330,19 @@ public class ProductService
         using var cmd = new SQLiteCommand(sql, conn);
         cmd.Parameters.AddWithValue("@id", id);
         cmd.ExecuteNonQuery();
+        if (CloudDatabaseHelper.IsConfigured)
+        {
+            try
+            {
+                using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                pgConn.Open();
+                using var pgCmd = new NpgsqlCommand("UPDATE products SET is_active = 0 WHERE pos_id = @id AND store_id = @sid", pgConn);
+                pgCmd.Parameters.AddWithValue("id", id);
+                pgCmd.Parameters.AddWithValue("sid", StoreId);
+                pgCmd.ExecuteNonQuery();
+            }
+            catch { }
+        }
     }
 
     private static Product Map(SQLiteDataReader rdr)
@@ -207,6 +358,23 @@ public class ProductService
             StockQty = Convert.ToInt32(rdr["StockQty"]),
             IsActive = Convert.ToBoolean(rdr["IsActive"]),
             CreatedAt = DateTime.Parse(rdr["CreatedAt"].ToString()!),
+            ImageData = rdr["image_data"]?.ToString() ?? ""
+        };
+    }
+
+    private static Product MapPg(NpgsqlDataReader rdr)
+    {
+        return new Product
+        {
+            Id = Convert.ToInt32(rdr["pos_id"]),
+            Name = rdr["name"].ToString() ?? "",
+            Barcode = rdr["barcode"]?.ToString() ?? "",
+            Category = rdr["category"]?.ToString() ?? "",
+            Price = Convert.ToDecimal(rdr["price"]),
+            Cost = Convert.ToDecimal(rdr["cost"]),
+            StockQty = Convert.ToInt32(rdr["stock_qty"]),
+            IsActive = Convert.ToInt32(rdr["is_active"]) == 1,
+            CreatedAt = DateTime.TryParse(rdr["created_at"]?.ToString(), out var dt) ? dt : DateTime.Now,
             ImageData = rdr["image_data"]?.ToString() ?? ""
         };
     }

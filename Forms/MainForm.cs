@@ -69,31 +69,36 @@ public partial class MainForm : Form
 
     private void StartTransferPoll()
     {
-        _transferTimer = new System.Windows.Forms.Timer { Interval = 60000 };
+        _transferTimer = new System.Windows.Forms.Timer { Interval = 15000 };
         _transferTimer.Tick += async (_, _) =>
         {
             try
             {
                 var transfers = await SyncService.GetPendingTransfersAsync();
-                if (transfers != null && transfers.Count > _lastTransferCount)
+                var count = transfers?.Count ?? 0;
+                if (count > _lastTransferCount)
                 {
-                    var newCount = transfers.Count - _lastTransferCount;
+                    var newCount = count - _lastTransferCount;
                     var icon = new NotifyIcon
                     {
                         Icon = SystemIcons.Information,
                         Visible = true,
-                        BalloonTipTitle = "New Warehouse Transfers",
-                        BalloonTipText = $"{newCount} new transfer(s) ready. Click Inventory to receive."
+                        BalloonTipTitle = "New Online Orders",
+                        BalloonTipText = $"{newCount} new order(s) ready. Open Online Orders to process."
                     };
                     icon.BalloonTipClicked += (_, _) =>
                     {
                         icon.Dispose();
-                        btnInventory_Click(null!, EventArgs.Empty);
+                        btnOnlineOrders_Click(null!, EventArgs.Empty);
                     };
                     icon.BalloonTipClosed += (_, _) => icon.Dispose();
                     icon.ShowBalloonTip(5000);
                 }
-                _lastTransferCount = transfers?.Count ?? 0;
+                _lastTransferCount = count;
+                if (btnOnlineOrders != null)
+                    btnOnlineOrders.Text = count > 0
+                        ? $"    Online Orders ({count})"
+                        : "    Online Orders";
             }
             catch { }
         };
@@ -216,6 +221,12 @@ public partial class MainForm : Form
         form.ShowDialog();
     }
 
+    private void btnOnlineOrders_Click(object? sender, EventArgs e)
+    {
+        using var form = new PendingOrdersForm(_currentUser, _customerDisplay);
+        form.ShowDialog();
+    }
+
     private void btnExpenses_Click(object? sender, EventArgs e)
     {
         using var form = new ExpensesForm(_currentUser);
@@ -294,14 +305,15 @@ public partial class MainForm : Form
         btnReports = CreateMenuButton("Reports", 0, 285, btnReports_Click, cardBg, textColor, hoverBg);
         btnCredit = CreateMenuButton("Credit Management", 0, 340, btnCredit_Click, cardBg, textColor, hoverBg);
         btnInventory = CreateMenuButton("Inventory", 0, 395, btnInventory_Click, cardBg, textColor, hoverBg);
-        btnExpenses = CreateMenuButton("Expenses", 0, 450, btnExpenses_Click, cardBg, textColor, hoverBg);
-        btnUsers = CreateMenuButton("User Management", 0, 505, btnUsers_Click, cardBg, textColor, hoverBg);
+        btnOnlineOrders = CreateMenuButton("Online Orders", 0, 450, btnOnlineOrders_Click, cardBg, textColor, hoverBg);
+        btnExpenses = CreateMenuButton("Expenses", 0, 505, btnExpenses_Click, cardBg, textColor, hoverBg);
+        btnUsers = CreateMenuButton("User Management", 0, 560, btnUsers_Click, cardBg, textColor, hoverBg);
         btnUsers.Visible = _currentUser.Role == "Admin";
-        btnEndShift = CreateMenuButton("End Shift", 0, 560, btnEndShift_Click, cardBg, textColor, hoverBg);
-        btnSettings = CreateMenuButton("Settings", 0, 615, btnSettings_Click, cardBg, textColor, hoverBg);
-        btnLogout = CreateMenuButton("Logout", 0, 670, btnLogout_Click, Color.FromArgb(50, 35, 35), Color.FromArgb(231, 76, 60), Color.FromArgb(70, 45, 45));
+        btnEndShift = CreateMenuButton("End Shift", 0, 615, btnEndShift_Click, cardBg, textColor, hoverBg);
+        btnSettings = CreateMenuButton("Settings", 0, 670, btnSettings_Click, cardBg, textColor, hoverBg);
+        btnLogout = CreateMenuButton("Logout", 0, 725, btnLogout_Click, Color.FromArgb(50, 35, 35), Color.FromArgb(231, 76, 60), Color.FromArgb(70, 45, 45));
 
-        Controls.AddRange(new Control[] { title, userInfo, divider, btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout });
+        Controls.AddRange(new Control[] { title, userInfo, divider, btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnOnlineOrders, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout });
     }
 
     private Button CreateMenuButton(string text, int x, int y, EventHandler click, Color bg, Color fg, Color hoverBg)
@@ -332,6 +344,7 @@ public partial class MainForm : Form
     private Button btnUsers = null!;
     private Button btnCredit = null!;
     private Button btnInventory = null!;
+    private Button btnOnlineOrders = null!;
     private Button btnExpenses = null!;
     private Button btnEndShift = null!;
     private Button btnSettings = null!;

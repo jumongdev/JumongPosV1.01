@@ -1,32 +1,62 @@
+using System.Data;
 using System.Data.SQLite;
 using JumongPosV1._01.Data;
 using JumongPosV1._01.Models;
+using Npgsql;
 
 namespace JumongPosV1._01.Services;
 
 public class StockService
 {
+    private static string StoreId => SyncService.StoreId;
+
     public static Product? GetByBarcode(string barcode)
     {
+        if (CloudDatabaseHelper.IsConfigured)
+        {
+            try
+            {
+                using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                pgConn.Open();
+                using var cmd = new NpgsqlCommand("SELECT * FROM products WHERE barcode = @b AND is_active = 1", pgConn);
+                cmd.Parameters.AddWithValue("b", barcode);
+                using var rdr = cmd.ExecuteReader();
+                if (rdr.Read()) return MapPg(rdr);
+            }
+            catch { }
+        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        using var cmd = new SQLiteCommand("SELECT * FROM Products WHERE Barcode = @b AND IsActive = 1", conn);
-        cmd.Parameters.AddWithValue("@b", barcode);
-        using var rdr = cmd.ExecuteReader();
-        if (rdr.Read()) return Map(rdr);
+        using var cmd2 = new SQLiteCommand("SELECT * FROM Products WHERE Barcode = @b AND IsActive = 1", conn);
+        cmd2.Parameters.AddWithValue("@b", barcode);
+        using var rdr2 = cmd2.ExecuteReader();
+        if (rdr2.Read()) return Map(rdr2);
         return null;
     }
 
     public static List<Product> Search(string keyword)
     {
         var list = new List<Product>();
+        if (CloudDatabaseHelper.IsConfigured)
+        {
+            try
+            {
+                using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                pgConn.Open();
+                using var cmd = new NpgsqlCommand("SELECT * FROM products WHERE is_active = 1 AND (name ILIKE @kw OR barcode ILIKE @kw) ORDER BY name LIMIT 30", pgConn);
+                cmd.Parameters.AddWithValue("kw", $"%{keyword}%");
+                using var rdr = cmd.ExecuteReader();
+                while (rdr.Read()) list.Add(MapPg(rdr));
+                if (list.Count > 0) return list;
+            }
+            catch { }
+        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var sql = "SELECT * FROM Products WHERE IsActive = 1 AND (Name LIKE @kw OR Barcode LIKE @kw) ORDER BY Name LIMIT 30";
-        using var cmd = new SQLiteCommand(sql, conn);
-        cmd.Parameters.AddWithValue("@kw", $"%{keyword}%");
-        using var rdr = cmd.ExecuteReader();
-        while (rdr.Read()) list.Add(Map(rdr));
+        using var cmd2 = new SQLiteCommand("SELECT * FROM Products WHERE IsActive = 1 AND (Name LIKE @kw OR Barcode LIKE @kw) ORDER BY Name LIMIT 30", conn);
+        cmd2.Parameters.AddWithValue("@kw", $"%{keyword}%");
+        using var rdr2 = cmd2.ExecuteReader();
+        while (rdr2.Read()) list.Add(Map(rdr2));
         return list;
     }
 
@@ -63,6 +93,22 @@ public class StockService
                 var trailId = Convert.ToInt32(idCmd.ExecuteScalar());
                 _ = SyncService.SyncStockTrail(new StockTrail { Id = trailId, ProductId = productId, ProductName = productName, Barcode = barcode, QuantityAdded = qty, StockBefore = stockBefore, StockAfter = stockAfter, Reference = reference, UserId = userId, UserName = userName, CreatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") });
                 _ = SyncService.SyncProduct(ProductService.GetById(productId));
+
+                // Also update PostgreSQL stock
+                if (CloudDatabaseHelper.IsConfigured)
+                {
+                    try
+                    {
+                        using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                        pgConn.Open();
+                        using var pgCmd = new NpgsqlCommand("UPDATE products SET stock_qty = @new WHERE pos_id = @id AND store_id = @sid", pgConn);
+                        pgCmd.Parameters.AddWithValue("new", stockAfter);
+                        pgCmd.Parameters.AddWithValue("id", productId);
+                        pgCmd.Parameters.AddWithValue("sid", StoreId);
+                        pgCmd.ExecuteNonQuery();
+                    }
+                    catch { }
+                }
             }
 
             tx.Commit();
@@ -145,6 +191,22 @@ public class StockService
             StockQty = Convert.ToInt32(rdr["StockQty"]),
             IsActive = Convert.ToBoolean(rdr["IsActive"]),
             CreatedAt = DateTime.Parse(rdr["CreatedAt"].ToString()!)
+        };
+    }
+
+    private static Product MapPg(NpgsqlDataReader rdr)
+    {
+        return new Product
+        {
+            Id = Convert.ToInt32(rdr["pos_id"]),
+            Name = rdr["name"].ToString() ?? "",
+            Barcode = rdr["barcode"]?.ToString() ?? "",
+            Category = rdr["category"]?.ToString() ?? "",
+            Price = Convert.ToDecimal(rdr["price"]),
+            Cost = Convert.ToDecimal(rdr["cost"]),
+            StockQty = Convert.ToInt32(rdr["stock_qty"]),
+            IsActive = Convert.ToInt32(rdr["is_active"]) == 1,
+            CreatedAt = DateTime.TryParse(rdr["created_at"]?.ToString(), out var dt) ? dt : DateTime.Now
         };
     }
 }

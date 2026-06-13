@@ -1,47 +1,114 @@
+using System.Data;
 using System.Data.SQLite;
 using JumongPosV1._01.Data;
 using JumongPosV1._01.Models;
+using Npgsql;
 
 namespace JumongPosV1._01.Services;
 
 public class CustomerService
 {
+    private static string StoreId => SyncService.StoreId;
+
+    public static async Task TryWriteToPgAsync(Customer c)
+    {
+        if (!CloudDatabaseHelper.IsConfigured) return;
+        try
+        {
+            using var pgConn = CloudDatabaseHelper.GetConnection()!;
+            await pgConn.OpenAsync();
+            await CloudDatabaseHelper.EnsureSchemaAsync(pgConn);
+            var sql = @"INSERT INTO customers (pos_id, store_id, name, phone, email, address, loyalty_points, credit_balance, credit_limit, is_active)
+                        VALUES (@pid, @sid, @n, @ph, @e, @a, @lp, @cb, @cl, @act)
+                        ON CONFLICT (store_id, pos_id) DO UPDATE SET
+                            name=@n, phone=@ph, email=@e, address=@a, loyalty_points=@lp,
+                            credit_balance=@cb, credit_limit=@cl, is_active=@act";
+            using var cmd = new NpgsqlCommand(sql, pgConn);
+            cmd.Parameters.AddWithValue("pid", c.Id);
+            cmd.Parameters.AddWithValue("sid", StoreId);
+            cmd.Parameters.AddWithValue("n", c.Name);
+            cmd.Parameters.AddWithValue("ph", (object?)c.Phone ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("e", (object?)c.Email ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("a", c.Address);
+            cmd.Parameters.AddWithValue("lp", c.LoyaltyPoints);
+            cmd.Parameters.AddWithValue("cb", c.CreditBalance);
+            cmd.Parameters.AddWithValue("cl", c.CreditLimit);
+            cmd.Parameters.AddWithValue("act", c.IsActive ? 1 : 0);
+            await cmd.ExecuteNonQueryAsync();
+        }
+        catch { }
+    }
+
     public static List<Customer> GetAll()
     {
         var list = new List<Customer>();
+        if (CloudDatabaseHelper.IsConfigured)
+        {
+            try
+            {
+                using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                pgConn.Open();
+                using var cmd = new NpgsqlCommand("SELECT * FROM customers ORDER BY name", pgConn);
+                using var rdr = cmd.ExecuteReader();
+                while (rdr.Read()) list.Add(MapPg(rdr));
+                if (list.Count > 0) return list;
+            }
+            catch { }
+        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var sql = "SELECT * FROM Customers ORDER BY Name";
-        using var cmd = new SQLiteCommand(sql, conn);
-        using var rdr = cmd.ExecuteReader();
-        while (rdr.Read())
-        {
-            list.Add(Map(rdr));
-        }
+        using var cmd2 = new SQLiteCommand("SELECT * FROM Customers ORDER BY Name", conn);
+        using var rdr2 = cmd2.ExecuteReader();
+        while (rdr2.Read()) list.Add(Map(rdr2));
         return list;
     }
 
     public static Customer? GetById(int id)
     {
+        if (CloudDatabaseHelper.IsConfigured)
+        {
+            try
+            {
+                using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                pgConn.Open();
+                using var cmd = new NpgsqlCommand("SELECT * FROM customers WHERE pos_id = @id AND store_id = @sid", pgConn);
+                cmd.Parameters.AddWithValue("id", id);
+                cmd.Parameters.AddWithValue("sid", StoreId);
+                using var rdr = cmd.ExecuteReader();
+                if (rdr.Read()) return MapPg(rdr);
+            }
+            catch { }
+        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var sql = "SELECT * FROM Customers WHERE Id = @id";
-        using var cmd = new SQLiteCommand(sql, conn);
-        cmd.Parameters.AddWithValue("@id", id);
-        using var rdr = cmd.ExecuteReader();
-        if (rdr.Read()) return Map(rdr);
+        using var cmd2 = new SQLiteCommand("SELECT * FROM Customers WHERE Id = @id", conn);
+        cmd2.Parameters.AddWithValue("@id", id);
+        using var rdr2 = cmd2.ExecuteReader();
+        if (rdr2.Read()) return Map(rdr2);
         return null;
     }
 
     public static Customer? GetByPhone(string phone)
     {
+        if (CloudDatabaseHelper.IsConfigured)
+        {
+            try
+            {
+                using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                pgConn.Open();
+                using var cmd = new NpgsqlCommand("SELECT * FROM customers WHERE phone = @p", pgConn);
+                cmd.Parameters.AddWithValue("p", phone);
+                using var rdr = cmd.ExecuteReader();
+                if (rdr.Read()) return MapPg(rdr);
+            }
+            catch { }
+        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var sql = "SELECT * FROM Customers WHERE Phone = @p";
-        using var cmd = new SQLiteCommand(sql, conn);
-        cmd.Parameters.AddWithValue("@p", phone);
-        using var rdr = cmd.ExecuteReader();
-        if (rdr.Read()) return Map(rdr);
+        using var cmd2 = new SQLiteCommand("SELECT * FROM Customers WHERE Phone = @p", conn);
+        cmd2.Parameters.AddWithValue("@p", phone);
+        using var rdr2 = cmd2.ExecuteReader();
+        if (rdr2.Read()) return Map(rdr2);
         return null;
     }
 
@@ -92,6 +159,7 @@ public class CustomerService
             cmd.Parameters.AddWithValue("@mb", modifiedBy);
             cmd.ExecuteNonQuery();
         }
+        _ = TryWriteToPgAsync(c);
         _ = SyncService.SyncCustomer(c);
         return null;
     }
@@ -131,6 +199,19 @@ public class CustomerService
         using var cmd = new SQLiteCommand("DELETE FROM Customers WHERE Id = @id", conn);
         cmd.Parameters.AddWithValue("@id", id);
         cmd.ExecuteNonQuery();
+        if (CloudDatabaseHelper.IsConfigured)
+        {
+            try
+            {
+                using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                pgConn.Open();
+                using var pgCmd = new NpgsqlCommand("DELETE FROM customers WHERE pos_id = @id AND store_id = @sid", pgConn);
+                pgCmd.Parameters.AddWithValue("id", id);
+                pgCmd.Parameters.AddWithValue("sid", StoreId);
+                pgCmd.ExecuteNonQuery();
+            }
+            catch { }
+        }
     }
 
     public static int RemoveDuplicatesNoPoints()
@@ -169,6 +250,20 @@ public class CustomerService
         cmd.Parameters.AddWithValue("@pts", points);
         cmd.Parameters.AddWithValue("@id", customerId);
         cmd.ExecuteNonQuery();
+        if (CloudDatabaseHelper.IsConfigured)
+        {
+            try
+            {
+                using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                pgConn.Open();
+                using var pgCmd = new NpgsqlCommand("UPDATE customers SET loyalty_points = @pts WHERE pos_id = @id AND store_id = @sid", pgConn);
+                pgCmd.Parameters.AddWithValue("pts", points);
+                pgCmd.Parameters.AddWithValue("id", customerId);
+                pgCmd.Parameters.AddWithValue("sid", StoreId);
+                pgCmd.ExecuteNonQuery();
+            }
+            catch { }
+        }
     }
 
     public static void UpdateCreditBalance(int customerId, decimal newBalance)
@@ -179,19 +274,45 @@ public class CustomerService
         cmd.Parameters.AddWithValue("@bal", newBalance);
         cmd.Parameters.AddWithValue("@id", customerId);
         cmd.ExecuteNonQuery();
+        if (CloudDatabaseHelper.IsConfigured)
+        {
+            try
+            {
+                using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                pgConn.Open();
+                using var pgCmd = new NpgsqlCommand("UPDATE customers SET credit_balance = @bal WHERE pos_id = @id AND store_id = @sid", pgConn);
+                pgCmd.Parameters.AddWithValue("bal", newBalance);
+                pgCmd.Parameters.AddWithValue("id", customerId);
+                pgCmd.Parameters.AddWithValue("sid", StoreId);
+                pgCmd.ExecuteNonQuery();
+            }
+            catch { }
+        }
     }
 
     public static List<Customer> Search(string keyword)
     {
         var list = new List<Customer>();
+        if (CloudDatabaseHelper.IsConfigured)
+        {
+            try
+            {
+                using var pgConn = CloudDatabaseHelper.GetConnection()!;
+                pgConn.Open();
+                using var cmd = new NpgsqlCommand("SELECT * FROM customers WHERE name ILIKE @kw OR phone ILIKE @kw ORDER BY name LIMIT 30", pgConn);
+                cmd.Parameters.AddWithValue("kw", $"%{keyword}%");
+                using var rdr = cmd.ExecuteReader();
+                while (rdr.Read()) list.Add(MapPg(rdr));
+                if (list.Count > 0) return list;
+            }
+            catch { }
+        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var sql = "SELECT * FROM Customers WHERE Name LIKE @kw OR Phone LIKE @kw ORDER BY Name LIMIT 30";
-        using var cmd = new SQLiteCommand(sql, conn);
-        cmd.Parameters.AddWithValue("@kw", $"%{keyword}%");
-        using var rdr = cmd.ExecuteReader();
-        while (rdr.Read())
-            list.Add(Map(rdr));
+        using var cmd2 = new SQLiteCommand("SELECT * FROM Customers WHERE Name LIKE @kw OR Phone LIKE @kw ORDER BY Name LIMIT 30", conn);
+        cmd2.Parameters.AddWithValue("@kw", $"%{keyword}%");
+        using var rdr2 = cmd2.ExecuteReader();
+        while (rdr2.Read()) list.Add(Map(rdr2));
         return list;
     }
 
@@ -209,6 +330,23 @@ public class CustomerService
             CreditLimit = rdr["CreditLimit"] != DBNull.Value ? Convert.ToDecimal(rdr["CreditLimit"]) : 0,
             IsActive = rdr["IsActive"] != DBNull.Value ? Convert.ToBoolean(rdr["IsActive"]) : true,
             CreatedAt = DateTime.Parse(rdr["CreatedAt"].ToString()!)
+        };
+    }
+
+    private static Customer MapPg(NpgsqlDataReader rdr)
+    {
+        return new Customer
+        {
+            Id = Convert.ToInt32(rdr["pos_id"]),
+            Name = rdr["name"].ToString() ?? "",
+            Phone = rdr["phone"]?.ToString() ?? "",
+            Email = rdr["email"]?.ToString() ?? "",
+            Address = rdr["address"]?.ToString() ?? "",
+            LoyaltyPoints = Convert.ToInt32(rdr["loyalty_points"]),
+            CreditBalance = rdr["credit_balance"] != DBNull.Value ? Convert.ToDecimal(rdr["credit_balance"]) : 0,
+            CreditLimit = rdr["credit_limit"] != DBNull.Value ? Convert.ToDecimal(rdr["credit_limit"]) : 0,
+            IsActive = rdr["is_active"] != DBNull.Value ? Convert.ToInt32(rdr["is_active"]) == 1 : true,
+            CreatedAt = DateTime.TryParse(rdr["created_at"]?.ToString(), out var dt) ? dt : DateTime.Now
         };
     }
 }

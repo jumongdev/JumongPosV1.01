@@ -26,7 +26,7 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 │   ├── ExpenseService.cs       # Expense CRUD
 │   ├── DataExporter.cs         # Import/Export JSON
 │   ├── MigrationService.cs     # Old DB migration tool
-│       ├── AppVersion.cs           # Current = "1.0.29"
+│       ├── AppVersion.cs           # Current = "1.0.30"
 │   └── ... (PrinterService, EmailService, etc.)
 ├── Forms/
 │   ├── MainForm.cs             # Sidebar navigation (POS, Products, Reports, Settings...)
@@ -58,7 +58,8 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
     ├── v1.0.26/  (exe)
     ├── v1.0.27/  (exe)
     └── v1.0.28/  (exe)
-    └── v1.0.29/  (exe) — current
+    └── v1.0.29/  (exe)
+    └── v1.0.30/  (exe) — current
 ```
 
 ## Tech Stack
@@ -220,6 +221,47 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 | `Forms/PaymentForm.cs` | Added points redemption UI: shows available points, click to redeem, deducts from grand total |
 | `Forms/PaymentForm.cs` | Added `PointsUsed` public property, uses `_effectiveTotal` for all payment calculations |
 | `Forms/SalesForm.cs` | `btnPay_Click()` awards 1 point per ₱100 spent and deducts redeemed points after payment |
+
+### v1.0.30 — PostgreSQL Multi-PC (Dual Database)
+
+#### Npgsql Dependency
+| File | Change |
+|---|---|
+| `JumongPosV1.01.csproj` | Added `Npgsql 10.0.3` NuGet package for direct PostgreSQL connectivity |
+
+#### CloudDatabaseHelper (new)
+| File | Change |
+|---|---|
+| `Data/CloudDatabaseHelper.cs` | New class: reads PG connection string from SQLite Settings, provides `GetConnection()`, `TestConnection()`, `EnsureSchemaAsync()`, `IsConfigured` |
+
+#### Dual-Database Services
+All shared entities (Products, Customers, Users, ProductUnits, Stock) now read from PostgreSQL first, fall back to SQLite. Writes go to both databases.
+
+| File | Change |
+|---|---|
+| `Services/ProductService.cs` | All CRUD methods try PG first, fall back to SQLite; `TryWriteToPgAsync()` writes upsert to PG; `MapPg()` for PG reader |
+| `Services/CustomerService.cs` | Same dual pattern: GetAll, GetById, GetByPhone, Search, Save, Delete, UpdateLoyaltyPoints, UpdateCreditBalance |
+| `Services/UserService.cs` | Same dual pattern: GetAll, Save, Delete + `TryWriteToPgAsync()` |
+| `Services/ProductUnitService.cs` | Same dual pattern: GetByProduct, GetDefault, Save, Delete |
+| `Services/StockService.cs` | `ConfirmReceiving()` updates PG stock; GetByBarcode/Search try PG first |
+
+#### Settings UI
+| File | Change |
+|---|---|
+| `Forms/SettingsForm.cs` | Added **CLOUD DATABASE** section with PG Host/Port/Database/User/Pass/SSL fields, **TEST CONNECTION** button, **MIGRATE TO CLOUD DB** button (progress popup) |
+
+#### What Stays SQLite-Only
+Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operational data)
+
+#### Online Ordering Pipeline (completed)
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/order.html` | Fixed API URL from Railway to relative path |
+| `JumongCloudAPI/wwwroot/manifest.json` | Created for PWA support |
+| `Forms/PendingOrdersForm.cs` | New form: lists pending warehouse transfers, **Process Order** button auto-matches items to local products, opens SalesForm with cart pre-populated |
+| `Forms/SalesForm.cs` | Added `LoadFromTransfer(orderId, customerName, items)` — skips order-type prompt, populates cart from transfer items; `btnPay_Click` auto-marks transfer received on sale complete |
+| `Forms/MainForm.cs` | Added **Online Orders** sidebar button; transfer poll interval reduced 60s→15s; button text shows pending count badge; balloon tip links to Online Orders |
+| `Services/SyncService.cs` | (no change) existing `GetPendingTransfersAsync()` and `MarkTransferReceivedAsync()` used |
 
 ## Current App Behavior
 
