@@ -449,7 +449,7 @@ function toast(msg,type='info'){
 }
 
 function updateRefreshTime(){
-  document.getElementById('lastRefresh').textContent='Updated: '+new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('lastRefresh').textContent='Updated: '+new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
 }
 
 function setLoading(id){document.getElementById(id).innerHTML='<div class="loading-spinner"><div class="spinner"></div>Loading...</div>'}
@@ -646,7 +646,7 @@ async function loadSaleProfits(){
     document.getElementById('saleProfitsBody').innerHTML=d.map(x=>{
       const dt=new Date(x.saleDate);
       const date=dt.toLocaleDateString('en-PH',{month:'short',day:'numeric'});
-      const time=dt.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+      const time=dt.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',hour12:true});
       const profitClass=x.profit>0?'green':x.profit<0?'red':'orange';
       const marginClass=x.marginPct>20?'green':x.marginPct>0?'orange':'red';
       const storeBadge='<span class="store-badge">'+shortStore(x.storeId,_storeMap[x.storeId])+'</span>';
@@ -677,7 +677,7 @@ async function loadRecentSales(){
     if(!d.length){setEmpty('recentSalesBody','No sales data',6);return}
     document.getElementById('recentSalesBody').innerHTML=d.map(x=>{
       const dt=new Date(x.saleDate);
-      const time=dt.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+      const time=dt.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',hour12:true});
       const date=dt.toLocaleDateString('en-PH',{month:'short',day:'numeric'});
       const badgeClass=x.isVoided?'bg-void':'bg-'+x.paymentMethod.toLowerCase().replace('-','');
       const label=x.isVoided?'VOID':x.paymentMethod;
@@ -695,7 +695,7 @@ async function loadVoidLogs(){
     if(!d.length){setEmpty('voidLogsBody','No void records',8);return}
     document.getElementById('voidLogsBody').innerHTML=d.map(x=>{
       const dt=new Date(x.createdAt);
-      const time=dt.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+      const time=dt.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',hour12:true});
       const date=dt.toLocaleDateString('en-PH',{month:'short',day:'numeric'});
       const actionBadge=x.action==='VoidSale'?'<span class="badge bg-void">FULL VOID</span>':'<span class="badge bg-void" style="font-size:0.7em">ITEM VOID</span>';
       return`<tr data-row><td><a href="#" class="inv-link" onclick="showSaleItems('${x.invoiceNo}');return false">${x.invoiceNo}</a></td><td>${actionBadge}</td><td>${x.productName||'<span style="color:var(--dim)">—</span>'}</td><td style="color:var(--orange);max-width:200px;white-space:normal">${x.reason||'<span style="color:var(--dim)">—</span>'}</td><td>${x.quantity||'—'}</td><td class="red">&#8369;${fmt(x.amount)}</td><td>${x.userName||'<span style="color:var(--dim)">—</span>'}</td><td>${date} ${time}</td></tr>`;
@@ -729,7 +729,7 @@ async function loadExpenses(){
     if(!dl.length){setEmpty('expensesBody','No expense details',6);return}
     document.getElementById('expensesBody').innerHTML=dl.map(function(x){
       var dt=new Date(x.timestamp);
-      return'<tr data-row><td class="red">&#8369;'+fmt(x.amount)+'</td><td>'+x.category+'</td><td>'+(x.description||'')+'</td><td>'+(x.referenceNo||'')+'</td><td>'+x.cashier+'</td><td>'+dt.toLocaleDateString('en-PH',{month:'short',day:'numeric'})+' '+dt.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'})+'</td></tr>';
+      return'<tr data-row><td class="red">&#8369;'+fmt(x.amount)+'</td><td>'+x.category+'</td><td>'+(x.description||'')+'</td><td>'+(x.referenceNo||'')+'</td><td>'+x.cashier+'</td><td>'+dt.toLocaleDateString('en-PH',{month:'short',day:'numeric'})+' '+dt.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',hour12:true})+'</td></tr>';
     }).join('');
   }catch(e){setEmpty('expensesCatBody','Failed to load expenses',3);setEmpty('expensesBody','',6)}
 }
@@ -743,7 +743,7 @@ async function loadShiftHistory(){
       const dt=new Date(x.closeDate);
       const storeBadge='<span class="store-badge">'+shortStore(x.storeId,_storeMap[x.storeId])+'</span>';
       const varClass=x.difference>=0?'green':'red';
-      return`<tr data-row><td>${dt.toLocaleDateString('en-PH')} ${dt.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'})}</td><td>${storeBadge}</td><td>&#8369;${fmt(x.totalSales)}</td><td>&#8369;${fmt(x.totalCash)}</td><td>&#8369;${fmt(x.totalEwallet)}</td><td>&#8369;${fmt(x.totalCredit)}</td><td>&#8369;${fmt(x.totalVoided)}</td><td>&#8369;${fmt(x.totalExpenses)}</td><td>&#8369;${fmt(x.cashOnHand)}</td><td class="${varClass}">&#8369;${fmt(x.difference)}</td><td>${x.userName}</td></tr>`;
+      return`<tr data-row><td>${dt.toLocaleDateString('en-PH')} ${dt.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',hour12:true})}</td><td>${storeBadge}</td><td>&#8369;${fmt(x.totalSales)}</td><td>&#8369;${fmt(x.totalCash)}</td><td>&#8369;${fmt(x.totalEwallet)}</td><td>&#8369;${fmt(x.totalCredit)}</td><td>&#8369;${fmt(x.totalVoided)}</td><td>&#8369;${fmt(x.totalExpenses)}</td><td>&#8369;${fmt(x.cashOnHand)}</td><td class="${varClass}">&#8369;${fmt(x.difference)}</td><td>${x.userName}</td></tr>`;
     }).join('');
     paginateRows('shiftHistoryBody','shiftPagination',0);
   }catch(e){setEmpty('shiftHistoryBody','Failed to load shift data',11)}
@@ -773,7 +773,7 @@ async function loadReceiving(){
     document.getElementById('receivingBody').innerHTML=d.map(x=>{
       const dt=new Date(x.createdAt);
       const storeBadge='<span class="store-badge">'+shortStore(x.storeId,_storeMap[x.storeId])+'</span>';
-      return`<tr data-row><td>${x.productName}</td><td>${x.barcode||''}</td><td>${x.quantityAdded}</td><td>${x.stockBefore}</td><td class="green">${x.stockAfter}</td><td>${x.reference||''}</td><td>${x.userName||''}</td><td>${storeBadge}</td><td>${dt.toLocaleDateString('en-PH')} ${dt.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'})}</td></tr>`;
+      return`<tr data-row><td>${x.productName}</td><td>${x.barcode||''}</td><td>${x.quantityAdded}</td><td>${x.stockBefore}</td><td class="green">${x.stockAfter}</td><td>${x.reference||''}</td><td>${x.userName||''}</td><td>${storeBadge}</td><td>${dt.toLocaleDateString('en-PH')} ${dt.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',hour12:true})}</td></tr>`;
     }).join('');
   }catch(e){setEmpty('receivingBody','Failed to load receiving',9)}
 }

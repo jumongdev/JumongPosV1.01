@@ -307,7 +307,7 @@ public class DashboardController : ControllerBase
             cmd.CommandText = $@"
                 SELECT st.product_name, st.barcode, st.quantity_added, st.stock_before, st.stock_after, st.reference, st.user_name, st.created_at, st.store_id
                 FROM stock_trails st
-                WHERE st.quantity_added > 0 {StoreFilter(storeId, "st")}{tf}
+                WHERE st.quantity_added > 0 AND (st.reference IS NULL OR st.reference NOT LIKE '% - void (%') {StoreFilter(storeId, "st")}{tf}
                 ORDER BY st.created_at DESC
                 LIMIT @limit";
             cmd.Parameters.AddWithValue("limit", limit);

@@ -106,7 +106,7 @@ public static class SyncService
                 Cost = product.Cost,
                 StockQty = product.StockQty,
                 IsActive = product.IsActive,
-                CreatedAt = product.CreatedAt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                CreatedAt = product.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss"),
                 ModifiedBy = product.ModifiedBy
             }
         };
@@ -157,7 +157,7 @@ public static class SyncService
             {
                 PosId = sale.Id,
                 InvoiceNo = sale.InvoiceNo,
-                SaleDate = sale.SaleDate.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                SaleDate = sale.SaleDate.ToString("yyyy-MM-dd HH:mm:ss"),
                 SubTotal = sale.SubTotal,
                 Discount = sale.Discount,
                 Tax = sale.Tax,
