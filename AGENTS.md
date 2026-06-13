@@ -26,7 +26,7 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 │   ├── ExpenseService.cs       # Expense CRUD
 │   ├── DataExporter.cs         # Import/Export JSON
 │   ├── MigrationService.cs     # Old DB migration tool
-│       ├── AppVersion.cs           # Current = "1.0.25"
+│       ├── AppVersion.cs           # Current = "1.0.27"
 │   └── ... (PrinterService, EmailService, etc.)
 ├── Forms/
 │   ├── MainForm.cs             # Sidebar navigation (POS, Products, Reports, Settings...)
@@ -54,7 +54,9 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
     ├── v1.0.21/  (exe)
     ├── v1.0.22/  (exe)
     ├── v1.0.23/  (exe)
-    └── v1.0.24/  (exe) — current
+    ├── v1.0.24/  (exe)
+    ├── v1.0.26/  (exe)
+    └── v1.0.27/  (exe) — current
 ```
 
 ## Tech Stack
@@ -144,13 +146,16 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 | `Forms/SaleService.cs` | All StockTrail INSERTs now include **UserName** (cashier name) for sales and voids |
 | `Forms/StockReceivingForm.cs` | Stock Receiving History opens **maximized**, proper column headers with names, dock order fixed |
 
-### Master Catalog Updates
-| Action | Detail |
+### v1.0.27 Changes
+| File | Change |
 |---|---|
-| Added 3 missing products | DEL MONTE TOMATO SAUCE, POTATO CRISPS BACON & CHEESE, SAN MIG LIGHT 330ML |
-| Added default 'pc' units | For the 3 new master products |
-| Synced prices/costs | Master updated to match HQ store (5 products adjusted) |
-| Master count | **621** products (matching HQ) |
+| `Forms/MainForm.cs` | Added `StartTransferPoll()` — 60-second background timer polls `GetPendingTransfersAsync()`, shows NotifyIcon balloon tip on new transfers, redirects to Inventory on click |
+| `JumongCloudAPI/wwwroot/index.html` | Added PRINT buttons to Sale Profits and Warehouse panels |
+| `Services/ProductService.cs` | Added `GetLowStockThreshold()` — reads from Settings table (key: `LowStockThreshold`), used by `GetStockStats()` and `Search()` |
+| `Forms/ProductsForm.cs` | Cell formatting uses configurable threshold instead of hardcoded 10 |
+| `Forms/SalesForm.cs` | `RebuildSearchPanel()` shows 3 states: green (in stock), orange (low stock ≤ threshold), red (out of stock); `btnPay_Click()` prompts to email receipt to customer |
+| `Forms/SettingsForm.cs` | Added Low Stock Threshold NumericUpDown in DISPLAY SETUP section, persists to Settings table |
+| `Services/EmailService.cs` | Added `SendReceipt(Sale, Customer, List<SaleItem>)` — generates HTML receipt and sends to customer email |
 
 ## Current App Behavior
 
