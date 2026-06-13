@@ -185,6 +185,92 @@ tr:nth-child(even) td {{ background: #F8F8FC; }}
         return SendEmail("Inventory Report", body);
     }
 
+    public string? SendReceipt(Sale sale, Customer? customer, List<SaleItem> items)
+    {
+        if (customer == null || string.IsNullOrWhiteSpace(customer.Email))
+            return "Customer has no email address.";
+
+        var company = "JUMONG POS";
+        using (var conn = DatabaseHelper.GetConnection())
+        {
+            conn.Open();
+            var setting = GetSetting(conn, "CompanyName");
+            if (!string.IsNullOrEmpty(setting)) company = setting;
+        }
+
+        var itemsHtml = string.Join("\n", items.Select((i, idx) => $@"
+<tr><td>{idx + 1}</td><td>{i.ProductName}</td><td>{i.Quantity}</td><td>₱{i.Price:N2}</td><td style='text-align:right'>₱{i.TotalPrice:N2}</td></tr>"));
+
+        var html = $@"
+<html>
+<head>
+<style>
+body {{ font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 16px; background: #F0F0F5; color: #222; }}
+.container {{ max-width: 500px; margin: 0 auto; background: #FFFFFF; border-radius: 8px; overflow: hidden; border: 1px solid #DDD; }}
+.header {{ background: #1A1A3E; padding: 20px; text-align: center; }}
+.header h1 {{ margin: 0; color: #00F5FF; font-size: 20px; }}
+.header p {{ margin: 4px 0 0; color: #B0B0D0; font-size: 12px; }}
+.body {{ padding: 16px 20px; }}
+table {{ width: 100%; border-collapse: collapse; margin-top: 8px; }}
+th {{ background: #1A1A3E; color: #FFF; font-size: 11px; text-align: left; padding: 6px 8px; }}
+td {{ padding: 6px 8px; font-size: 12px; color: #222; border-bottom: 1px solid #E0E0E0; }}
+tr:nth-child(even) td {{ background: #F8F8FC; }}
+.total-row td {{ font-weight: bold; color: #1A1A3E; border-top: 2px solid #CCC; }}
+.footer {{ padding: 16px 20px; text-align: center; color: #888; font-size: 11px; background: #F5F5FA; }}
+</style>
+</head>
+<body>
+<div class='container'>
+<div class='header'>
+<h1>{company.ToUpper()}</h1>
+<p>OFFICIAL RECEIPT</p>
+</div>
+<div class='body'>
+<p><strong>Invoice:</strong> {sale.InvoiceNo}</p>
+<p><strong>Date:</strong> {sale.SaleDate:MMMM dd, yyyy  hh:mm tt}</p>
+<p><strong>Customer:</strong> {customer.Name}</p>
+{(string.IsNullOrWhiteSpace(customer.Address) ? "" : $"<p><strong>Address:</strong> {customer.Address}</p>")}
+<hr style='border:none;border-top:1px solid #E0E0E0'>
+<table>
+<tr><th>#</th><th>Item</th><th>Qty</th><th>Price</th><th style='text-align:right'>Total</th></tr>
+{itemsHtml}
+<tr class='total-row'><td colspan='4'>TOTAL</td><td style='text-align:right'>₱{sale.GrandTotal:N2}</td></tr>
+</table>
+<hr style='border:none;border-top:1px solid #E0E0E0'>
+<p><strong>Paid:</strong> ₱{sale.AmountPaid:N2}</p>
+<p><strong>Change:</strong> ₱{sale.Change:N2}</p>
+<p><strong>Payment:</strong> {sale.PaymentMethod}</p>
+</div>
+<div class='footer'>
+<p>Thank you for your purchase!</p>
+<p>— {company.ToUpper()} —</p>
+</div>
+</div>
+</body>
+</html>";
+
+        return SendEmailTo(customer.Email, $"Receipt — {sale.InvoiceNo}", html);
+    }
+
+    private string? SendEmailTo(string to, string subject, string htmlBody)
+    {
+        try
+        {
+            using var msg = new MailMessage(_smtpUser, to, subject, "");
+            msg.IsBodyHtml = true;
+            msg.Body = htmlBody;
+            using var client = new SmtpClient(_smtpHost, _smtpPort);
+            client.EnableSsl = true;
+            client.Credentials = new NetworkCredential(_smtpUser, _smtpPass);
+            client.Send(msg);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return ex.Message;
+        }
+    }
+
     private string? SendEmail(string subject, string body)
     {
         try

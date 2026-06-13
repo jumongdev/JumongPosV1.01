@@ -193,6 +193,7 @@ tr:hover{background:var(--hover)}
       <div class="panel-actions">
         <input class="panel-search" placeholder="Search..." oninput="filterTable('saleProfitsBody',this.value)" onclick="event.stopPropagation()">
         <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();exportCSV('saleprofits')">CSV</button>
+        <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();window.print()">PRINT</button>
       </div>
     </div>
     <div class="panel-body">
@@ -365,6 +366,7 @@ tr:hover{background:var(--hover)}
         <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();whAddFromMaster()" id="whFromMasterBtn" style="display:none;margin-right:4px">FROM MASTER</button>
         <button class="btn btn-sm" onclick="event.stopPropagation()" id="whAddBtn" style="display:none">+ ADD</button>
         <button class="btn btn-sm" onclick="event.stopPropagation()" id="whOrderBtn" style="display:none;background:var(--green)">+ NEW ORDER</button>
+        <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();window.print()">PRINT</button>
       </div>
     </div>
     <div class="panel-body">

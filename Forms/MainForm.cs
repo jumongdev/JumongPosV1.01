@@ -12,6 +12,9 @@ public partial class MainForm : Form
     private readonly User _currentUser;
     private readonly CustomerDisplayForm _customerDisplay;
     private System.Windows.Forms.Timer? _schedulerTimer;
+    private System.Windows.Forms.Timer? _transferTimer;
+    private static int _lastTransferCount;
+
     private string? _lastDailyReportSent;
 
     public MainForm(User user)
@@ -53,6 +56,7 @@ public partial class MainForm : Form
 
         StartEmailScheduler();
         StartSyncRetry();
+        StartTransferPoll();
         DebugHelper.AddFormLabel(this);
     }
 
@@ -61,6 +65,38 @@ public partial class MainForm : Form
         var syncTimer = new System.Windows.Forms.Timer { Interval = 30000 };
         syncTimer.Tick += async (_, _) => { try { await SyncService.RetryFailedAsync(); } catch { } };
         syncTimer.Start();
+    }
+
+    private void StartTransferPoll()
+    {
+        _transferTimer = new System.Windows.Forms.Timer { Interval = 60000 };
+        _transferTimer.Tick += async (_, _) =>
+        {
+            try
+            {
+                var transfers = await SyncService.GetPendingTransfersAsync();
+                if (transfers != null && transfers.Count > _lastTransferCount)
+                {
+                    var newCount = transfers.Count - _lastTransferCount;
+                    var icon = new NotifyIcon
+                    {
+                        Icon = SystemIcons.Information,
+                        Visible = true,
+                        BalloonTipTitle = "New Warehouse Transfers",
+                        BalloonTipText = $"{newCount} new transfer(s) ready. Click Inventory to receive."
+                    };
+                    icon.ShowBalloonTip(5000);
+                    icon.BalloonTipClicked += (_, _) =>
+                    {
+                        btnInventory_Click(null!, EventArgs.Empty);
+                    };
+                    icon.BalloonTipClosed += (_, _) => icon.Dispose();
+                }
+                _lastTransferCount = transfers?.Count ?? 0;
+            }
+            catch { }
+        };
+        _transferTimer.Start();
     }
 
     private void StartEmailScheduler()
@@ -134,6 +170,8 @@ public partial class MainForm : Form
     {
         _schedulerTimer?.Stop();
         _schedulerTimer?.Dispose();
+        _transferTimer?.Stop();
+        _transferTimer?.Dispose();
         _customerDisplay?.Close();
         base.OnFormClosed(e);
     }

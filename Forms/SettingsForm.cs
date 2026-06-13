@@ -369,10 +369,22 @@ public partial class SettingsForm : Form
             chkCustomerDisplay = new CheckBox { Text = "Enable Customer Display", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(220, dy), Size = new Size(200, 25), FlatStyle = FlatStyle.Flat };
             dy += 32;
             var lblRestart = new Label { Text = "Screen changes take effect after restart.", Font = new Font("Segoe UI", 8F), ForeColor = dimText, Location = new Point(15, dy), Size = new Size(380, 20) };
+            var lblLowStock = new Label { Text = "Low Stock\nThreshold:", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, dy + 24), Size = new Size(120, 32), TextAlign = ContentAlignment.MiddleLeft };
+            var numLowStock = new NumericUpDown { Location = new Point(140, dy + 26), Size = new Size(80, 25), Minimum = 1, Maximum = 999, Value = ProductService.GetLowStockThreshold(), BackColor = inputBg, ForeColor = inputFg, BorderStyle = BorderStyle.FixedSingle };
+            numLowStock.ValueChanged += (_, _) =>
+            {
+                using var conn = DatabaseHelper.GetConnection();
+                conn.Open();
+                using var cmd = new SQLiteCommand("INSERT OR REPLACE INTO Settings (Key, Value) VALUES ('LowStockThreshold', @v)", conn);
+                cmd.Parameters.AddWithValue("@v", ((int)numLowStock.Value).ToString());
+                cmd.ExecuteNonQuery();
+            };
+            var lblLowStockHint = new Label { Text = "Products at or below this qty show orange.", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(128, 128, 128), Location = new Point(225, dy + 26), Size = new Size(200, 22) };
             MakeSection("DISPLAY SETUP", 205, new Control[] {
                 lblPos, cmbPosScreen, lblCust, cmbCustomerScreen,
                 lblEmailSched, numEmailScheduleHour, lblEmailSchedHint,
-                chkEnableOnlineOrders, chkCustomerDisplay, lblRestart
+                chkEnableOnlineOrders, chkCustomerDisplay, lblRestart,
+                lblLowStock, numLowStock, lblLowStockHint
             });
         }
 

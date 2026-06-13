@@ -122,7 +122,7 @@ public class ProductService
         if (!string.IsNullOrEmpty(category))
             sql += " AND Category = @cat";
         if (stockFilter == "low")
-            sql += " AND StockQty > 0 AND StockQty <= 10";
+            sql += $" AND StockQty > 0 AND StockQty <= {GetLowStockThreshold()}";
         else if (stockFilter == "out")
             sql += " AND StockQty = 0";
         sql += " ORDER BY Name";
@@ -137,12 +137,27 @@ public class ProductService
         return list;
     }
 
+    public static int GetLowStockThreshold()
+    {
+        try
+        {
+            using var conn = DatabaseHelper.GetConnection();
+            conn.Open();
+            using var cmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'LowStockThreshold'", conn);
+            var val = cmd.ExecuteScalar()?.ToString();
+            if (int.TryParse(val, out var t) && t > 0) return t;
+        }
+        catch { }
+        return 10;
+    }
+
     public static (int total, int lowStock, int outOfStock) GetStockStats()
     {
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
+        var threshold = GetLowStockThreshold();
         var total = 0; var low = 0; var outOf = 0;
-        var cmd = new SQLiteCommand("SELECT COUNT(*), SUM(CASE WHEN StockQty = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN StockQty > 0 AND StockQty <= 10 THEN 1 ELSE 0 END) FROM Products WHERE IsActive = 1", conn);
+        var cmd = new SQLiteCommand($"SELECT COUNT(*), SUM(CASE WHEN StockQty = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN StockQty > 0 AND StockQty <= {threshold} THEN 1 ELSE 0 END) FROM Products WHERE IsActive = 1", conn);
         using var rdr = cmd.ExecuteReader();
         if (rdr.Read())
         {

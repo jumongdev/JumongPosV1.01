@@ -85,7 +85,7 @@ public partial class ProductsForm : Form
                     e.CellStyle!.ForeColor = Color.FromArgb(231, 76, 60);
                     e.CellStyle.SelectionForeColor = Color.FromArgb(231, 76, 60);
                 }
-                else if (val.StockQty <= 10)
+                else if (val.StockQty <= ProductService.GetLowStockThreshold())
                 {
                     e.CellStyle!.ForeColor = Color.FromArgb(243, 156, 18);
                     e.CellStyle.SelectionForeColor = Color.FromArgb(243, 156, 18);

@@ -483,47 +483,55 @@ public partial class SalesForm : Form
         if (_pnlSearchResults.Controls[0] is Panel hdr && hdr.Controls.Count >= 2)
             ((Label)hdr.Controls[1]).Text = $"{results.Count} result{(results.Count == 1 ? "" : "s")}";
 
+        var threshold = ProductService.GetLowStockThreshold();
         var rowH = 46;
         var top = 28;
         foreach (var prod in results.Take(8))
         {
-            var inStock = prod.StockQty > 0;
+            var isOut = prod.StockQty <= 0;
+            var isLow = !isOut && prod.StockQty <= threshold;
+            var canAdd = !isOut;
             var row = new Panel
             {
                 Location = new Point(0, top),
                 Size = new Size(_pnlSearchResults.Width, rowH),
                 BackColor = CCard,
                 Tag = prod,
-                Cursor = inStock ? Cursors.Hand : Cursors.Default
+                Cursor = canAdd ? Cursors.Hand : Cursors.Default
             };
 
+            Color iconBg, iconFg;
+            if (isOut) { iconBg = CRedLight; iconFg = CRedDark; }
+            else if (isLow) { iconBg = Color.FromArgb(255, 243, 205); iconFg = Color.FromArgb(243, 156, 18); }
+            else { iconBg = CBlueLight; iconFg = CBlueMid; }
             var icon = new Panel
             {
                 Location = new Point(10, 8),
                 Size = new Size(30, 30),
-                BackColor = inStock ? CBlueLight : CRedLight
+                BackColor = iconBg
             };
             var iconLbl = new Label
             {
                 Text = "\u25a0",
                 Font = new Font("Segoe UI", 8F),
-                ForeColor = inStock ? CBlueMid : CRedDark,
+                ForeColor = iconFg,
                 TextAlign = ContentAlignment.MiddleCenter,
                 Dock = DockStyle.Fill
             };
             icon.Controls.Add(iconLbl);
 
+            var stockLabel = isOut ? "Out of stock" : (isLow ? $"Low stock ({prod.StockQty})" : $"{prod.StockQty} in stock");
             var lblName = new Label
             {
                 Text = prod.Name,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = inStock ? CText : CTextMuted,
+                ForeColor = canAdd ? CText : CTextMuted,
                 Location = new Point(48, 6), Size = new Size(200, 18),
                 AutoEllipsis = true
             };
             var lblSub = new Label
             {
-                Text = $"{prod.Barcode}  ·  {(inStock ? $"{prod.StockQty} in stock" : "Out of stock")}",
+                Text = $"{prod.Barcode}  ·  {stockLabel}",
                 Font = new Font("Segoe UI", 8F),
                 ForeColor = CTextHint,
                 Location = new Point(48, 25), Size = new Size(200, 15)
@@ -533,7 +541,7 @@ public partial class SalesForm : Form
             {
                 Text = $"\u20b1{prod.Price:N2}",
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                ForeColor = inStock ? CGreenDark : CTextHint,
+                ForeColor = canAdd ? CGreenDark : CTextHint,
                 Location = new Point(row.Width - 120, 13), Size = new Size(72, 20),
                 TextAlign = ContentAlignment.MiddleRight, Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
@@ -544,15 +552,15 @@ public partial class SalesForm : Form
                 Font = new Font("Segoe UI", 13F, FontStyle.Bold),
                 Location = new Point(row.Width - 42, 9), Size = new Size(32, 28),
                 FlatStyle = FlatStyle.Flat,
-                FlatAppearance = { BorderSize = 1, BorderColor = inStock ? CGreenMid : CBorder },
-                BackColor = inStock ? CGreenLight : CSurface,
-                ForeColor = inStock ? CGreenDark : CTextHint,
-                Cursor = inStock ? Cursors.Hand : Cursors.Default,
-                Enabled = inStock,
+                FlatAppearance = { BorderSize = 1, BorderColor = canAdd ? CGreenMid : CBorder },
+                BackColor = canAdd ? CGreenLight : CSurface,
+                ForeColor = canAdd ? CGreenDark : CTextHint,
+                Cursor = canAdd ? Cursors.Hand : Cursors.Default,
+                Enabled = canAdd,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 Tag = prod
             };
-            if (inStock)
+            if (canAdd)
                 btnAdd.Click += (_, _) => AddSearchedProduct((Product)btnAdd.Tag!);
 
             row.Paint += (s, ev) =>
@@ -562,7 +570,7 @@ public partial class SalesForm : Form
             };
 
             row.Controls.AddRange(new Control[] { icon, lblName, lblSub, lblPrice, btnAdd });
-            if (inStock)
+            if (canAdd)
                 row.Click += (_, _) => AddSearchedProduct(prod);
 
             _pnlSearchResults.Controls.Add(row);
@@ -795,6 +803,17 @@ public partial class SalesForm : Form
         {
             var cashierName = _currentUser?.FullName ?? _currentUser?.Username ?? "Admin";
             PrinterService.PrintReceipt(sale, cashierName, _selectedCustomer);
+        }
+
+        if (_selectedCustomer != null && !string.IsNullOrWhiteSpace(_selectedCustomer.Email)
+            && MessageBox.Show("Email receipt to customer?", "Email Receipt", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+        {
+            var emailSvc = new EmailService();
+            var emailError = emailSvc.SendReceipt(sale, _selectedCustomer, _cart.ToList());
+            if (emailError != null)
+                MessageBox.Show($"Failed to send email: {emailError}", "Email Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            else
+                MessageBox.Show("Receipt sent to " + _selectedCustomer.Email, "Email Sent", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         _cart.Clear();
