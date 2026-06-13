@@ -183,14 +183,19 @@ public class DashboardController : ControllerBase
                 SELECT vl.invoice_no, vl.action, vl.reason, vl.product_name, vl.quantity, vl.amount, vl.user_name, vl.created_at, vl.store_id
                 FROM void_logs vl
                 WHERE 1=1 " + StoreFilter(storeId, "vl") + @"
-                ORDER BY vl.created_at DESC
+                ORDER BY vl.created_at DESC, vl.pos_id
                 LIMIT @limit";
             cmd.Parameters.AddWithValue("limit", limit);
             if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
             var data = new List<object>();
             using var reader = cmd.ExecuteReader();
+            var seen = new HashSet<string>();
             while (reader.Read())
+            {
+                var key = reader.GetString(0) + "|" + reader.GetString(1) + "|" + reader.GetInt32(4);
+                if (!seen.Add(key)) continue;
                 data.Add(new { invoiceNo = reader.GetString(0), action = reader.GetString(1), reason = reader.GetString(2), productName = reader.IsDBNull(3) ? "" : reader.GetString(3), quantity = reader.GetInt32(4), amount = reader.GetDecimal(5), userName = reader.IsDBNull(6) ? "" : reader.GetString(6), createdAt = reader.GetDateTime(7), storeId = reader.GetString(8) });
+            }
             return Ok(data);
         }
 

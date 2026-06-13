@@ -382,11 +382,10 @@ public class SaleService
             voidSale.ExecuteNonQuery();
 
             var logSale = new SQLiteCommand(
-                "INSERT INTO VoidLog (SaleId, Action, Reason, InvoiceNo, Amount, UserId, UserName) VALUES (@sid, 'VoidSale', @r, @inv, @amt, @uid, @uname)", conn);
+                "INSERT INTO VoidLog (SaleId, Action, Reason, InvoiceNo, Amount, UserId, UserName) VALUES (@sid, 'VoidSale', @r, @inv, 0, @uid, @uname)", conn);
             logSale.Parameters.AddWithValue("@sid", saleId);
             logSale.Parameters.AddWithValue("@r", reason);
             logSale.Parameters.AddWithValue("@inv", sale.InvoiceNo);
-            logSale.Parameters.AddWithValue("@amt", sale.GrandTotal);
             logSale.Parameters.AddWithValue("@uid", voidedByUserId);
             logSale.Parameters.AddWithValue("@uname", voidedByUserName);
             logSale.ExecuteNonQuery();
