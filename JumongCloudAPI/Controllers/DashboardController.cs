@@ -644,7 +644,7 @@ public class DashboardController : ControllerBase
         [HttpGet("version")]
         public IActionResult GetVersion()
         {
-            return Ok(new { version = "1.0.25", buildDate = "2026-06-12", changes = "Simplify timezone: raw local time sent to cloud", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.25/JumongPosV1.01.exe" });
+            return Ok(new { version = "1.0.26", buildDate = "2026-06-13", changes = "Warehouse Transfer System: master-to-warehouse imports, order workflow, POS pending transfer check + receive, base-unit stock tracking", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.26/JumongPosV1.01.exe" });
         }
 
         [HttpGet("products/master")]
