@@ -644,7 +644,7 @@ public class DashboardController : ControllerBase
         [HttpGet("version")]
         public IActionResult GetVersion()
         {
-            return Ok(new { version = "1.0.28", buildDate = "2026-06-13", changes = "Quick fixes: btnRemove wired, PrintReceipt setting, PendingTransfer models extracted", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.28/JumongPosV1.01.exe" });
+            return Ok(new { version = "1.0.31", buildDate = "2026-06-13", changes = "Void sync fix: VoidSale and VoidItem now sync void logs + stock trails to cloud after voiding", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.31/JumongPosV1.01.exe" });
         }
 
         [HttpGet("products/master")]

@@ -263,6 +263,17 @@ Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operationa
 | `Forms/MainForm.cs` | Added **Online Orders** sidebar button; transfer poll interval reduced 60s→15s; button text shows pending count badge; balloon tip links to Online Orders |
 | `Services/SyncService.cs` | (no change) existing `GetPendingTransfersAsync()` and `MarkTransferReceivedAsync()` used |
 
+### v1.0.31 — Void Sync Fix (VoidLog + StockTrail)
+
+| File | Change |
+|---|---|
+| `Services/AppVersion.cs` | `Current` bumped to `"1.0.31"` |
+| `Services/SaleService.cs:418-479` | `VoidSale()` now syncs all void logs + stock trails to cloud after committing (was only syncing sale state) |
+| `Services/SaleService.cs:588-589` | `VoidItem()` now syncs stock trail to cloud after voiding (was only syncing void log + sale) |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | Version endpoint updated to 1.0.31 |
+
+**Impact:** Cloud dashboard now correctly reflects voided sales and their stock trail records in real-time. Existing voided sales corrected by running SYNC ALL after update.
+
 ## Current App Behavior
 
 ### Products Page
