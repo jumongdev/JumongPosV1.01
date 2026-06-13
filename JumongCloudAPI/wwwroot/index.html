@@ -240,16 +240,17 @@ select option{background:var(--surface);color:var(--text)}
       <div class="pagination" id="salesPagination"></div>
     </div>
   </div>
-  <div class="panel" id="panelTopProducts">
-    <div class="panel-header" onclick="togglePanel('panelTopProducts')">
-      <h3><span class="collapse-icon">&#9660;</span> TOP PRODUCTS</h3>
+  <div class="panel" id="panelVoidLogs">
+    <div class="panel-header" onclick="togglePanel('panelVoidLogs')">
+      <h3><span class="collapse-icon">&#9660;</span> <span style="color:var(--red)">VOID LOGS</span></h3>
       <div class="panel-actions">
-        <input class="panel-search" placeholder="Search..." oninput="filterTable('topProductsBody',this.value)" onclick="event.stopPropagation()">
-        <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();exportCSV('products')">CSV</button>
+        <input class="panel-search" placeholder="Search..." oninput="filterTable('voidLogsBody',this.value)" onclick="event.stopPropagation()">
+        <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();exportCSV('voids')">CSV</button>
       </div>
     </div>
     <div class="panel-body">
-      <div style="overflow-x:auto"><table><thead><tr><th onclick="sortTable('topProductsBody',0)">Product</th><th onclick="sortTable('topProductsBody',1)">Qty Sold</th><th onclick="sortTable('topProductsBody',2)">Revenue</th></tr></thead><tbody id="topProductsBody"><tr><td colspan="3"><div class="loading-spinner"><div class="spinner"></div></div></td></tr></tbody></table></div>
+      <div style="overflow-x:auto"><table><thead><tr><th>Invoice</th><th>Action</th><th>Item</th><th>Reason</th><th>Qty</th><th>Amount</th><th>Cashier</th><th>Date/Time</th></tr></thead><tbody id="voidLogsBody"><tr><td colspan="8"><div class="loading-spinner"><div class="spinner"></div></div></td></tr></tbody></table></div>
+      <div class="pagination" id="voidLogsPagination"></div>
     </div>
   </div>
 </div>
@@ -688,17 +689,19 @@ async function loadRecentSales(){
   }catch(e){setEmpty('recentSalesBody','Failed to load sales',6)}
 }
 
-async function loadTopProducts(){
+async function loadVoidLogs(){
   try{
-    const d=await fetchJSON(API+'/top-products?days=30&limit=15'+filterParams());
-    _cache.products=d;
-    if(!d.length){setEmpty('topProductsBody','No product data',3);return}
-    const maxQty=Math.max(...d.map(x=>x.totalQty),1);
-    document.getElementById('topProductsBody').innerHTML=d.map(x=>{
-      const pct=(x.totalQty/maxQty*100).toFixed(0);
-      return`<tr data-row><td>${x.productName}<div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:var(--accent)"></div></div></td><td>${fmtInt(x.totalQty)}</td><td>&#8369;${fmt(x.totalAmount)}</td></tr>`;
+    const d=await fetchJSON(API+'/void-logs?limit=100'+filterParams());
+    if(!d.length){setEmpty('voidLogsBody','No void records',8);return}
+    document.getElementById('voidLogsBody').innerHTML=d.map(x=>{
+      const dt=new Date(x.createdAt);
+      const time=dt.toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+      const date=dt.toLocaleDateString('en-PH',{month:'short',day:'numeric'});
+      const actionBadge=x.action==='VoidSale'?'<span class="badge bg-void">FULL VOID</span>':'<span class="badge bg-void" style="font-size:0.7em">ITEM VOID</span>';
+      return`<tr data-row><td><a href="#" class="inv-link" onclick="showSaleItems('${x.invoiceNo}');return false">${x.invoiceNo}</a></td><td>${actionBadge}</td><td>${x.productName||'<span style="color:var(--dim)">—</span>'}</td><td style="color:var(--orange);max-width:200px;white-space:normal">${x.reason||'<span style="color:var(--dim)">—</span>'}</td><td>${x.quantity||'—'}</td><td class="red">&#8369;${fmt(x.amount)}</td><td>${x.userName||'<span style="color:var(--dim)">—</span>'}</td><td>${date} ${time}</td></tr>`;
     }).join('');
-  }catch(e){setEmpty('topProductsBody','Failed to load products',3)}
+    paginateRows('voidLogsBody','voidLogsPagination',0);
+  }catch(e){setEmpty('voidLogsBody','Failed to load void logs',8)}
 }
 
 async function loadCashierPerformance(){
@@ -919,7 +922,7 @@ async function deleteMasterProduct(id){
 }
 
 async function refreshAll(){
-  await Promise.allSettled([loadSummary(),loadProfitSummary(),loadTrends(),loadPeakHours(),loadSaleProfits(),loadRecentSales(),loadTopProducts(),loadCashierPerformance(),loadExpenses(),loadShiftHistory()]);
+  await Promise.allSettled([loadSummary(),loadProfitSummary(),loadTrends(),loadPeakHours(),loadSaleProfits(),loadRecentSales(),loadVoidLogs(),loadCashierPerformance(),loadExpenses(),loadShiftHistory()]);
   updateRefreshTime();
 }
 
