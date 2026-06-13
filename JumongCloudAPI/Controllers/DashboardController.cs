@@ -962,6 +962,33 @@ public class DashboardController : ControllerBase
             return Ok(new { id = Convert.ToInt32(cmd.ExecuteScalar()) });
         }
 
+        [HttpPut("warehouse/clients/{id}")]
+        public IActionResult WhUpdateClient(int id, [FromBody] WhClientDto c)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "UPDATE wh_clients SET name=@n, contact=@ct, address=@a, store_type=@st, store_id=@sid WHERE id=@id";
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.Parameters.AddWithValue("n", c.Name);
+            cmd.Parameters.AddWithValue("ct", c.Contact ?? "");
+            cmd.Parameters.AddWithValue("a", c.Address ?? "");
+            cmd.Parameters.AddWithValue("st", c.StoreType ?? "pos");
+            cmd.Parameters.AddWithValue("sid", c.StoreId ?? "");
+            cmd.ExecuteNonQuery();
+            return Ok(new { success = true });
+        }
+
+        [HttpDelete("warehouse/clients/{id}")]
+        public IActionResult WhDeleteClient(int id)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "UPDATE wh_clients SET is_active = false WHERE id = @id";
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.ExecuteNonQuery();
+            return Ok(new { success = true });
+        }
+
         [HttpPost("warehouse/products/from-master/{masterId}")]
         public IActionResult WhAddFromMaster(int masterId)
         {
