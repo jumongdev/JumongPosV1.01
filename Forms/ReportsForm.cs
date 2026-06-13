@@ -56,12 +56,15 @@ public partial class ReportsForm : Form
             if (e.ColumnIndex == dgvSales.Columns["Status"]?.Index)
             {
                 e.Value = row.IsVoided ? "VOIDED" : "COMPLETED";
-                e.CellStyle!.ForeColor = row.IsVoided ? Color.FromArgb(231, 76, 60) : Color.FromArgb(46, 204, 113);
-                e.CellStyle.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
+                if (e.CellStyle != null)
+                {
+                    e.CellStyle.ForeColor = row.IsVoided ? Color.FromArgb(231, 76, 60) : Color.FromArgb(46, 204, 113);
+                    e.CellStyle.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
+                }
             }
             else if (row.IsVoided)
             {
-                e.CellStyle!.ForeColor = Color.Gray;
+                if (e.CellStyle != null) e.CellStyle.ForeColor = Color.Gray;
             }
         };
 

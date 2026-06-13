@@ -85,12 +85,13 @@ public partial class MainForm : Form
                         BalloonTipTitle = "New Warehouse Transfers",
                         BalloonTipText = $"{newCount} new transfer(s) ready. Click Inventory to receive."
                     };
-                    icon.ShowBalloonTip(5000);
                     icon.BalloonTipClicked += (_, _) =>
                     {
+                        icon.Dispose();
                         btnInventory_Click(null!, EventArgs.Empty);
                     };
                     icon.BalloonTipClosed += (_, _) => icon.Dispose();
+                    icon.ShowBalloonTip(5000);
                 }
                 _lastTransferCount = transfers?.Count ?? 0;
             }
@@ -172,7 +173,8 @@ public partial class MainForm : Form
         _schedulerTimer?.Dispose();
         _transferTimer?.Stop();
         _transferTimer?.Dispose();
-        _customerDisplay?.Close();
+        if (_customerDisplay != null && !_customerDisplay.IsDisposed)
+            _customerDisplay.Close();
         base.OnFormClosed(e);
     }
 

@@ -36,9 +36,9 @@ public class SyncController : ControllerBase
     {
         var sid = StoreId();
         return SyncTable("products", items, new[] { "pos_id", "name", "barcode", "category", "price", "cost", "stock_qty", "is_active", "created_at", "modified_by" },
-            $"INSERT INTO products (pos_id, store_id, name, barcode, category, price, cost, stock_qty, is_active, created_at, modified_by, synced_at) " +
-            $"VALUES (@p0,'{sid}',@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,NOW()) " +
-            $"ON CONFLICT (store_id, pos_id) DO UPDATE SET name=@p1, barcode=@p2, category=@p3, price=@p4, cost=@p5, stock_qty=@p6, is_active=@p7, modified_by=@p9, synced_at=NOW()");
+            "INSERT INTO products (pos_id, store_id, name, barcode, category, price, cost, stock_qty, is_active, created_at, modified_by, synced_at) " +
+            "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,NOW()) " +
+            "ON CONFLICT (store_id, pos_id) DO UPDATE SET name=@p1, barcode=@p2, category=@p3, price=@p4, cost=@p5, stock_qty=@p6, is_active=@p7, modified_by=@p9, synced_at=NOW()", sid);
     }
 
     [HttpPost("customers")]
@@ -46,9 +46,9 @@ public class SyncController : ControllerBase
     {
         var sid = StoreId();
         return SyncTable("customers", items, new[] { "pos_id", "name", "phone", "email", "loyalty_points", "is_active", "credit_balance", "credit_limit", "address", "created_at", "modified_by" },
-            $"INSERT INTO customers (pos_id, store_id, name, phone, email, loyalty_points, is_active, credit_balance, credit_limit, address, created_at, modified_by, synced_at) " +
-            $"VALUES (@p0,'{sid}',@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,NOW()) " +
-            $"ON CONFLICT (store_id, pos_id) DO UPDATE SET name=@p1, phone=@p2, email=@p3, loyalty_points=@p4, is_active=@p5, credit_balance=@p6, credit_limit=@p7, address=@p8, modified_by=@p10, synced_at=NOW()");
+            "INSERT INTO customers (pos_id, store_id, name, phone, email, loyalty_points, is_active, credit_balance, credit_limit, address, created_at, modified_by, synced_at) " +
+            "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,NOW()) " +
+            "ON CONFLICT (store_id, pos_id) DO UPDATE SET name=@p1, phone=@p2, email=@p3, loyalty_points=@p4, is_active=@p5, credit_balance=@p6, credit_limit=@p7, address=@p8, modified_by=@p10, synced_at=NOW()", sid);
     }
 
     [HttpPost("users")]
@@ -56,9 +56,9 @@ public class SyncController : ControllerBase
     {
         var sid = StoreId();
         return SyncTable("users", items, new[] { "pos_id", "username", "role", "full_name", "is_active" },
-            $"INSERT INTO users (pos_id, store_id, username, role, full_name, is_active, synced_at) " +
-            $"VALUES (@p0,'{sid}',@p1,@p2,@p3,@p4,NOW()) " +
-            $"ON CONFLICT (store_id, pos_id) DO UPDATE SET username=@p1, role=@p2, full_name=@p3, is_active=@p4, synced_at=NOW()");
+            "INSERT INTO users (pos_id, store_id, username, role, full_name, is_active, synced_at) " +
+            "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,NOW()) " +
+            "ON CONFLICT (store_id, pos_id) DO UPDATE SET username=@p1, role=@p2, full_name=@p3, is_active=@p4, synced_at=NOW()", sid);
     }
 
     [HttpPost("sales")]
@@ -71,11 +71,12 @@ public class SyncController : ControllerBase
             using var tx = conn.BeginTransaction();
 
             using var cmd = new NpgsqlCommand(
-                $"INSERT INTO sales (pos_id, store_id, invoice_no, sale_date, sub_total, discount, tax, grand_total, amount_paid, change, payment_method, customer_id, user_id, is_voided, reference_no, order_type, cash_paid, ew_paid, cashier_name, synced_at) " +
-                $"VALUES (@p0,'{sid}',@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,@p12,@p13,@p14,@p15,@p16,@p17,NOW()) " +
-                $"ON CONFLICT (store_id, pos_id) DO UPDATE SET invoice_no=@p1, sale_date=@p2, sub_total=@p3, discount=@p4, tax=@p5, grand_total=@p6, amount_paid=@p7, change=@p8, payment_method=@p9, customer_id=@p10, user_id=@p11, is_voided=@p12, reference_no=@p13, order_type=@p14, cash_paid=@p15, ew_paid=@p16, cashier_name=@p17, synced_at=NOW()",
+                "INSERT INTO sales (pos_id, store_id, invoice_no, sale_date, sub_total, discount, tax, grand_total, amount_paid, change, payment_method, customer_id, user_id, is_voided, reference_no, order_type, cash_paid, ew_paid, cashier_name, synced_at) " +
+                "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,@p12,@p13,@p14,@p15,@p16,@p17,NOW()) " +
+                "ON CONFLICT (store_id, pos_id) DO UPDATE SET invoice_no=@p1, sale_date=@p2, sub_total=@p3, discount=@p4, tax=@p5, grand_total=@p6, amount_paid=@p7, change=@p8, payment_method=@p9, customer_id=@p10, user_id=@p11, is_voided=@p12, reference_no=@p13, order_type=@p14, cash_paid=@p15, ew_paid=@p16, cashier_name=@p17, synced_at=NOW()",
                 conn, tx);
             cmd.Parameters.AddWithValue("p0", payload.Sale.PosId);
+            cmd.Parameters.AddWithValue("@sid", sid);
             cmd.Parameters.AddWithValue("p1", payload.Sale.InvoiceNo);
             cmd.Parameters.AddWithValue("p2", payload.Sale.SaleDate);
             cmd.Parameters.AddWithValue("p3", payload.Sale.SubTotal);
@@ -98,11 +99,12 @@ public class SyncController : ControllerBase
             foreach (var item in payload.Items)
             {
                 using var icmd = new NpgsqlCommand(
-                    $"INSERT INTO sale_items (pos_id, store_id, sale_id, product_id, product_name, barcode, price, quantity, total_price, is_voided, unit_name, qty_per_unit, unit_cost, synced_at) " +
-                    $"VALUES (@p0,'{sid}',@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,NOW()) " +
-                    $"ON CONFLICT (store_id, pos_id) DO UPDATE SET sale_id=@p1, product_id=@p2, product_name=@p3, barcode=@p4, price=@p5, quantity=@p6, total_price=@p7, is_voided=@p8, unit_name=@p9, qty_per_unit=@p10, unit_cost=@p11, synced_at=NOW()",
+                    "INSERT INTO sale_items (pos_id, store_id, sale_id, product_id, product_name, barcode, price, quantity, total_price, is_voided, unit_name, qty_per_unit, unit_cost, synced_at) " +
+                    "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,NOW()) " +
+                    "ON CONFLICT (store_id, pos_id) DO UPDATE SET sale_id=@p1, product_id=@p2, product_name=@p3, barcode=@p4, price=@p5, quantity=@p6, total_price=@p7, is_voided=@p8, unit_name=@p9, qty_per_unit=@p10, unit_cost=@p11, synced_at=NOW()",
                     conn, tx);
                 icmd.Parameters.AddWithValue("p0", item.PosId);
+                icmd.Parameters.AddWithValue("@sid", sid);
                 icmd.Parameters.AddWithValue("p1", payload.Sale.PosId);
                 icmd.Parameters.AddWithValue("p2", item.ProductId);
                 icmd.Parameters.AddWithValue("p3", item.ProductName);
@@ -131,9 +133,9 @@ public class SyncController : ControllerBase
     {
         var sid = StoreId();
         return SyncTable("void_logs", items, new[] { "pos_id", "sale_id", "sale_item_id", "action", "reason", "invoice_no", "product_name", "quantity", "amount", "user_id", "user_name", "created_at" },
-            $"INSERT INTO void_logs (pos_id, store_id, sale_id, sale_item_id, action, reason, invoice_no, product_name, quantity, amount, user_id, user_name, created_at, synced_at) " +
-            $"VALUES (@p0,'{sid}',@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,NOW()) " +
-            $"ON CONFLICT (store_id, pos_id) DO UPDATE SET sale_id=@p1, sale_item_id=@p2, action=@p3, reason=@p4, invoice_no=@p5, product_name=@p6, quantity=@p7, amount=@p8, user_id=@p9, user_name=@p10, created_at=@p11, synced_at=NOW()");
+            "INSERT INTO void_logs (pos_id, store_id, sale_id, sale_item_id, action, reason, invoice_no, product_name, quantity, amount, user_id, user_name, created_at, synced_at) " +
+            "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,NOW()) " +
+            "ON CONFLICT (store_id, pos_id) DO UPDATE SET sale_id=@p1, sale_item_id=@p2, action=@p3, reason=@p4, invoice_no=@p5, product_name=@p6, quantity=@p7, amount=@p8, user_id=@p9, user_name=@p10, created_at=@p11, synced_at=NOW()", sid);
     }
 
     [HttpPost("stocktrails")]
@@ -141,9 +143,9 @@ public class SyncController : ControllerBase
     {
         var sid = StoreId();
         return SyncTable("stock_trails", items, new[] { "pos_id", "product_id", "product_name", "barcode", "quantity_added", "stock_before", "stock_after", "reference", "user_id", "user_name", "created_at" },
-            $"INSERT INTO stock_trails (pos_id, store_id, product_id, product_name, barcode, quantity_added, stock_before, stock_after, reference, user_id, user_name, created_at, synced_at) " +
-            $"VALUES (@p0,'{sid}',@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,NOW()) " +
-            $"ON CONFLICT (store_id, pos_id) DO UPDATE SET product_id=@p1, product_name=@p2, barcode=@p3, quantity_added=@p4, stock_before=@p5, stock_after=@p6, reference=@p7, user_id=@p8, user_name=@p9, created_at=@p10, synced_at=NOW()");
+            "INSERT INTO stock_trails (pos_id, store_id, product_id, product_name, barcode, quantity_added, stock_before, stock_after, reference, user_id, user_name, created_at, synced_at) " +
+            "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,NOW()) " +
+            "ON CONFLICT (store_id, pos_id) DO UPDATE SET product_id=@p1, product_name=@p2, barcode=@p3, quantity_added=@p4, stock_before=@p5, stock_after=@p6, reference=@p7, user_id=@p8, user_name=@p9, created_at=@p10, synced_at=NOW()", sid);
     }
 
     [HttpPost("credittransactions")]
@@ -151,9 +153,9 @@ public class SyncController : ControllerBase
     {
         var sid = StoreId();
         return SyncTable("credit_transactions", items, new[] { "pos_id", "customer_id", "sale_id", "type", "description", "debit", "credit", "balance", "payment_method", "reference_no", "user_id", "user_name", "created_at" },
-            $"INSERT INTO credit_transactions (pos_id, store_id, customer_id, sale_id, type, description, debit, credit, balance, payment_method, reference_no, user_id, user_name, created_at, synced_at) " +
-            $"VALUES (@p0,'{sid}',@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,@p12,NOW()) " +
-            $"ON CONFLICT (store_id, pos_id) DO UPDATE SET customer_id=@p1, sale_id=@p2, type=@p3, description=@p4, debit=@p5, credit=@p6, balance=@p7, payment_method=@p8, reference_no=@p9, user_id=@p10, user_name=@p11, created_at=@p12, synced_at=NOW()");
+            "INSERT INTO credit_transactions (pos_id, store_id, customer_id, sale_id, type, description, debit, credit, balance, payment_method, reference_no, user_id, user_name, created_at, synced_at) " +
+            "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,@p12,NOW()) " +
+            "ON CONFLICT (store_id, pos_id) DO UPDATE SET customer_id=@p1, sale_id=@p2, type=@p3, description=@p4, debit=@p5, credit=@p6, balance=@p7, payment_method=@p8, reference_no=@p9, user_id=@p10, user_name=@p11, created_at=@p12, synced_at=NOW()", sid);
     }
 
     [HttpPost("dailycloses")]
@@ -161,9 +163,9 @@ public class SyncController : ControllerBase
     {
         var sid = StoreId();
         return SyncTable("daily_closes", items, new[] { "pos_id", "close_date", "total_sales", "total_cash", "total_ewallet", "total_credit", "total_voided", "cash_on_hand", "difference", "opening_cash", "total_expenses", "notes", "user_id", "user_name", "created_at" },
-            $"INSERT INTO daily_closes (pos_id, store_id, close_date, total_sales, total_cash, total_ewallet, total_credit, total_voided, cash_on_hand, difference, opening_cash, total_expenses, notes, user_id, user_name, created_at, synced_at) " +
-            $"VALUES (@p0,'{sid}',@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,@p12,@p13,@p14,NOW()) " +
-            $"ON CONFLICT (store_id, pos_id) DO UPDATE SET close_date=@p1, total_sales=@p2, total_cash=@p3, total_ewallet=@p4, total_credit=@p5, total_voided=@p6, cash_on_hand=@p7, difference=@p8, opening_cash=@p9, total_expenses=@p10, notes=@p11, user_id=@p12, user_name=@p13, created_at=@p14, synced_at=NOW()");
+            "INSERT INTO daily_closes (pos_id, store_id, close_date, total_sales, total_cash, total_ewallet, total_credit, total_voided, cash_on_hand, difference, opening_cash, total_expenses, notes, user_id, user_name, created_at, synced_at) " +
+            "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,@p12,@p13,@p14,NOW()) " +
+            "ON CONFLICT (store_id, pos_id) DO UPDATE SET close_date=@p1, total_sales=@p2, total_cash=@p3, total_ewallet=@p4, total_credit=@p5, total_voided=@p6, cash_on_hand=@p7, difference=@p8, opening_cash=@p9, total_expenses=@p10, notes=@p11, user_id=@p12, user_name=@p13, created_at=@p14, synced_at=NOW()", sid);
     }
 
     [HttpPost("expenses")]
@@ -171,12 +173,12 @@ public class SyncController : ControllerBase
     {
         var sid = StoreId();
         return SyncTable("expenses", items, new[] { "pos_id", "amount", "category", "description", "reference_no", "cashier_username", "timestamp", "receipt_image" },
-            $"INSERT INTO expenses (pos_id, store_id, amount, category, description, reference_no, cashier_username, timestamp, receipt_image, synced_at) " +
-            $"VALUES (@p0,'{sid}',@p1,@p2,@p3,@p4,@p5,@p6,@p7,NOW()) " +
-            $"ON CONFLICT (store_id, pos_id) DO UPDATE SET amount=@p1, category=@p2, description=@p3, reference_no=@p4, cashier_username=@p5, timestamp=@p6, receipt_image=@p7, synced_at=NOW()");
+            "INSERT INTO expenses (pos_id, store_id, amount, category, description, reference_no, cashier_username, timestamp, receipt_image, synced_at) " +
+            "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,@p6,@p7,NOW()) " +
+            "ON CONFLICT (store_id, pos_id) DO UPDATE SET amount=@p1, category=@p2, description=@p3, reference_no=@p4, cashier_username=@p5, timestamp=@p6, receipt_image=@p7, synced_at=NOW()", sid);
     }
 
-    private IActionResult SyncTable(string tableName, List<JsonElement> items, string[] fields, string upsertSql)
+    private IActionResult SyncTable(string tableName, List<JsonElement> items, string[] fields, string upsertSql, string sid)
     {
         try
         {
@@ -186,6 +188,7 @@ public class SyncController : ControllerBase
             foreach (var item in items)
             {
                 using var cmd = new NpgsqlCommand(upsertSql, conn, tx);
+                cmd.Parameters.AddWithValue("@sid", sid);
                 for (var i = 0; i < fields.Length; i++)
                 {
                     var key = "";

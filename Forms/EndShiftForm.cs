@@ -134,7 +134,10 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
             if (emailError != null) MessageBox.Show($"Auto-email failed: {emailError}", "Email Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
-    catch { }
+    catch (Exception emailEx)
+    {
+        MessageBox.Show($"Auto-email failed: {emailEx.Message}", "Email Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+    }
 
     num1000.Value = num500.Value = num200.Value = num100.Value = num50.Value = num20.Value = 0;
     txtCoins.Value = 0;

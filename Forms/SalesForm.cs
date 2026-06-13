@@ -17,7 +17,6 @@ public partial class SalesForm : Form
     private readonly CustomerDisplayForm _customerDisplay;
     private bool _displayVisible = true;
     private System.Windows.Forms.Timer _barcodeTimer = null!;
-    private DateTime _lastBarcodeKeystroke = DateTime.MinValue;
 
     private static readonly Color CTopbar      = Color.FromArgb(26, 26, 46);
     private static readonly Color CTopbarChip  = Color.FromArgb(37, 37, 64);
@@ -350,7 +349,6 @@ public partial class SalesForm : Form
         else if (!char.IsControl((char)Keys.None) &&
                  e.KeyCode != Keys.ShiftKey && e.KeyCode != Keys.ControlKey)
         {
-            _lastBarcodeKeystroke = DateTime.Now;
             _barcodeTimer.Stop();
             _barcodeTimer.Start();
         }

@@ -34,6 +34,7 @@ public partial class CustomerDisplayForm : Form
         BuildLayout();
         BuildSlideshow();
         LoadGcashQr();
+        FormClosing += (_, e) => { e.Cancel = true; Hide(); };
         SetIdleMode(true);
         Resize += (_, _) => LayoutPanels();
         DebugHelper.AddFormLabel(this);

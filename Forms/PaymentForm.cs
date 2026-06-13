@@ -61,7 +61,7 @@ public partial class PaymentForm : Form
             idx = (idx - 1 + methods.Length) % methods.Length;
             if (methods[idx] == "Credit" && _customer == null) idx = 2;
             SelectMethod(methods[idx]);
-            FlashMethodButton();
+            _ = FlashMethodButton();
             e.SuppressKeyPress = true;
         }
         else if (e.KeyCode == Keys.Right)
@@ -69,7 +69,7 @@ public partial class PaymentForm : Form
             idx = (idx + 1) % methods.Length;
             if (methods[idx] == "Credit" && _customer == null) idx = 0;
             SelectMethod(methods[idx]);
-            FlashMethodButton();
+            _ = FlashMethodButton();
             e.SuppressKeyPress = true;
         }
         else if (e.KeyCode == Keys.Enter)
@@ -84,7 +84,7 @@ public partial class PaymentForm : Form
         }
     }
 
-    private async void FlashMethodButton()
+    private async Task FlashMethodButton()
     {
         var methods = new[] { "Cash", "E-Wallet", "Split", "Credit" };
         var methodBtns = new[] { btnMethodCash, btnMethodEwallet, btnMethodSplit, btnMethodCredit };

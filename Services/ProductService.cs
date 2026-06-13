@@ -122,7 +122,7 @@ public class ProductService
         if (!string.IsNullOrEmpty(category))
             sql += " AND Category = @cat";
         if (stockFilter == "low")
-            sql += $" AND StockQty > 0 AND StockQty <= {GetLowStockThreshold()}";
+            sql += $" AND StockQty > 0 AND StockQty <= @thresh";
         else if (stockFilter == "out")
             sql += " AND StockQty = 0";
         sql += " ORDER BY Name";
@@ -131,6 +131,8 @@ public class ProductService
             cmd.Parameters.AddWithValue("@q", $"%{keyword}%");
         if (!string.IsNullOrEmpty(category))
             cmd.Parameters.AddWithValue("@cat", category);
+        if (stockFilter == "low")
+            cmd.Parameters.AddWithValue("@thresh", GetLowStockThreshold());
         using var rdr = cmd.ExecuteReader();
         while (rdr.Read())
             list.Add(Map(rdr));
@@ -157,7 +159,8 @@ public class ProductService
         conn.Open();
         var threshold = GetLowStockThreshold();
         var total = 0; var low = 0; var outOf = 0;
-        var cmd = new SQLiteCommand($"SELECT COUNT(*), SUM(CASE WHEN StockQty = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN StockQty > 0 AND StockQty <= {threshold} THEN 1 ELSE 0 END) FROM Products WHERE IsActive = 1", conn);
+        var cmd = new SQLiteCommand("SELECT COUNT(*), SUM(CASE WHEN StockQty = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN StockQty > 0 AND StockQty <= @thresh THEN 1 ELSE 0 END) FROM Products WHERE IsActive = 1", conn);
+        cmd.Parameters.AddWithValue("@thresh", threshold);
         using var rdr = cmd.ExecuteReader();
         if (rdr.Read())
         {
