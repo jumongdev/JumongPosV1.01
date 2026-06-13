@@ -430,6 +430,7 @@ public class SaleService
                 {
                     using var sc = DatabaseHelper.GetConnection();
                     sc.Open();
+
                     var voidLogs = new SQLiteCommand("SELECT * FROM VoidLog WHERE SaleId = @sid ORDER BY Id", sc);
                     voidLogs.Parameters.AddWithValue("@sid", saleId);
                     using var vlRdr = voidLogs.ExecuteReader();
@@ -472,6 +473,27 @@ public class SaleService
                             UserId = Convert.ToInt32(trRdr["UserId"]),
                             UserName = trRdr["UserName"]?.ToString() ?? "",
                             CreatedAt = trRdr["CreatedAt"]?.ToString() ?? ""
+                        });
+                    }
+
+                    var ctCmd = new SQLiteCommand("SELECT * FROM CreditTransactions WHERE SaleId = @sid ORDER BY Id", sc);
+                    ctCmd.Parameters.AddWithValue("@sid", saleId);
+                    using var ctRdr = ctCmd.ExecuteReader();
+                    while (ctRdr.Read())
+                    {
+                        _ = SyncService.SyncCreditTransaction(new CreditTransaction
+                        {
+                            Id = Convert.ToInt32(ctRdr["Id"]),
+                            CustomerId = Convert.ToInt32(ctRdr["CustomerId"]),
+                            SaleId = ctRdr["SaleId"] != DBNull.Value ? Convert.ToInt32(ctRdr["SaleId"]) : null,
+                            Type = ctRdr["Type"]?.ToString() ?? "",
+                            Description = ctRdr["Description"]?.ToString() ?? "",
+                            Debit = Convert.ToDecimal(ctRdr["Debit"]),
+                            Credit = Convert.ToDecimal(ctRdr["Credit"]),
+                            Balance = Convert.ToDecimal(ctRdr["Balance"]),
+                            UserId = Convert.ToInt32(ctRdr["UserId"]),
+                            UserName = ctRdr["UserName"]?.ToString() ?? "",
+                            CreatedAt = ctRdr["CreatedAt"]?.ToString() ?? ""
                         });
                     }
                 }
@@ -593,6 +615,35 @@ public class SaleService
                 var updatedSale = GetById(saleId);
                 if (updatedSale != null && updatedSale.Items.Count > 0)
                     _ = SyncService.SyncSale(updatedSale, updatedSale.Items);
+            }
+            catch { }
+            try
+            {
+                if (paymentMethod == "Credit" && customerId.HasValue)
+                {
+                    using var ctConn = DatabaseHelper.GetConnection();
+                    ctConn.Open();
+                    var ctCmd = new SQLiteCommand("SELECT * FROM CreditTransactions WHERE SaleId = @sid AND Type = 'Void' ORDER BY Id", ctConn);
+                    ctCmd.Parameters.AddWithValue("@sid", saleId);
+                    using var ctRdr = ctCmd.ExecuteReader();
+                    while (ctRdr.Read())
+                    {
+                        _ = SyncService.SyncCreditTransaction(new CreditTransaction
+                        {
+                            Id = Convert.ToInt32(ctRdr["Id"]),
+                            CustomerId = Convert.ToInt32(ctRdr["CustomerId"]),
+                            SaleId = ctRdr["SaleId"] != DBNull.Value ? Convert.ToInt32(ctRdr["SaleId"]) : null,
+                            Type = ctRdr["Type"]?.ToString() ?? "",
+                            Description = ctRdr["Description"]?.ToString() ?? "",
+                            Debit = Convert.ToDecimal(ctRdr["Debit"]),
+                            Credit = Convert.ToDecimal(ctRdr["Credit"]),
+                            Balance = Convert.ToDecimal(ctRdr["Balance"]),
+                            UserId = Convert.ToInt32(ctRdr["UserId"]),
+                            UserName = ctRdr["UserName"]?.ToString() ?? "",
+                            CreatedAt = ctRdr["CreatedAt"]?.ToString() ?? ""
+                        });
+                    }
+                }
             }
             catch { }
         }
