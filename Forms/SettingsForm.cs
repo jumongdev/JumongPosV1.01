@@ -380,7 +380,7 @@ public partial class SettingsForm : Form
                 cmd.ExecuteNonQuery();
             };
             var lblLowStockHint = new Label { Text = "Products at or below this qty show orange.", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(128, 128, 128), Location = new Point(225, dy + 26), Size = new Size(200, 22) };
-            dy += 46;
+            dy = dy + 56 + 10; // bottom of LowStock section + gap
             int tzMinutes;
             using (var sc = DatabaseHelper.GetConnection()) { sc.Open(); using var scmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'AppTimezone'", sc); tzMinutes = int.TryParse(scmd.ExecuteScalar()?.ToString(), out var t) ? t : 480; }
             var lblTz = new Label { Text = "Timezone:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, dy), Size = new Size(140, 25) };
@@ -409,7 +409,7 @@ public partial class SettingsForm : Form
                 sCmd.ExecuteNonQuery();
             };
             var lblTzHint = new Label { Text = "All timestamps use this timezone regardless of system clock.", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(128, 128, 128), Location = new Point(15, dy + 28), Size = new Size(400, 20) };
-            MakeSection("DISPLAY SETUP", 250, new Control[] {
+            MakeSection("DISPLAY SETUP", 310, new Control[] {
                 lblPos, cmbPosScreen, lblCust, cmbCustomerScreen,
                 lblEmailSched, numEmailScheduleHour, lblEmailSchedHint,
                 chkEnableOnlineOrders, chkCustomerDisplay, lblRestart,
@@ -508,7 +508,7 @@ public partial class SettingsForm : Form
             txtSmtpTo.TextChanged += (_, _) => SaveSetting("SmtpTo", txtSmtpTo.Text);
             ey += 36;
 
-            MakeSection("EMAIL SETUP", ey - 36, new Control[] {
+            MakeSection("EMAIL SETUP", ey, new Control[] {
                 lblSmtpHost, txtSmtpHost, lblSmtpPort, numSmtpPort,
                 lblSmtpUser, txtSmtpUser, lblSmtpPass, txtSmtpPass,
                 lblSmtpTo, txtSmtpTo
@@ -621,7 +621,7 @@ public partial class SettingsForm : Form
             };
             py += 42;
 
-            MakeSection("CLOUD DATABASE", py - 40, new Control[] {
+            MakeSection("CLOUD DATABASE", py + 4, new Control[] {
                 lblPgHost, txtPgHost, lblPgPort, txtPgPort, lblPgDb, txtPgDb,
                 lblPgUser, txtPgUser, lblPgPass, txtPgPass, chkPgSsl,
                 btnTestPg, testResult, btnMigrate, migrateDesc
