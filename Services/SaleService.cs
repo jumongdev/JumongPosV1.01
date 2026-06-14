@@ -192,7 +192,7 @@ public class SaleService
         return sale;
     }
 
-    public static List<Sale> GetSales(DateTime? from = null, DateTime? to = null, string? invoiceNo = null)
+    public static List<Sale> GetSales(DateTime? from = null, DateTime? to = null, string? invoiceNo = null, bool? synced = null)
     {
         var list = new List<Sale>();
         using var conn = DatabaseHelper.GetConnection();
@@ -204,6 +204,7 @@ public class SaleService
         if (from.HasValue) conditions.Add("s.SaleDate >= @from");
         if (to.HasValue) conditions.Add("s.SaleDate <= @to");
         if (!string.IsNullOrEmpty(invoiceNo)) conditions.Add("s.InvoiceNo LIKE @inv");
+        if (synced.HasValue) conditions.Add("s.Synced = @synced");
         if (conditions.Count > 0)
             sql += " WHERE " + string.Join(" AND ", conditions);
         sql += " GROUP BY s.Id ORDER BY s.SaleDate DESC";
@@ -212,6 +213,7 @@ public class SaleService
         if (from.HasValue) cmd.Parameters.AddWithValue("@from", from.Value.ToString("yyyy-MM-dd 00:00:00"));
         if (to.HasValue) cmd.Parameters.AddWithValue("@to", to.Value.ToString("yyyy-MM-dd 23:59:59"));
         if (!string.IsNullOrEmpty(invoiceNo)) cmd.Parameters.AddWithValue("@inv", $"%{invoiceNo}%");
+        if (synced.HasValue) cmd.Parameters.AddWithValue("@synced", synced.Value ? 1 : 0);
         using var rdr = cmd.ExecuteReader();
         while (rdr.Read())
             list.Add(MapSale(rdr));

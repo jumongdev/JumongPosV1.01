@@ -205,15 +205,15 @@ public partial class StockReceivingForm : Form
     private void ShowTrail()
     {
         using var form = new Form { Text = "Stock Receiving History", WindowState = FormWindowState.Maximized, StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = Color.FromArgb(10, 10, 26) };
-        var pnlToolbar = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = Color.FromArgb(20, 20, 40) };
-        var searchBox = new TextBox { Location = new Point(15, 12), Size = new Size(150, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = Color.FromArgb(30, 30, 55), ForeColor = Color.FromArgb(230, 230, 245) };
-        var dtpDate = new DateTimePicker { Location = new Point(175, 12), Size = new Size(130, 25), Format = DateTimePickerFormat.Short, Value = DateTime.Today };
-        var btnFilter = new Button { Text = "FILTER", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(72, 126, 176), ForeColor = Color.White, Location = new Point(315, 10), Size = new Size(70, 28), Cursor = Cursors.Hand };
-        var btnPrint = new Button { Text = "\uD83D\uDDAB PRINT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(46, 204, 113), ForeColor = Color.White, Location = new Point(393, 10), Size = new Size(80, 28), Cursor = Cursors.Hand };
-        var lblTitle = new Label { Text = "\uD83D\uDCE6 RECEIVING HISTORY", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 245, 255), Location = new Point(490, 12), Size = new Size(300, 28) };
+        var pnlToolbar = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = Color.FromArgb(20, 20, 40) };
+        var searchBox = new TextBox { Location = new Point(15, 18), Size = new Size(150, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = Color.FromArgb(30, 30, 55), ForeColor = Color.FromArgb(230, 230, 245) };
+        var dtpDate = new DateTimePicker { Location = new Point(175, 18), Size = new Size(130, 25), Format = DateTimePickerFormat.Short, Value = DateTime.Today };
+        var btnFilter = new Button { Text = "FILTER", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(72, 126, 176), ForeColor = Color.White, Location = new Point(315, 16), Size = new Size(70, 28), Cursor = Cursors.Hand };
+        var btnPrint = new Button { Text = "\uD83D\uDDAB PRINT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(46, 204, 113), ForeColor = Color.White, Location = new Point(393, 16), Size = new Size(80, 28), Cursor = Cursors.Hand };
+        var lblTitle = new Label { Text = "\uD83D\uDCE6 RECEIVING HISTORY", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 245, 255), Location = new Point(490, 15), Size = new Size(350, 30) };
         pnlToolbar.Controls.AddRange(new Control[] { searchBox, dtpDate, btnFilter, btnPrint, lblTitle });
 
-        var dgv = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = Color.FromArgb(20, 20, 40), BorderStyle = BorderStyle.None, GridColor = Color.FromArgb(40, 40, 70), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = Color.FromArgb(0, 245, 255), Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 32, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = Color.FromArgb(230, 230, 245), SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White }, RowTemplate = { Height = 30 }, AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) } };
+        var dgv = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = Color.FromArgb(20, 20, 40), BorderStyle = BorderStyle.None, GridColor = Color.FromArgb(40, 40, 70), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = Color.FromArgb(0, 245, 255), Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 35, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = Color.FromArgb(230, 230, 245), SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White }, RowTemplate = { Height = 30 }, AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) } };
 
         dgv.AutoGenerateColumns = false;
         dgv.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "DATE/TIME", DataPropertyName = "CreatedAt", Width = 150 });
@@ -254,9 +254,8 @@ public partial class StockReceivingForm : Form
                 MessageBox.Show("No data to print.", "Print", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         };
-        form.Controls.Add(dgv);
         form.Controls.Add(pnlToolbar);
-        pnlToolbar.BringToFront();
+        form.Controls.Add(dgv);
         LoadTrail();
         form.ShowDialog();
     }
@@ -322,15 +321,16 @@ public partial class StockReceivingForm : Form
         var pnlPending = new Panel { Location = new Point(margin, 180), Size = new Size(100, 300), BackColor = panelBg };
         pnlPending.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlPending.Width - 1, pnlPending.Height - 1); };
         var lblPendingTitle = new Label { Text = "PENDING ITEMS", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(12, 8), Size = new Size(150, 20) };
-        dgvPending = new DataGridView { Location = new Point(8, 32), Size = new Size(100, 200), ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = panelBg, BorderStyle = BorderStyle.None, GridColor = Color.FromArgb(40, 40, 70), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, SelectionMode = DataGridViewSelectionMode.FullRowSelect, Font = new Font("Segoe UI", 9F), CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal, ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = neonTitle, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = inputFg, SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) } };
+        dgvPending = new DataGridView { Location = new Point(8, 40), Size = new Size(100, 200), ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = panelBg, BorderStyle = BorderStyle.None, GridColor = Color.FromArgb(40, 40, 70), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, SelectionMode = DataGridViewSelectionMode.FullRowSelect, Font = new Font("Segoe UI", 9F), CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal, ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = neonTitle, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = inputFg, SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) } };
         dgvPending.Columns.Add("Product", "PRODUCT");
         dgvPending.Columns.Add("Barcode", "BARCODE");
         dgvPending.Columns.Add("Current", "CURRENT");
         dgvPending.Columns.Add("Qty", "QTY ADDED");
         dgvPending.Columns.Add("NewStock", "NEW STOCK");
-        dgvPending.Columns.Add("Remove", "");
+        dgvPending.Columns.Add("Remove", "✕");
         dgvPending.Columns[0].MinimumWidth = 200;
         dgvPending.Columns[5].Width = 35;
+        dgvPending.Columns[5].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
         dgvPending.CellClick += (_, e) => { if (e.ColumnIndex == 5 && e.RowIndex >= 0) RemoveFromList(e.RowIndex); };
         pnlPending.Controls.AddRange(new Control[] { lblPendingTitle, dgvPending });
 
@@ -379,8 +379,8 @@ public partial class StockReceivingForm : Form
         pnlBottom.Location = new Point(margin, pnlPending.Bottom + margin);
         pnlBottom.Size = new Size(w, bottomH);
 
-        dgvPending.Location = new Point(8, 32);
-        dgvPending.Size = new Size(w - 16, availH - 40);
+        dgvPending.Location = new Point(8, 40);
+        dgvPending.Size = new Size(w - 16, availH - 48);
     }
 
     private TextBox txtBarcode = null!;

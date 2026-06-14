@@ -59,7 +59,10 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
     ├── v1.0.27/  (exe)
     └── v1.0.28/  (exe)
     └── v1.0.29/  (exe)
-    └── v1.0.30/  (exe) — current
+    └── v1.0.30/  (exe)
+    └── v1.0.31/  (exe)
+    └── v1.0.32/  (exe)
+    └── v1.0.33/  (exe) — current
 ```
 
 ## Tech Stack
@@ -263,6 +266,32 @@ Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operationa
 | `Forms/MainForm.cs` | Added **Online Orders** sidebar button; transfer poll interval reduced 60s→15s; button text shows pending count badge; balloon tip links to Online Orders |
 | `Services/SyncService.cs` | (no change) existing `GetPendingTransfersAsync()` and `MarkTransferReceivedAsync()` used |
 
+### v1.0.33 — Sale Date Sync Fix + Unsynced-Only Query
+
+| File | Change |
+|---|---|
+| `Services/AppVersion.cs` | `Current` bumped to `"1.0.33"` |
+| `Services/SyncService.cs:160` | Fixed `saleDate` format: pass raw `DateTime` instead of `ToString("yyyy-MM-dd HH:mm:ss")` — cloud now receives ISO 8601 format, fixing 400 validation error |
+| `Services/SaleService.cs:195` | Added `bool? synced = null` param to `GetSales()` — SQL filters `WHERE Synced = @synced` |
+| `Forms/SettingsForm.cs:706-708` | `btnSyncToday_Click` now uses `GetSales(..., synced: false)` — only loads unsynced sales, no in-memory filtering |
+
+**Impact:** Sales now sync to cloud dashboard correctly. SYNC TODAY only queries unsynced sales from SQLite directly — faster, no wasted loops.
+
+### v1.0.32 — Stock Receiving Form Layout Fix
+
+| File | Change |
+|---|---|
+| `Services/AppVersion.cs` | `Current` bumped to `"1.0.32"` |
+| `Forms/StockReceivingForm.cs:325` | `dgvPending` Y from 32→40 to fix overlap with "PENDING ITEMS" label, column headers, and first row |
+| `Forms/StockReceivingForm.cs:331` | Remove column header changed from `""` to `"✕"` |
+| `Forms/StockReceivingForm.cs:334` | Added `AutoSizeMode = None` to Remove column so Width=35 is respected (was overridden by Fill mode) |
+| `Forms/StockReceivingForm.cs:382-383` | `ResizeLayout` updated to match new Y=40 and adjusted height (`availH - 48`) |
+| `Forms/StockReceivingForm.cs:208` | `ShowTrail()` toolbar height 50→60, controls Y adjusted for vertical centering |
+| `Forms/StockReceivingForm.cs:213` | `ShowTrail()` title size 300×28→350×30 to prevent DPI/font overflow |
+| `Forms/StockReceivingForm.cs:216` | `ShowTrail()` `AutoSizeColumnsMode` `AllCells`→`Fill`, `ColumnHeadersHeight` 32→35 |
+| `Forms/StockReceivingForm.cs:257` | `ShowTrail()` removed unnecessary `BringToFront()`, toolbar added before DataGridView |
+| `JumongPos.db` | SMTP and PostgreSQL connection details seeded into Settings table |
+
 ### v1.0.31 — Void Sync Fix (VoidLog + StockTrail + CreditTxn)
 
 | File | Change |
@@ -292,7 +321,7 @@ Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operationa
 | Button | Description | Progress |
 |---|---|---|
 | SYNC ALL TO CLOUD | Upload all data (products, sales, expenses, etc.) | ✅ Non-modal popup |
-| SYNC TODAY ONLY | Upload today's unsynced data | ✅ Non-modal popup |
+| SYNC TODAY ONLY | Upload today's unsynced data (SQL-level filter, skips synced) | ✅ Non-modal popup |
 | SYNC FROM CLOUD | Download master catalog (stock unchanged) | ✅ Non-modal popup |
 | VIEW SYNC LOG | History of sync operations | — |
 | UPDATE APP | Check GitHub for new version | — |

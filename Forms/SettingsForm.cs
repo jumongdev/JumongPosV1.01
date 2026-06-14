@@ -703,9 +703,8 @@ public partial class SettingsForm : Form
             var today = DateTime.Now.ToString("yyyy-MM-dd");
             var todayStart = today + " 00:00:00";
             var todayEnd = today + " 23:59:59";
-            var sales = SaleService.GetSales(from: DateTime.Parse(todayStart), to: DateTime.Parse(todayEnd));
-            var unsyncedSales = new List<Sale>();
-            foreach (var s in sales) { s.Items = SaleService.GetSaleItems(s.Id); if (!s.Synced) unsyncedSales.Add(s); }
+            var unsyncedSales = SaleService.GetSales(from: DateTime.Parse(todayStart), to: DateTime.Parse(todayEnd), synced: false);
+            foreach (var s in unsyncedSales) { s.Items = SaleService.GetSaleItems(s.Id); }
             var expenses = ExpenseService.GetExpensesBetween(todayStart, DateTime.Parse(todayEnd));
             var voids = SaleService.GetVoidLogs().Where(v => v.CreatedAt?.StartsWith(today) == true).ToList();
             var stockTrails = StockService.GetTrail(limit: 10000).Where(t => t.CreatedAt?.StartsWith(today) == true).ToList();
