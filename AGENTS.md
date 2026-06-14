@@ -62,7 +62,8 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
     └── v1.0.30/  (exe)
     └── v1.0.31/  (exe)
     └── v1.0.32/  (exe)
-    └── v1.0.33/  (exe) — current
+    └── v1.0.33/  (exe)
+    └── v1.0.34/  (exe) — current
 ```
 
 ## Tech Stack
@@ -265,6 +266,15 @@ Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operationa
 | `Forms/SalesForm.cs` | Added `LoadFromTransfer(orderId, customerName, items)` — skips order-type prompt, populates cart from transfer items; `btnPay_Click` auto-marks transfer received on sale complete |
 | `Forms/MainForm.cs` | Added **Online Orders** sidebar button; transfer poll interval reduced 60s→15s; button text shows pending count badge; balloon tip links to Online Orders |
 | `Services/SyncService.cs` | (no change) existing `GetPendingTransfersAsync()` and `MarkTransferReceivedAsync()` used |
+
+### v1.0.34 — SMTP/PG Settings Seed Migration
+
+| File | Change |
+|---|---|
+| `Services/AppVersion.cs` | `Current` bumped to `"1.0.34"` |
+| `Data/DatabaseHelper.cs` | Added migration: `INSERT OR IGNORE` seeds missing SMTP (SmtpHost, SmtpPort, SmtpUser, SmtpPass, SmtpTo) and PG (PgHost, PgPort, PgDatabase, PgUser, PgPass, PgSsl) settings for existing DBs |
+
+**Impact:** New and existing databases now get SMTP and PostgreSQL connection settings seeded automatically. Previously these were only created if the Settings table was empty. Fixes blank EMAIL SETUP and CLOUD DATABASE fields in Settings.
 
 ### v1.0.33 — Sale Date Sync Fix + Unsynced-Only Query
 

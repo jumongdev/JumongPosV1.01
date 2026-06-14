@@ -517,6 +517,14 @@ public class DatabaseHelper
             conn);
         syncLog.ExecuteNonQuery();
 
+        // Seed SMTP and PostgreSQL settings if missing (existing DBs from before v1.0.32)
+        using var seedMissing = new SQLiteCommand(
+            "INSERT OR IGNORE INTO Settings (Key, Value) VALUES " +
+            "('SmtpHost', ''), ('SmtpPort', '587'), ('SmtpUser', ''), ('SmtpPass', ''), ('SmtpTo', ''), " +
+            "('PgHost', ''), ('PgPort', '5432'), ('PgDatabase', ''), ('PgUser', ''), ('PgPass', ''), ('PgSsl', 'True')",
+            conn);
+        seedMissing.ExecuteNonQuery();
+
         SeedDefaults(conn);
     }
 
