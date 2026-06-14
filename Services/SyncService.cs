@@ -418,6 +418,16 @@ public static class SyncService
                 var response = await _client.PostAsync(url, content);
                 if (response.IsSuccessStatusCode)
                 {
+                    if (endpoint == "/sales")
+                    {
+                        try
+                        {
+                            using var doc = JsonDocument.Parse(payload);
+                            if (doc.RootElement.TryGetProperty("sale", out var saleEl) && saleEl.TryGetProperty("posId", out var posIdEl))
+                                MarkSynced(posIdEl.GetInt32());
+                        }
+                        catch { }
+                    }
                     RemoveFromQueue(id);
                 }
             }

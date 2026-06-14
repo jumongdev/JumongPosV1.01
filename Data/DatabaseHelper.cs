@@ -517,13 +517,25 @@ public class DatabaseHelper
             conn);
         syncLog.ExecuteNonQuery();
 
-        // Seed SMTP and PostgreSQL settings if missing (existing DBs from before v1.0.32)
+        // Seed SMTP and PostgreSQL settings if missing (existing DBs from before v1.0.34)
         using var seedMissing = new SQLiteCommand(
             "INSERT OR IGNORE INTO Settings (Key, Value) VALUES " +
             "('SmtpHost', ''), ('SmtpPort', '587'), ('SmtpUser', ''), ('SmtpPass', ''), ('SmtpTo', ''), " +
             "('PgHost', ''), ('PgPort', '5432'), ('PgDatabase', ''), ('PgUser', ''), ('PgPass', ''), ('PgSsl', 'True')",
             conn);
         seedMissing.ExecuteNonQuery();
+
+        // Fix stale Railway cloud API URL → DigitalOcean
+        using var fixUrl = new SQLiteCommand(
+            "UPDATE Settings SET Value = 'https://jumong-pos-api-p285q.ondigitalocean.app/api' WHERE Key = 'CloudApiUrl' AND Value LIKE '%railway%'",
+            conn);
+        if (fixUrl.ExecuteNonQuery() > 0)
+        {
+            using var logUrl = new SQLiteCommand(
+                "INSERT OR IGNORE INTO SyncLog (Endpoint, Status, Error, CreatedAt) VALUES ('/migration', 'OK', 'Fixed stale CloudApiUrl (Railway→DO)', datetime('now','localtime'))",
+                conn);
+            logUrl.ExecuteNonQuery();
+        }
 
         SeedDefaults(conn);
     }

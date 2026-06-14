@@ -63,7 +63,8 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
     └── v1.0.31/  (exe)
     └── v1.0.32/  (exe)
     └── v1.0.33/  (exe)
-    └── v1.0.34/  (exe) — current
+    └── v1.0.34/  (exe)
+    └── v1.0.35/  (exe) — current
 ```
 
 ## Tech Stack
@@ -266,6 +267,16 @@ Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operationa
 | `Forms/SalesForm.cs` | Added `LoadFromTransfer(orderId, customerName, items)` — skips order-type prompt, populates cart from transfer items; `btnPay_Click` auto-marks transfer received on sale complete |
 | `Forms/MainForm.cs` | Added **Online Orders** sidebar button; transfer poll interval reduced 60s→15s; button text shows pending count badge; balloon tip links to Online Orders |
 | `Services/SyncService.cs` | (no change) existing `GetPendingTransfersAsync()` and `MarkTransferReceivedAsync()` used |
+
+### v1.0.35 — Cloud API URL Auto-Fix + Retry MarkSynced
+
+| File | Change |
+|---|---|
+| `Services/AppVersion.cs` | `Current` bumped to `"1.0.35"` |
+| `Data/DatabaseHelper.cs` | Added migration: auto-fixes stale Railway `CloudApiUrl` → DigitalOcean on startup |
+| `Services/SyncService.cs` | `RetryFailedAsync()` now calls `MarkSynced()` on successful `/sales` retry |
+
+**Impact:** Fixes silent sync failure caused by old Railway API URL lingering in DB. Background retries now properly mark sales as synced on success.
 
 ### v1.0.34 — SMTP/PG Settings Seed Migration
 
