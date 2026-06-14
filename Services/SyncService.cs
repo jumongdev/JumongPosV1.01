@@ -264,7 +264,7 @@ public static class SyncService
         {
             new {
                 PosId = dc.Id,
-                CloseDate = dc.CloseDate,
+                CloseDate = ToUtcString(dc.CloseDate),
                 TotalSales = dc.TotalSales,
                 TotalCash = dc.TotalCash,
                 TotalEwallet = dc.TotalEWallet,
@@ -285,10 +285,6 @@ public static class SyncService
 
     public static async Task SyncExpense(Expense expense)
     {
-        var offset = TimeZoneInfo.Local.BaseUtcOffset;
-        var ts = expense.Timestamp.Length > 19
-            ? expense.Timestamp
-            : expense.Timestamp + " " + (offset.Hours >= 0 ? "+" : "") + offset.ToString("hh\\:mm");
         var data = new[]
         {
             new {
@@ -298,7 +294,7 @@ public static class SyncService
                 Description = expense.Description,
                 ReferenceNo = (string?)expense.ReferenceNo,
                 CashierUsername = expense.CashierUsername,
-                Timestamp = ts,
+                Timestamp = ToUtcString(expense.Timestamp),
                 ReceiptImage = expense.ReceiptImage
             }
         };
@@ -356,7 +352,9 @@ public static class SyncService
     {
         if (string.IsNullOrEmpty(localTime)) return "";
         if (localTime.Length > 19) return localTime;
-        return localTime;
+        var offset = TimeZoneInfo.Local.BaseUtcOffset;
+        var sign = offset.Hours >= 0 ? "+" : "";
+        return localTime + " " + sign + offset.ToString("hh\\:mm");
     }
 
     private static void LogSync(string endpoint, string status, string error)

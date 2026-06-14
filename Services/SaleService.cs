@@ -150,7 +150,7 @@ public class SaleService
         {
             Id = Convert.ToInt32(rdr["Id"]),
             InvoiceNo = rdr["InvoiceNo"].ToString() ?? "",
-            SaleDate = DateTime.Parse(rdr["SaleDate"].ToString()!),
+            SaleDate = DateTime.SpecifyKind(DateTime.Parse(rdr["SaleDate"].ToString()!), DateTimeKind.Local),
             SubTotal = Convert.ToDecimal(rdr["SubTotal"]),
             Discount = Convert.ToDecimal(rdr["Discount"]),
             Tax = Convert.ToDecimal(rdr["Tax"]),
@@ -301,7 +301,7 @@ public class SaleService
         {
             Id = Convert.ToInt32(rdr["Id"]),
             InvoiceNo = rdr["InvoiceNo"].ToString() ?? "",
-            SaleDate = DateTime.Parse(rdr["SaleDate"].ToString()!),
+            SaleDate = DateTime.SpecifyKind(DateTime.Parse(rdr["SaleDate"].ToString()!), DateTimeKind.Local),
             SubTotal = Convert.ToDecimal(rdr["SubTotal"]),
             Discount = Convert.ToDecimal(rdr["Discount"]),
             Tax = Convert.ToDecimal(rdr["Tax"]),

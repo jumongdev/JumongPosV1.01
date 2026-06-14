@@ -278,6 +278,33 @@ Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operationa
 
 **Impact:** Fixes synced sales showing wrong date/time on cloud dashboard (was off by 8 hours because `Unspecified` DateTime was treated as UTC).
 
+### v1.0.37 — Comprehensive Timezone Fix (ToUtcString + SpecifyKind)
+
+| File | Change |
+|---|---|
+| `Services/AppVersion.cs` | `Current` bumped to `"1.0.37"` |
+| `Services/SyncService.cs:355-362` | `ToUtcString()` now appends `+08:00` offset (was a no-op returning bare string). Affects: VoidLog, StockTrail, CreditTxn, DailyClose |
+| `Services/SyncService.cs:267` | `DailyClose.CloseDate` now uses `ToUtcString()` for timezone offset (was bare string) |
+| `Services/SyncService.cs:288-301` | `SyncExpense` simplified: uses `ToUtcString()` instead of custom offset logic (behavior unchanged) |
+| `Services/SaleService.cs:153` | `GetByInvoiceNo()`: `DateTime.Parse` → `DateTime.SpecifyKind(..., Local)` |
+| `Services/SaleService.cs:304` | `MapSale()`: `DateTime.Parse` → `DateTime.SpecifyKind(..., Local)` |
+| `Services/ProductService.cs:360` | `Product.Map()`: `DateTime.Parse` → `DateTime.SpecifyKind(..., Local)` |
+| `Services/StockService.cs:193` | `Product.Map()`: `DateTime.Parse` → `DateTime.SpecifyKind(..., Local)` |
+| `Services/CustomerService.cs:332` | `Customer.Map()`: `DateTime.Parse` → `DateTime.SpecifyKind(..., Local)` |
+| `Services/CreditService.cs:352` | `Customer.MapCustomer()`: `DateTime.Parse` → `DateTime.SpecifyKind(..., Local)` |
+| `Forms/RetrieveHeldCartForm.cs:37` | `HeldCart.CreatedAt`: `DateTime.Parse` → `DateTime.SpecifyKind(..., Local)` |
+
+**Impact:** Eliminates root cause of recurring timezone bugs: `DateTime.Parse` from SQLite always produces `Kind = Unspecified`, which `System.Text.Json` serializes without timezone offset. Now ALL `DateTime` properties carry `Kind.Local` at the point of SQLite read, so they serialize with `+08:00`. String-based timestamp sync methods now also send explicit offset via `ToUtcString()`.
+
+### v1.0.37b — Cloud Dashboard Timezone Display Fix
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/index.html` | Added `timeZone:'Asia/Manila'` to all 10 `toLocaleDateString`/`toLocaleTimeString` calls — times now display in PH time regardless of browser timezone |
+| `JumongCloudAPI/wwwroot/order.html` | Same fix for warehouse order list |
+
+**Impact:** Cloud dashboard was displaying UTC times in the browser's local timezone because `toLocaleDateString('en-PH')` only controls date formatting, not timezone conversion. Now all dates explicitly use `timeZone: 'Asia/Manila'` so the dashboard shows correct PH time from any browser.
+
 ### v1.0.35 — Cloud API URL Auto-Fix + Retry MarkSynced
 
 | File | Change |

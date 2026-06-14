@@ -349,7 +349,7 @@ public class CreditService
             LoyaltyPoints = Convert.ToInt32(rdr["LoyaltyPoints"]),
             CreditBalance = rdr["CreditBalance"] != DBNull.Value ? Convert.ToDecimal(rdr["CreditBalance"]) : 0,
             CreditLimit = rdr["CreditLimit"] != DBNull.Value ? Convert.ToDecimal(rdr["CreditLimit"]) : 0,
-            CreatedAt = DateTime.Parse(rdr["CreatedAt"].ToString()!)
+            CreatedAt = DateTime.SpecifyKind(DateTime.Parse(rdr["CreatedAt"].ToString()!), DateTimeKind.Local)
         };
     }
 

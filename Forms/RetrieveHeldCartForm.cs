@@ -34,7 +34,7 @@ public partial class RetrieveHeldCartForm : Form
                 CustomerId = rdr.IsDBNull(2) ? null : rdr.GetInt32(2),
                 CustomerName = rdr.GetString(3),
                 ItemsJson = rdr.GetString(4),
-                CreatedAt = DateTime.Parse(rdr.GetString(5))
+                CreatedAt = DateTime.SpecifyKind(DateTime.Parse(rdr.GetString(5)), DateTimeKind.Local)
             });
         }
 
