@@ -19,6 +19,8 @@ public static class TimeHelper
 
     public static DateTime Today => Now.Date;
 
+    public static int GetTimezoneOffset() => GetOffset();
+
     private static int GetOffset()
     {
         var cacheAge = (DateTime.UtcNow - _lastRead).TotalSeconds;
