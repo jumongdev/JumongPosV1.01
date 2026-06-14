@@ -258,6 +258,11 @@ public static class PgDatabaseHelper
         imgMig.CommandText = "ALTER TABLE master_products ADD COLUMN IF NOT EXISTS image_data TEXT DEFAULT ''";
         try { imgMig.ExecuteNonQuery(); } catch { }
 
+        // Migration: add updated_at to master_products
+        using var upMig = conn.CreateCommand();
+        upMig.CommandText = "ALTER TABLE master_products ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()";
+        try { upMig.ExecuteNonQuery(); } catch { }
+
         // Recreate unique constraints with store_id
         using var dropCmd = conn.CreateCommand();
         dropCmd.CommandText = @"
@@ -329,7 +334,8 @@ public static class PgDatabaseHelper
                 stock_qty INTEGER NOT NULL DEFAULT 0,
                 is_active BOOLEAN NOT NULL DEFAULT TRUE,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                modified_by TEXT DEFAULT ''
+                modified_by TEXT DEFAULT '',
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
             CREATE TABLE IF NOT EXISTS master_product_units (
                 id SERIAL PRIMARY KEY,

@@ -522,7 +522,7 @@ public class DatabaseHelper
             "INSERT OR IGNORE INTO Settings (Key, Value) VALUES " +
             "('SmtpHost', ''), ('SmtpPort', '587'), ('SmtpUser', ''), ('SmtpPass', ''), ('SmtpTo', ''), " +
             "('PgHost', ''), ('PgPort', '5432'), ('PgDatabase', ''), ('PgUser', ''), ('PgPass', ''), ('PgSsl', 'True'), " +
-            "('AppTimezone', '480')",
+            "('AppTimezone', '480'), ('LastMasterSync', '')",
             conn);
         seedMissing.ExecuteNonQuery();
 

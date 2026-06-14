@@ -669,7 +669,7 @@ public class DashboardController : ControllerBase
         [HttpGet("version")]
         public IActionResult GetVersion()
         {
-            return Ok(new { version = "1.0.40", buildDate = "2026-06-14", changes = "Layout fixes: ShowTrail AutoSize=false + control z-order, Settings section heights adjusted to prevent overlap", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.40/JumongPosV1.01.exe" });
+            return Ok(new { version = "1.0.41", buildDate = "2026-06-14", changes = "Incremental master catalog sync: UPDATE MASTER CATALOG button only downloads changed products", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.41/JumongPosV1.01.exe" });
         }
 
         [HttpGet("fix-hvr-times")]
@@ -778,11 +778,17 @@ public class DashboardController : ControllerBase
         }
 
         [HttpGet("products/master/download")]
-        public IActionResult DownloadMasterCatalog()
+        public IActionResult DownloadMasterCatalog([FromQuery] string? since = null)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
+            var where = "mp.is_active = true";
+            if (!string.IsNullOrEmpty(since) && DateTime.TryParse(since, out var sinceDate))
+            {
+                where += " AND mp.updated_at > @since";
+                cmd.Parameters.AddWithValue("since", sinceDate);
+            }
+            cmd.CommandText = $@"
                 SELECT mp.id, mp.name, mp.barcode, mp.category, mp.price, mp.cost, mp.stock_qty, mp.image_data,
                        COALESCE(json_agg(
                            json_build_object('unitName', mpu.unit_name, 'price', mpu.price, 'cost', mpu.cost, 'qtyPerUnit', mpu.qty_per_unit, 'isDefault', mpu.is_default)
@@ -790,7 +796,7 @@ public class DashboardController : ControllerBase
                        ) FILTER (WHERE mpu.id IS NOT NULL), '[]') AS units
                 FROM master_products mp
                 LEFT JOIN master_product_units mpu ON mpu.product_id = mp.id
-                WHERE mp.is_active = true
+                WHERE {where}
                 GROUP BY mp.id ORDER BY mp.name";
             using var reader = cmd.ExecuteReader();
             var products = new List<object>();
@@ -819,8 +825,8 @@ public class DashboardController : ControllerBase
                 foreach (var p in products)
                 {
                     using var cmd = new NpgsqlCommand(@"
-                        INSERT INTO master_products (name, barcode, category, price, cost, stock_qty, image_data)
-                        VALUES (@name, @barcode, @cat, @price, @cost, @qty, @img) RETURNING id", conn, tx);
+                        INSERT INTO master_products (name, barcode, category, price, cost, stock_qty, image_data, updated_at)
+                        VALUES (@name, @barcode, @cat, @price, @cost, @qty, @img, NOW()) RETURNING id", conn, tx);
                     cmd.Parameters.AddWithValue("name", p.Name);
                     cmd.Parameters.AddWithValue("barcode", (object?)p.Barcode ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("cat", p.Category ?? "");
@@ -865,8 +871,8 @@ public class DashboardController : ControllerBase
             try
             {
                 using var cmd = new NpgsqlCommand(@"
-                    INSERT INTO master_products (name, barcode, category, price, cost, stock_qty, image_data)
-                    VALUES (@n, @b, @c, @p, @co, 0, @img) RETURNING id", conn, tx);
+                    INSERT INTO master_products (name, barcode, category, price, cost, stock_qty, image_data, updated_at)
+                    VALUES (@n, @b, @c, @p, @co, 0, @img, NOW()) RETURNING id", conn, tx);
                 cmd.Parameters.AddWithValue("n", p.Name);
                 cmd.Parameters.AddWithValue("b", (object?)p.Barcode ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("c", p.Category ?? "");
@@ -905,7 +911,7 @@ public class DashboardController : ControllerBase
             try
             {
                 using var cmd = new NpgsqlCommand(@"
-                    UPDATE master_products SET name=@n, barcode=@b, category=@c, price=@p, cost=@co, image_data=@img
+                    UPDATE master_products SET name=@n, barcode=@b, category=@c, price=@p, cost=@co, image_data=@img, updated_at=NOW()
                     WHERE id=@id", conn, tx);
                 cmd.Parameters.AddWithValue("n", p.Name);
                 cmd.Parameters.AddWithValue("b", (object?)p.Barcode ?? DBNull.Value);

@@ -555,6 +555,46 @@ public static class SyncService
         return added + updated;
     }
 
+    public static async Task<int> DownloadUpdatedMasterCatalog(IProgress<string>? progress = null)
+    {
+        try
+        {
+            var lastSync = "";
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                using var cmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'LastMasterSync'", conn);
+                lastSync = cmd.ExecuteScalar()?.ToString() ?? "";
+            }
+
+            var url = ApiUrl.TrimEnd('/') + "/dashboard/products/master/download";
+            if (!string.IsNullOrEmpty(lastSync))
+                url += "?since=" + Uri.EscapeDataString(lastSync);
+
+            progress?.Report("Checking for updated products...");
+            var json = await _client.GetStringAsync(url);
+            var products = JsonSerializer.Deserialize<List<JsonElement>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (products == null || products.Count == 0)
+            {
+                progress?.Report("No new or updated products.");
+                return 0;
+            }
+
+            progress?.Report($"Found {products.Count} new/updated products. Downloading...");
+            var result = await DownloadMasterCatalog(progress);
+            if (result > 0)
+            {
+                using var conn = DatabaseHelper.GetConnection();
+                conn.Open();
+                using var cmd = new SQLiteCommand("INSERT OR REPLACE INTO Settings (Key, Value) VALUES ('LastMasterSync', @v)", conn);
+                cmd.Parameters.AddWithValue("@v", TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+                cmd.ExecuteNonQuery();
+            }
+            return result;
+        }
+        catch (Exception ex) { progress?.Report($"Error: {ex.Message}"); return 0; }
+    }
+
     private static void InsertUnits(SQLiteConnection conn, int productId, JsonElement unitsEl)
     {
         foreach (var u in unitsEl.EnumerateArray())

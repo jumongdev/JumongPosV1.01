@@ -449,17 +449,20 @@ public partial class SettingsForm : Form
             btnSyncFromCloud.ForeColor = Color.FromArgb(10, 10, 26);
             var desc3 = MakeDesc("Download master catalog prices & costs from cloud (stock quantity unchanged)", descX, cy);
             cy += 42;
+            btnUpdateMaster = MakeBtn("\uD83D\uDD04 UPDATE MASTER CATALOG", btnX, cy, Color.FromArgb(0, 150, 136), btnUpdateMaster_Click);
+            var descUpdate = MakeDesc("Download only new/changed products from cloud (faster than full sync)", descX, cy);
+            cy += 42;
             btnSyncLog = MakeBtn("\uD83D\uDCCB VIEW SYNC LOG", btnX, cy, accentBlue, btnSyncLog_Click);
             var desc4 = MakeDesc("View history of all sync operations and any errors", descX, cy);
             cy += 42;
             btnUpdate = MakeBtn("\u2B07 UPDATE APP", btnX, cy, Color.FromArgb(155, 89, 182), btnUpdate_Click);
             var desc5 = MakeDesc($"Check GitHub for new version (current: v{AppVersion.Current})", descX, cy);
 
-            MakeSection("CLOUD SYNC", 350, new Control[] {
+            MakeSection("CLOUD SYNC", 392, new Control[] {
                 lblCloudApi, txtCloudApiUrl, lblStoreIdLabel, lblStoreId,
                 lblStoreNameLabel, txtStoreName,
                 btnSyncAll, desc1, btnSyncToday, desc2, btnSyncFromCloud, desc3,
-                btnSyncLog, desc4, btnUpdate, desc5
+                btnUpdateMaster, descUpdate, btnSyncLog, desc4, btnUpdate, desc5
             });
         }
 
@@ -827,6 +830,29 @@ public partial class SettingsForm : Form
         }
     }
 
+    private async void btnUpdateMaster_Click(object? sender, EventArgs e)
+    {
+        try
+        {
+            btnUpdateMaster.Enabled = false;
+            btnUpdateMaster.Text = "CHECKING...";
+            var progress = new Progress<string>(m => { if (m.StartsWith("Complete") || m.StartsWith("Error") || m.StartsWith("No new")) btnUpdateMaster.Text = "\uD83D\uDD04 UPDATE MASTER CATALOG"; });
+            var count = await SyncService.DownloadUpdatedMasterCatalog(progress);
+            btnUpdateMaster.Text = "\uD83D\uDD04 UPDATE MASTER CATALOG";
+            if (count > 0)
+                MessageBox.Show($"Updated {count} products from cloud.", "Update Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Update failed: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            btnUpdateMaster.Enabled = true;
+            btnUpdateMaster.Text = "\uD83D\uDD04 UPDATE MASTER CATALOG";
+        }
+    }
+
     private async void btnUpdate_Click(object? sender, EventArgs e)
     {
         btnUpdate.Enabled = false;
@@ -929,6 +955,7 @@ public partial class SettingsForm : Form
     private Button btnSyncToday = null!;
     private Button btnSyncLog = null!;
     private Button btnSyncFromCloud = null!;
+    private Button btnUpdateMaster = null!;
     private Button btnUpdate = null!;
     private Button btnExportProducts = null!;
     private Button btnImportAndSync = null!;
