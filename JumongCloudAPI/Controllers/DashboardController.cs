@@ -669,7 +669,7 @@ public class DashboardController : ControllerBase
         [HttpGet("version")]
         public IActionResult GetVersion()
         {
-            return Ok(new { version = "1.0.39", buildDate = "2026-06-14", changes = "Update progress popup: shows progress bar + 'do not close' warning during update download", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.39/JumongPosV1.01.exe" });
+            return Ok(new { version = "1.0.40", buildDate = "2026-06-14", changes = "Layout fixes: ShowTrail AutoSize=false + control z-order, Settings section heights adjusted to prevent overlap", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.40/JumongPosV1.01.exe" });
         }
 
         [HttpGet("fix-hvr-times")]
