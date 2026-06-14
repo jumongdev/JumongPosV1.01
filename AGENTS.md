@@ -64,7 +64,8 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
     └── v1.0.32/  (exe)
     └── v1.0.33/  (exe)
     └── v1.0.34/  (exe)
-    └── v1.0.35/  (exe) — current
+    └── v1.0.35/  (exe)
+    └── v1.0.36/  (exe) — current
 ```
 
 ## Tech Stack
@@ -267,6 +268,15 @@ Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operationa
 | `Forms/SalesForm.cs` | Added `LoadFromTransfer(orderId, customerName, items)` — skips order-type prompt, populates cart from transfer items; `btnPay_Click` auto-marks transfer received on sale complete |
 | `Forms/MainForm.cs` | Added **Online Orders** sidebar button; transfer poll interval reduced 60s→15s; button text shows pending count badge; balloon tip links to Online Orders |
 | `Services/SyncService.cs` | (no change) existing `GetPendingTransfersAsync()` and `MarkTransferReceivedAsync()` used |
+
+### v1.0.36 — Sale Date Timezone Fix
+
+| File | Change |
+|---|---|
+| `Services/AppVersion.cs` | `Current` bumped to `"1.0.36"` |
+| `Services/SyncService.cs:160` | Wraps `sale.SaleDate` with `DateTime.SpecifyKind(..., Local)` so System.Text.Json serializes with `+08:00` offset — cloud API receives PH timezone correctly |
+
+**Impact:** Fixes synced sales showing wrong date/time on cloud dashboard (was off by 8 hours because `Unspecified` DateTime was treated as UTC).
 
 ### v1.0.35 — Cloud API URL Auto-Fix + Retry MarkSynced
 

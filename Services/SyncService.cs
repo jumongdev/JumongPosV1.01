@@ -157,7 +157,7 @@ public static class SyncService
             {
                 PosId = sale.Id,
                 InvoiceNo = sale.InvoiceNo,
-                SaleDate = sale.SaleDate,
+                SaleDate = DateTime.SpecifyKind(sale.SaleDate, DateTimeKind.Local),
                 SubTotal = sale.SubTotal,
                 Discount = sale.Discount,
                 Tax = sale.Tax,
