@@ -806,51 +806,14 @@ public partial class SettingsForm : Form
         form.ShowDialog();
     }
 
-    private async void btnSyncFromCloud_Click(object? sender, EventArgs e)
+    private void btnSyncFromCloud_Click(object? sender, EventArgs e)
     {
-        try
-        {
-            btnSyncFromCloud.Enabled = false;
-            btnSyncFromCloud.Text = "SYNCING...";
-            var progress = new Progress<string>(m => { if (m.StartsWith("Complete") || m.StartsWith("Error")) btnSyncFromCloud.Text = "\u2B06 SYNC FROM CLOUD"; });
-            var count = await SyncService.DownloadMasterCatalog(progress);
-            if (count > 0)
-                MessageBox.Show($"Synced {count} products from cloud.\nPrice, Cost, and Units updated.\nStock was NOT changed.", "Sync Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            else
-                MessageBox.Show("No updates from cloud.", "Sync Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Sync failed: {ex.Message}", "Sync Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-        finally
-        {
-            btnSyncFromCloud.Enabled = true;
-            btnSyncFromCloud.Text = "\u2B06 SYNC FROM CLOUD";
-        }
+        ShowSyncProgress("Syncing From Cloud...", SyncService.DownloadMasterCatalog);
     }
 
-    private async void btnUpdateMaster_Click(object? sender, EventArgs e)
+    private void btnUpdateMaster_Click(object? sender, EventArgs e)
     {
-        try
-        {
-            btnUpdateMaster.Enabled = false;
-            btnUpdateMaster.Text = "CHECKING...";
-            var progress = new Progress<string>(m => { if (m.StartsWith("Complete") || m.StartsWith("Error") || m.StartsWith("No new")) btnUpdateMaster.Text = "\uD83D\uDD04 UPDATE MASTER CATALOG"; });
-            var count = await SyncService.DownloadUpdatedMasterCatalog(progress);
-            btnUpdateMaster.Text = "\uD83D\uDD04 UPDATE MASTER CATALOG";
-            if (count > 0)
-                MessageBox.Show($"Updated {count} products from cloud.", "Update Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Update failed: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-        finally
-        {
-            btnUpdateMaster.Enabled = true;
-            btnUpdateMaster.Text = "\uD83D\uDD04 UPDATE MASTER CATALOG";
-        }
+        ShowSyncProgress("Updating Master Catalog...", SyncService.DownloadUpdatedMasterCatalog);
     }
 
     private async void btnUpdate_Click(object? sender, EventArgs e)
