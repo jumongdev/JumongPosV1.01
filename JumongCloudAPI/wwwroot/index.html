@@ -640,7 +640,7 @@ async function loadPeakHours(){
 
 async function loadSaleProfits(){
   try{
-    const d=await fetchJSON(API+'/sale-profits?limit=100'+filterParams());
+    const d=await fetchJSON(API+'/sale-profits?limit=5000'+filterParams());
     _cache.saleprofits=d;
     if(!d.length){setEmpty('saleProfitsBody','No profit data',8);return}
     document.getElementById('saleProfitsBody').innerHTML=d.map(x=>{
@@ -724,7 +724,7 @@ async function loadExpenses(){
       var pct=total>0?(x.total/total*100).toFixed(1):0;
       return'<tr data-row><td>'+x.category+'</td><td class="red">&#8369;'+fmt(x.total)+'</td><td><div style="display:flex;align-items:center;gap:6px"><span>'+pct+'%</span><div class="progress-bar" style="flex:1"><div class="progress-fill" style="width:'+pct+'%;background:var(--red)"></div></div></div></td></tr>';
     }).join('');
-    var dl=await fetchJSON(API+'/expenses-list?limit=100'+filterParams());
+    var dl=await fetchJSON(API+'/expenses-list?limit=5000'+filterParams());
     _cache.expenses=dl;
     if(!dl.length){setEmpty('expensesBody','No expense details',6);return}
     document.getElementById('expensesBody').innerHTML=dl.map(function(x){
