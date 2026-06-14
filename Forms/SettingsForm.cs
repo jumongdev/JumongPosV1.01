@@ -843,15 +843,70 @@ public partial class SettingsForm : Form
         var result = MessageBox.Show($"New version {version} available!\n\nChanges: {changes}\n\nDownload and install update?", "Update Available", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
         if (result != DialogResult.Yes) { btnUpdate.Enabled = true; btnUpdate.Text = "\u2B07 UPDATE APP"; return; }
 
-        btnUpdate.Text = "DOWNLOADING...";
-        var progress = new Progress<int>(p => btnUpdate.Text = $"DOWNLOADING {p}%");
-        var ok = await UpdateService.DownloadAndUpdate(downloadUrl ?? "", progress);
-        if (!ok)
+        ShowUpdateProgress(version ?? "", downloadUrl ?? "");
+    }
+
+    private static void ShowUpdateProgress(string version, string downloadUrl)
+    {
+        var form = new Form
         {
-            MessageBox.Show("Download failed. Check your connection and try again.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            btnUpdate.Enabled = true;
-            btnUpdate.Text = "\u2B07 UPDATE APP";
-        }
+            Text = $"Updating to v{version}...",
+            Size = new Size(420, 140),
+            StartPosition = FormStartPosition.CenterScreen,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            ControlBox = false,
+            ShowInTaskbar = false,
+            TopMost = true,
+            BackColor = Color.FromArgb(20, 20, 40),
+            ForeColor = Color.FromArgb(230, 230, 245)
+        };
+        var lbl = new Label
+        {
+            Text = "Downloading update... 0%",
+            Location = new Point(15, 15),
+            Size = new Size(390, 22),
+            ForeColor = Color.FromArgb(0, 245, 255),
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        var bar = new ProgressBar
+        {
+            Location = new Point(15, 45),
+            Size = new Size(390, 28),
+            Style = ProgressBarStyle.Continuous,
+            ForeColor = Color.FromArgb(46, 204, 113)
+        };
+        var lblWait = new Label
+        {
+            Text = "Please wait — do not close or use POS while updating.",
+            Location = new Point(15, 80),
+            Size = new Size(390, 20),
+            ForeColor = Color.FromArgb(140, 140, 170),
+            Font = new Font("Segoe UI", 8F)
+        };
+        form.Controls.AddRange(new Control[] { lbl, bar, lblWait });
+
+        form.Load += async (_, _) =>
+        {
+            var progress = new Progress<int>(p =>
+            {
+                try { form.Invoke(() => { lbl.Text = $"Downloading update... {p}%"; bar.Value = p; }); } catch { }
+            });
+            var ok = await UpdateService.DownloadAndUpdate(downloadUrl, progress);
+            if (!ok)
+            {
+                try
+                {
+                    form.Invoke(() =>
+                    {
+                        form.Close();
+                        MessageBox.Show("Download failed. Check your connection and try again.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    });
+                }
+                catch { }
+            }
+        };
+        form.ShowDialog();
     }
 
     private Button btnSave = new();
