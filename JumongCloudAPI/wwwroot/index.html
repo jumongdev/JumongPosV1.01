@@ -672,7 +672,7 @@ function showSaleItems(invoiceNo){
 }
 async function loadRecentSales(){
   try{
-    const d=await fetchJSON(API+'/recent-sales?limit=100'+filterParams());
+    const d=await fetchJSON(API+'/recent-sales?limit=5000'+filterParams());
     _cache.sales=d;
     if(!d.length){setEmpty('recentSalesBody','No sales data',6);return}
     document.getElementById('recentSalesBody').innerHTML=d.map(x=>{
