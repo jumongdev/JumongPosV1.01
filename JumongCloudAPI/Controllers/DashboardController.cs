@@ -669,7 +669,50 @@ public class DashboardController : ControllerBase
         [HttpGet("version")]
         public IActionResult GetVersion()
         {
-            return Ok(new { version = "1.0.31", buildDate = "2026-06-13", changes = "Void sync fix: VoidSale/VoidItem sync void logs + stock trails + credit txns; Void Logs panel in cloud dashboard shows per-item reason", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.31/JumongPosV1.01.exe" });
+            return Ok(new { version = "1.0.37", buildDate = "2026-06-14", changes = "Comprehensive timezone fix: ToUtcString, SpecifyKind, cloud dashboard timeZone:Asia/Manila", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.37/JumongPosV1.01.exe" });
+        }
+
+        [HttpGet("fix-hvr-times")]
+        public IActionResult FixHvrTimes()
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            var total = 0;
+            // HVR machine runs UTC clock, so sales were stored 8h behind.
+            // Only fix sales where invoice date doesn't match UTC date (wrong shift).
+            cmd.CommandText = @"
+                UPDATE sales SET sale_date = sale_date + INTERVAL '8 hours'
+                WHERE store_id = 'STORE-20260602-AA36'
+                  AND invoice_no LIKE 'INV-AA36-20260614%'
+                  AND sale_date::date = '2026-06-13'";
+            total += cmd.ExecuteNonQuery();
+            cmd.CommandText = @"
+                UPDATE void_logs SET created_at = created_at + INTERVAL '8 hours'
+                WHERE store_id = 'STORE-20260602-AA36'
+                  AND created_at::date = '2026-06-13'";
+            total += cmd.ExecuteNonQuery();
+            cmd.CommandText = @"
+                UPDATE stock_trails SET created_at = created_at + INTERVAL '8 hours'
+                WHERE store_id = 'STORE-20260602-AA36'
+                  AND created_at::date = '2026-06-13'";
+            total += cmd.ExecuteNonQuery();
+            cmd.CommandText = @"
+                UPDATE credit_transactions SET created_at = created_at + INTERVAL '8 hours'
+                WHERE store_id = 'STORE-20260602-AA36'
+                  AND created_at::date = '2026-06-13'";
+            total += cmd.ExecuteNonQuery();
+            cmd.CommandText = @"
+                UPDATE daily_closes SET close_date = close_date + INTERVAL '8 hours',
+                                        created_at = created_at + INTERVAL '8 hours'
+                WHERE store_id = 'STORE-20260602-AA36'
+                  AND close_date::date = '2026-06-13'";
+            total += cmd.ExecuteNonQuery();
+            cmd.CommandText = @"
+                UPDATE expenses SET timestamp = timestamp + INTERVAL '8 hours'
+                WHERE store_id = 'STORE-20260602-AA36'
+                  AND timestamp::date = '2026-06-13'";
+            total += cmd.ExecuteNonQuery();
+            return Ok(new { @fixed = total, message = $"Fixed {total} HVR records — added 8h to June 13 UTC timestamps" });
         }
 
         [HttpGet("products/master")]
