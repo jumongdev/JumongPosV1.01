@@ -691,7 +691,7 @@ async function loadRecentSales(){
 
 async function loadVoidLogs(){
   try{
-    const d=await fetchJSON(API+'/void-logs?limit=100'+filterParams());
+    const d=await fetchJSON(API+'/void-logs?limit=5000'+filterParams());
     if(!d.length){setEmpty('voidLogsBody','No void records',8);return}
     document.getElementById('voidLogsBody').innerHTML=d.map(x=>{
       const dt=new Date(x.createdAt);
