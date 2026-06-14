@@ -46,21 +46,7 @@ public class EmailService
         return cmd.ExecuteScalar()?.ToString();
     }
 
-    public bool IsConfigured
-    {
-        get
-        {
-            try
-            {
-                using var conn = DatabaseHelper.GetConnection();
-                conn.Open();
-                var host = GetSetting(conn, "SmtpHost");
-                var user = GetSetting(conn, "SmtpUser");
-                return !string.IsNullOrWhiteSpace(host) && !string.IsNullOrWhiteSpace(user);
-            }
-            catch { return false; }
-        }
-    }
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(_smtpHost) && !string.IsNullOrWhiteSpace(_smtpUser);
 
     public string? SendEndShiftReport(decimal totalSales, decimal totalCash, decimal totalEWallet,
         decimal totalCredit, decimal totalVoided, decimal cashOnHand, decimal difference, string cashierName,
