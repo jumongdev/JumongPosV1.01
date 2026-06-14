@@ -307,7 +307,7 @@ public static class SyncService
         {
             var url = ApiUrl.TrimEnd('/') + endpoint + "?store_id=" + StoreId + "&store_name=" + Uri.EscapeDataString(StoreName);
             File.AppendAllText(Path.Combine(AppContext.BaseDirectory, "sync_log.txt"),
-                $"{DateTime.Now:HH:mm:ss} POST {url}{Environment.NewLine}");
+                $"{TimeHelper.Now:HH:mm:ss} POST {url}{Environment.NewLine}");
             var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var response = await _client.PostAsync(url, content);

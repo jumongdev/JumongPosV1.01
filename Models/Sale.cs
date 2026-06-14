@@ -1,10 +1,12 @@
+using JumongPosV1._01.Services;
+
 namespace JumongPosV1._01.Models;
 
 public class Sale
 {
     public int Id { get; set; }
     public string InvoiceNo { get; set; } = string.Empty;
-    public DateTime SaleDate { get; set; } = DateTime.Now;
+    public DateTime SaleDate { get; set; } = TimeHelper.Now;
     public decimal SubTotal { get; set; }
     public decimal Discount { get; set; }
     public decimal Tax { get; set; }

@@ -61,7 +61,7 @@ public static class ShiftSessionService
         Upsert(conn, "ShiftSessionActive", "1");
         Upsert(conn, "ShiftOpeningBalance", openingBalance.ToString("F2"));
         Upsert(conn, "ShiftStartedBy", startedBy);
-        Upsert(conn, "ShiftStartedAt", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+        Upsert(conn, "ShiftStartedAt", TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss"));
     }
 
     public static void EndSession()

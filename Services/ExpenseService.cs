@@ -22,7 +22,7 @@ public class ExpenseService
         cmd.ExecuteNonQuery();
         using var idCmd = new SQLiteCommand("SELECT last_insert_rowid()", conn);
         var expenseId = Convert.ToInt32(idCmd.ExecuteScalar());
-        _ = SyncService.SyncExpense(new Expense { Id = expenseId, Amount = amount, Category = category, Description = description, ReferenceNo = refNo, CashierUsername = username, Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), ReceiptImage = receiptImage });
+        _ = SyncService.SyncExpense(new Expense { Id = expenseId, Amount = amount, Category = category, Description = description, ReferenceNo = refNo, CashierUsername = username, Timestamp = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss"), ReceiptImage = receiptImage });
     }
 
     public static List<Expense> GetExpensesByCashier(string username)

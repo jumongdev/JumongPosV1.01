@@ -152,7 +152,7 @@ public class ExpenseEntryForm : Form
             var receiptsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ExpenseReceipts");
             Directory.CreateDirectory(receiptsDir);
             var ext = Path.GetExtension(ofd.FileName);
-            var destFile = Path.Combine(receiptsDir, $"expense_{DateTime.Now:yyyyMMddHHmmss}{ext}");
+            var destFile = Path.Combine(receiptsDir, $"expense_{TimeHelper.Now:yyyyMMddHHmmss}{ext}");
             File.Copy(ofd.FileName, destFile, overwrite: true);
             _receiptPath = destFile;
             pbReceipt.Image = Image.FromFile(destFile);

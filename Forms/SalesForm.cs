@@ -850,7 +850,7 @@ public partial class SalesForm : Form
         var sale = new Sale
         {
             InvoiceNo     = SaleService.GenerateInvoiceNo(),
-            SaleDate      = DateTime.Now,
+            SaleDate      = TimeHelper.Now,
             SubTotal      = subTotal,
             Discount      = discountAmt,
             Tax           = taxAmt,
@@ -1389,7 +1389,7 @@ public partial class SalesForm : Form
         tbControls[0].Size     = new Size(160, topH);
         _pnlCashierChip.Location = new Point(184, 8);
         _pnlCashierChip.Size     = new Size(140, 28);
-        _lblTime.Text     = DateTime.Now.ToString("MMM dd, yyyy  h:mm tt");
+        _lblTime.Text     = TimeHelper.Now.ToString("MMM dd, yyyy  h:mm tt");
         _lblTime.Location = new Point(w - 310, 0);
         _lblTime.Size     = new Size(190, topH);
         tbControls[3].Location = new Point(w - 110, 10);

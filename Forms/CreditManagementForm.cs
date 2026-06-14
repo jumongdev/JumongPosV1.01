@@ -11,8 +11,8 @@ public partial class CreditManagementForm : Form
     private Customer? _selectedCustomer;
     private List<Customer> _customers = new();
     private Dictionary<int, decimal> _todayBalances = new();
-    private DateTime _dateFrom = DateTime.Today.AddDays(-30);
-    private DateTime _dateTo = DateTime.Today;
+    private DateTime _dateFrom = TimeHelper.Today.AddDays(-30);
+    private DateTime _dateTo = TimeHelper.Today;
     private string _paymentFilter = "All";
 
     private readonly User? _currentUser;

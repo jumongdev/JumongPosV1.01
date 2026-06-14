@@ -161,7 +161,7 @@ public class DailyCloseService
     {
         var list = new List<(string, string, decimal, string)>();
         var since = GetLastCloseTime();
-        var end = endDate?.ToString("yyyy-MM-dd HH:mm:ss") ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        var end = endDate?.ToString("yyyy-MM-dd HH:mm:ss") ?? TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
@@ -224,7 +224,7 @@ public class DailyCloseService
     {
         var list = new List<(string, decimal)>();
         var since = GetLastCloseTime();
-        var end = endDate?.ToString("yyyy-MM-dd HH:mm:ss") ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        var end = endDate?.ToString("yyyy-MM-dd HH:mm:ss") ?? TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();

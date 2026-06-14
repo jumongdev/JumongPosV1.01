@@ -12,8 +12,8 @@ public partial class ReportsForm : Form
     {
         _currentUser = user;
         InitializeComponent();
-        dtpFrom.Value = DateTime.Today;
-        dtpTo.Value = DateTime.Today;
+        dtpFrom.Value = TimeHelper.Today;
+        dtpTo.Value = TimeHelper.Today;
         LoadReport();
         DebugHelper.AddFormLabel(this);
     }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using JumongPosV1._01.Services;
 
 namespace JumongPosV1._01.Models;
 
@@ -9,7 +10,7 @@ public class HeldCart
     public int? CustomerId { get; set; }
     public string CustomerName { get; set; } = "";
     public string ItemsJson { get; set; } = "[]";
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime CreatedAt { get; set; } = TimeHelper.Now;
 
     public List<SaleItem> DeserializeItems()
     {

@@ -8,7 +8,7 @@ public class SaleService
 {
     public static string GenerateInvoiceNo()
     {
-        var date = DateTime.Now.ToString("yyyyMMdd");
+        var date = TimeHelper.Now.ToString("yyyyMMdd");
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
 
@@ -608,8 +608,8 @@ public class SaleService
             }
 
             trans.Commit();
-            _ = SyncService.SyncVoidLog(new VoidLog { SaleId = saleId, SaleItemId = itemId, Action = "VoidItem", Reason = reason, InvoiceNo = invoiceNo, ProductName = productName, Quantity = qty, Amount = total, UserId = voidedByUserId, UserName = voidedByUserName, CreatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") });
-            _ = SyncService.SyncStockTrail(new StockTrail { ProductId = productId, ProductName = productName, Barcode = barcode, QuantityAdded = restockQty, StockBefore = stockBefore, StockAfter = stockBefore + restockQty, Reference = $"{invoiceNo} - void ({reason})", UserId = userId, UserName = voidedByUserName, InvoiceNo = invoiceNo, CustomerName = "", CreatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") });
+            _ = SyncService.SyncVoidLog(new VoidLog { SaleId = saleId, SaleItemId = itemId, Action = "VoidItem", Reason = reason, InvoiceNo = invoiceNo, ProductName = productName, Quantity = qty, Amount = total, UserId = voidedByUserId, UserName = voidedByUserName, CreatedAt = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss") });
+            _ = SyncService.SyncStockTrail(new StockTrail { ProductId = productId, ProductName = productName, Barcode = barcode, QuantityAdded = restockQty, StockBefore = stockBefore, StockAfter = stockBefore + restockQty, Reference = $"{invoiceNo} - void ({reason})", UserId = userId, UserName = voidedByUserName, InvoiceNo = invoiceNo, CustomerName = "", CreatedAt = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss") });
             // Re-sync the sale so cloud knows which items are voided
             try
             {

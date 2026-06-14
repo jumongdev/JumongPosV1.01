@@ -122,7 +122,7 @@ public partial class MainForm : Form
             _schedulerTimer = new System.Windows.Forms.Timer { Interval = 60000 };
             _schedulerTimer.Tick += (_, _) =>
             {
-                var now = DateTime.Now;
+                var now = TimeHelper.Now;
                 var todayStr = now.ToString("yyyy-MM-dd");
                 if (now.Hour == scheduleHour && _lastDailyReportSent != todayStr)
                 {

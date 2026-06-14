@@ -29,7 +29,7 @@ public class EndShiftForm : Form
     private void LoadTotals()
     {
         (_totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, _creditPayCash, _creditPayEWallet, _totalExpenses) = DailyCloseService.GetShiftTotals();
-        lblDate.Text = DateTime.Now.ToString("MMMM dd, yyyy  hh:mm tt");
+        lblDate.Text = TimeHelper.Now.ToString("MMMM dd, yyyy  hh:mm tt");
         var cashierName = string.IsNullOrEmpty(_currentUser.FullName) ? _currentUser.Username : _currentUser.FullName;
         lblCashierName.Text = cashierName;
         lblTotalExpenses.Text = _totalExpenses.ToString("N2");
@@ -77,7 +77,7 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
     var creditPayments = DailyCloseService.GetCreditPaymentsSinceLastClose();
 
     var diff = cashOnHand + _totalExpenses - _totalCash - _creditPayCash;
-    var now = DateTime.Now;
+    var now = TimeHelper.Now;
 
     var dc = new DailyClose 
     { 
@@ -160,7 +160,7 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
     var gcashTxns = DailyCloseService.GetGcashTransactionsSinceLastClose();
     var creditCustomers = DailyCloseService.GetCreditCustomersSinceLastClose();
     var creditPayments = DailyCloseService.GetCreditPaymentsSinceLastClose();
-        PrinterService.PrintAuditEndShiftReport(cashOnHand, diff, cashierName, DateTime.Now, txtNotes.Text.Trim(), _totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, expenses, gcashTxns, creditCustomers, creditPayments, (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value);
+        PrinterService.PrintAuditEndShiftReport(cashOnHand, diff, cashierName, TimeHelper.Now, txtNotes.Text.Trim(), _totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, expenses, gcashTxns, creditCustomers, creditPayments, (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value);
 }
 
 private void btnEmail_Click(object? sender, EventArgs e)

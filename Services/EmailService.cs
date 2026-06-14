@@ -110,7 +110,7 @@ tr:nth-child(even) td {{ background: #F8F8FC; }}
 <h1>{company.ToUpper()}</h1>
 {(string.IsNullOrEmpty(address) ? "" : $"<p>{address}</p>")}
 {(string.IsNullOrEmpty(mobile) ? "" : $"<p>Mobile: {mobile}</p>")}
-<p>End Shift Report — {DateTime.Now:MMMM dd, yyyy  hh:mm tt}</p>
+<p>End Shift Report — {TimeHelper.Now:MMMM dd, yyyy  hh:mm tt}</p>
 <p>Cashier: <strong>{cashierName}</strong></p>
 </div>
 
@@ -193,7 +193,7 @@ tr:nth-child(even) td {{ background: #F8F8FC; }}
 </body>
 </html>";
 
-        SendOrQueueHtml($"End Shift Report — {cashierName} — {DateTime.Now:yyyy-MM-dd}", html);
+        SendOrQueueHtml($"End Shift Report — {cashierName} — {TimeHelper.Now:yyyy-MM-dd}", html);
         return null;
     }
 
@@ -203,7 +203,7 @@ tr:nth-child(even) td {{ background: #F8F8FC; }}
 
         var products = ProductService.GetAll();
         var body = $@"INVENTORY COUNT
-{DateTime.Now:MMMM dd, yyyy  hh:mm tt}
+{TimeHelper.Now:MMMM dd, yyyy  hh:mm tt}
 
 {"Product",-30} {"Stock",8}
 ──────────────────────────────────────
@@ -368,7 +368,7 @@ tr:nth-child(even) td {{ background: #F8F8FC; }}
                 var existing = File.ReadAllText(QueuePath);
                 list = JsonSerializer.Deserialize<List<PendingEmail>>(existing) ?? new();
             }
-            list.Add(new PendingEmail { Subject = subject, Body = body, IsHtml = isHtml, QueuedAt = DateTime.Now });
+            list.Add(new PendingEmail { Subject = subject, Body = body, IsHtml = isHtml, QueuedAt = TimeHelper.Now });
             File.WriteAllText(QueuePath, JsonSerializer.Serialize(list));
         }
         catch { }

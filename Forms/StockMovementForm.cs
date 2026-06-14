@@ -258,7 +258,7 @@ public partial class StockMovementForm : Form
 
             tx.Commit();
 
-            _ = SyncService.SyncStockTrail(new StockTrail { Id = trailId, ProductId = _product.Id, ProductName = _product.Name, Barcode = _product.Barcode, QuantityAdded = qty, StockBefore = stockBefore, StockAfter = stockAfter, Reference = $"Adjustment: {reason}", UserId = _currentUser?.Id ?? 0, UserName = userName, CreatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") });
+            _ = SyncService.SyncStockTrail(new StockTrail { Id = trailId, ProductId = _product.Id, ProductName = _product.Name, Barcode = _product.Barcode, QuantityAdded = qty, StockBefore = stockBefore, StockAfter = stockAfter, Reference = $"Adjustment: {reason}", UserId = _currentUser?.Id ?? 0, UserName = userName, CreatedAt = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss") });
             _ = SyncService.SyncProduct(ProductService.GetById(_product.Id)!);
 
             _product.StockQty = stockAfter;

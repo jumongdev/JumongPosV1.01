@@ -287,7 +287,7 @@ public class PrinterService
 
         lines.Add(new LineEntry { Text = header, Align = TextAlign.Center, Bold = true, Spacing = 22 });
         lines.Add(new LineEntry { Text = "END SHIFT REPORT", Align = TextAlign.Center, Bold = true, Spacing = 18 });
-        lines.Add(new LineEntry { Text = DateTime.Now.ToString("MMMM dd, yyyy  hh:mm tt"), Align = TextAlign.Center, Spacing = 14 });
+        lines.Add(new LineEntry { Text = TimeHelper.Now.ToString("MMMM dd, yyyy  hh:mm tt"), Align = TextAlign.Center, Spacing = 14 });
         lines.Add(new LineEntry { Text = $"Cashier: {cashierName}", Spacing = 14 });
         lines.Add(new LineEntry { Text = new string('=', paperW / 3), Align = TextAlign.Center, Spacing = 14 });
 
@@ -625,7 +625,7 @@ public class PrinterService
             lines.Add(new LineEntry { Text = mobile, Align = TextAlign.Center, Spacing = 14 });
         lines.Add(new LineEntry { Text = new string('=', lineChars), Align = TextAlign.Center, Spacing = 14 });
         lines.Add(new LineEntry { Text = "STOCK RECEIVING", Align = TextAlign.Center, Bold = true, Spacing = 18 });
-        lines.Add(new LineEntry { Text = DateTime.Now.ToString("yyyy-MM-dd HH:mm"), Align = TextAlign.Center, Spacing = 14 });
+        lines.Add(new LineEntry { Text = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm"), Align = TextAlign.Center, Spacing = 14 });
         lines.Add(new LineEntry { Text = $"Received by: {cashierName}", Spacing = 14 });
         if (!string.IsNullOrEmpty(reference))
         lines.Add(new LineEntry { Text = $"Ref: {reference}", Spacing = 14 });
@@ -736,7 +736,7 @@ public class PrinterService
 
         lines.Add(new LineEntry { Text = header, Align = TextAlign.Center, Bold = true, Spacing = 22 });
         lines.Add(new LineEntry { Text = "STOCK RECEIVING LOG", Align = TextAlign.Center, Bold = true, Spacing = 18 });
-        lines.Add(new LineEntry { Text = dateLabel ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm"), Align = TextAlign.Center, Spacing = 14 });
+        lines.Add(new LineEntry { Text = dateLabel ?? TimeHelper.Now.ToString("yyyy-MM-dd HH:mm"), Align = TextAlign.Center, Spacing = 14 });
         if (!string.IsNullOrEmpty(filter))
             lines.Add(new LineEntry { Text = $"Filter: {filter}", Spacing = 14 });
         lines.Add(new LineEntry { Text = $"{receivingOnly.Count} entries", Spacing = 14 });

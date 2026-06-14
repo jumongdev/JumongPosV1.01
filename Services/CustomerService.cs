@@ -346,7 +346,7 @@ public class CustomerService
             CreditBalance = rdr["credit_balance"] != DBNull.Value ? Convert.ToDecimal(rdr["credit_balance"]) : 0,
             CreditLimit = rdr["credit_limit"] != DBNull.Value ? Convert.ToDecimal(rdr["credit_limit"]) : 0,
             IsActive = rdr["is_active"] != DBNull.Value ? Convert.ToInt32(rdr["is_active"]) == 1 : true,
-            CreatedAt = DateTime.TryParse(rdr["created_at"]?.ToString(), out var dt) ? dt : DateTime.Now
+            CreatedAt = DateTime.TryParse(rdr["created_at"]?.ToString(), out var dt) ? dt : TimeHelper.Now
         };
     }
 }

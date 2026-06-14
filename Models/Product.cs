@@ -1,3 +1,5 @@
+using JumongPosV1._01.Services;
+
 namespace JumongPosV1._01.Models;
 
 public class Product
@@ -10,7 +12,7 @@ public class Product
     public decimal Cost { get; set; }
     public int StockQty { get; set; }
     public bool IsActive { get; set; } = true;
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime CreatedAt { get; set; } = TimeHelper.Now;
     public string ModifiedBy { get; set; } = string.Empty;
     public string ImageData { get; set; } = "";
 

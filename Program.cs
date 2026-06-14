@@ -80,7 +80,7 @@ static class Program
             var backupDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backups");
             Directory.CreateDirectory(backupDir);
 
-            var timestamp = DateTime.Now.ToString("yyyyMMdd");
+            var timestamp = TimeHelper.Now.ToString("yyyyMMdd");
             var backupPath = Path.Combine(backupDir, $"JumongPos_{timestamp}.db");
 
             if (!File.Exists(backupPath))
@@ -104,7 +104,7 @@ static class Program
 
             var body = $@"App Error Report
 Machine: {Environment.MachineName}
-Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}
+Time: {TimeHelper.Now:yyyy-MM-dd HH:mm:ss}
 Version: v1.01
 
 Exception:

@@ -141,7 +141,7 @@ public static class MigrationService
             ins.Parameters.AddWithValue("@co", Convert.ToDecimal(rdr["Cost"]));
             ins.Parameters.AddWithValue("@qty", Convert.ToInt32(rdr["StockQty"]));
             ins.Parameters.AddWithValue("@act", Convert.ToInt32(rdr["IsActive"]));
-            ins.Parameters.AddWithValue("@dt", rdr["CreatedAt"].ToString() ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            ins.Parameters.AddWithValue("@dt", rdr["CreatedAt"].ToString() ?? TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             ins.Parameters.AddWithValue("@src", rdr["SourceId"]?.ToString() ?? "");
             ins.ExecuteNonQuery();
         }
@@ -181,7 +181,7 @@ public static class MigrationService
             ins.Parameters.AddWithValue("@p", rdr["Phone"].ToString() ?? "");
             ins.Parameters.AddWithValue("@e", rdr["Email"].ToString() ?? "");
             ins.Parameters.AddWithValue("@pt", Convert.ToInt32(rdr["LoyaltyPoints"]));
-            ins.Parameters.AddWithValue("@dt", rdr["CreatedAt"].ToString() ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            ins.Parameters.AddWithValue("@dt", rdr["CreatedAt"].ToString() ?? TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             ins.Parameters.AddWithValue("@cb", Convert.ToDecimal(rdr["CreditBalance"]));
             ins.Parameters.AddWithValue("@addr", rdr["Address"].ToString() ?? "");
             ins.ExecuteNonQuery();
@@ -259,7 +259,7 @@ public static class MigrationService
             ins.Parameters.AddWithValue("@pn", rdr["ProductName"].ToString() ?? "");
             ins.Parameters.AddWithValue("@qty", Convert.ToInt32(rdr["Quantity"]));
             ins.Parameters.AddWithValue("@amt", Convert.ToDecimal(rdr["Amount"]));
-            ins.Parameters.AddWithValue("@dt", rdr["CreatedAt"].ToString() ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            ins.Parameters.AddWithValue("@dt", rdr["CreatedAt"].ToString() ?? TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             ins.ExecuteNonQuery();
         }
     }
@@ -283,7 +283,7 @@ public static class MigrationService
             ins.Parameters.AddWithValue("@ref", rdr["Reference"].ToString() ?? "");
             ins.Parameters.AddWithValue("@uid", Convert.ToInt32(rdr["UserId"]));
             ins.Parameters.AddWithValue("@un", rdr["UserName"].ToString() ?? "");
-            ins.Parameters.AddWithValue("@dt", rdr["CreatedAt"].ToString() ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            ins.Parameters.AddWithValue("@dt", rdr["CreatedAt"].ToString() ?? TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             ins.ExecuteNonQuery();
         }
     }
@@ -305,7 +305,7 @@ public static class MigrationService
             ins.Parameters.AddWithValue("@db", Convert.ToDecimal(rdr["Debit"]));
             ins.Parameters.AddWithValue("@cr", Convert.ToDecimal(rdr["Credit"]));
             ins.Parameters.AddWithValue("@bal", Convert.ToDecimal(rdr["Balance"]));
-            ins.Parameters.AddWithValue("@dt", rdr["CreatedAt"].ToString() ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            ins.Parameters.AddWithValue("@dt", rdr["CreatedAt"].ToString() ?? TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             ins.ExecuteNonQuery();
         }
     }
@@ -324,7 +324,7 @@ public static class MigrationService
             ins.Parameters.AddWithValue("@cid", rdr["CustomerId"] != DBNull.Value ? Convert.ToInt32(rdr["CustomerId"]) : (object)DBNull.Value);
             ins.Parameters.AddWithValue("@cn", rdr["CustomerName"].ToString() ?? "");
             ins.Parameters.AddWithValue("@json", rdr["ItemsJson"].ToString() ?? "[]");
-            ins.Parameters.AddWithValue("@dt", rdr["CreatedAt"].ToString() ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            ins.Parameters.AddWithValue("@dt", rdr["CreatedAt"].ToString() ?? TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             ins.ExecuteNonQuery();
         }
     }
@@ -354,7 +354,7 @@ public static class MigrationService
             ins.Parameters.AddWithValue("@coh", Convert.ToDecimal(rdr["CashOnHand"]));
             ins.Parameters.AddWithValue("@diff", Convert.ToDecimal(rdr["Difference"]));
             ins.Parameters.AddWithValue("@notes", rdr["Notes"].ToString() ?? "");
-            ins.Parameters.AddWithValue("@dt", rdr["CreatedAt"].ToString() ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+            ins.Parameters.AddWithValue("@dt", rdr["CreatedAt"].ToString() ?? TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             ins.Parameters.AddWithValue("@uid", Convert.ToInt32(rdr["UserId"]));
             ins.Parameters.AddWithValue("@un", rdr["UserName"].ToString() ?? "");
             ins.ExecuteNonQuery();

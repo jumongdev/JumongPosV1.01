@@ -178,7 +178,7 @@ public partial class SettingsForm : Form
 
     private void btnExportProducts_Click(object? sender, EventArgs e)
     {
-        using var sfd = new SaveFileDialog { Filter = "JSON files (*.json)|*.json", FileName = $"JumongPos_Products_{DateTime.Now:yyyyMMdd}.json" };
+        using var sfd = new SaveFileDialog { Filter = "JSON files (*.json)|*.json", FileName = $"JumongPos_Products_{TimeHelper.Now:yyyyMMdd}.json" };
         if (sfd.ShowDialog() != DialogResult.OK) return;
         DataExporter.ExportProducts(sfd.FileName);
     }
@@ -198,7 +198,7 @@ public partial class SettingsForm : Form
             var dbPath = DatabaseHelper.DbPath;
             if (!File.Exists(dbPath)) { MessageBox.Show("Database file not found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
 
-            using var sfd = new SaveFileDialog { Filter = "SQLite DB (*.db)|*.db", FileName = $"JumongPos_Backup_{DateTime.Now:yyyyMMdd_HHmmss}.db" };
+            using var sfd = new SaveFileDialog { Filter = "SQLite DB (*.db)|*.db", FileName = $"JumongPos_Backup_{TimeHelper.Now:yyyyMMdd_HHmmss}.db" };
             if (sfd.ShowDialog() != DialogResult.OK) return;
 
             File.Copy(dbPath, sfd.FileName, overwrite: true);
@@ -219,7 +219,7 @@ public partial class SettingsForm : Form
         try
         {
             var dbPath = DatabaseHelper.DbPath;
-            var safetyBackup = Path.Combine(Path.GetDirectoryName(dbPath)!, $"JumongPos_PreRestore_{DateTime.Now:yyyyMMdd_HHmmss}.db");
+            var safetyBackup = Path.Combine(Path.GetDirectoryName(dbPath)!, $"JumongPos_PreRestore_{TimeHelper.Now:yyyyMMdd_HHmmss}.db");
             File.Copy(dbPath, safetyBackup, overwrite: true);
 
             File.Copy(ofd.FileName, dbPath, overwrite: true);
@@ -380,11 +380,41 @@ public partial class SettingsForm : Form
                 cmd.ExecuteNonQuery();
             };
             var lblLowStockHint = new Label { Text = "Products at or below this qty show orange.", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(128, 128, 128), Location = new Point(225, dy + 26), Size = new Size(200, 22) };
-            MakeSection("DISPLAY SETUP", 205, new Control[] {
+            dy += 46;
+            int tzMinutes;
+            using (var sc = DatabaseHelper.GetConnection()) { sc.Open(); using var scmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'AppTimezone'", sc); tzMinutes = int.TryParse(scmd.ExecuteScalar()?.ToString(), out var t) ? t : 480; }
+            var lblTz = new Label { Text = "Timezone:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, dy), Size = new Size(140, 25) };
+            var cmbTimezone = new ComboBox { Location = new Point(180, dy), Size = new Size(260, 25), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = inputBg, ForeColor = inputFg, FlatStyle = FlatStyle.Flat };
+            cmbTimezone.Items.AddRange(new object[] {
+                new { Text = "(UTC+05:00) Pakistan / Maldives", Value = 300 },
+                new { Text = "(UTC+05:30) India / Sri Lanka", Value = 330 },
+                new { Text = "(UTC+06:00) Bangladesh", Value = 360 },
+                new { Text = "(UTC+07:00) Bangkok / Jakarta", Value = 420 },
+                new { Text = "(UTC+08:00) Philippines / Singapore", Value = 480 },
+                new { Text = "(UTC+09:00) Tokyo / Seoul", Value = 540 },
+                new { Text = "(UTC+10:00) Sydney / Guam", Value = 600 }
+            });
+            cmbTimezone.DisplayMember = "Text";
+            cmbTimezone.ValueMember = "Value";
+            for (var i = 0; i < cmbTimezone.Items.Count; i++)
+                if (((dynamic)cmbTimezone.Items[i]).Value == tzMinutes)
+                { cmbTimezone.SelectedIndex = i; break; }
+            if (cmbTimezone.SelectedIndex < 0) cmbTimezone.SelectedIndex = 4; // default UTC+8
+            cmbTimezone.SelectedIndexChanged += (_, _) =>
+            {
+                using var sConn = DatabaseHelper.GetConnection();
+                sConn.Open();
+                using var sCmd = new SQLiteCommand("INSERT OR REPLACE INTO Settings (Key, Value) VALUES ('AppTimezone', @v)", sConn);
+                sCmd.Parameters.AddWithValue("@v", ((dynamic)cmbTimezone.SelectedItem).Value.ToString());
+                sCmd.ExecuteNonQuery();
+            };
+            var lblTzHint = new Label { Text = "All timestamps use this timezone regardless of system clock.", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(128, 128, 128), Location = new Point(15, dy + 28), Size = new Size(400, 20) };
+            MakeSection("DISPLAY SETUP", 250, new Control[] {
                 lblPos, cmbPosScreen, lblCust, cmbCustomerScreen,
                 lblEmailSched, numEmailScheduleHour, lblEmailSchedHint,
                 chkEnableOnlineOrders, chkCustomerDisplay, lblRestart,
-                lblLowStock, numLowStock, lblLowStockHint
+                lblLowStock, numLowStock, lblLowStockHint,
+                lblTz, cmbTimezone, lblTzHint
             });
         }
 
@@ -700,7 +730,7 @@ public partial class SettingsForm : Form
     {
         ShowSyncProgress("Syncing Today...", async p =>
         {
-            var today = DateTime.Now.ToString("yyyy-MM-dd");
+            var today = TimeHelper.Now.ToString("yyyy-MM-dd");
             var todayStart = today + " 00:00:00";
             var todayEnd = today + " 23:59:59";
             var unsyncedSales = SaleService.GetSales(from: DateTime.Parse(todayStart), to: DateTime.Parse(todayEnd), synced: false);

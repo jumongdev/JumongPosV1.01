@@ -91,7 +91,7 @@ public class StockService
                 ins.ExecuteNonQuery();
                 using var idCmd = new SQLiteCommand("SELECT last_insert_rowid()", conn);
                 var trailId = Convert.ToInt32(idCmd.ExecuteScalar());
-                _ = SyncService.SyncStockTrail(new StockTrail { Id = trailId, ProductId = productId, ProductName = productName, Barcode = barcode, QuantityAdded = qty, StockBefore = stockBefore, StockAfter = stockAfter, Reference = reference, UserId = userId, UserName = userName, CreatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") });
+                _ = SyncService.SyncStockTrail(new StockTrail { Id = trailId, ProductId = productId, ProductName = productName, Barcode = barcode, QuantityAdded = qty, StockBefore = stockBefore, StockAfter = stockAfter, Reference = reference, UserId = userId, UserName = userName, CreatedAt = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss") });
                 _ = SyncService.SyncProduct(ProductService.GetById(productId));
 
                 // Also update PostgreSQL stock
@@ -206,7 +206,7 @@ public class StockService
             Cost = Convert.ToDecimal(rdr["cost"]),
             StockQty = Convert.ToInt32(rdr["stock_qty"]),
             IsActive = Convert.ToInt32(rdr["is_active"]) == 1,
-            CreatedAt = DateTime.TryParse(rdr["created_at"]?.ToString(), out var dt) ? dt : DateTime.Now
+            CreatedAt = DateTime.TryParse(rdr["created_at"]?.ToString(), out var dt) ? dt : TimeHelper.Now
         };
     }
 }

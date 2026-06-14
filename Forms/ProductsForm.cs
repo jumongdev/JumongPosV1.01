@@ -439,7 +439,7 @@ public partial class ProductsForm : Form
         var sb = new System.Text.StringBuilder();
         sb.AppendLine(sep);
         sb.AppendLine("INVENTORY STOCK CHECKLIST".PadLeft((lineChars + 28) / 2).PadRight(lineChars));
-        sb.AppendLine($"Printed: {DateTime.Now:yyyy-MM-dd hh:mm tt}".PadLeft((lineChars + 37) / 2).PadRight(lineChars));
+        sb.AppendLine($"Printed: {TimeHelper.Now:yyyy-MM-dd hh:mm tt}".PadLeft((lineChars + 37) / 2).PadRight(lineChars));
         sb.AppendLine(sep);
         sb.AppendLine();
 

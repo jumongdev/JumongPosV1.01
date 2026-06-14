@@ -1,3 +1,5 @@
+using JumongPosV1._01.Services;
+
 namespace JumongPosV1._01.Models;
 
 public class Customer
@@ -11,7 +13,7 @@ public class Customer
     public decimal CreditBalance { get; set; }
     public decimal CreditLimit { get; set; }
     public bool IsActive { get; set; } = true;
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime CreatedAt { get; set; } = TimeHelper.Now;
     public string ModifiedBy { get; set; } = string.Empty;
 
     public string DisplayPhone => string.IsNullOrEmpty(Phone) || Phone.StartsWith("imported-") ? "—" : Phone;

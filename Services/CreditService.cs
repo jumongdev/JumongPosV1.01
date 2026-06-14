@@ -39,7 +39,7 @@ public class CreditService
         upd.ExecuteNonQuery();
 
         trans.Commit();
-        _ = SyncService.SyncCreditTransaction(new CreditTransaction { CustomerId = customerId, SaleId = saleId, Type = type, Description = description, Debit = amount > 0 ? amount : 0, Credit = amount < 0 ? Math.Abs(amount) : 0, Balance = newBalance, PaymentMethod = paymentMethod, ReferenceNo = referenceNo, UserId = userId, UserName = userName, CreatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") });
+        _ = SyncService.SyncCreditTransaction(new CreditTransaction { CustomerId = customerId, SaleId = saleId, Type = type, Description = description, Debit = amount > 0 ? amount : 0, Credit = amount < 0 ? Math.Abs(amount) : 0, Balance = newBalance, PaymentMethod = paymentMethod, ReferenceNo = referenceNo, UserId = userId, UserName = userName, CreatedAt = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss") });
     }
 
     public static List<CreditTransaction> GetAll()
@@ -167,7 +167,7 @@ public class CreditService
         if (customerId.HasValue) unpaid = unpaid.Where(t => t.CustomerId == customerId.Value).ToList();
 
         decimal current = 0, d30 = 0, d60 = 0, d90 = 0, d90Plus = 0;
-        var now = DateTime.Now;
+        var now = TimeHelper.Now;
         foreach (var t in unpaid)
         {
             var days = (now - ParseDate(t.CreatedAt)).Days;
@@ -293,7 +293,7 @@ public class CreditService
         sb.AppendLine($"Phone: {customer.Phone}");
         sb.AppendLine($"Address: {customer.Address}");
         sb.AppendLine($"Period: {(from?.ToString("yyyy-MM-dd") ?? "Start")} to {(to?.ToString("yyyy-MM-dd") ?? "Present")}");
-        sb.AppendLine($"Generated: {DateTime.Now:yyyy-MM-dd HH:mm}");
+        sb.AppendLine($"Generated: {TimeHelper.Now:yyyy-MM-dd HH:mm}");
         sb.AppendLine(new string('-', 80));
         sb.AppendLine($"{ "Date",-20} {"Type",-12} {"Description",-25} {"Debit",12} {"Credit",12} {"Balance",12}");
         sb.AppendLine(new string('-', 80));
@@ -317,7 +317,7 @@ public class CreditService
     private static CreditTransaction MapTransaction(SQLiteDataReader rdr)
     {
         var createdAt = rdr["CreatedAt"].ToString() ?? "";
-        var days = (DateTime.Now - ParseDate(createdAt)).Days;
+        var days = (TimeHelper.Now - ParseDate(createdAt)).Days;
         return new CreditTransaction
         {
             Id = Convert.ToInt32(rdr["Id"]),
@@ -356,6 +356,6 @@ public class CreditService
     private static DateTime ParseDate(string dateStr)
     {
         if (DateTime.TryParse(dateStr, out var dt)) return dt;
-        return DateTime.Now;
+        return TimeHelper.Now;
     }
 }
