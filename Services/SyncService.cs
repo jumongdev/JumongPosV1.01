@@ -157,7 +157,7 @@ public static class SyncService
             {
                 PosId = sale.Id,
                 InvoiceNo = sale.InvoiceNo,
-                SaleDate = new DateTimeOffset(sale.SaleDate.Ticks, TimeSpan.FromMinutes(TimeHelper.GetTimezoneOffset())),
+                SaleDate = new DateTimeOffset(sale.SaleDate.Ticks, TimeSpan.FromMinutes(TimeHelper.GetTimezoneOffset())).UtcDateTime,
                 SubTotal = sale.SubTotal,
                 Discount = sale.Discount,
                 Tax = sale.Tax,
@@ -352,9 +352,12 @@ public static class SyncService
     {
         if (string.IsNullOrEmpty(localTime)) return "";
         if (localTime.Length > 19) return localTime;
-        var offset = TimeZoneInfo.Local.BaseUtcOffset;
-        var sign = offset.Hours >= 0 ? "+" : "";
-        return localTime + " " + sign + offset.ToString("hh\\:mm");
+        var totalMin = TimeHelper.GetTimezoneOffset();
+        var sign = totalMin >= 0 ? "+" : "-";
+        var absMin = Math.Abs(totalMin);
+        var hours = absMin / 60;
+        var mins = absMin % 60;
+        return $"{localTime} {sign}{hours:D2}:{mins:D2}";
     }
 
     private static void LogSync(string endpoint, string status, string error)
