@@ -210,7 +210,7 @@ public partial class StockReceivingForm : Form
         var dtpDate = new DateTimePicker { Location = new Point(175, 18), Size = new Size(130, 25), Format = DateTimePickerFormat.Short, Value = TimeHelper.Today };
         var btnFilter = new Button { Text = "FILTER", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(72, 126, 176), ForeColor = Color.White, Location = new Point(315, 16), Size = new Size(70, 28), Cursor = Cursors.Hand };
         var btnPrint = new Button { Text = "\uD83D\uDDAB PRINT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(46, 204, 113), ForeColor = Color.White, Location = new Point(393, 16), Size = new Size(80, 28), Cursor = Cursors.Hand };
-        var lblTitle = new Label { Text = "\uD83D\uDCE6 RECEIVING HISTORY", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 245, 255), Location = new Point(490, 15), Size = new Size(350, 30) };
+        var lblTitle = new Label { Text = "\uD83D\uDCE6 RECEIVING HISTORY", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 245, 255), Location = new Point(490, 15), Size = new Size(350, 30), AutoSize = false };
         pnlToolbar.Controls.AddRange(new Control[] { searchBox, dtpDate, btnFilter, btnPrint, lblTitle });
 
         var dgv = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = Color.FromArgb(20, 20, 40), BorderStyle = BorderStyle.None, GridColor = Color.FromArgb(40, 40, 70), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = Color.FromArgb(0, 245, 255), Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 35, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = Color.FromArgb(230, 230, 245), SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White }, RowTemplate = { Height = 30 }, AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) } };
@@ -254,8 +254,8 @@ public partial class StockReceivingForm : Form
                 MessageBox.Show("No data to print.", "Print", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         };
-        form.Controls.Add(pnlToolbar);
         form.Controls.Add(dgv);
+        form.Controls.Add(pnlToolbar);
         LoadTrail();
         form.ShowDialog();
     }
