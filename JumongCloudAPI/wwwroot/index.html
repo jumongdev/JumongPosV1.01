@@ -950,8 +950,8 @@ function switchSection(section,el){
   document.querySelectorAll('.sidebar a').forEach(function(x){x.classList.remove('active')});
   el.classList.add('active');
   document.getElementById('sidebar').classList.remove('open');
-  var hide = ['summaryCards','profitCards','panelTrends','panelPeakHours','panelSaleProfits','panelRecentSales','panelTopProducts','panelCashiers','panelExpenses','panelShiftHistory','panelReceiving','panelStock','panelProducts','panelWarehouse','panelCustomers','panelUsers'];
-  var show = {'dashboard':['summaryCards','profitCards','panelTrends','panelPeakHours','panelSaleProfits','panelRecentSales','panelTopProducts','panelCashiers','panelExpenses','panelShiftHistory','panelReceiving','panelStock'],'products':['panelProducts'],'available':['panelStock','panelReceiving'],'warehouse':['panelWarehouse'],'customers':['panelCustomers'],'users':['panelUsers']};
+  var hide = ['summaryCards','profitCards','panelTrends','panelPeakHours','panelSaleProfits','panelRecentSales','panelTopProducts','panelCashiers','panelExpenses','panelShiftHistory','panelReceiving','panelStock','panelProducts','panelWarehouse','panelCustomers','panelUsers','panelVoidLogs'];
+  var show = {'dashboard':['summaryCards','profitCards','panelTrends','panelPeakHours','panelSaleProfits','panelRecentSales','panelTopProducts','panelCashiers','panelExpenses','panelShiftHistory','panelReceiving','panelStock','panelVoidLogs'],'products':['panelProducts'],'available':['panelStock','panelReceiving'],'warehouse':['panelWarehouse'],'customers':['panelCustomers'],'users':['panelUsers']};
   hide.forEach(function(id){var e=document.getElementById(id);if(e)e.style.display='none'});
   if(show[section])show[section].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display=''});
   if(section==='customers')loadCustomers();

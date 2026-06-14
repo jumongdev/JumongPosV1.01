@@ -607,9 +607,11 @@ public partial class SalesForm : Form
                 Location = new Point(48, 25), Size = new Size(200, 15)
             };
 
+            var defaultUnit = ProductUnitService.GetDefault(prod.Id);
+            var displayPrice = defaultUnit?.Price ?? prod.Price;
             var lblPrice = new Label
             {
-                Text = $"\u20b1{prod.Price:N2}",
+                Text = $"\u20b1{displayPrice:N2}",
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 ForeColor = canAdd ? CGreenDark : CTextHint,
                 Location = new Point(row.Width - 120, 13), Size = new Size(72, 20),

@@ -393,6 +393,8 @@ Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operationa
 
 ## Build & Deploy
 
+**IMPORTANT: After EVERY git push, ALWAYS force-deploy the cloud API to DigitalOcean** (unless the push only touched publish/ or client-only files like Forms/*.cs, Models/*.cs).
+
 ### Client App
 ```powershell
 # Build
@@ -408,9 +410,9 @@ gh release create v1.0.XX "publish\v1.0.XX\JumongPosV1.01.exe" `
 ```powershell
 # Deploy to DigitalOcean
 git push origin master
-# Or force deploy via API:
-# POST https://api.digitalocean.com/v2/apps/{app_id}/deployments
-# Body: {"force_build": true}
+# Then ALWAYS force deploy via API (auto-build from push may not trigger):
+$body = @{force_build = $true} | ConvertTo-Json
+Invoke-RestMethod -Uri "https://api.digitalocean.com/v2/apps/{app_id}/deployments" -Method Post -ContentType "application/json" -Headers @{Authorization = "Bearer {token}"} -Body $body
 ```
 
 ### Database Queries (Cloud PostgreSQL)
