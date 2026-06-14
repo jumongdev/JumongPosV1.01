@@ -679,38 +679,40 @@ public class DashboardController : ControllerBase
             using var cmd = conn.CreateCommand();
             var total = 0;
             // HVR machine runs UTC clock, so sales were stored 8h behind.
-            // Only fix sales where invoice date doesn't match UTC date (wrong shift).
+            // Use timezone-agnostic condition: sale_date < June 14 UTC means the record
+            // hasn't been corrected yet. ::date in WHERE is WRONG because session
+            // timezone (Asia/Manila) causes UTC evening times to appear as next day.
             cmd.CommandText = @"
                 UPDATE sales SET sale_date = sale_date + INTERVAL '8 hours'
                 WHERE store_id = 'STORE-20260602-AA36'
                   AND invoice_no LIKE 'INV-AA36-20260614%'
-                  AND sale_date::date = '2026-06-13'";
+                  AND sale_date < '2026-06-14 00:00:00+00'::timestamptz";
             total += cmd.ExecuteNonQuery();
             cmd.CommandText = @"
                 UPDATE void_logs SET created_at = created_at + INTERVAL '8 hours'
                 WHERE store_id = 'STORE-20260602-AA36'
-                  AND created_at::date = '2026-06-13'";
+                  AND created_at < '2026-06-14 00:00:00+00'::timestamptz";
             total += cmd.ExecuteNonQuery();
             cmd.CommandText = @"
                 UPDATE stock_trails SET created_at = created_at + INTERVAL '8 hours'
                 WHERE store_id = 'STORE-20260602-AA36'
-                  AND created_at::date = '2026-06-13'";
+                  AND created_at < '2026-06-14 00:00:00+00'::timestamptz";
             total += cmd.ExecuteNonQuery();
             cmd.CommandText = @"
                 UPDATE credit_transactions SET created_at = created_at + INTERVAL '8 hours'
                 WHERE store_id = 'STORE-20260602-AA36'
-                  AND created_at::date = '2026-06-13'";
+                  AND created_at < '2026-06-14 00:00:00+00'::timestamptz";
             total += cmd.ExecuteNonQuery();
             cmd.CommandText = @"
                 UPDATE daily_closes SET close_date = close_date + INTERVAL '8 hours',
                                         created_at = created_at + INTERVAL '8 hours'
                 WHERE store_id = 'STORE-20260602-AA36'
-                  AND close_date::date = '2026-06-13'";
+                  AND close_date < '2026-06-14 00:00:00+00'::timestamptz";
             total += cmd.ExecuteNonQuery();
             cmd.CommandText = @"
                 UPDATE expenses SET timestamp = timestamp + INTERVAL '8 hours'
                 WHERE store_id = 'STORE-20260602-AA36'
-                  AND timestamp::date = '2026-06-13'";
+                  AND timestamp < '2026-06-14 00:00:00+00'::timestamptz";
             total += cmd.ExecuteNonQuery();
             return Ok(new { @fixed = total, message = $"Fixed {total} HVR records — added 8h to June 13 UTC timestamps" });
         }
