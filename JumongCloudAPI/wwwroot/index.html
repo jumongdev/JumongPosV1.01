@@ -340,6 +340,7 @@ select option{background:var(--surface);color:var(--text)}
       <h3><span class="collapse-icon">&#9660;</span> PRODUCT MANAGEMENT</h3>
       <div class="panel-actions">
         <input class="panel-search" placeholder="Search..." oninput="filterTable('masterProductsBody',this.value)" onclick="event.stopPropagation()">
+        <select id="productCatFilter" class="panel-search" style="width:auto;min-width:100px" onchange="filterProductsByCategory(this.value)" onclick="event.stopPropagation()"><option value="">All Categories</option></select>
         <button class="btn btn-sm" onclick="event.stopPropagation();showProductEditor()">+ ADD PRODUCT</button>
         <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();loadMasterProducts()">REFRESH</button>
       </div>
@@ -789,9 +790,21 @@ async function loadMasterProducts(){
       var mc=margin>20?'green':margin>0?'orange':'red';
       var uc=x.units&&x.units.length||0;
       var img=x.imageData?'<img src="'+x.imageData+'" style="width:36px;height:36px;object-fit:cover;border-radius:4px;vertical-align:middle" title="Has Image">':'';
-      return'<tr data-row><td>'+x.id+'</td><td style="text-align:center">'+img+'</td><td>'+x.name+'</td><td>'+(x.barcode||'')+'</td><td>'+(x.category||'')+'</td><td>&#8369;'+fmt(x.price)+'</td><td class="red">&#8369;'+fmt(x.cost)+'</td><td class="'+mc+'">'+margin+'%</td><td>'+uc+'</td><td><button class="btn btn-sm btn-outline" onclick="showProductEditor('+x.id+')">EDIT</button> <button class="btn btn-sm btn-outline btn-danger" onclick="deleteMasterProduct('+x.id+')">DEL</button></td></tr>';
+      return'<tr data-row data-category="'+(x.category||'')+'"><td>'+x.id+'</td><td style="text-align:center">'+img+'</td><td>'+x.name+'</td><td>'+(x.barcode||'')+'</td><td>'+(x.category||'')+'</td><td>&#8369;'+fmt(x.price)+'</td><td class="red">&#8369;'+fmt(x.cost)+'</td><td class="'+mc+'">'+margin+'%</td><td>'+uc+'</td><td><button class="btn btn-sm btn-outline" onclick="showProductEditor('+x.id+')">EDIT</button> <button class="btn btn-sm btn-outline btn-danger" onclick="deleteMasterProduct('+x.id+')">DEL</button></td></tr>';
     }).join('');
+    populateProductCategoryFilter();
   }catch(e){setEmpty('masterProductsBody','Failed to load products',10)}
+}
+
+function populateProductCategoryFilter(){
+  var sel=document.getElementById('productCatFilter');
+  if(!sel||!_masterProducts)return;
+  var cats=[],cur=sel.value;sel.innerHTML='<option value="">All Categories</option>';
+  _masterProducts.forEach(function(x){if(x.category&&cats.indexOf(x.category)===-1)cats.push(x.category)});
+  cats.sort();cats.forEach(function(c){var o=document.createElement('option');o.value=c;o.textContent=c;if(c===cur)o.selected=true;sel.appendChild(o)});
+}
+function filterProductsByCategory(cat){
+  document.querySelectorAll('#masterProductsBody tr[data-row]').forEach(function(r){r.style.display=!cat||r.getAttribute('data-category')===cat?'':'none'});
 }
 
 function showProductEditor(id){
