@@ -96,6 +96,30 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 
 ## Complete Change History
 
+### v1.0.44 — Various Fixes (Email, Dashboard Limits, Category Filter)
+
+| File | Change |
+|---|---|
+| `Services/EmailService.cs:49-63` | `IsConfigured` now checks instance fields (`_smtpHost`, `_smtpUser`) instead of DB Settings table — fixes End Shift email not sending |
+| `Services/AppVersion.cs` | `Current` bumped to `"1.0.44"` |
+| `JumongCloudAPI/wwwroot/index.html` | All dashboard list limits increased from 100 to 5000 (Recent Sales, Sale Profits, Void Logs, Expenses) |
+| `JumongCloudAPI/wwwroot/index.html` | Void Logs panel moved to Dashboard section only (was visible on all sections) |
+| `JumongCloudAPI/wwwroot/index.html` | Added category filter dropdown to Product List page |
+
+**Impact:** End Shift auto-email now works. Dashboard shows all transactions instead of latest 100. Product list can be filtered by category.
+
+### v1.0.43 — Update Master Catalog Only Downloads Changed Products
+
+| File | Change |
+|---|---|
+| `Services/SyncService.cs:561-598` | `DownloadUpdatedMasterCatalog()` rewritten — no longer calls `DownloadMasterCatalog()` (which downloaded ALL). Instead processes only products from `?since=` filtered API response directly |
+| `Services/SyncService.cs:600-680` | Extracted `ProcessProducts()` helper for shared insert/update logic |
+| `Forms/SalesForm.cs:610-611` | Search results now show default unit's price (`ProductUnitService.GetDefault`) instead of base product price |
+| `Forms/SettingsForm.cs:809-829` | `btnSyncFromCloud_Click` now uses `ShowSyncProgress` progress popup (was blocking button state) |
+| `Forms/SettingsForm.cs:833-854` | `btnUpdateMaster_Click` now uses `ShowSyncProgress` progress popup (was blocking button state) |
+
+**Impact:** UPDATE MASTER CATALOG only downloads products that actually changed since last sync. SYNC FROM CLOUD and UPDATE MASTER CATALOG both show non-modal progress popups. POS search shows correct default unit price.
+
 ### Profit/Margin Fix (v1.0.18 → v1.0.19)
 | File | Change |
 |---|---|
