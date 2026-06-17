@@ -465,7 +465,7 @@ public static class SyncService
 
     public static async Task<int> DownloadMasterCatalog(IProgress<string>? progress = null)
     {
-        var added = 0; var updated = 0;
+        var added = 0; var updated = 0; var deactivated = 0;
         try
         {
             var url = ApiUrl.TrimEnd('/') + "/dashboard/products/master/download";
@@ -476,6 +476,8 @@ public static class SyncService
 
             using var conn = DatabaseHelper.GetConnection();
             conn.Open();
+
+            var processedIds = new List<int>();
 
             foreach (var p in products)
             {
@@ -523,6 +525,7 @@ public static class SyncService
                     if (p.TryGetProperty("units", out var uEl) && uEl.ValueKind == JsonValueKind.Array)
                         InsertUnits(conn, existingId, uEl);
 
+                    processedIds.Add(existingId);
                     updated++;
                 }
                 else
@@ -546,16 +549,25 @@ public static class SyncService
                     if (p.TryGetProperty("units", out var uEl) && uEl.ValueKind == JsonValueKind.Array)
                         InsertUnits(conn, localId, uEl);
 
+                    processedIds.Add(localId);
                     added++;
                 }
 
                 if ((added + updated) % 50 == 0) progress?.Report($"Processed {added + updated} products...");
             }
 
-            progress?.Report($"Complete! {added} added, {updated} updated.");
+            // Deactivate local master-sourced products that are no longer in the cloud master catalog
+            if (processedIds.Count > 0)
+            {
+                var ids = string.Join(",", processedIds);
+                using var deact = new SQLiteCommand($"UPDATE Products SET IsActive = 0, ModifiedBy = 'cloud' WHERE SourceId = 'master' AND IsActive = 1 AND Id NOT IN ({ids})", conn);
+                deactivated = deact.ExecuteNonQuery();
+            }
+
+            progress?.Report($"Complete! {added} added, {updated} updated, {deactivated} deactivated.");
         }
         catch (Exception ex) { progress?.Report($"Error: {ex.Message}"); }
-        return added + updated;
+        return added + updated + deactivated;
     }
 
     public static async Task<int> DownloadUpdatedMasterCatalog(IProgress<string>? progress = null)

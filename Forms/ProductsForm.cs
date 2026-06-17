@@ -717,7 +717,7 @@ public partial class ProductsForm : Form
         btnUnits.Visible = false;
         btnSave.Visible = false;
         btnCancel.Visible = false;
-        btnDelete.Visible = false;
+        btnDelete.Visible = _currentUser?.Role == "Admin";
         btnPrintChecklist.Visible = false;
         btnStockMovement.Text = "\uD83D\uDCC8 VIEW STOCK MOV'T";
 

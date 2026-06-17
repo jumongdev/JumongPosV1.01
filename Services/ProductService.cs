@@ -324,12 +324,26 @@ public class ProductService
 
     public static void Delete(int id)
     {
-        using var conn = DatabaseHelper.GetConnection();
-        conn.Open();
+        // Read product before deletion for sync
+        Product? product = null;
+        using (var conn = DatabaseHelper.GetConnection())
+        {
+            conn.Open();
+            using var rdr = new SQLiteCommand("SELECT * FROM Products WHERE Id = @id", conn);
+            rdr.Parameters.AddWithValue("@id", id);
+            using var reader = rdr.ExecuteReader();
+            if (reader.Read()) product = Map(reader);
+        }
+
+        if (product == null) return;
+
+        using var conn2 = DatabaseHelper.GetConnection();
+        conn2.Open();
         var sql = "UPDATE Products SET IsActive = 0 WHERE Id = @id";
-        using var cmd = new SQLiteCommand(sql, conn);
-        cmd.Parameters.AddWithValue("@id", id);
-        cmd.ExecuteNonQuery();
+        using var cmd2 = new SQLiteCommand(sql, conn2);
+        cmd2.Parameters.AddWithValue("@id", id);
+        cmd2.ExecuteNonQuery();
+
         if (CloudDatabaseHelper.IsConfigured)
         {
             try
@@ -343,6 +357,10 @@ public class ProductService
             }
             catch { }
         }
+
+        // Sync deletion to cloud API
+        product.IsActive = false;
+        _ = SyncService.SyncProduct(product);
     }
 
     private static Product Map(SQLiteDataReader rdr)
