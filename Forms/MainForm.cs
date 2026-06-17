@@ -148,10 +148,20 @@ public partial class MainForm : Form
             var cashierName = "Auto Scheduled Report";
 
             var emailSvc = new EmailService();
-            if (emailSvc.IsConfigured)
-                emailSvc.SendEndShiftReport(totalSales, totalCash, totalEWallet, totalCredit, totalVoided, 0, 0, cashierName, totalExpenses, expenses, gcashTxns, creditCustomers, creditPayments, 0, 0, 0, 0, 0, 0, 0);
+            if (!emailSvc.IsConfigured) return;
+
+            var error = emailSvc.SendEndShiftReport(totalSales, totalCash, totalEWallet, totalCredit, totalVoided, 0, 0, cashierName, totalExpenses, expenses, gcashTxns, creditCustomers, creditPayments, 0, 0, 0, 0, 0, 0, 0);
+            if (error != null)
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "scheduled_report_errors.log");
+                File.AppendAllText(logPath, $"{TimeHelper.Now:yyyy-MM-dd HH:mm:ss} - Scheduled report failed: {error}{Environment.NewLine}");
+            }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "scheduled_report_errors.log");
+            File.AppendAllText(logPath, $"{TimeHelper.Now:yyyy-MM-dd HH:mm:ss} - Scheduled report exception: {ex.Message}{Environment.NewLine}");
+        }
     }
 
     private static void UpsertSetting(string key, string value)

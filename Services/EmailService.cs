@@ -179,7 +179,13 @@ tr:nth-child(even) td {{ background: #F8F8FC; }}
 </body>
 </html>";
 
-        SendOrQueueHtml($"End Shift Report — {cashierName} — {TimeHelper.Now:yyyy-MM-dd}", html);
+        var subject = $"End Shift Report — {cashierName} — {TimeHelper.Now:yyyy-MM-dd}";
+        var result = SendEmailHtml(subject, html);
+        if (result != null)
+        {
+            QueueEmail(subject, html, true);
+            return result;
+        }
         return null;
     }
 
