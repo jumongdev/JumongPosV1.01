@@ -609,6 +609,27 @@ public static class SyncService
         catch (Exception ex) { progress?.Report($"Error: {ex.Message}"); return 0; }
     }
 
+    public static async Task<int> CountPendingMasterUpdates()
+    {
+        try
+        {
+            var lastSync = "";
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                using var cmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'LastMasterSync'", conn);
+                lastSync = cmd.ExecuteScalar()?.ToString() ?? "";
+            }
+            var url = ApiUrl.TrimEnd('/') + "/dashboard/products/master/download";
+            if (!string.IsNullOrEmpty(lastSync))
+                url += "?since=" + Uri.EscapeDataString(lastSync);
+            var json = await _client.GetStringAsync(url);
+            var products = System.Text.Json.JsonSerializer.Deserialize<List<System.Text.Json.JsonElement>>(json);
+            return products?.Count ?? 0;
+        }
+        catch { return 0; }
+    }
+
     private static (int added, int updated) ProcessProducts(SQLiteConnection conn, List<JsonElement> products, IProgress<string>? progress)
     {
         var added = 0; var updated = 0;

@@ -12,7 +12,6 @@ public partial class OrderTypeForm : Form
     public OrderTypeForm()
     {
         InitializeComponent();
-        txtBarcodeScan.Focus();
 
         var onlineEnabled = true;
         try
@@ -28,12 +27,7 @@ public partial class OrderTypeForm : Form
         if (!onlineEnabled)
         {
             btnOnline.Visible = false;
-            var shift = 60;
-            sep.Location = new Point(sep.Location.X, sep.Location.Y - shift);
-            lblScan.Location = new Point(lblScan.Location.X, lblScan.Location.Y - shift);
-            txtBarcodeScan.Location = new Point(txtBarcodeScan.Location.X, txtBarcodeScan.Location.Y - shift);
-            lblPriceCheck.Location = new Point(lblPriceCheck.Location.X, lblPriceCheck.Location.Y - shift);
-            ClientSize = new Size(380, 310);
+            ClientSize = new Size(380, 225);
         }
 
         DebugHelper.AddFormLabel(this);
@@ -46,32 +40,6 @@ public partial class OrderTypeForm : Form
         Close();
     }
 
-    private void txtBarcodeScan_KeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.KeyCode == Keys.Enter)
-        {
-            e.SuppressKeyPress = true;
-            var code = txtBarcodeScan.Text.Trim();
-            if (string.IsNullOrEmpty(code)) return;
-
-            var product = ProductService.GetByBarcode(code);
-            if (product != null)
-            {
-                var unit = ProductUnitService.GetDefault(product.Id);
-                var price = unit?.Price ?? product.Price;
-                var unitName = unit?.UnitName ?? "pc";
-                lblPriceCheck.Text = $"{product.Name}  —  \u20b1{price:N2} / {unitName}";
-                lblPriceCheck.ForeColor = Color.FromArgb(46, 204, 113);
-            }
-            else
-            {
-                lblPriceCheck.Text = $"Barcode '{code}' not found.";
-                lblPriceCheck.ForeColor = Color.FromArgb(231, 76, 60);
-            }
-            txtBarcodeScan.Clear();
-        }
-    }
-
     private void InitializeComponent()
     {
         var accent = Color.FromArgb(72, 126, 176);
@@ -80,7 +48,7 @@ public partial class OrderTypeForm : Form
         var textColor = Color.FromArgb(44, 44, 44);
 
         Text = "Order Type";
-        ClientSize = new Size(380, 370);
+        ClientSize = new Size(380, 275);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         StartPosition = FormStartPosition.CenterParent;
         MaximizeBox = false;
@@ -147,48 +115,8 @@ public partial class OrderTypeForm : Form
         };
         btnOnline.Click += (s, e) => SelectType("Online");
 
-        sep = new Panel
-        {
-            Location = new Point(30, 265),
-            Size = new Size(320, 1),
-            BackColor = Color.FromArgb(220, 220, 225)
-        };
-
-        lblScan = new Label
-        {
-            Text = "SCAN BARCODE TO CHECK PRICE",
-            Font = new Font("Segoe UI", 8F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(140, 140, 160),
-            Location = new Point(30, 278),
-            Size = new Size(200, 15)
-        };
-
-        txtBarcodeScan = new TextBox
-        {
-            Font = new Font("Segoe UI", 14F),
-            Location = new Point(30, 295),
-            Size = new Size(320, 30),
-            BorderStyle = BorderStyle.FixedSingle,
-            BackColor = Color.White,
-            ForeColor = textColor
-        };
-        txtBarcodeScan.KeyDown += txtBarcodeScan_KeyDown;
-
-        lblPriceCheck = new Label
-        {
-            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(46, 204, 113),
-            Location = new Point(30, 330),
-            Size = new Size(320, 25),
-            TextAlign = ContentAlignment.MiddleLeft
-        };
-
-        Controls.AddRange(new Control[] { pnlHeader, btnWalkIn, btnCounter, btnOnline, sep, lblScan, txtBarcodeScan, lblPriceCheck });
+        Controls.AddRange(new Control[] { pnlHeader, btnWalkIn, btnCounter, btnOnline });
     }
 
-    private TextBox txtBarcodeScan = null!;
-    private Label lblPriceCheck = null!;
-    private Label lblScan = null!;
     private Button btnOnline = null!;
-    private Panel sep = null!;
 }

@@ -517,11 +517,10 @@ public class DatabaseHelper
             conn);
         syncLog.ExecuteNonQuery();
 
-        // Seed SMTP, PostgreSQL, and AppTimezone settings if missing
+        // Seed SMTP and AppTimezone settings if missing
         using var seedMissing = new SQLiteCommand(
             "INSERT OR IGNORE INTO Settings (Key, Value) VALUES " +
             "('SmtpHost', ''), ('SmtpPort', '587'), ('SmtpUser', ''), ('SmtpPass', ''), ('SmtpTo', ''), " +
-            "('PgHost', ''), ('PgPort', '5432'), ('PgDatabase', ''), ('PgUser', ''), ('PgPass', ''), ('PgSsl', 'True'), " +
             "('AppTimezone', '480'), ('LastMasterSync', '')",
             conn);
         seedMissing.ExecuteNonQuery();

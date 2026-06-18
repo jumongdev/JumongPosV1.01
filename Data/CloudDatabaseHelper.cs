@@ -31,7 +31,7 @@ public static class CloudDatabaseHelper
             string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(pass))
             return null;
 
-        var cs = $"Host={host};Port={port ?? "5432"};Database={db};Username={user};Password={pass};";
+        var cs = $"Host={host};Port={port ?? "5432"};Database={db};Username={user};Password={pass};ConnectTimeout=3;";
         if (ssl == "True" || ssl == "true")
             cs += "SSL Mode=Require;Trust Server Certificate=true;";
         return cs;

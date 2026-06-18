@@ -158,7 +158,29 @@ public partial class StockMovementForm : Form
             var pnlTool = new Panel { Location = new Point(padding, 0), Size = new Size(clientW, 45), BackColor = Color.FromArgb(20, 20, 40) };
             var lblTitle = new Label { Text = $"INVOICE: {inv}", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(15, 12), Size = new Size(350, 25) };
             var btnReprint = new Button { Text = " REPRINT", Font = new Font("Segoe UI", 10F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(72, 126, 176), ForeColor = Color.White, Cursor = Cursors.Hand, Size = new Size(120, 32), Location = new Point(pnlTool.Width - 135, 6) };
-            btnReprint.Click += (_, _) => { PrinterService.PrintReceipt(sale, sale.UserId?.ToString() ?? "System"); receipt.DialogResult = DialogResult.OK; receipt.Close(); };
+            btnReprint.Click += (_, _) =>
+            {
+                var activeItems = sale.Items.Where(x => !x.IsVoided).ToList();
+                if (activeItems.Count < sale.Items.Count)
+                {
+                    var adjusted = new Sale
+                    {
+                        InvoiceNo = sale.InvoiceNo, SaleDate = sale.SaleDate,
+                        SubTotal = activeItems.Sum(x => x.TotalPrice), Discount = 0, Tax = 0,
+                        GrandTotal = activeItems.Sum(x => x.TotalPrice),
+                        AmountPaid = activeItems.Sum(x => x.TotalPrice), Change = 0,
+                        PaymentMethod = sale.PaymentMethod, OrderType = sale.OrderType,
+                        Items = activeItems
+                    };
+                    PrinterService.PrintReceipt(adjusted, "Reprint (Void Adjusted)");
+                }
+                else
+                {
+                    PrinterService.PrintReceipt(sale, sale.UserId?.ToString() ?? "System");
+                }
+                receipt.DialogResult = DialogResult.OK;
+                receipt.Close();
+            };
             pnlTool.Controls.AddRange(new Control[] { lblTitle, btnReprint });
 
             var info = new Label { Text = $"Cashier: {sale.UserId}  |  Customer: {sale.CustomerName ?? "Walk-in"}  |  Payment: {sale.PaymentMethod}  |  Total: \u20b1{sale.GrandTotal:N2}", Location = new Point(padding, clientH - 40), Size = new Size(clientW, 30), Font = new Font("Segoe UI", 9F), ForeColor = dimText, BackColor = Color.FromArgb(20, 20, 40), TextAlign = ContentAlignment.MiddleLeft };
@@ -173,6 +195,15 @@ public partial class StockMovementForm : Form
             dgvReceipt.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "PRICE", DataPropertyName = "Price", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight } });
             dgvReceipt.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "TOTAL", DataPropertyName = "TotalPrice", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight } });
             dgvReceipt.DataSource = sale.Items;
+            dgvReceipt.CellFormatting += (_, ef) =>
+            {
+                if (ef.RowIndex < 0) return;
+                if (dgvReceipt.Rows[ef.RowIndex].DataBoundItem is SaleItem si && si.IsVoided)
+                {
+                    ef.CellStyle!.ForeColor = Color.FromArgb(231, 76, 60);
+                    ef.CellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Strikeout);
+                }
+            };
 
             receipt.Resize += (_, _) =>
             {

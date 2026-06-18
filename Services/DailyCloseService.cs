@@ -83,7 +83,7 @@ public class DailyCloseService
 
         // Credit payments received in cash
         var payCashSql = "SELECT COALESCE(SUM(Credit), 0) FROM CreditTransactions " +
-                         "WHERE Type = 'Payment' AND Description LIKE 'CREDIT_PAY_CASH|%'";
+                         "WHERE Type = 'Payment' AND PaymentMethod = 'Cash'";
         if (!string.IsNullOrEmpty(since))
             payCashSql += " AND CreatedAt > @since_pc";
         using var payCashCmd = new SQLiteCommand(payCashSql, conn);
@@ -93,7 +93,7 @@ public class DailyCloseService
 
         // Credit payments received in ewallet
         var payEwSql = "SELECT COALESCE(SUM(Credit), 0) FROM CreditTransactions " +
-                       "WHERE Type = 'Payment' AND Description LIKE 'CREDIT_PAY_EWALLET|%'";
+                       "WHERE Type = 'Payment' AND PaymentMethod = 'E-Wallet'";
         if (!string.IsNullOrEmpty(since))
             payEwSql += " AND CreatedAt > @since_pe";
         using var payEwCmd = new SQLiteCommand(payEwSql, conn);
@@ -228,12 +228,13 @@ public class DailyCloseService
 
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var sql = "SELECT c.Name, s.GrandTotal FROM Sales s " +
+        var sql = "SELECT c.Name, COALESCE(SUM(si.TotalPrice), 0) AS Total FROM Sales s " +
                   "LEFT JOIN Customers c ON s.CustomerId = c.Id " +
-                  "WHERE s.PaymentMethod = 'Credit' AND s.IsVoided = 0";
+                  "JOIN SaleItems si ON si.SaleId = s.Id " +
+                  "WHERE s.PaymentMethod = 'Credit' AND s.IsVoided = 0 AND si.IsVoided = 0";
         if (!string.IsNullOrEmpty(since))
             sql += " AND s.SaleDate > @since";
-        sql += " AND s.SaleDate <= @end ORDER BY s.SaleDate";
+        sql += " AND s.SaleDate <= @end GROUP BY c.Id, c.Name ORDER BY s.SaleDate";
 
         using var cmd = new SQLiteCommand(sql, conn);
         if (!string.IsNullOrEmpty(since))
@@ -245,7 +246,7 @@ public class DailyCloseService
         {
             list.Add((
                 rdr["Name"]?.ToString() ?? "Unknown",
-                Convert.ToDecimal(rdr["GrandTotal"])
+                Convert.ToDecimal(rdr["Total"])
             ));
         }
         return list;
@@ -306,12 +307,13 @@ public class DailyCloseService
 
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var sql = "SELECT c.Name, s.GrandTotal FROM Sales s " +
+        var sql = "SELECT c.Name, COALESCE(SUM(si.TotalPrice), 0) AS Total FROM Sales s " +
                   "LEFT JOIN Customers c ON s.CustomerId = c.Id " +
-                  "WHERE s.PaymentMethod = 'Credit' AND s.IsVoided = 0";
+                  "JOIN SaleItems si ON si.SaleId = s.Id " +
+                  "WHERE s.PaymentMethod = 'Credit' AND s.IsVoided = 0 AND si.IsVoided = 0";
         if (!string.IsNullOrEmpty(since))
             sql += " AND s.SaleDate > @since";
-        sql += " AND s.SaleDate <= @end ORDER BY s.SaleDate";
+        sql += " AND s.SaleDate <= @end GROUP BY c.Id, c.Name ORDER BY s.SaleDate";
 
         using var cmd = new System.Data.SQLite.SQLiteCommand(sql, conn);
         if (!string.IsNullOrEmpty(since))
@@ -323,7 +325,7 @@ public class DailyCloseService
         {
             list.Add((
                 rdr["Name"]?.ToString() ?? "Unknown",
-                Convert.ToDecimal(rdr["GrandTotal"])
+                Convert.ToDecimal(rdr["Total"])
             ));
         }
         return list;

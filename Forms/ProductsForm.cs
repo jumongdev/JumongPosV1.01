@@ -122,131 +122,6 @@ public partial class ProductsForm : Form
         if (!_suppressSearch) LoadProducts();
     }
 
-    private void btnCheckCost_Click(object? sender, EventArgs e)
-    {
-        var form = new Form
-        {
-            Text = "Cost Check",
-            Size = new Size(1000, 600),
-            StartPosition = FormStartPosition.CenterParent,
-            BackColor = Color.FromArgb(10, 10, 26)
-        };
-
-        var canvasBg = Color.FromArgb(10, 10, 26);
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var accentGreen = Color.FromArgb(46, 204, 113);
-        var accentRed = Color.FromArgb(231, 76, 60);
-        var accentOrange = Color.FromArgb(243, 156, 18);
-        var borderColor = Color.FromArgb(40, 40, 70);
-
-        var pnlToolbar = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = panelBg };
-        var lblTitle = new Label { Text = "COST ISSUES", Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(15, 14), Size = new Size(150, 25) };
-
-        var btnAll = new Button { Text = "ALL", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Location = new Point(180, 12), Size = new Size(80, 28), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(72, 126, 176), ForeColor = Color.White, Cursor = Cursors.Hand, Tag = "all" };
-        var btnNoCost = new Button { Text = "COST = 0", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Location = new Point(270, 12), Size = new Size(90, 28), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentRed, ForeColor = Color.White, Cursor = Cursors.Hand, Tag = "zero" };
-        var btnEqual = new Button { Text = "COST = PRICE", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Location = new Point(370, 12), Size = new Size(100, 28), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentOrange, ForeColor = Color.White, Cursor = Cursors.Hand, Tag = "equal" };
-        var btnOver = new Button { Text = "COST > PRICE", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Location = new Point(480, 12), Size = new Size(100, 28), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(155, 89, 182), ForeColor = Color.White, Cursor = Cursors.Hand, Tag = "over" };
-
-        var lblCount = new Label { Text = "", Font = new Font("Segoe UI", 9F), ForeColor = Color.FromArgb(140, 140, 170), Location = new Point(600, 16), Size = new Size(200, 20), TextAlign = ContentAlignment.MiddleLeft };
-
-        pnlToolbar.Controls.AddRange(new Control[] { lblTitle, btnAll, btnNoCost, btnEqual, btnOver, lblCount });
-
-        var dgv = new DataGridView
-        {
-            Dock = DockStyle.Fill,
-            ReadOnly = true,
-            AllowUserToAddRows = false,
-            AllowUserToDeleteRows = false,
-            AllowUserToResizeRows = false,
-            MultiSelect = false,
-            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-            Font = new Font("Segoe UI", 9F),
-            BackgroundColor = canvasBg,
-            BorderStyle = BorderStyle.None,
-            GridColor = borderColor,
-            RowHeadersVisible = false,
-            CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
-            ColumnHeadersDefaultCellStyle = { BackColor = Color.FromArgb(25, 25, 50), ForeColor = neonTitle, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Alignment = DataGridViewContentAlignment.MiddleCenter },
-            ColumnHeadersHeight = 32,
-            EnableHeadersVisualStyles = false,
-            DefaultCellStyle = { BackColor = Color.FromArgb(22, 22, 45), ForeColor = Color.FromArgb(230, 230, 245), SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White, Padding = new Padding(4, 2, 4, 2) },
-            AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) },
-            RowTemplate = { Height = 28 }
-        };
-
-        void LoadData(string filter)
-        {
-            using var conn = Data.DatabaseHelper.GetConnection();
-            conn.Open();
-            var where = filter switch
-            {
-                "zero" => "AND Cost = 0",
-                "equal" => "AND Cost = Price",
-                "over" => "AND Cost > Price",
-                _ => "AND (Cost = 0 OR Cost = Price OR Cost > Price)"
-            };
-            using var cmd = new System.Data.SQLite.SQLiteCommand($@"
-                SELECT Id, Name, Barcode, Category, Price, Cost,
-                       CASE 
-                           WHEN Cost = 0 THEN 'NO COST'
-                           WHEN Cost > Price THEN 'LOSS'
-                           WHEN Cost = Price THEN 'NO PROFIT'
-                           ELSE 'OK'
-                       END as Issue
-                FROM Products 
-                WHERE IsActive = 1 {where}
-                ORDER BY 
-                    CASE WHEN Cost = 0 THEN 1 WHEN Cost > Price THEN 2 ELSE 3 END,
-                    Name
-            ", conn);
-            using var reader = cmd.ExecuteReader();
-            var dt = new System.Data.DataTable();
-            dt.Load(reader);
-            dgv.DataSource = dt;
-            lblCount.Text = $"{dt.Rows.Count} products";
-
-            dgv.Columns.Clear();
-            dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Id", HeaderText = "ID", Width = 50 });
-            dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Name", HeaderText = "PRODUCT NAME", Width = 250 });
-            dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Barcode", HeaderText = "BARCODE", Width = 130 });
-            dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Category", HeaderText = "CATEGORY", Width = 100 });
-            dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Price", HeaderText = "PRICE", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = neonTitle } });
-            dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Cost", HeaderText = "COST", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = accentRed } });
-            dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Issue", HeaderText = "ISSUE", Width = 100 });
-        }
-
-        dgv.CellFormatting += (s, ev) =>
-        {
-            if (ev.RowIndex < 0 || ev.ColumnIndex < 0) return;
-            var issueCol = dgv.Columns["Issue"]?.Index ?? -1;
-            if (ev.ColumnIndex == issueCol && ev.Value != null)
-            {
-                var issue = ev.Value.ToString();
-                ev.CellStyle!.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
-                if (issue == "NO COST") { ev.CellStyle.ForeColor = accentRed; ev.CellStyle.SelectionForeColor = accentRed; }
-                else if (issue == "LOSS") { ev.CellStyle.ForeColor = Color.FromArgb(155, 89, 182); ev.CellStyle.SelectionForeColor = Color.FromArgb(155, 89, 182); }
-                else if (issue == "NO PROFIT") { ev.CellStyle.ForeColor = accentOrange; ev.CellStyle.SelectionForeColor = accentOrange; }
-            }
-        };
-
-        void SetActive(Button active)
-        {
-            foreach (var btn in new[] { btnAll, btnNoCost, btnEqual, btnOver })
-                btn.FlatAppearance.BorderSize = btn == active ? 2 : 0;
-        }
-
-        btnAll.Click += (s, ev) => { SetActive(btnAll); LoadData("all"); };
-        btnNoCost.Click += (s, ev) => { SetActive(btnNoCost); LoadData("zero"); };
-        btnEqual.Click += (s, ev) => { SetActive(btnEqual); LoadData("equal"); };
-        btnOver.Click += (s, ev) => { SetActive(btnOver); LoadData("over"); };
-
-        form.Controls.Add(dgv);
-        form.Controls.Add(pnlToolbar);
-        form.Shown += (s, ev) => { SetActive(btnAll); LoadData("all"); };
-        form.ShowDialog();
-    }
-
     private void SetReadOnly(bool readOnly)
     {
         _isEditing = !readOnly;
@@ -577,41 +452,48 @@ public partial class ProductsForm : Form
         cmbFilterCategory = new ComboBox { Location = new Point(650, 12), Size = new Size(150, 28), DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, BackColor = inputBg, ForeColor = inputFg };
         cmbFilterCategory.SelectedIndexChanged += TriggerSearch;
 
-        var btnCheckCost = new Button { Text = "CHECK COST", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Location = new Point(820, 12), Size = new Size(110, 28), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentOrange, ForeColor = Color.White, Cursor = Cursors.Hand };
-        btnCheckCost.Click += btnCheckCost_Click;
-
-        var btnDownload = new Button { Text = "DOWNLOAD MASTER", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Location = new Point(940, 12), Size = new Size(150, 28), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(72, 126, 176), ForeColor = Color.White, Cursor = Cursors.Hand };
-        btnDownload.Click += (_, _) =>
+        var btnUpdateMaster = new Button { Text = "UPDATE MASTER", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Location = new Point(940, 12), Size = new Size(150, 28), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(0, 150, 136), ForeColor = Color.White, Cursor = Cursors.Hand };
+        btnUpdateMaster.Click += (_, _) =>
         {
             var form = new Form
             {
-                Text = "Downloading Master...",
-                Size = new Size(380, 110),
+                Text = "Updating Master Catalog...",
+                Size = new Size(400, 120),
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 ControlBox = false,
+                ShowInTaskbar = false,
                 TopMost = true,
-                BackColor = Color.FromArgb(20, 20, 40)
+                BackColor = Color.FromArgb(20, 20, 40),
+                ForeColor = Color.FromArgb(230, 230, 245)
             };
-            var lbl = new Label { Text = "Downloading...", Location = new Point(15, 50), Size = new Size(350, 22), ForeColor = Color.FromArgb(0, 245, 255) };
-            form.Controls.Add(new Label { Text = "Preparing...", Location = new Point(15, 15), Size = new Size(350, 28), ForeColor = Color.FromArgb(230, 230, 245) });
-            form.Controls.Add(lbl);
+            var bar = new ProgressBar { Location = new Point(15, 15), Size = new Size(360, 28), Style = ProgressBarStyle.Marquee, MarqueeAnimationSpeed = 30, ForeColor = Color.FromArgb(0, 150, 136) };
+            var lbl = new Label { Text = "Starting...", Location = new Point(15, 55), Size = new Size(360, 22), ForeColor = Color.FromArgb(0, 245, 255) };
+            form.Controls.AddRange(new Control[] { bar, lbl });
             form.Load += async (_, __) =>
             {
                 var p = new Progress<string>(m => { try { form.Invoke(() => lbl.Text = m); } catch { } });
-                var count = await SyncService.DownloadMasterCatalog(p);
-                try { form.Invoke(() => { lbl.Text = "Complete! " + count + " items."; }); } catch { }
-                await Task.Delay(1500);
+                try
+                {
+                    var count = await SyncService.DownloadUpdatedMasterCatalog(p);
+                    try { form.Invoke(() => { lbl.Text = count > 0 ? $"Updated {count} products." : "No changes found."; }); } catch { }
+                    await Task.Delay(1000);
+                    _suppressSearch = true;
+                    LoadProducts();
+                    UpdateStats();
+                    _suppressSearch = false;
+                }
+                catch (Exception ex)
+                {
+                    try { form.Invoke(() => lbl.Text = "Error: " + ex.Message); } catch { }
+                    await Task.Delay(2000);
+                }
                 try { form.Close(); } catch { }
-                _suppressSearch = true;
-                LoadProducts();
-                UpdateStats();
-                _suppressSearch = false;
             };
-            form.Show();
+            form.ShowDialog();
         };
 
-        pnlToolbar.Controls.AddRange(new Control[] { lblPageTitle, lblSearchIcon, txtSearch, lblCatFilter, cmbFilterCategory, btnCheckCost, btnDownload });
+        pnlToolbar.Controls.AddRange(new Control[] { lblPageTitle, lblSearchIcon, txtSearch, lblCatFilter, cmbFilterCategory, btnUpdateMaster });
 
         // ── METRICS BAR ──
         var pnlMetrics = new Panel { Dock = DockStyle.Top, Height = 35, BackColor = canvasBg };
@@ -717,7 +599,7 @@ public partial class ProductsForm : Form
         btnUnits.Visible = false;
         btnSave.Visible = false;
         btnCancel.Visible = false;
-        btnDelete.Visible = _currentUser?.Role == "Admin";
+        btnDelete.Visible = false;
         btnPrintChecklist.Visible = false;
         btnStockMovement.Text = "\uD83D\uDCC8 VIEW STOCK MOV'T";
 

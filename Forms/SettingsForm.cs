@@ -50,22 +50,6 @@ public partial class SettingsForm : Form
         numMarginLeft.Value = int.TryParse(GetSetting(conn, "PrinterMarginLeft"), out var ml) ? ml : 5;
         numMarginRight.Value = int.TryParse(GetSetting(conn, "PrinterMarginRight"), out var mr) ? mr : 2;
 
-        var screens = Screen.AllScreens;
-        cmbPosScreen.Items.Clear();
-        cmbCustomerScreen.Items.Clear();
-        for (var i = 0; i < screens.Length; i++)
-        {
-            var item = $"Screen {i + 1}{(i == 0 ? " (Primary)" : "")}";
-            cmbPosScreen.Items.Add(item);
-            cmbCustomerScreen.Items.Add(item);
-        }
-
-        var posIdx = int.TryParse(GetSetting(conn, "PosScreenIndex"), out var p) ? p : 0;
-        var custIdx = int.TryParse(GetSetting(conn, "CustomerScreenIndex"), out var c) ? c : (screens.Length > 1 ? 1 : 0);
-
-        if (posIdx >= 0 && posIdx < cmbPosScreen.Items.Count) cmbPosScreen.SelectedIndex = posIdx; else cmbPosScreen.SelectedIndex = 0;
-        if (custIdx >= 0 && custIdx < cmbCustomerScreen.Items.Count) cmbCustomerScreen.SelectedIndex = custIdx; else if (screens.Length > 1) cmbCustomerScreen.SelectedIndex = 1; else cmbCustomerScreen.SelectedIndex = 0;
-
         _originalSettings.Clear();
         _originalSettings["PrinterName"] = cmbPrinter.Text;
         _originalSettings["CompanyName"] = txtCompanyName.Text;
@@ -75,21 +59,41 @@ public partial class SettingsForm : Form
         _originalSettings["PaperWidth"] = paperValForLabel(cmbPaperSize.Text);
         _originalSettings["PrinterMarginLeft"] = numMarginLeft.Value.ToString();
         _originalSettings["PrinterMarginRight"] = numMarginRight.Value.ToString();
-        _originalSettings["PosScreenIndex"] = cmbPosScreen.SelectedIndex.ToString();
-        _originalSettings["CustomerScreenIndex"] = cmbCustomerScreen.SelectedIndex.ToString();
 
-        var schedHour = GetSetting(conn, "EmailScheduleHour") ?? "20";
-        numEmailScheduleHour.Value = int.TryParse(schedHour, out var sh) && sh >= 0 && sh <= 23 ? sh : 20;
-        _originalSettings["EmailScheduleHour"] = numEmailScheduleHour.Value.ToString();
-        var enableOnline = GetSetting(conn, "EnableOnlineOrders") ?? "true";
-        chkEnableOnlineOrders.Checked = enableOnline == "true";
-        _originalSettings["EnableOnlineOrders"] = enableOnline;
-        var enableCustDisplay = GetSetting(conn, "EnableCustomerDisplay") ?? "true";
-        chkCustomerDisplay.Checked = enableCustDisplay == "true";
-        _originalSettings["EnableCustomerDisplay"] = enableCustDisplay;
-        var cloudUrl = GetSetting(conn, "CloudApiUrl") ?? "https://jumong-pos-api-p285q.ondigitalocean.app/api";
-        txtCloudApiUrl.Text = cloudUrl;
-        _originalSettings["CloudApiUrl"] = cloudUrl;
+        if (_currentUser.Role == "Admin")
+        {
+            var screens = Screen.AllScreens;
+            cmbPosScreen.Items.Clear();
+            cmbCustomerScreen.Items.Clear();
+            for (var i = 0; i < screens.Length; i++)
+            {
+                var item = $"Screen {i + 1}{(i == 0 ? " (Primary)" : "")}";
+                cmbPosScreen.Items.Add(item);
+                cmbCustomerScreen.Items.Add(item);
+            }
+
+            var posIdx = int.TryParse(GetSetting(conn, "PosScreenIndex"), out var p) ? p : 0;
+            var custIdx = int.TryParse(GetSetting(conn, "CustomerScreenIndex"), out var c) ? c : (screens.Length > 1 ? 1 : 0);
+
+            if (posIdx >= 0 && posIdx < cmbPosScreen.Items.Count) cmbPosScreen.SelectedIndex = posIdx; else cmbPosScreen.SelectedIndex = 0;
+            if (custIdx >= 0 && custIdx < cmbCustomerScreen.Items.Count) cmbCustomerScreen.SelectedIndex = custIdx; else if (screens.Length > 1) cmbCustomerScreen.SelectedIndex = 1; else cmbCustomerScreen.SelectedIndex = 0;
+
+            _originalSettings["PosScreenIndex"] = cmbPosScreen.SelectedIndex.ToString();
+            _originalSettings["CustomerScreenIndex"] = cmbCustomerScreen.SelectedIndex.ToString();
+
+            var schedHour = GetSetting(conn, "EmailScheduleHour") ?? "20";
+            numEmailScheduleHour.Value = int.TryParse(schedHour, out var sh) && sh >= 0 && sh <= 23 ? sh : 20;
+            _originalSettings["EmailScheduleHour"] = numEmailScheduleHour.Value.ToString();
+            var enableOnline = GetSetting(conn, "EnableOnlineOrders") ?? "true";
+            chkEnableOnlineOrders.Checked = enableOnline == "true";
+            _originalSettings["EnableOnlineOrders"] = enableOnline;
+            var enableCustDisplay = GetSetting(conn, "EnableCustomerDisplay") ?? "true";
+            chkCustomerDisplay.Checked = enableCustDisplay == "true";
+            _originalSettings["EnableCustomerDisplay"] = enableCustDisplay;
+            var cloudUrl = GetSetting(conn, "CloudApiUrl") ?? "https://jumong-pos-api-p285q.ondigitalocean.app/api";
+            txtCloudApiUrl.Text = cloudUrl;
+            _originalSettings["CloudApiUrl"] = cloudUrl;
+        }
     }
 
     private static string paperValForLabel(string label) =>
@@ -125,14 +129,18 @@ public partial class SettingsForm : Form
             ["ReceiptFooter"] = txtFooter.Text,
             ["PaperWidth"] = paperVal,
             ["PrinterMarginLeft"] = numMarginLeft.Value.ToString(),
-            ["PrinterMarginRight"] = numMarginRight.Value.ToString(),
-            ["PosScreenIndex"] = cmbPosScreen.SelectedIndex.ToString(),
-            ["CustomerScreenIndex"] = cmbCustomerScreen.SelectedIndex.ToString(),
-            ["EmailScheduleHour"] = numEmailScheduleHour.Value.ToString(),
-            ["EnableOnlineOrders"] = chkEnableOnlineOrders.Checked ? "true" : "false",
-            ["EnableCustomerDisplay"] = chkCustomerDisplay.Checked ? "true" : "false",
-            ["CloudApiUrl"] = txtCloudApiUrl.Text
+            ["PrinterMarginRight"] = numMarginRight.Value.ToString()
         };
+
+        if (_currentUser.Role == "Admin")
+        {
+            newValues["PosScreenIndex"] = cmbPosScreen.SelectedIndex.ToString();
+            newValues["CustomerScreenIndex"] = cmbCustomerScreen.SelectedIndex.ToString();
+            newValues["EmailScheduleHour"] = numEmailScheduleHour.Value.ToString();
+            newValues["EnableOnlineOrders"] = chkEnableOnlineOrders.Checked ? "true" : "false";
+            newValues["EnableCustomerDisplay"] = chkCustomerDisplay.Checked ? "true" : "false";
+            newValues["CloudApiUrl"] = txtCloudApiUrl.Text;
+        }
 
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
@@ -147,12 +155,15 @@ public partial class SettingsForm : Form
             UpsertSetting(conn, "PaperWidth", paperVal);
             UpsertSetting(conn, "PrinterMarginLeft", numMarginLeft.Value.ToString());
             UpsertSetting(conn, "PrinterMarginRight", numMarginRight.Value.ToString());
-            UpsertSetting(conn, "PosScreenIndex", cmbPosScreen.SelectedIndex.ToString());
-            UpsertSetting(conn, "CustomerScreenIndex", cmbCustomerScreen.SelectedIndex.ToString());
-            UpsertSetting(conn, "EmailScheduleHour", numEmailScheduleHour.Value.ToString());
-            UpsertSetting(conn, "EnableOnlineOrders", chkEnableOnlineOrders.Checked ? "true" : "false");
-            UpsertSetting(conn, "EnableCustomerDisplay", chkCustomerDisplay.Checked ? "true" : "false");
-            UpsertSetting(conn, "CloudApiUrl", txtCloudApiUrl.Text);
+            if (_currentUser.Role == "Admin")
+            {
+                UpsertSetting(conn, "PosScreenIndex", cmbPosScreen.SelectedIndex.ToString());
+                UpsertSetting(conn, "CustomerScreenIndex", cmbCustomerScreen.SelectedIndex.ToString());
+                UpsertSetting(conn, "EmailScheduleHour", numEmailScheduleHour.Value.ToString());
+                UpsertSetting(conn, "EnableOnlineOrders", chkEnableOnlineOrders.Checked ? "true" : "false");
+                UpsertSetting(conn, "EnableCustomerDisplay", chkCustomerDisplay.Checked ? "true" : "false");
+                UpsertSetting(conn, "CloudApiUrl", txtCloudApiUrl.Text);
+            }
 
             foreach (var kv in newValues)
             {
@@ -454,15 +465,11 @@ public partial class SettingsForm : Form
             cy += 42;
             btnSyncLog = MakeBtn("\uD83D\uDCCB VIEW SYNC LOG", btnX, cy, accentBlue, btnSyncLog_Click);
             var desc4 = MakeDesc("View history of all sync operations and any errors", descX, cy);
-            cy += 42;
-            btnUpdate = MakeBtn("\u2B07 UPDATE APP", btnX, cy, Color.FromArgb(155, 89, 182), btnUpdate_Click);
-            var desc5 = MakeDesc($"Check GitHub for new version (current: v{AppVersion.Current})", descX, cy);
-
-            MakeSection("CLOUD SYNC", 392, new Control[] {
+            MakeSection("CLOUD SYNC", 350, new Control[] {
                 lblCloudApi, txtCloudApiUrl, lblStoreIdLabel, lblStoreId,
                 lblStoreNameLabel, txtStoreName,
                 btnSyncAll, desc1, btnSyncToday, desc2, btnSyncFromCloud, desc3,
-                btnUpdateMaster, descUpdate, btnSyncLog, desc4, btnUpdate, desc5
+                btnUpdateMaster, descUpdate, btnSyncLog, desc4
             });
         }
 
@@ -663,6 +670,21 @@ public partial class SettingsForm : Form
             });
         }
 
+        // ═══════════════════════════════════════════
+        // 7. APP UPDATE (all users)
+        // ═══════════════════════════════════════════
+        {
+            var uy = 40;
+            var btnX = 15;
+            var btnW = 210;
+            var descX = btnX + btnW + 10;
+
+            btnUpdate = MakeBtn("\u2B07 UPDATE APP", btnX, uy, Color.FromArgb(155, 89, 182), btnUpdate_Click);
+            var desc = MakeDesc($"Check GitHub for new version (current: v{AppVersion.Current})", descX, uy);
+
+            MakeSection("APP UPDATE", 85, new Control[] { btnUpdate, desc });
+        }
+
         Controls.AddRange(new Control[] { pnlToolbar, _pnlScroll });
     }
 
@@ -835,7 +857,7 @@ public partial class SettingsForm : Form
         ShowUpdateProgress(version ?? "", downloadUrl ?? "");
     }
 
-    private static void ShowUpdateProgress(string version, string downloadUrl)
+    internal static void ShowUpdateProgress(string version, string downloadUrl)
     {
         var form = new Form
         {

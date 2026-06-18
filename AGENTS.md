@@ -26,7 +26,7 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 │   ├── ExpenseService.cs       # Expense CRUD
 │   ├── DataExporter.cs         # Import/Export JSON
 │   ├── MigrationService.cs     # Old DB migration tool
-│       ├── AppVersion.cs           # Current = "1.0.30"
+│       ├── AppVersion.cs           # Current = "1.0.45"
 │   └── ... (PrinterService, EmailService, etc.)
 ├── Forms/
 │   ├── MainForm.cs             # Sidebar navigation (POS, Products, Reports, Settings...)
@@ -57,15 +57,17 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
     ├── v1.0.24/  (exe)
     ├── v1.0.26/  (exe)
     ├── v1.0.27/  (exe)
-    └── v1.0.28/  (exe)
-    └── v1.0.29/  (exe)
-    └── v1.0.30/  (exe)
-    └── v1.0.31/  (exe)
-    └── v1.0.32/  (exe)
-    └── v1.0.33/  (exe)
-    └── v1.0.34/  (exe)
-    └── v1.0.35/  (exe)
-    └── v1.0.36/  (exe) — current
+    ├── v1.0.28/  (exe)
+    ├── v1.0.29/  (exe)
+    ├── v1.0.30/  (exe)
+    ├── v1.0.31/  (exe)
+    ├── v1.0.32/  (exe)
+    ├── v1.0.33/  (exe)
+    ├── v1.0.34/  (exe)
+    ├── v1.0.35/  (exe)
+    ├── v1.0.36/  (exe)
+    ├── v1.0.44/  (exe)
+    └── v1.0.45/  (exe) — current
 ```
 
 ## Tech Stack
@@ -387,17 +389,49 @@ Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operationa
 
 **Impact:** Cloud dashboard now correctly reflects voided sales, stock trail records, and credit balance reversals in real-time. Existing voided sales corrected by running SYNC ALL after update. Void Logs panel lets you see exactly what item was voided and why.
 
-## Current App Behavior
+### Change History
+
+### v1.0.45 — Email Error Propagation + Product Deletion Sync + Master Cleanup
+
+#### Email Fix
+| File | Change |
+|---|---|
+| `Services/EmailService.cs:182-188` | `SendEndShiftReport()` now returns actual SMTP error instead of always `null` — UI now shows failure message. Falls back to queue on error. |
+| `Forms/MainForm.cs:139-168` | `SendScheduledReport()` no longer silently catches all exceptions — logs failures to `scheduled_report_errors.log` |
+
+#### Product Deletion Sync
+| File | Change |
+|---|---|
+| `Services/ProductService.cs:325-362` | `Delete()` now calls `SyncService.SyncProduct()` with `IsActive=false` after soft-delete, so cloud API per-store `products` table is updated |
+| `Services/SyncService.cs:466-563` | `DownloadMasterCatalog()` now deactivates local `SourceId='master'` products whose IDs weren't in cloud response — cleans up products deleted from master catalog |
+| `Forms/ProductsForm.cs:720` | DELETE button visible for Admin users (`_currentUser?.Role == "Admin"`) |
+
+**Impact:** Deleting a product locally now syncs to cloud. Running SYNC FROM CLOUD removes locally orphaned products deleted from master catalog. Delete button available for Admin. End shift email errors are now visible.
+
+### v1.0.46 — End Shift Credit Payment Totals Fix
+
+| File | Change |
+|---|---|
+| `Services/AppVersion.cs` | `Current` bumped to `"1.0.46"` |
+| `Services/DailyCloseService.cs:86,96` | Fixed `GetShiftTotals()` credit payment queries: changed `Description LIKE 'CREDIT_PAY_CASH\|%'` → `PaymentMethod = 'Cash'` and `'CREDIT_PAY_EWALLET\|%'` → `PaymentMethod = 'E-Wallet'` — the old description patterns never matched the actual stored descriptions (`"Payment - Cash \| ..."`) |
+| `Services/DailyCloseService.cs:231-248,309-328` | Fixed `GetCreditCustomersSinceLastClose()` and `GetCreditCustomersBetween()`: replaced `s.GrandTotal` with `COALESCE(SUM(si.TotalPrice), 0)` joining `SaleItems` with `si.IsVoided = 0` — the old query showed the original sale total even when items were voided. Now shows only non-voided item totals. |
+
+**Impact:** End Shift now correctly includes cash and e-wallet credit payments in the difference calculation. Previously `_creditPayCash` and `_creditPayEWallet` were always 0, inflating the shift difference by the amount of credit payments received during the shift. Credit customer list now shows only non-voided items' totals instead of the full sale `GrandTotal` — customer debt reflects voided/refunded items correctly.
+
+---
+
+# Current App Behavior
 
 ### Products Page
-| Feature | Any User |
-|---|---|
-| View product list | ✅ (78% width, name auto-fills) |
-| View product details (right panel) | ✅ (read-only, 22% width) |
-| CHECK COST | ✅ |
-| VIEW STOCK MOV'T | ✅ (TYPE column: Sale/Receiving/Void/Adjustment) |
-| DOWNLOAD MASTER | ✅ (with progress popup) |
-| + NEW / EDIT / UNITS / DELETE / SAVE / CANCEL | ❌ hidden for ALL |
+| Feature | Any User | Admin |
+|---|---|---|
+| View product list | ✅ (78% width, name auto-fills) | ✅ |
+| View product details (right panel) | ✅ (read-only, 22% width) | ✅ |
+| CHECK COST | ✅ | ✅ |
+| VIEW STOCK MOV'T | ✅ (TYPE column: Sale/Receiving/Void/Adjustment) | ✅ |
+| UPDATE MASTER | ✅ (incremental, all users) | ✅ |
+| DELETE | ❌ hidden | ❌ hidden |
+| NEW / EDIT / UNITS / SAVE / CANCEL | ❌ hidden for ALL | ❌ hidden for ALL |
 
 ### Settings Page
 | Button | Description | Progress |

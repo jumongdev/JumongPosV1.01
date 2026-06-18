@@ -54,10 +54,21 @@ public partial class MainForm : Form
         catch { }
         if (showDisplay) _customerDisplay.Show();
 
+        try
+        {
+            using var conn3 = DatabaseHelper.GetConnection();
+            conn3.Open();
+            using var cmd3 = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'EnableOnlineOrders'", conn3);
+            btnOnlineOrders.Visible = cmd3.ExecuteScalar()?.ToString() != "false";
+        }
+        catch { }
+        LayoutMenuButtons();
+
         StartEmailScheduler();
         StartSyncRetry();
-        StartTransferPoll();
+        if (btnOnlineOrders.Visible) StartTransferPoll();
         DebugHelper.AddFormLabel(this);
+        Load += (_, _) => LayoutMenuButtons();
     }
 
     private void StartSyncRetry()
@@ -324,7 +335,26 @@ public partial class MainForm : Form
         btnLogout = CreateMenuButton("Logout", 0, 725, btnLogout_Click, Color.FromArgb(50, 35, 35), Color.FromArgb(231, 76, 60), Color.FromArgb(70, 45, 45));
 
         Controls.AddRange(new Control[] { title, userInfo, divider, btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnOnlineOrders, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout });
+
+        _menuButtons = new Button[] { btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnOnlineOrders, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout };
+        LayoutMenuButtons();
     }
+
+    private void LayoutMenuButtons()
+    {
+        var y = 120;
+        var step = 55;
+        foreach (var btn in _menuButtons)
+        {
+            if (btn.Visible)
+            {
+                btn.Location = new Point(60, y);
+                y += step;
+            }
+        }
+    }
+
+    private Button[] _menuButtons = null!;
 
     private Button CreateMenuButton(string text, int x, int y, EventHandler click, Color bg, Color fg, Color hoverBg)
     {

@@ -54,11 +54,11 @@ static class Program
             return;
         }
 
-        Application.ThreadException += (_, e) => SendErrorEmail(e.Exception);
+        Application.ThreadException += (_, e) => { LogCrash(e.Exception); SendErrorEmail(e.Exception); };
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {
             if (e.ExceptionObject is Exception ex)
-                SendErrorEmail(ex);
+            { LogCrash(ex); SendErrorEmail(ex); }
         };
 
         EmailService.FlushQueue();
@@ -67,7 +67,40 @@ static class Program
         if (login.ShowDialog() != DialogResult.OK)
             return;
 
-        Application.Run(new MainForm(login.CurrentUser!));
+        try
+        {
+            Application.Run(new MainForm(login.CurrentUser!));
+        }
+        catch (Exception ex)
+        {
+            LogCrash(ex);
+            MessageBox.Show($"Application error:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    static void LogCrash(Exception ex)
+    {
+        try
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "crash.log");
+            var lines = new List<string>
+            {
+                $"=== Crash at {TimeHelper.Now:yyyy-MM-dd HH:mm:ss} ===",
+                $"Machine: {Environment.MachineName}",
+                $"Version: v{AppVersion.Current}",
+                $"Type: {ex.GetType().FullName}",
+                $"Message: {ex.Message}",
+                $"Stack: {ex.StackTrace}",
+            };
+            if (ex.InnerException != null)
+            {
+                lines.Add($"Inner: {ex.InnerException.GetType().FullName}: {ex.InnerException.Message}");
+                lines.Add($"Inner Stack: {ex.InnerException.StackTrace}");
+            }
+            lines.Add("");
+            File.AppendAllText(logPath, string.Join(Environment.NewLine, lines));
+        }
+        catch { }
     }
 
     static void AutoBackup()

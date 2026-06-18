@@ -19,6 +19,8 @@ public partial class SalesForm : Form
     private System.Windows.Forms.Timer _barcodeTimer = null!;
     private decimal _discountPercent;
     private decimal _taxRate;
+    private Label _lblUpdateBanner = null!;
+    private Label _lblMasterBanner = null!;
 
     private static readonly Color CTopbar      = Color.FromArgb(26, 26, 46);
     private static readonly Color CTopbarChip  = Color.FromArgb(37, 37, 64);
@@ -119,6 +121,42 @@ public partial class SalesForm : Form
         Location = screen.WorkingArea.Location;
         if (!_skipOrderTypePrompt)
             PromptNextTransaction();
+
+        _ = CheckForUpdatesAsync();
+    }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        try
+        {
+            var (available, _, _, _) = await UpdateService.CheckUpdate();
+            if (available && !IsDisposed)
+            {
+                BeginInvoke(() =>
+                {
+                    _lblUpdateBanner.Text = "UPDATE AVAILABLE";
+                    _lblUpdateBanner.Visible = true;
+                    ResizeTopbar();
+                });
+            }
+        }
+        catch { }
+
+        try
+        {
+            var count = await SyncService.CountPendingMasterUpdates();
+            if (count > 0 && !IsDisposed)
+            {
+                BeginInvoke(() =>
+                {
+                    _lblMasterBanner.Text = $"MASTER: {count} NEW";
+                    _lblMasterBanner.Tag = count;
+                    _lblMasterBanner.Visible = true;
+                    ResizeTopbar();
+                });
+            }
+        }
+        catch { }
     }
 
     private bool _skipOrderTypePrompt;
@@ -987,7 +1025,49 @@ public partial class SalesForm : Form
         };
         btnDisplay.Click += (_, _) => ToggleCustomerDisplay();
 
-        _pnlTopbar.Controls.AddRange(new Control[] { lblBrand, _pnlCashierChip, _lblTime, btnDisplay });
+        _lblUpdateBanner = new Label
+        {
+            Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = Color.FromArgb(231, 76, 60),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Cursor = Cursors.Hand,
+            Visible = false,
+            Padding = new Padding(6, 0, 6, 0)
+        };
+        _lblUpdateBanner.Click += async (_, _) =>
+        {
+            var (available, version, _, downloadUrl) = await UpdateService.CheckUpdate();
+            if (!available || string.IsNullOrEmpty(downloadUrl)) return;
+            var result = MessageBox.Show($"New version {version} available!\n\nDownload and install update?", "Update Available", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (result == DialogResult.Yes)
+                SettingsForm.ShowUpdateProgress(version ?? "", downloadUrl);
+        };
+
+        _lblMasterBanner = new Label
+        {
+            Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = Color.FromArgb(243, 156, 18),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Cursor = Cursors.Hand,
+            Visible = false,
+            Padding = new Padding(6, 0, 6, 0)
+        };
+        _lblMasterBanner.Click += async (_, _) =>
+        {
+            if (_lblMasterBanner.Tag is int count && count > 0)
+            {
+                var result = MessageBox.Show($"There are {count} new/updated products available.\nRun 'Update Master Catalog' now?", "Master Catalog", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (result == DialogResult.Yes)
+                {
+                    _lblMasterBanner.Visible = false;
+                    await SyncService.DownloadUpdatedMasterCatalog();
+                }
+            }
+        };
+
+        _pnlTopbar.Controls.AddRange(new Control[] { lblBrand, _pnlCashierChip, _lblUpdateBanner, _lblMasterBanner, _lblTime, btnDisplay });
 
         _pnlCustomerBar = new Panel { BackColor = CCard };
         _pnlCustomerBar.Paint += (s, e) =>
@@ -1394,8 +1474,10 @@ public partial class SalesForm : Form
         _lblTime.Text     = TimeHelper.Now.ToString("MMM dd, yyyy  h:mm tt");
         _lblTime.Location = new Point(w - 310, 0);
         _lblTime.Size     = new Size(190, topH);
-        tbControls[3].Location = new Point(w - 110, 10);
-        tbControls[3].Size     = new Size(90, 24);
+        tbControls[5].Location = new Point(w - 110, 10);
+        tbControls[5].Size     = new Size(90, 24);
+
+        ResizeTopbar();
 
         _pnlCustomerBar.Location = new Point(0, topH);
         _pnlCustomerBar.Size     = new Size(leftW, custH);
@@ -1483,6 +1565,23 @@ public partial class SalesForm : Form
         rcs[7].Location = new Point(m + pw / 2, ry); rcs[7].Size = new Size(pw / 2, 22); ry += 26;
         rcs[8].Location = new Point(m, ry);        rcs[8].Size = new Size(pw, 1); ry += 16;
         btnPay.Location = new Point(m, ry);       btnPay.Size = new Size(pw, 52);
+    }
+
+    private void ResizeTopbar()
+    {
+        var tbControls = _pnlTopbar.Controls;
+        var bannerX = 330;
+        if (_lblUpdateBanner.Visible)
+        {
+            _lblUpdateBanner.Location = new Point(bannerX, 8);
+            _lblUpdateBanner.Size = new Size(140, 28);
+            bannerX += 148;
+        }
+        if (_lblMasterBanner.Visible)
+        {
+            _lblMasterBanner.Location = new Point(bannerX, 8);
+            _lblMasterBanner.Size = new Size(150, 28);
+        }
     }
 
     private Panel _pnlTopbar = null!;
