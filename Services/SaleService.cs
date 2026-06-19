@@ -551,9 +551,11 @@ public class SaleService
             restock.Parameters.AddWithValue("@pid", productId);
             restock.ExecuteNonQuery();
 
+            var now = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
             using var trail = new SQLiteCommand(
-                "INSERT INTO StockTrail (ProductId, ProductName, Barcode, QuantityAdded, StockBefore, StockAfter, Reference, UserId, UserName, InvoiceNo, CustomerName) " +
-                "VALUES (@pid, @pn, @bc, @qa, @sb, @sa, @ref, @uid, @un, @inv, @cust)", conn);
+                "INSERT INTO StockTrail (ProductId, ProductName, Barcode, QuantityAdded, StockBefore, StockAfter, Reference, UserId, UserName, InvoiceNo, CustomerName, CreatedAt) " +
+                "VALUES (@pid, @pn, @bc, @qa, @sb, @sa, @ref, @uid, @un, @inv, @cust, @ca)", conn);
             trail.Parameters.AddWithValue("@pid", productId);
             trail.Parameters.AddWithValue("@pn", productName);
             trail.Parameters.AddWithValue("@bc", barcode);
@@ -565,11 +567,13 @@ public class SaleService
             trail.Parameters.AddWithValue("@un", voidedByUserName);
             trail.Parameters.AddWithValue("@inv", invoiceNo);
             trail.Parameters.AddWithValue("@cust", "");
+            trail.Parameters.AddWithValue("@ca", now);
             trail.ExecuteNonQuery();
 
             var log = new SQLiteCommand(
-                "INSERT INTO VoidLog (SaleId, SaleItemId, Action, Reason, InvoiceNo, ProductName, Quantity, Amount, UserId, UserName) " +
-                "VALUES (@sid, @siid, 'VoidItem', @r, @inv, @pn, @qty, @amt, @uid, @uname)", conn);
+                "INSERT INTO VoidLog (SaleId, SaleItemId, Action, Reason, InvoiceNo, ProductName, Quantity, Amount, UserId, UserName, CreatedAt) " +
+                "VALUES (@sid, @siid, 'VoidItem', @r, @inv, @pn, @qty, @amt, @uid, @uname, @ca)", conn);
+            log.Parameters.AddWithValue("@ca", now);
             log.Parameters.AddWithValue("@sid", saleId);
             log.Parameters.AddWithValue("@siid", itemId);
             log.Parameters.AddWithValue("@r", reason);
@@ -608,8 +612,8 @@ public class SaleService
             }
 
             trans.Commit();
-            _ = SyncService.SyncVoidLog(new VoidLog { SaleId = saleId, SaleItemId = itemId, Action = "VoidItem", Reason = reason, InvoiceNo = invoiceNo, ProductName = productName, Quantity = qty, Amount = total, UserId = voidedByUserId, UserName = voidedByUserName, CreatedAt = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss") });
-            _ = SyncService.SyncStockTrail(new StockTrail { ProductId = productId, ProductName = productName, Barcode = barcode, QuantityAdded = restockQty, StockBefore = stockBefore, StockAfter = stockBefore + restockQty, Reference = $"{invoiceNo} - void ({reason})", UserId = userId, UserName = voidedByUserName, InvoiceNo = invoiceNo, CustomerName = "", CreatedAt = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss") });
+            _ = SyncService.SyncVoidLog(new VoidLog { SaleId = saleId, SaleItemId = itemId, Action = "VoidItem", Reason = reason, InvoiceNo = invoiceNo, ProductName = productName, Quantity = qty, Amount = total, UserId = voidedByUserId, UserName = voidedByUserName, CreatedAt = now });
+            _ = SyncService.SyncStockTrail(new StockTrail { ProductId = productId, ProductName = productName, Barcode = barcode, QuantityAdded = restockQty, StockBefore = stockBefore, StockAfter = stockBefore + restockQty, Reference = $"{invoiceNo} - void ({reason})", UserId = userId, UserName = voidedByUserName, InvoiceNo = invoiceNo, CustomerName = "", CreatedAt = now });
             // Re-sync the sale so cloud knows which items are voided
             try
             {

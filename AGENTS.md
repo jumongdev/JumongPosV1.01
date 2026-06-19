@@ -428,6 +428,17 @@ Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operationa
 
 **Impact:** Changing a product's barcode in the cloud master catalog and running UPDATE MASTER or SYNC FROM CLOUD now correctly updates the barcode in the local database. Previously the barcode was parsed from cloud JSON but never written during updates (only on new product inserts).
 
+### v1.0.49 — Consistent Timestamps for Stock Trail & Void Log Inserts
+
+| File | Change |
+|---|---|
+| `Services/AppVersion.cs` | `Current` bumped to `"1.0.49"` |
+| `Services/StockService.cs:72-73,80-93,96` | `ConfirmReceiving()` now explicitly sets `CreatedAt = TimeHelper.Now` in INSERT (was relying on SQLite `datetime('now','localtime')` which uses machine OS timezone). Sync reuses same `now` variable. |
+| `Forms/StockMovementForm.cs:273-275,292` | Adjustment INSERT now explicitly sets `CreatedAt = TimeHelper.Now`. Sync reuses same `now` variable. |
+| `Services/SaleService.cs:554-568,570-581,615-616` | VoidItem stock trail and void log INSERTs now explicitly set `CreatedAt = TimeHelper.Now`. Sync calls reuse same `now` variable. |
+
+**Impact:** Fixes time discrepancy between local display and cloud dashboard for stock receiving, adjustments, and void stock trails. Previously these records used SQLite's `datetime('now','localtime')` (machine OS timezone) for local storage but `TimeHelper.Now` (UTC+8 configured offset) for cloud sync. If the machine's OS timezone differed from the configured AppTimezone (+08:00), local and cloud timestamps would differ. Sales were already consistent because SaleService explicitly set `SaleDate` from the same source.
+
 ### v1.0.47 — Reports Role Access, Settings Crash Fix, POS Banners, Online Orders Toggle
 
 | File | Change |

@@ -70,6 +70,7 @@ public class StockService
             foreach (var (productId, productName, barcode, stockBefore, qty) in items)
             {
                 var stockAfter = stockBefore + qty;
+                var now = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
                 using var upd = new SQLiteCommand("UPDATE Products SET StockQty = @new WHERE Id = @id", conn);
                 upd.Parameters.AddWithValue("@new", stockAfter);
@@ -77,8 +78,8 @@ public class StockService
                 upd.ExecuteNonQuery();
 
                 using var ins = new SQLiteCommand(@"
-                    INSERT INTO StockTrail (ProductId, ProductName, Barcode, QuantityAdded, StockBefore, StockAfter, Reference, UserId, UserName, InvoiceNo, CustomerName)
-                    VALUES (@pid, @pn, @bc, @qa, @sb, @sa, @ref, @uid, @un, '', '')", conn);
+                    INSERT INTO StockTrail (ProductId, ProductName, Barcode, QuantityAdded, StockBefore, StockAfter, Reference, UserId, UserName, InvoiceNo, CustomerName, CreatedAt)
+                    VALUES (@pid, @pn, @bc, @qa, @sb, @sa, @ref, @uid, @un, '', '', @ca)", conn);
                 ins.Parameters.AddWithValue("@pid", productId);
                 ins.Parameters.AddWithValue("@pn", productName);
                 ins.Parameters.AddWithValue("@bc", barcode);
@@ -88,10 +89,11 @@ public class StockService
                 ins.Parameters.AddWithValue("@ref", reference);
                 ins.Parameters.AddWithValue("@uid", userId);
                 ins.Parameters.AddWithValue("@un", userName);
+                ins.Parameters.AddWithValue("@ca", now);
                 ins.ExecuteNonQuery();
                 using var idCmd = new SQLiteCommand("SELECT last_insert_rowid()", conn);
                 var trailId = Convert.ToInt32(idCmd.ExecuteScalar());
-                _ = SyncService.SyncStockTrail(new StockTrail { Id = trailId, ProductId = productId, ProductName = productName, Barcode = barcode, QuantityAdded = qty, StockBefore = stockBefore, StockAfter = stockAfter, Reference = reference, UserId = userId, UserName = userName, CreatedAt = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss") });
+                _ = SyncService.SyncStockTrail(new StockTrail { Id = trailId, ProductId = productId, ProductName = productName, Barcode = barcode, QuantityAdded = qty, StockBefore = stockBefore, StockAfter = stockAfter, Reference = reference, UserId = userId, UserName = userName, CreatedAt = now });
                 _ = SyncService.SyncProduct(ProductService.GetById(productId));
 
                 // Also update PostgreSQL stock

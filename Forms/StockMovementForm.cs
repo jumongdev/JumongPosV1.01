@@ -270,9 +270,11 @@ public partial class StockMovementForm : Form
             upd.Parameters.AddWithValue("@id", _product.Id);
             upd.ExecuteNonQuery();
 
+            var now = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
             using var ins = new SQLiteCommand(
-                "INSERT INTO StockTrail (ProductId, ProductName, Barcode, QuantityAdded, StockBefore, StockAfter, Reference, UserId, UserName) " +
-                "VALUES (@pid, @pn, @bc, @qa, @sb, @sa, @ref, @uid, @un)", conn);
+                "INSERT INTO StockTrail (ProductId, ProductName, Barcode, QuantityAdded, StockBefore, StockAfter, Reference, UserId, UserName, CreatedAt) " +
+                "VALUES (@pid, @pn, @bc, @qa, @sb, @sa, @ref, @uid, @un, @ca)", conn);
             ins.Parameters.AddWithValue("@pid", _product.Id);
             ins.Parameters.AddWithValue("@pn", _product.Name);
             ins.Parameters.AddWithValue("@bc", _product.Barcode);
@@ -282,6 +284,7 @@ public partial class StockMovementForm : Form
             ins.Parameters.AddWithValue("@ref", $"Adjustment: {reason}");
             ins.Parameters.AddWithValue("@uid", _currentUser?.Id ?? 0);
             ins.Parameters.AddWithValue("@un", userName);
+            ins.Parameters.AddWithValue("@ca", now);
             ins.ExecuteNonQuery();
 
             using var idCmd = new SQLiteCommand("SELECT last_insert_rowid()", conn);
@@ -289,7 +292,7 @@ public partial class StockMovementForm : Form
 
             tx.Commit();
 
-            _ = SyncService.SyncStockTrail(new StockTrail { Id = trailId, ProductId = _product.Id, ProductName = _product.Name, Barcode = _product.Barcode, QuantityAdded = qty, StockBefore = stockBefore, StockAfter = stockAfter, Reference = $"Adjustment: {reason}", UserId = _currentUser?.Id ?? 0, UserName = userName, CreatedAt = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss") });
+            _ = SyncService.SyncStockTrail(new StockTrail { Id = trailId, ProductId = _product.Id, ProductName = _product.Name, Barcode = _product.Barcode, QuantityAdded = qty, StockBefore = stockBefore, StockAfter = stockAfter, Reference = $"Adjustment: {reason}", UserId = _currentUser?.Id ?? 0, UserName = userName, CreatedAt = now });
             _ = SyncService.SyncProduct(ProductService.GetById(_product.Id)!);
 
             _product.StockQty = stockAfter;

@@ -63,7 +63,8 @@ public class EmailService
         var company = GetSetting(conn, "CompanyName") ?? "JUMONG POS";
         var address = GetSetting(conn, "CompanyAddress") ?? "";
         var mobile = GetSetting(conn, "CompanyMobile") ?? "";
-        var expectedCash = totalCash - totalExpenses;
+        var creditPayCash = creditPayments.Where(cp => cp.PaymentMethod == "Cash").Sum(cp => cp.Amount);
+        var expectedCash = totalCash - totalExpenses + creditPayCash;
 
         var html = $@"
 <html>
