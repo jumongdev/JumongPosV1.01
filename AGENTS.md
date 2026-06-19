@@ -26,7 +26,7 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 │   ├── ExpenseService.cs       # Expense CRUD
 │   ├── DataExporter.cs         # Import/Export JSON
 │   ├── MigrationService.cs     # Old DB migration tool
-│       ├── AppVersion.cs           # Current = "1.0.45"
+│       ├── AppVersion.cs           # Current = "1.0.48"
 │   └── ... (PrinterService, EmailService, etc.)
 ├── Forms/
 │   ├── MainForm.cs             # Sidebar navigation (POS, Products, Reports, Settings...)
@@ -67,7 +67,8 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
     ├── v1.0.35/  (exe)
     ├── v1.0.36/  (exe)
     ├── v1.0.44/  (exe)
-    └── v1.0.45/  (exe) — current
+    ├── v1.0.45/  (exe)
+    └── v1.0.48/  (exe) — current
 ```
 
 ## Tech Stack
@@ -418,6 +419,31 @@ Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operationa
 
 **Impact:** End Shift now correctly includes cash and e-wallet credit payments in the difference calculation. Previously `_creditPayCash` and `_creditPayEWallet` were always 0, inflating the shift difference by the amount of credit payments received during the shift. Credit customer list now shows only non-voided items' totals instead of the full sale `GrandTotal` — customer debt reflects voided/refunded items correctly.
 
+### v1.0.48 — Barcode Sync Fix for Master Catalog Update
+
+| File | Change |
+|---|---|
+| `Services/AppVersion.cs` | `Current` bumped to `"1.0.48"` |
+| `Services/SyncService.cs:511,663` | Added `Barcode=@b` to UPDATE SQL in both `DownloadMasterCatalog()` and `ProcessProducts()` — barcode changes from cloud master now sync to local client |
+
+**Impact:** Changing a product's barcode in the cloud master catalog and running UPDATE MASTER or SYNC FROM CLOUD now correctly updates the barcode in the local database. Previously the barcode was parsed from cloud JSON but never written during updates (only on new product inserts).
+
+### v1.0.47 — Reports Role Access, Settings Crash Fix, POS Banners, Online Orders Toggle
+
+| File | Change |
+|---|---|
+| `Services/AppVersion.cs` | `Current` bumped to `"1.0.47"` |
+| `Forms/ReportsForm.cs` | Redesigned: single date picker (not range), cashier grid empty until Enter pressed in invoice search, admin auto-loads with metrics bar (transaction count + total sales) |
+| `Forms/SettingsForm.cs:53-94,123-166` | Admin-only controls (`cmbPosScreen`, `cmbCustomerScreen`) wrapped in `if Admin` in `LoadSettings()` and `btnSave_Click()` — fixes NullReferenceException for cashier |
+| `Forms/SettingsForm.cs:682-692` | Added APP UPDATE section at bottom, visible to all users (was admin-only) |
+| `Forms/SalesForm.cs:115-155,990-1027` | Added red "UPDATE AVAILABLE" and orange "MASTER: X NEW" banners in topbar with click handlers, checked async on load |
+| `Services/SyncService.cs:610-630` | Added `CountPendingMasterUpdates()` lightweight HTTP check for banner |
+| `Forms/MainForm.cs:57-66,342-370` | `btnOnlineOrders.Visible` controlled by `EnableOnlineOrders` setting; `LayoutMenuButtons()` stacks visible buttons sequentially removing gaps; called on constructor, after visibility changes, and on `Load` event |
+| `Data/DatabaseHelper.cs` | Added `EnableOnlineOrders` setting seed (default `True`) |
+| `Services/AppVersion.cs` | Changed `LatestVersion` GitHub URL to `raw.githubusercontent.com` |
+
+**Impact:** Cashier can now open Settings without crash — only RECEIPT SETUP and APP UPDATE sections visible. Reports form simplified for both roles. POS now shows update/master catalog banner alerts. Online Orders button can be hidden via Settings → DISPLAY SETUP. Menu buttons no longer have gaps when some are hidden.
+
 ---
 
 # Current App Behavior
@@ -430,7 +456,7 @@ Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operationa
 | CHECK COST | ✅ | ✅ |
 | VIEW STOCK MOV'T | ✅ (TYPE column: Sale/Receiving/Void/Adjustment) | ✅ |
 | UPDATE MASTER | ✅ (incremental, all users) | ✅ |
-| DELETE | ❌ hidden | ❌ hidden |
+| DELETE | ❌ hidden | ✅ (Admin only) |
 | NEW / EDIT / UNITS / SAVE / CANCEL | ❌ hidden for ALL | ❌ hidden for ALL |
 
 ### Settings Page
@@ -440,7 +466,7 @@ Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operationa
 | SYNC TODAY ONLY | Upload today's unsynced data (SQL-level filter, skips synced) | ✅ Non-modal popup |
 | SYNC FROM CLOUD | Download master catalog (stock unchanged) | ✅ Non-modal popup |
 | VIEW SYNC LOG | History of sync operations | — |
-| UPDATE APP | Check GitHub for new version | — |
+| UPDATE APP | Check GitHub for new version (all users) | — |
 
 ### Stock Movement / Receiving
 | Feature | Detail |
@@ -489,3 +515,4 @@ Use a temp .NET project with Npgsql. Add machine IP to firewall first:
 5. **All timestamps** send raw local time string (no offset) — cloud `SET TIMEZONE TO 'Asia/Manila'` handles conversion
 6. **Profit queries** in cloud API fallback to `p.cost` when `sale_items.unit_cost = 0`
 7. **Sync progress** shown via non-modal popup — user can continue working while syncing
+8. **Local DB StoreId must be set to `STORE-DEV-0001` during development/testing** to prevent accidental cloud sync contamination of customer's production data

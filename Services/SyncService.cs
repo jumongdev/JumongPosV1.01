@@ -508,8 +508,9 @@ public static class SyncService
                 {
                     var imageData = p.TryGetProperty("imageData", out var img) ? img.GetString() : null;
                     // Update existing product
-                    using var upd = new SQLiteCommand("UPDATE Products SET Name=@n, Category=@c, Price=@p, Cost=@co, image_data=@img, ModifiedBy='cloud' WHERE Id=@id", conn);
+                    using var upd = new SQLiteCommand("UPDATE Products SET Name=@n, Barcode=@b, Category=@c, Price=@p, Cost=@co, image_data=@img, ModifiedBy='cloud' WHERE Id=@id", conn);
                     upd.Parameters.AddWithValue("@n", name);
+                    upd.Parameters.AddWithValue("@b", (object?)barcode ?? DBNull.Value);
                     upd.Parameters.AddWithValue("@c", category ?? "");
                     upd.Parameters.AddWithValue("@p", price);
                     upd.Parameters.AddWithValue("@co", cost);
@@ -660,8 +661,9 @@ public static class SyncService
             if (existingId > 0)
             {
                 var imageData = p.TryGetProperty("imageData", out var img) ? img.GetString() : null;
-                using var upd = new SQLiteCommand("UPDATE Products SET Name=@n, Category=@c, Price=@p, Cost=@co, image_data=@img, ModifiedBy='cloud' WHERE Id=@id", conn);
+                using var upd = new SQLiteCommand("UPDATE Products SET Name=@n, Barcode=@b, Category=@c, Price=@p, Cost=@co, image_data=@img, ModifiedBy='cloud' WHERE Id=@id", conn);
                 upd.Parameters.AddWithValue("@n", name);
+                upd.Parameters.AddWithValue("@b", (object?)barcode ?? DBNull.Value);
                 upd.Parameters.AddWithValue("@c", category ?? "");
                 upd.Parameters.AddWithValue("@p", price);
                 upd.Parameters.AddWithValue("@co", cost);
