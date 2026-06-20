@@ -716,6 +716,36 @@ public class DashboardController : ControllerBase
             return Ok(new { @fixed = total, message = $"Fixed {total} records across both stores — added 8h to timestamps" });
         }
 
+        [HttpGet("fix-stock-trails-after-jun14")]
+        public IActionResult FixStockTrailsAfterJun14()
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            var total = 0;
+            // HVR and HQ machines have UTC clocks but PH timezone configured.
+            // Before v1.0.49 desktop fix, stock trails used SQLite datetime('now','localtime')
+            // which stored UTC time. Sync then appended +08:00 offset, turning UTC time into
+            // a wrong +08:00 time. This fix adds 8 hours to timestamps that are clearly off
+            // (stored < 08:00 AM UTC would mean actual time was between 8AM-4PM Manila time).
+            // Only targets records with hour < 8 (likely wrong UTC-based timestamps).
+            cmd.CommandText = @"
+                UPDATE stock_trails SET created_at = created_at + INTERVAL '8 hours'
+                WHERE store_id IN ('STORE-20260602-AA36','STORE-20260602-7159')
+                  AND EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Manila') < 8";
+            total += cmd.ExecuteNonQuery();
+            cmd.CommandText = @"
+                UPDATE void_logs SET created_at = created_at + INTERVAL '8 hours'
+                WHERE store_id IN ('STORE-20260602-AA36','STORE-20260602-7159')
+                  AND EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Manila') < 8";
+            total += cmd.ExecuteNonQuery();
+            cmd.CommandText = @"
+                UPDATE credit_transactions SET created_at = created_at + INTERVAL '8 hours'
+                WHERE store_id IN ('STORE-20260602-AA36','STORE-20260602-7159')
+                  AND EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Manila') < 8";
+            total += cmd.ExecuteNonQuery();
+            return Ok(new { @fixed = total, message = $"Fixed {total} records across both stores — added 8h to timestamps where Manila hour < 8" });
+        }
+
         [HttpGet("products/master")]
         public IActionResult GetMasterProducts()
         {
