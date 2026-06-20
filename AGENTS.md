@@ -439,6 +439,15 @@ Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operationa
 
 **Impact:** Fixes time discrepancy between local display and cloud dashboard for stock receiving, adjustments, and void stock trails. Previously these records used SQLite's `datetime('now','localtime')` (machine OS timezone) for local storage but `TimeHelper.Now` (UTC+8 configured offset) for cloud sync. If the machine's OS timezone differed from the configured AppTimezone (+08:00), local and cloud timestamps would differ. Sales were already consistent because SaleService explicitly set `SaleDate` from the same source.
 
+### v1.0.50 — Product List Unit Display + Stock Trail Timestamp Backfill
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/index.html:788-801` | Product list "Units" column now shows each unit's name, price, and default marker (`*`) inline instead of just the unit count. Products without units show `—`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:675-717` | Added `GET /fix-stock-trails-after-jun14` endpoint — backfills stock_trails, void_logs, and credit_transactions where Manila hour < 8 (wrong UTC-based timestamps from pre-v1.0.49 data) by adding 8 hours. |
+
+**Impact:** Dashboard product list now shows unit prices at a glance for price verification. Old stock trail/void/credit records with wrong timestamps (off by 8 hours) can be fixed by hitting the fix endpoint.
+
 ### v1.0.47 — Reports Role Access, Settings Crash Fix, POS Banners, Online Orders Toggle
 
 | File | Change |
