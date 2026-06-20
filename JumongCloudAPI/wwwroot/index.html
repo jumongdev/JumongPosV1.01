@@ -788,9 +788,17 @@ async function loadMasterProducts(){
     document.getElementById('masterProductsBody').innerHTML=_masterProducts.map(function(x,i){
       var margin=x.price>0?((x.price-x.cost)/x.price*100).toFixed(1):'0.0';
       var mc=margin>20?'green':margin>0?'orange':'red';
-      var uc=x.units&&x.units.length||0;
+      var unitHtml='';
+      if(x.units&&x.units.length){
+        unitHtml=x.units.map(function(u){
+          var def=u.isDefault?' <span style="color:var(--accent);font-weight:700" title="Default">*</span>':'';
+          return'<div style="font-size:0.78em;line-height:1.4;white-space:nowrap">'+esc(u.unitName)+': &#8369;'+fmt(u.price)+def+'</div>';
+        }).join('');
+      }else{
+        unitHtml='<span style="color:var(--dim);font-size:0.75em">—</span>';
+      }
       var img=x.imageData?'<img src="'+x.imageData+'" style="width:36px;height:36px;object-fit:cover;border-radius:4px;vertical-align:middle" title="Has Image">':'';
-      return'<tr data-row data-category="'+(x.category||'')+'"><td>'+x.id+'</td><td style="text-align:center">'+img+'</td><td>'+x.name+'</td><td>'+(x.barcode||'')+'</td><td>'+(x.category||'')+'</td><td>&#8369;'+fmt(x.price)+'</td><td class="red">&#8369;'+fmt(x.cost)+'</td><td class="'+mc+'">'+margin+'%</td><td>'+uc+'</td><td><button class="btn btn-sm btn-outline" onclick="showProductEditor('+x.id+')">EDIT</button> <button class="btn btn-sm btn-outline btn-danger" onclick="deleteMasterProduct('+x.id+')">DEL</button></td></tr>';
+      return'<tr data-row data-category="'+(x.category||'')+'"><td>'+x.id+'</td><td style="text-align:center">'+img+'</td><td>'+x.name+'</td><td>'+(x.barcode||'')+'</td><td>'+(x.category||'')+'</td><td>&#8369;'+fmt(x.price)+'</td><td class="red">&#8369;'+fmt(x.cost)+'</td><td class="'+mc+'">'+margin+'%</td><td style="min-width:130px">'+unitHtml+'</td><td><button class="btn btn-sm btn-outline" onclick="showProductEditor('+x.id+')">EDIT</button> <button class="btn btn-sm btn-outline btn-danger" onclick="deleteMasterProduct('+x.id+')">DEL</button></td></tr>';
     }).join('');
     populateProductCategoryFilter();
   }catch(e){setEmpty('masterProductsBody','Failed to load products',10)}
