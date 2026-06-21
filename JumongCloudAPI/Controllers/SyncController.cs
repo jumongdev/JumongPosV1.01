@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
+using System.Globalization;
 using System.Text.Json;
 
 namespace JumongCloudAPI.Controllers;
@@ -212,7 +213,7 @@ public class SyncController : ControllerBase
                         cmd.Parameters.AddWithValue($"p{i}", prop.GetBoolean());
                     else if (prop.ValueKind == JsonValueKind.Number)
                         cmd.Parameters.AddWithValue($"p{i}", prop.GetDecimal());
-                    else if (prop.ValueKind == JsonValueKind.String && DateTime.TryParse(prop.GetString(), out var dt))
+                    else if (prop.ValueKind == JsonValueKind.String && DateTime.TryParse(prop.GetString(), null, DateTimeStyles.AdjustToUniversal, out var dt))
                         cmd.Parameters.AddWithValue($"p{i}", dt);
                     else
                         cmd.Parameters.AddWithValue($"p{i}", prop.GetString());

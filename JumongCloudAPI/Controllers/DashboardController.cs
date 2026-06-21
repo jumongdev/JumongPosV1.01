@@ -746,6 +746,57 @@ public class DashboardController : ControllerBase
             return Ok(new { @fixed = total, message = $"Fixed {total} records across both stores — added 8h to timestamps where Manila hour < 8" });
         }
 
+        [HttpGet("fix-sync-table-times")]
+        public IActionResult FixSyncTableTimes()
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            var total = 0;
+            // SyncController.SyncTable used DateTime.TryParse with default styles,
+            // which converted offset strings (+08:00) to server local time (UTC),
+            // then Npgsql (session Asia/Manila) double-converted them — stored 8h behind.
+            // This fix adds 8h to ALL records affected (stored Manila hour >= 8,
+            // since hour < 8 was already handled by fix-stock-trails-after-jun14).
+            cmd.CommandText = @"
+                UPDATE stock_trails SET created_at = created_at + INTERVAL '8 hours'
+                WHERE store_id IN ('STORE-20260602-AA36','STORE-20260602-7159')
+                  AND EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Manila') >= 8";
+            total += cmd.ExecuteNonQuery();
+            cmd.CommandText = @"
+                UPDATE void_logs SET created_at = created_at + INTERVAL '8 hours'
+                WHERE store_id IN ('STORE-20260602-AA36','STORE-20260602-7159')
+                  AND EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Manila') >= 8";
+            total += cmd.ExecuteNonQuery();
+            cmd.CommandText = @"
+                UPDATE credit_transactions SET created_at = created_at + INTERVAL '8 hours'
+                WHERE store_id IN ('STORE-20260602-AA36','STORE-20260602-7159')
+                  AND EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Manila') >= 8";
+            total += cmd.ExecuteNonQuery();
+            cmd.CommandText = @"
+                UPDATE daily_closes SET close_date = close_date + INTERVAL '8 hours',
+                                        created_at = created_at + INTERVAL '8 hours'
+                WHERE store_id IN ('STORE-20260602-AA36','STORE-20260602-7159')
+                  AND EXTRACT(HOUR FROM close_date AT TIME ZONE 'Asia/Manila') >= 8";
+            total += cmd.ExecuteNonQuery();
+            cmd.CommandText = @"
+                UPDATE expenses SET timestamp = timestamp + INTERVAL '8 hours'
+                WHERE store_id IN ('STORE-20260602-AA36','STORE-20260602-7159')
+                  AND EXTRACT(HOUR FROM timestamp AT TIME ZONE 'Asia/Manila') >= 8";
+            total += cmd.ExecuteNonQuery();
+            // Also fix products and customers created_at
+            cmd.CommandText = @"
+                UPDATE products SET created_at = created_at + INTERVAL '8 hours'
+                WHERE store_id IN ('STORE-20260602-AA36','STORE-20260602-7159')
+                  AND EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Manila') >= 8";
+            total += cmd.ExecuteNonQuery();
+            cmd.CommandText = @"
+                UPDATE customers SET created_at = created_at + INTERVAL '8 hours'
+                WHERE store_id IN ('STORE-20260602-AA36','STORE-20260602-7159')
+                  AND EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Manila') >= 8";
+            total += cmd.ExecuteNonQuery();
+            return Ok(new { @fixed = total, message = $"Fixed {total} records — added 8h to all Maria hour >= 8 timestamps (SyncTable double-conversion fix)" });
+        }
+
         [HttpGet("products/master")]
         public IActionResult GetMasterProducts()
         {

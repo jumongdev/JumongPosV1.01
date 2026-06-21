@@ -24,7 +24,9 @@ public partial class ReportsForm : Form
         if (string.IsNullOrEmpty(inv) && !_isAdmin)
             return;
         var dt = dtpDate.Value;
-        var sales = SaleService.GetSales(dt, dt, inv);
+        var pm = cmbPaymentFilter.SelectedItem?.ToString();
+        if (pm == "All") pm = null;
+        var sales = SaleService.GetSales(dt, dt, inv, paymentMethod: pm);
 
         dgvSales.AutoGenerateColumns = false;
         dgvSales.Columns.Clear();
@@ -212,6 +214,13 @@ public partial class ReportsForm : Form
         txtInvoiceSearch.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; LoadReport(); } };
         toolbarCtls.AddRange(new Control[] { lblInv, txtInvoiceSearch });
 
+        var lblPm = new Label { Text = "Method:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(685, 16), Size = new Size(55, 20) };
+        cmbPaymentFilter = new ComboBox { Location = new Point(743, 12), Size = new Size(110, 25), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = inputBg, ForeColor = inputFg, FlatStyle = FlatStyle.Flat };
+        cmbPaymentFilter.Items.AddRange(new string[] { "All", "Cash", "E-Wallet", "Credit", "Split" });
+        cmbPaymentFilter.SelectedIndex = 0;
+        cmbPaymentFilter.SelectedIndexChanged += (_, _) => LoadReport();
+        toolbarCtls.AddRange(new Control[] { lblPm, cmbPaymentFilter });
+
         pnlToolbar.Controls.AddRange(toolbarCtls.ToArray());
 
         // ── METRICS BAR ──
@@ -299,6 +308,7 @@ public partial class ReportsForm : Form
 
     private DataGridView dgvSales = null!;
     private DateTimePicker dtpDate = null!;
+    private ComboBox cmbPaymentFilter = null!;
     private Button btnRefresh = null!, btnReprint = null!, btnVoidReceipt = null!, btnVoidItem = null!, btnVoidLog = null!;
     private Label lblMetricCount = null!, lblMetricTotal = null!;
     private TextBox txtInvoiceSearch = null!;

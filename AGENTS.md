@@ -448,6 +448,16 @@ Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operationa
 
 **Impact:** Dashboard product list now shows unit prices at a glance for price verification. Old stock trail/void/credit records with wrong timestamps (off by 8 hours) can be fixed by hitting the fix endpoint.
 
+### v1.0.51 — Reports Payment Method Filter
+
+| File | Change |
+|---|---|
+| `Services/SaleService.cs:195` | Added `paymentMethod` optional param to `GetSales()` — filters via `WHERE s.PaymentMethod = @pm` |
+| `Forms/ReportsForm.cs:27-29` | Reads combobox selection, passes payment method filter to `GetSales` |
+| `Forms/ReportsForm.cs:217-222` | Added **Method** combobox (All / Cash / E-Wallet / Credit / Split) to toolbar, triggers reload on change |
+
+**Impact:** Reports page now has a payment method dropdown to filter sales by Cash, E-Wallet, Credit, or Split. Selecting a method instantly filters the grid.
+
 ### v1.0.47 — Reports Role Access, Settings Crash Fix, POS Banners, Online Orders Toggle
 
 | File | Change |
