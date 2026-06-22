@@ -117,14 +117,14 @@ tr:nth-child(even) td {{ background: #F8F8FC; }}
 <h2>Cash Denomination Breakdown</h2>
 <table>
 <tr><th>Denomination</th><th>Count</th><th style=""text-align:right"">Amount</th></tr>
-{(denom1000 > 0 ? $"<tr><td>1000</td><td>{denom1000}</td><td style='text-align:right'>₱{denom1000 * 1000:N2}</td></tr>" : "")}
-{(denom500 > 0 ? $"<tr><td>500</td><td>{denom500}</td><td style='text-align:right'>₱{denom500 * 500:N2}</td></tr>" : "")}
-{(denom200 > 0 ? $"<tr><td>200</td><td>{denom200}</td><td style='text-align:right'>₱{denom200 * 200:N2}</td></tr>" : "")}
-{(denom100 > 0 ? $"<tr><td>100</td><td>{denom100}</td><td style='text-align:right'>₱{denom100 * 100:N2}</td></tr>" : "")}
-{(denom50 > 0 ? $"<tr><td>50</td><td>{denom50}</td><td style='text-align:right'>₱{denom50 * 50:N2}</td></tr>" : "")}
-{(denom20 > 0 ? $"<tr><td>20</td><td>{denom20}</td><td style='text-align:right'>₱{denom20 * 20:N2}</td></tr>" : "")}
-{(denomCoins > 0 ? $"<tr><td>Coins</td><td></td><td style='text-align:right'>₱{denomCoins:N2}</td></tr>" : "")}
-<tr class=""total-row""><td colspan=""2""><strong>TOTAL</strong></td><td style=""text-align:right""><strong>₱{cashOnHand:N2}</strong></td></tr>
+{(denom1000 > 0 ? $"<tr><td>1000</td><td>{denom1000}</td><td style='text-align:right'>Php {denom1000 * 1000:N2}</td></tr>" : "")}
+{(denom500 > 0 ? $"<tr><td>500</td><td>{denom500}</td><td style='text-align:right'>Php {denom500 * 500:N2}</td></tr>" : "")}
+{(denom200 > 0 ? $"<tr><td>200</td><td>{denom200}</td><td style='text-align:right'>Php {denom200 * 200:N2}</td></tr>" : "")}
+{(denom100 > 0 ? $"<tr><td>100</td><td>{denom100}</td><td style='text-align:right'>Php {denom100 * 100:N2}</td></tr>" : "")}
+{(denom50 > 0 ? $"<tr><td>50</td><td>{denom50}</td><td style='text-align:right'>Php {denom50 * 50:N2}</td></tr>" : "")}
+{(denom20 > 0 ? $"<tr><td>20</td><td>{denom20}</td><td style='text-align:right'>Php {denom20 * 20:N2}</td></tr>" : "")}
+{(denomCoins > 0 ? $"<tr><td>Coins</td><td></td><td style='text-align:right'>Php {denomCoins:N2}</td></tr>" : "")}
+<tr class=""total-row""><td colspan=""2""><strong>TOTAL</strong></td><td style=""text-align:right""><strong>Php {cashOnHand:N2}</strong></td></tr>
 </table>
 </div>
 
