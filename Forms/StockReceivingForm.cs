@@ -33,6 +33,7 @@ public partial class StockReceivingForm : Form
             var btnOk = new Button { Text = "SELECT", Font = new Font("Segoe UI", 10F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(72, 126, 176), ForeColor = Color.White, Location = new Point(350, 420), Size = new Size(100, 30), Cursor = Cursors.Hand };
             btnOk.Click += (_, _) => { if (dgv.SelectedRows.Count > 0) { _currentProduct = results[dgv.SelectedRows[0].Index]; picker.Close(); } };
             dgv.CellDoubleClick += (_, _) => btnOk.PerformClick();
+            dgv.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; btnOk.PerformClick(); } };
             pnlPicker.Controls.AddRange(new Control[] { dgv, btnOk });
             picker.Controls.Add(pnlPicker);
             picker.Controls.SetChildIndex(pnlPicker, 0);

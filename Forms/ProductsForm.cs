@@ -600,7 +600,6 @@ public partial class ProductsForm : Form
         btnSave.Visible = false;
         btnCancel.Visible = false;
         btnDelete.Visible = false;
-        btnPrintChecklist.Visible = false;
         btnStockMovement.Text = "\uD83D\uDCC8 VIEW STOCK MOV'T";
 
         pnlMain.Controls.AddRange(new Control[] { pnlLeft, pnlRight });

@@ -26,7 +26,7 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 │   ├── ExpenseService.cs       # Expense CRUD
 │   ├── DataExporter.cs         # Import/Export JSON
 │   ├── MigrationService.cs     # Old DB migration tool
-│       ├── AppVersion.cs           # Current = "1.0.48"
+│       ├── AppVersion.cs           # Current = "1.0.53"
 │   └── ... (PrinterService, EmailService, etc.)
 ├── Forms/
 │   ├── MainForm.cs             # Sidebar navigation (POS, Products, Reports, Settings...)
@@ -68,7 +68,8 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
     ├── v1.0.36/  (exe)
     ├── v1.0.44/  (exe)
     ├── v1.0.45/  (exe)
-    └── v1.0.48/  (exe) — current
+    ├── v1.0.52/  (exe)
+    └── v1.0.53/  (exe) — current
 ```
 
 ## Tech Stack
@@ -473,6 +474,15 @@ Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operationa
 | `Services/AppVersion.cs` | Changed `LatestVersion` GitHub URL to `raw.githubusercontent.com` |
 
 **Impact:** Cashier can now open Settings without crash — only RECEIPT SETUP and APP UPDATE sections visible. Reports form simplified for both roles. POS now shows update/master catalog banner alerts. Online Orders button can be hidden via Settings → DISPLAY SETUP. Menu buttons no longer have gaps when some are hidden.
+
+### v1.0.53 — Email Report ₱ Encoding Fix
+
+| File | Change |
+|---|---|
+| `Services/AppVersion.cs` | `Current` bumped to `"1.0.53"` |
+| `Services/EmailService.cs:120-127` | Replaced `₱` (PHP symbol) with `Php` in Cash Denomination table — fixes `?` character display in email clients |
+
+**Impact:** End shift email now shows `Php 77,000.00` instead of `?77,000.00` in the denomination breakdown section.
 
 ---
 

@@ -36,7 +36,6 @@ public partial class SalesForm : Form
     private static readonly Color CTextHint    = Color.FromArgb(160, 160, 190);
     private static readonly Color CGreenDark   = Color.FromArgb(39, 80, 10);
     private static readonly Color CGreenMid    = Color.FromArgb(99, 153, 34);
-    private static readonly Color CGreenLight  = Color.FromArgb(234, 243, 222);
     private static readonly Color CBlueLight   = Color.FromArgb(230, 241, 251);
     private static readonly Color CBlueMid     = Color.FromArgb(24, 95, 165);
     private static readonly Color CBlueDark    = Color.FromArgb(12, 68, 124);
@@ -550,171 +549,21 @@ public partial class SalesForm : Form
         RefreshCart();
     }
 
-    private void txtSearch_TextChanged(object? sender, EventArgs e)
+    private void ShowSearchPopup(string initialSearch)
     {
-        if (txtSearch.Text.Length >= 2)
+        using var form = new ProductSearchForm();
+        form.InitialSearchText = initialSearch;
+        if (form.ShowDialog() == DialogResult.OK && form.SelectedProduct != null)
         {
-            var results = ProductService.Search(txtSearch.Text);
-            RebuildSearchPanel(results);
-            _pnlSearchResults.Visible = results.Count > 0;
-            if (_pnlSearchResults.Visible) _pnlSearchResults.BringToFront();
+            var product = form.SelectedProduct;
+            var unit = GetUnitForProduct(product);
+            if (unit != null || ProductUnitService.GetByProduct(product.Id).Count == 0)
+                AddToCart(product, unit);
         }
-        else
-        {
-            _pnlSearchResults.Visible = false;
-        }
+        txtBarcode.Focus();
     }
 
-    private void RebuildSearchPanel(List<Product> results)
-    {
-        _pnlSearchResults.SuspendLayout();
-        while (_pnlSearchResults.Controls.Count > 1)
-            _pnlSearchResults.Controls.RemoveAt(1);
-
-        if (_pnlSearchResults.Controls[0] is Panel hdr && hdr.Controls.Count >= 2)
-            ((Label)hdr.Controls[1]).Text = $"{results.Count} result{(results.Count == 1 ? "" : "s")}";
-
-        var threshold = ProductService.GetLowStockThreshold();
-        var rowH = 46;
-        var top = 28;
-        foreach (var prod in results.Take(8))
-        {
-            var isOut = prod.StockQty <= 0;
-            var isLow = !isOut && prod.StockQty <= threshold;
-            var canAdd = !isOut;
-            var row = new Panel
-            {
-                Location = new Point(0, top),
-                Size = new Size(_pnlSearchResults.Width, rowH),
-                BackColor = CCard,
-                Tag = prod,
-                Cursor = canAdd ? Cursors.Hand : Cursors.Default
-            };
-
-            Control icon;
-            if (!string.IsNullOrWhiteSpace(prod.ImageData))
-            {
-                Image? img = null;
-                try { img = Image.FromStream(new MemoryStream(Convert.FromBase64String(prod.ImageData))); } catch { }
-                var pb = new PictureBox
-                {
-                    Location = new Point(10, 8),
-                    Size = new Size(30, 30),
-                    SizeMode = PictureBoxSizeMode.Zoom,
-                    Image = img
-                };
-                icon = pb;
-            }
-            else
-            {
-                Color iconBg, iconFg;
-                if (isOut) { iconBg = CRedLight; iconFg = CRedDark; }
-                else if (isLow) { iconBg = Color.FromArgb(255, 243, 205); iconFg = Color.FromArgb(243, 156, 18); }
-                else { iconBg = CBlueLight; iconFg = CBlueMid; }
-                var panel = new Panel
-                {
-                    Location = new Point(10, 8),
-                    Size = new Size(30, 30),
-                    BackColor = iconBg
-                };
-                panel.Controls.Add(new Label
-                {
-                    Text = "\u25a0",
-                    Font = new Font("Segoe UI", 8F),
-                    ForeColor = iconFg,
-                    TextAlign = ContentAlignment.MiddleCenter,
-                    Dock = DockStyle.Fill
-                });
-                icon = panel;
-            }
-
-            var stockLabel = isOut ? "Out of stock" : (isLow ? $"Low stock ({prod.StockQty})" : $"{prod.StockQty} in stock");
-            var lblName = new Label
-            {
-                Text = prod.Name,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = canAdd ? CText : CTextMuted,
-                Location = new Point(48, 6), Size = new Size(200, 18),
-                AutoEllipsis = true
-            };
-            var lblSub = new Label
-            {
-                Text = $"{prod.Barcode}  ·  {stockLabel}",
-                Font = new Font("Segoe UI", 8F),
-                ForeColor = CTextHint,
-                Location = new Point(48, 25), Size = new Size(200, 15)
-            };
-
-            var defaultUnit = ProductUnitService.GetDefault(prod.Id);
-            var displayPrice = defaultUnit?.Price ?? prod.Price;
-            var lblPrice = new Label
-            {
-                Text = $"\u20b1{displayPrice:N2}",
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                ForeColor = canAdd ? CGreenDark : CTextHint,
-                Location = new Point(row.Width - 120, 13), Size = new Size(72, 20),
-                TextAlign = ContentAlignment.MiddleRight, Anchor = AnchorStyles.Top | AnchorStyles.Right
-            };
-
-            var btnAdd = new Button
-            {
-                Text = "+",
-                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
-                Location = new Point(row.Width - 42, 9), Size = new Size(32, 28),
-                FlatStyle = FlatStyle.Flat,
-                FlatAppearance = { BorderSize = 1, BorderColor = canAdd ? CGreenMid : CBorder },
-                BackColor = canAdd ? CGreenLight : CSurface,
-                ForeColor = canAdd ? CGreenDark : CTextHint,
-                Cursor = canAdd ? Cursors.Hand : Cursors.Default,
-                Enabled = canAdd,
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                Tag = prod
-            };
-            if (canAdd)
-                btnAdd.Click += (_, _) => AddSearchedProduct((Product)btnAdd.Tag!);
-
-            row.Paint += (s, ev) =>
-            {
-                using var pen = new Pen(CBorderLight, 1);
-                ev.Graphics.DrawLine(pen, 0, rowH - 1, row.Width, rowH - 1);
-            };
-
-            row.Controls.AddRange(new Control[] { icon, lblName, lblSub, lblPrice, btnAdd });
-            if (canAdd)
-                row.Click += (_, _) => AddSearchedProduct(prod);
-
-            _pnlSearchResults.Controls.Add(row);
-            top += rowH;
-        }
-
-        _pnlSearchResults.Height = top;
-        _pnlSearchResults.ResumeLayout();
-    }
-
-    private void AddSearchedProduct(Product product)
-    {
-        var unit = GetUnitForProduct(product);
-        if (unit != null || ProductUnitService.GetByProduct(product.Id).Count == 0)
-        {
-            AddToCart(product, unit);
-            _pnlSearchResults.Visible = false;
-            txtSearch.Clear();
-            _searchHighlightIdx = -1;
-            txtBarcode.Focus();
-        }
-    }
-
-    private void HighlightSearchRow()
-    {
-        var rows = _pnlSearchResults.Controls.Cast<Control>().Skip(1).ToList();
-        for (var i = 0; i < rows.Count; i++)
-        {
-            var isHl = i == _searchHighlightIdx;
-            rows[i].BackColor = isHl ? Color.FromArgb(40, 80, 140) : CCard;
-            foreach (Control c in rows[i].Controls)
-                if (c is Label l) l.ForeColor = isHl ? Color.White : CText;
-        }
-    }
+    
 
     private void RefreshCart()
     {
@@ -990,21 +839,13 @@ public partial class SalesForm : Form
         };
 
         var cashierName = _currentUser?.FullName ?? _currentUser?.Username ?? "Admin";
-        _pnlCashierChip = new Panel { BackColor = CTopbarChip };
-        _pnlCashierChip.Paint += (s, e) =>
-        {
-            using var pen = new Pen(CTopbarBorder, 1);
-            e.Graphics.DrawRectangle(pen, 0, 0, _pnlCashierChip.Width - 1, _pnlCashierChip.Height - 1);
-        };
-        var lblCashierChip = new Label
+        var lblCashierName = new Label
         {
             Text = cashierName,
-            Font = new Font("Segoe UI", 9F),
-            ForeColor = CTopbarText,
-            TextAlign = ContentAlignment.MiddleCenter,
-            Dock = DockStyle.Fill
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(100, 200, 255),
+            TextAlign = ContentAlignment.MiddleLeft
         };
-        _pnlCashierChip.Controls.Add(lblCashierChip);
 
         _lblTime = new Label
         {
@@ -1062,12 +903,12 @@ public partial class SalesForm : Form
                 if (result == DialogResult.Yes)
                 {
                     _lblMasterBanner.Visible = false;
-                    await SyncService.DownloadUpdatedMasterCatalog();
+                    SettingsForm.ShowSyncProgress("Updating Master Catalog...", SyncService.DownloadUpdatedMasterCatalog);
                 }
             }
         };
 
-        _pnlTopbar.Controls.AddRange(new Control[] { lblBrand, _pnlCashierChip, _lblUpdateBanner, _lblMasterBanner, _lblTime, btnDisplay });
+        _pnlTopbar.Controls.AddRange(new Control[] { lblBrand, lblCashierName, _lblUpdateBanner, _lblMasterBanner, _lblTime, btnDisplay });
 
         _pnlCustomerBar = new Panel { BackColor = CCard };
         _pnlCustomerBar.Paint += (s, e) =>
@@ -1134,75 +975,19 @@ public partial class SalesForm : Form
             Font = new Font("Segoe UI", 8F, FontStyle.Bold),
             ForeColor = CTextHint
         };
-        txtSearch = new TextBox
+        btnSearch = new Button
         {
-            Font = new Font("Segoe UI", 13F),
-            BorderStyle = BorderStyle.FixedSingle,
-            BackColor = Color.FromArgb(245, 246, 250),
-            ForeColor = CText
+            Text = "🔍  Search  (F2)",
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            FlatStyle = FlatStyle.Flat,
+            FlatAppearance = { BorderSize = 1, BorderColor = CBorder },
+            BackColor = CBlueLight,
+            ForeColor = CBlueDark,
+            Cursor = Cursors.Hand
         };
-        txtSearch.TextChanged += txtSearch_TextChanged;
-        txtSearch.KeyDown += (s, e) =>
-        {
-            if (e.KeyCode == Keys.Escape)
-            {
-                _pnlSearchResults.Visible = false;
-                txtSearch.Clear();
-                txtBarcode.Focus();
-                e.SuppressKeyPress = true;
-            }
-            else if (e.KeyCode == Keys.Down && _pnlSearchResults.Visible)
-            {
-                e.SuppressKeyPress = true;
-                _searchHighlightIdx = Math.Min(_searchHighlightIdx + 1, _pnlSearchResults.Controls.Count - 2);
-                HighlightSearchRow();
-            }
-            else if (e.KeyCode == Keys.Up && _pnlSearchResults.Visible)
-            {
-                e.SuppressKeyPress = true;
-                _searchHighlightIdx = Math.Max(_searchHighlightIdx - 1, 0);
-                HighlightSearchRow();
-            }
-            else if (e.KeyCode == Keys.Enter && _pnlSearchResults.Visible && _searchHighlightIdx >= 0)
-            {
-                e.SuppressKeyPress = true;
-                var rows = _pnlSearchResults.Controls.Cast<Control>().Skip(1).ToList();
-                if (_searchHighlightIdx < rows.Count && rows[_searchHighlightIdx].Tag is Product p)
-                    AddSearchedProduct(p);
-            }
-        };
+        btnSearch.Click += (_, _) => ShowSearchPopup("");
 
-        _pnlSearch.Controls.AddRange(new Control[] { lblBarcodeHint, txtBarcode, lblSearchHint, txtSearch });
-
-        _pnlSearchResults = new Panel
-        {
-            BackColor = CCard,
-            Visible = false,
-            BorderStyle = BorderStyle.FixedSingle
-        };
-
-        var srHeader = new Panel { Location = new Point(0, 0), Size = new Size(400, 28), BackColor = CSurface };
-        srHeader.Paint += (s, e) =>
-        {
-            using var pen = new Pen(CBorderLight, 1);
-            e.Graphics.DrawLine(pen, 0, 27, srHeader.Width, 27);
-        };
-        var srHeaderIcon = new Label
-        {
-            Text = "\u25ba",
-            Font = new Font("Segoe UI", 9F),
-            ForeColor = CTextHint,
-            Location = new Point(10, 6), Size = new Size(16, 16)
-        };
-        var srHeaderCount = new Label
-        {
-            Text = "Results",
-            Font = new Font("Segoe UI", 8F, FontStyle.Bold),
-            ForeColor = CTextMuted,
-            Location = new Point(28, 6), Size = new Size(120, 16)
-        };
-        srHeader.Controls.AddRange(new Control[] { srHeaderIcon, srHeaderCount });
-        _pnlSearchResults.Controls.Add(srHeader);
+        _pnlSearch.Controls.AddRange(new Control[] { lblBarcodeHint, txtBarcode, lblSearchHint, btnSearch });
 
         _pnlCart = new Panel { BackColor = CSurface };
 
@@ -1420,7 +1205,7 @@ public partial class SalesForm : Form
         KeyDown += (s, e) =>
         {
             if (e.KeyCode == Keys.F1) { txtBarcode.Focus(); txtBarcode.SelectAll(); e.SuppressKeyPress = true; }
-            else if (e.KeyCode == Keys.F2) { txtSearch.Focus(); txtSearch.SelectAll(); e.SuppressKeyPress = true; }
+            else if (e.KeyCode == Keys.F2) { ShowSearchPopup(""); e.SuppressKeyPress = true; }
             else if (e.KeyCode == Keys.F3)
             {
                 if (dgvCart.Rows.Count > 0 && dgvCart.CurrentCell != null)
@@ -1435,7 +1220,7 @@ public partial class SalesForm : Form
         Controls.AddRange(new Control[]
         {
             _pnlTopbar, _pnlCustomerBar, _pnlSearch,
-            _pnlCart, _pnlTotals, _pnlSearchResults
+            _pnlCart, _pnlTotals
         });
 
         Resize += (_, _) => LayoutControls();
@@ -1469,8 +1254,8 @@ public partial class SalesForm : Form
         var tbControls = _pnlTopbar.Controls;
         tbControls[0].Location = new Point(16, 0);
         tbControls[0].Size     = new Size(160, topH);
-        _pnlCashierChip.Location = new Point(184, 8);
-        _pnlCashierChip.Size     = new Size(140, 28);
+        tbControls[1].Location = new Point(180, 0);
+        tbControls[1].Size     = new Size(180, topH);
         _lblTime.Text     = TimeHelper.Now.ToString("MMM dd, yyyy  h:mm tt");
         _lblTime.Location = new Point(w - 310, 0);
         _lblTime.Size     = new Size(190, topH);
@@ -1493,22 +1278,7 @@ public partial class SalesForm : Form
         sc[0].Location = new Point(gap, 4);          sc[0].Size = new Size(80, 14);
         txtBarcode.Location = new Point(gap, 18);    txtBarcode.Size = new Size(half - gap * 2, 28);
         sc[2].Location = new Point(half + gap, 4);   sc[2].Size = new Size(120, 14);
-        txtSearch.Location  = new Point(half + gap, 18); txtSearch.Size = new Size(half - gap * 2, 28);
-
-        _pnlSearchResults.Location = new Point(half + gap, topH + custH + searchH);
-        _pnlSearchResults.Size     = new Size(half - gap * 2, _pnlSearchResults.Height);
-        foreach (Control c in _pnlSearchResults.Controls)
-        {
-            c.Width = _pnlSearchResults.Width - 2;
-            if (c is Panel row)
-            {
-                foreach (Control rc in row.Controls)
-                {
-                    if (rc.Anchor.HasFlag(AnchorStyles.Right))
-                        rc.Left = row.Width - rc.Width - 8;
-                }
-            }
-        }
+        btnSearch.Location  = new Point(half + gap, 16); btnSearch.Size = new Size(half - gap * 2, 32);
 
         _pnlCart.Location = new Point(0, cartTop);
         _pnlCart.Size     = new Size(leftW, cartH);
@@ -1585,11 +1355,8 @@ public partial class SalesForm : Form
     }
 
     private Panel _pnlTopbar = null!;
-    private Panel _pnlCashierChip = null!;
     private Panel _pnlCustomerBar = null!;
     private Panel _pnlSearch = null!;
-    private Panel _pnlSearchResults = null!;
-    private int _searchHighlightIdx = -1;
     private Panel _pnlCart = null!;
     private Panel _pnlTotals = null!;
     private Label _lblTime = null!;
@@ -1599,7 +1366,7 @@ public partial class SalesForm : Form
     private Label lblDiscountVal = null!;
     private Label lblTaxVal = null!;
     private TextBox txtBarcode = null!;
-    private TextBox txtSearch = null!;
+    private Button btnSearch = null!;
     private DataGridView dgvCart = null!;
     private Label lblSubTotal = null!;
     private Label lblGrandTotal = null!;

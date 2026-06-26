@@ -688,7 +688,7 @@ public partial class SettingsForm : Form
         Controls.AddRange(new Control[] { pnlToolbar, _pnlScroll });
     }
 
-    private static void ShowSyncProgress(string title, Func<IProgress<string>, Task<int>> work)
+    internal static void ShowSyncProgress(string title, Func<IProgress<string>, Task<int>> work)
     {
         var form = new Form
         {
