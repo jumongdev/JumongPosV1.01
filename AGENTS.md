@@ -26,7 +26,7 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 │   ├── ExpenseService.cs       # Expense CRUD
 │   ├── DataExporter.cs         # Import/Export JSON
 │   ├── MigrationService.cs     # Old DB migration tool
-│       ├── AppVersion.cs           # Current = "1.0.53"
+│       ├── AppVersion.cs           # Current = "1.0.54"
 │   └── ... (PrinterService, EmailService, etc.)
 ├── Forms/
 │   ├── MainForm.cs             # Sidebar navigation (POS, Products, Reports, Settings...)
@@ -69,7 +69,8 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
     ├── v1.0.44/  (exe)
     ├── v1.0.45/  (exe)
     ├── v1.0.52/  (exe)
-    └── v1.0.53/  (exe) — current
+    ├── v1.0.53/  (exe)
+    └── v1.0.54/  (exe) — current
 ```
 
 ## Tech Stack
@@ -99,6 +100,29 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 | `STORE-20260602-AA36` | Andengs Superstore - HVR |
 
 ## Complete Change History
+
+### v1.0.54 — POS Search Popup, Cashier Display, Stock Receiving Fix, Print Checklist Fix
+
+| File | Change |
+|---|---|
+| `Forms/ProductSearchForm.cs` | **New file** — popup form with DataGridView, replaces old inline dropdown for product search in POS |
+| `Forms/SalesForm.cs` | Removed search textbox + dropdown panel; added **Search (F2)** button that opens `ProductSearchForm` popup; cashier name changed to bold cyan label beside brand |
+| `Forms/SalesForm.cs:914` | Master catalog banner click now shows non-modal **progress popup** via `SettingsForm.ShowSyncProgress()` |
+| `Forms/SettingsForm.cs:691` | `ShowSyncProgress()` changed from `private` to `internal` so SalesForm can reuse it |
+| `Forms/StockReceivingForm.cs:33` | Added `KeyDown` handler for Enter key in product picker — fixes arrow+Enter selecting next row instead of current product |
+| `Forms/ProductsForm.cs:603` | **CHECKLIST** button no longer hidden (was accidentally set `Visible=false` with edit buttons) |
+| `Services/AppVersion.cs` | `Current` bumped to `"1.0.54"` |
+
+**Impact:** POS search now shows full product names in a wide popup instead of truncated dropdown. Cashier name prominently displayed. Master update shows progress. Stock receiving product picker works correctly with Enter key. Print checklist button restored.
+
+### v1.0.53 — Email Report ₱ Encoding Fix
+
+| File | Change |
+|---|---|
+| `Services/AppVersion.cs` | `Current` bumped to `"1.0.53"` |
+| `Services/EmailService.cs:120-127` | Replaced `₱` (PHP symbol) with `Php` in Cash Denomination table — fixes `?` character display in email clients |
+
+**Impact:** End shift email now shows `Php 77,000.00` instead of `?77,000.00` in the denomination breakdown section.
 
 ### v1.0.44 — Various Fixes (Email, Dashboard Limits, Category Filter)
 
