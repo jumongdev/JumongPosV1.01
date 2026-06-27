@@ -562,22 +562,38 @@ public class DashboardController : ControllerBase
             if (string.IsNullOrEmpty(invoiceNo)) return BadRequest("invoiceNo required");
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
+
+            // Get sale-level info
+            string? paymentMethod = null, referenceNo = null;
+            decimal? ewPaid = null, grandTotal = null;
+            cmd.CommandText = "SELECT payment_method, reference_no, ew_paid, grand_total FROM sales WHERE invoice_no = @inv";
+            cmd.Parameters.AddWithValue("inv", invoiceNo);
+            using (var r = cmd.ExecuteReader())
+            {
+                if (r.Read())
+                {
+                    paymentMethod = r.IsDBNull(0) ? null : r.GetString(0);
+                    referenceNo = r.IsDBNull(1) ? null : r.GetString(1);
+                    ewPaid = r.IsDBNull(2) ? null : r.GetDecimal(2);
+                    grandTotal = r.IsDBNull(3) ? null : r.GetDecimal(3);
+                }
+            }
+
+            // Get items
             cmd.CommandText = @"
                 SELECT si.product_name, si.barcode, si.quantity, si.price, si.total_price,
                        COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0) AS unit_cost, si.qty_per_unit,
                        si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0) AS total_cost,
                        si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS profit,
-                       p.pos_id AS product_pos_id, si.store_id
+                       p.pos_id AS product_pos_id
                 FROM sale_items si
-                JOIN sales s ON si.sale_id = s.pos_id AND si.store_id = s.store_id
                 LEFT JOIN products p ON si.product_id = p.pos_id AND si.store_id = p.store_id
-                WHERE s.invoice_no = @inv AND si.is_voided = false
+                WHERE si.sale_id = (SELECT pos_id FROM sales WHERE invoice_no = @inv) AND si.is_voided = false
                 ORDER BY si.product_name";
-            cmd.Parameters.AddWithValue("inv", invoiceNo);
-            var data = new List<object>();
+            var items = new List<object>();
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
-                data.Add(new {
+                items.Add(new {
                     productName = reader.GetString(0),
                     barcode = reader.IsDBNull(1) ? "" : reader.GetString(1),
                     quantity = reader.GetInt32(2),
@@ -589,7 +605,7 @@ public class DashboardController : ControllerBase
                     profit = reader.GetDecimal(8),
                     productPosId = reader.IsDBNull(9) ? 0 : reader.GetInt32(9)
                 });
-            return Ok(data);
+            return Ok(new { items, paymentMethod, referenceNo, ewPaid, grandTotal });
         }
 
         [HttpGet("debug-missing-profits")]

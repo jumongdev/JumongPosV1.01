@@ -55,6 +55,7 @@ document.addEventListener('alpine:init', () => {
     cache: {},
     editorOpen: false,
     saleModalOpen: false, saleInvoiceNo: '', saleItems: [], saleLoading: false,
+    salePaymentMethod: '', saleReferenceNo: '', saleEwPaid: 0, saleGrandTotal: 0,
     _sidebarOpen: localStorage.getItem('sidebar') !== 'collapsed',
     _whBadge: 0,
 
@@ -67,9 +68,18 @@ document.addEventListener('alpine:init', () => {
       this.saleInvoiceNo = invoiceNo;
       this.saleModalOpen = true;
       this.saleLoading = true;
+      this.salePaymentMethod = '';
+      this.saleReferenceNo = '';
+      this.saleEwPaid = 0;
+      this.saleGrandTotal = 0;
       try {
-        this.saleItems = await fetchJSON(API + '/sale-items?invoiceNo=' + encodeURIComponent(invoiceNo));
-      } catch (e) { this.saleItems = [] }
+        const data = await fetchJSON(API + '/sale-items?invoiceNo=' + encodeURIComponent(invoiceNo));
+        this.saleItems = data.items || [];
+        this.salePaymentMethod = data.paymentMethod || '';
+        this.saleReferenceNo = data.referenceNo || '';
+        this.saleEwPaid = data.ewPaid || 0;
+        this.saleGrandTotal = data.grandTotal || 0;
+      } catch (e) { this.saleItems = []; this.salePaymentMethod = ''; this.saleReferenceNo = ''; this.saleEwPaid = 0; this.saleGrandTotal = 0 }
       this.saleLoading = false;
     },
     saleTotalRevenue() { return this.saleItems.reduce((s, x) => s + x.totalPrice, 0) },

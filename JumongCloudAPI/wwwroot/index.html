@@ -1013,6 +1013,14 @@ tailwind.config = {
         <div class="overflow-auto p-5 flex-1">
           <template x-if="$store.app.saleLoading"><div class="flex justify-center py-8"><span class="spinner"></span></div></template>
           <template x-if="!$store.app.saleLoading && $store.app.saleItems.length===0"><div class="text-center py-8 text-gray-400">No items</div></template>
+          <template x-if="!$store.app.saleLoading && $store.app.salePaymentMethod && $store.app.salePaymentMethod !== 'Cash'">
+            <div class="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 flex flex-wrap gap-4 text-xs">
+              <span class="font-semibold text-amber-700 dark:text-amber-400">Payment: <span x-text="$store.app.salePaymentMethod"></span></span>
+              <span x-show="$store.app.saleReferenceNo">Ref: <span class="font-mono text-amber-700 dark:text-amber-300" x-text="$store.app.saleReferenceNo"></span></span>
+              <span x-show="$store.app.saleEwPaid>0">Amount: &#8369;<span class="font-semibold text-amber-700 dark:text-amber-300" x-text="fmt($store.app.saleEwPaid)"></span></span>
+              <span x-show="$store.app.saleGrandTotal>0">Total: &#8369;<span class="font-semibold" x-text="fmt($store.app.saleGrandTotal)"></span></span>
+            </div>
+          </template>
           <template x-if="$store.app.saleItems.length > 0">
             <div>
               <table class="w-full text-xs">
