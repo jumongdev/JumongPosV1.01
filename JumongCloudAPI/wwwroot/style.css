@@ -1,0 +1,71 @@
+/* ──────────────────────────────────────────── */
+/*  Jumong POS Dashboard — Custom Styles       */
+/*  Only what Tailwind can't handle            */
+/* ──────────────────────────────────────────── */
+
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#222255;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#4040cc}
+.dark ::-webkit-scrollbar-thumb{background:#334;border-radius:3px}
+.dark ::-webkit-scrollbar-thumb:hover{background:#556}
+::selection{background:#00e5ff;color:#000}
+
+html{scroll-behavior:smooth}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif}
+
+/* Sidebar transition */
+.sidebar{transition:width .25s ease}
+.sidebar .nav-label{transition:opacity .2s,width .2s;white-space:nowrap;overflow:hidden}
+.sidebar.collapsed .nav-label{width:0;opacity:0;display:none}
+.sidebar.collapsed{width:64px!important}
+.sidebar.collapsed a{justify-content:center;padding:11px 0}
+
+/* Panel collapse animation */
+.panel-body{transition:max-height .3s ease,opacity .25s ease}
+.panel.collapsed .panel-body{max-height:0!important;opacity:0;overflow:hidden;padding-top:0!important;padding-bottom:0!important}
+
+/* Bar chart animations */
+.chart-bar-item,.hour-bar{transition:all .3s}
+.chart-bar-item:hover,.hour-bar:hover{transform:scaleY(1.04);transform-origin:bottom}
+
+/* Toast slide-in */
+@keyframes slideIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
+.toast{animation:slideIn .3s ease}
+
+/* Spinner */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,0.06);border-top-color:#00e5ff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
+
+/* Modal */
+@keyframes modalIn{from{opacity:0;transform:scale(0.95) translateY(-10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.modal-box{animation:modalIn .25s ease}
+
+/* Live dot pulse */
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(0.85)}}
+.live-dot{animation:pulse 2s infinite}
+
+/* Print */
+@media print{
+  .no-print{display:none!important}
+  .panel{break-inside:avoid;border:1px solid #ccc!important;box-shadow:none!important}
+  body{background:#fff!important;color:#000!important}
+}
+
+/* Smooth sidebar nav items */
+.sidebar a{transition:all .2s}
+
+/* Table row hover in dark mode */
+.dark tbody tr{transition:background .15s}
+.dark tbody tr:hover{background:rgba(255,255,255,0.03)}
+
+/* Light table row hover */
+tbody tr:hover{background:rgba(0,0,0,0.02)}
+
+/* Input / select focus ring */
+input:focus,select:focus,textarea:focus{outline:none;box-shadow:0 0 0 3px rgba(0,229,255,0.12);border-color:#00e5ff!important}
+
+/* Preserve column alignment in modals */
+.modal-body table th{position:sticky;top:0;z-index:1}
+/* Alpine cloak */
+[x-cloak]{display:none!important}
