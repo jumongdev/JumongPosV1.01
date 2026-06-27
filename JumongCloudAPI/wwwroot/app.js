@@ -53,7 +53,7 @@ document.addEventListener('alpine:init', () => {
     storeMap: {},
     lastRefresh: '',
     cache: {},
-    editorOpen: false,
+    editorOpen: false, editingId: null,
     saleModalOpen: false, saleInvoiceNo: '', saleItems: [], saleLoading: false,
     salePaymentMethod: '', saleReferenceNo: '', saleEwPaid: 0, saleGrandTotal: 0,
     _sidebarOpen: localStorage.getItem('sidebar') !== 'collapsed',
@@ -332,7 +332,7 @@ document.addEventListener('alpine:init', () => {
 
   /* ── Master Products ────────────────────────────────── */
   Alpine.data('masterProducts', () => ({
-    d: [], loading: true, search: '', catFilter: '', editingId: null,
+    d: [], loading: true, search: '', catFilter: '',
     async init() { window.addEventListener('load-products', () => this.load()); await this.load() },
     async load() {
       this.loading = true;
@@ -351,10 +351,10 @@ document.addEventListener('alpine:init', () => {
     margin(p) { return p.price > 0 ? ((p.price - p.cost) / p.price * 100).toFixed(1) : '0.0' },
     marginClass(m) { const v = parseFloat(m); return v > 20 ? 'text-emerald-400' : v > 0 ? 'text-amber-400' : 'text-red-400' },
     openEditor(id) {
-      this.editingId = id || null;
+      Alpine.store('app').editingId = id || null;
       Alpine.store('app').editorOpen = true;
     },
-    closeEditor() { Alpine.store('app').editorOpen = false; this.editingId = null },
+    closeEditor() { Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null },
     async deleteProduct(id) {
       const p = this.d.find(x => x.id === id); if (!p) return;
       if (!confirm('Delete "' + p.name + '"?')) return;
@@ -365,7 +365,7 @@ document.addEventListener('alpine:init', () => {
         this.load();
       } catch (e) { toast('Delete failed: ' + e.message, 'error') }
     },
-    get editingProduct() { return this.editingId ? this.d.find(x => x.id === this.editingId) : null }
+    get editingProduct() { const id = Alpine.store('app').editingId; return id ? this.d.find(x => x.id === id) : null }
   }));
 
   /* ── Product Editor (nested within masterProducts) ──── */
@@ -373,7 +373,8 @@ document.addEventListener('alpine:init', () => {
     name: '', barcode: '', category: '', price: 0, cost: 0, imageData: '',
     units: [], productId: null, categories: [],
     async init() {
-      this.$watch('$store.app.section', () => { if (this.$store.app.section !== 'products') Alpine.store('app').editorOpen = false });
+      this.$watch('$store.app.section', () => { if (this.$store.app.section !== 'products') this.reset() });
+      this.$watch('$store.app.editorOpen', (v) => { if (v) this.open(Alpine.store('app').editingId) });
       try { this.categories = await fetchJSON(API + '/products/categories') } catch (e) {}
     },
     open(id) {
@@ -383,6 +384,7 @@ document.addEventListener('alpine:init', () => {
         if (p) { this.name = p.name; this.barcode = p.barcode || ''; this.category = p.category || ''; this.price = p.price; this.cost = p.cost; this.imageData = p.imageData || ''; this.units = (p.units || []).map(u => ({ ...u })) }
       } else { this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.units = [] }
     },
+    reset() { this.productId = null; this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.units = []; Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null },
     addUnit() { this.units.push({ unitName: '', price: 0, qtyPerUnit: 1, isDefault: false }) },
     removeUnit(i) { this.units.splice(i, 1) },
     async save() {
@@ -402,8 +404,7 @@ document.addEventListener('alpine:init', () => {
           const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
           if (!r.ok) throw new Error('Failed'); toast('Product created', 'success');
         }
-        this.productId = null;
-        Alpine.store('app').editorOpen = false;
+        this.reset();
         dispatchEvent(new CustomEvent('load-products'));
       } catch (e) { toast('Save failed: ' + e.message, 'error') }
     },
