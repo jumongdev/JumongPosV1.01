@@ -95,8 +95,7 @@ tailwind.config = {
           </span>
           <span class="text-[11px] text-gray-400 dark:text-[#4a4a7a] hidden sm:block" x-text="'Updated: '+$store.app.lastRefresh"></span>
           <select id="storeSelect" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] text-gray-700 dark:text-slate-200 rounded-lg px-2 py-1.5 min-w-[140px]"
-            @change="$store.app.setStore($event.target.value)"
-            x-init="() => { const render = v => { $el.innerHTML = '<option value=\"\">All Stores</option>' + (v||[]).map(s => '<option value=\"' + esc(s.storeId) + '\">' + esc(s.storeName || s.storeId) + '</option>').join('') }; render($store.app.stores); $watch('$store.app.stores', render) }">
+            @change="$store.app.setStore($event.target.value)">
             <option value="">All Stores</option>
           </select>
           <button @click="$store.app.toggleDark()" class="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-[#181848] transition-colors" x-html="$store.app.darkMode ? '&#9788;' : '&#9790;'"></button>

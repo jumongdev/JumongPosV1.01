@@ -703,6 +703,12 @@ function downloadCSV(csv, name) {
     const stores = await fetchJSON(API + '/stores');
     Alpine.store('app').stores = stores;
     stores.forEach(s => Alpine.store('app').storeMap[s.storeId] = s.storeName || '');
+    // Populate store select directly (avoids Alpine x-for issues inside <select>)
+    const sel = document.getElementById('storeSelect');
+    if (sel) {
+      sel.innerHTML = '<option value="">All Stores</option>' +
+        stores.map(s => '<option value="' + esc(s.storeId) + '">' + esc(s.storeName || s.storeId) + '</option>').join('');
+    }
   } catch (e) {}
   // Initial dark mode
   document.documentElement.classList.toggle('dark', Alpine.store('app').darkMode);
