@@ -625,6 +625,24 @@ document.addEventListener('alpine:init', () => {
       this.loading = false;
     }
   }));
+
+  /* ── Load Stores ──────────────────────────────────── */
+  (async () => {
+    try {
+      const stores = await fetchJSON(API + '/stores');
+      Alpine.store('app').stores = stores;
+      stores.forEach(s => Alpine.store('app').storeMap[s.storeId] = s.storeName || '');
+      const sel = document.getElementById('storeSelect');
+      if (sel) {
+        sel.innerHTML = '<option value="">All Stores</option>' +
+          stores.map(s => '<option value="' + esc(s.storeId) + '">' + esc(s.storeName || s.storeId) + '</option>').join('');
+      }
+    } catch (e) {}
+    document.documentElement.classList.toggle('dark', Alpine.store('app').darkMode);
+    setInterval(() => { if (!document.hidden) Alpine.store('app').refreshAll() }, 60000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) Alpine.store('app').refreshAll() });
+    Alpine.store('app').refreshAll();
+  })();
 });
 
 /* ── Product Analytics ──────────────────────────────── */
@@ -697,24 +715,4 @@ function downloadCSV(csv, name) {
   toast(name + ' exported', 'success');
 }
 
-/* ── Load Stores on Page Load ────────────────────────── */
-(async () => {
-  try {
-    const stores = await fetchJSON(API + '/stores');
-    Alpine.store('app').stores = stores;
-    stores.forEach(s => Alpine.store('app').storeMap[s.storeId] = s.storeName || '');
-    // Populate store select directly (avoids Alpine x-for issues inside <select>)
-    const sel = document.getElementById('storeSelect');
-    if (sel) {
-      sel.innerHTML = '<option value="">All Stores</option>' +
-        stores.map(s => '<option value="' + esc(s.storeId) + '">' + esc(s.storeName || s.storeId) + '</option>').join('');
-    }
-  } catch (e) {}
-  // Initial dark mode
-  document.documentElement.classList.toggle('dark', Alpine.store('app').darkMode);
-  // Auto refresh every 60s
-  setInterval(() => { if (!document.hidden) Alpine.store('app').refreshAll() }, 60000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) Alpine.store('app').refreshAll() });
-  // Initial load
-  Alpine.store('app').refreshAll();
-})();
+
