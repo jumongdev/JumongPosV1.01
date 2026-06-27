@@ -53,7 +53,7 @@ document.addEventListener('alpine:init', () => {
     storeMap: {},
     lastRefresh: '',
     cache: {},
-    editorOpen: false, editingId: null,
+    editorOpen: false, editingId: null, editingProductData: null,
     saleModalOpen: false, saleInvoiceNo: '', saleItems: [], saleLoading: false,
     salePaymentMethod: '', saleReferenceNo: '', saleEwPaid: 0, saleGrandTotal: 0,
     _sidebarOpen: localStorage.getItem('sidebar') !== 'collapsed',
@@ -352,9 +352,10 @@ document.addEventListener('alpine:init', () => {
     marginClass(m) { const v = parseFloat(m); return v > 20 ? 'text-emerald-400' : v > 0 ? 'text-amber-400' : 'text-red-400' },
     openEditor(id) {
       Alpine.store('app').editingId = id || null;
+      Alpine.store('app').editingProductData = id ? this.d.find(x => x.id === id) || null : null;
       Alpine.store('app').editorOpen = true;
     },
-    closeEditor() { Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null },
+    closeEditor() { Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null; Alpine.store('app').editingProductData = null },
     async deleteProduct(id) {
       const p = this.d.find(x => x.id === id); if (!p) return;
       if (!confirm('Delete "' + p.name + '"?')) return;
@@ -379,12 +380,11 @@ document.addEventListener('alpine:init', () => {
     },
     open(id) {
       this.productId = id || null;
-      if (id) {
-        const p = document.querySelector('[x-data="masterProducts"]')?.__x?.$data?.d?.find(x => x.id === id);
-        if (p) { this.name = p.name; this.barcode = p.barcode || ''; this.category = p.category || ''; this.price = p.price; this.cost = p.cost; this.imageData = p.imageData || ''; this.units = (p.units || []).map(u => ({ ...u })) }
-      } else { this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.units = [] }
+      const p = Alpine.store('app').editingProductData;
+      if (id && p) { this.name = p.name; this.barcode = p.barcode || ''; this.category = p.category || ''; this.price = p.price; this.cost = p.cost; this.imageData = p.imageData || ''; this.units = (p.units || []).map(u => ({ ...u })) }
+      else { this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.units = [] }
     },
-    reset() { this.productId = null; this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.units = []; Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null },
+    reset() { this.productId = null; this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.units = []; Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null; Alpine.store('app').editingProductData = null },
     addUnit() { this.units.push({ unitName: '', price: 0, qtyPerUnit: 1, isDefault: false }) },
     removeUnit(i) { this.units.splice(i, 1) },
     async save() {
