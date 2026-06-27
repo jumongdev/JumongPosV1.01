@@ -142,7 +142,8 @@ public class DashboardController : ControllerBase
                        COALESCE(p.category, '') AS category,
                        SUM(si.quantity) AS total_qty,
                        SUM(si.total_price) AS total_revenue,
-                       SUM(si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS total_cost
+                       SUM(si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS total_cost,
+                       SUM(si.total_price) - SUM(si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS total_profit
                 FROM sale_items si
                 JOIN sales s ON si.sale_id = s.pos_id AND si.store_id = s.store_id
                 LEFT JOIN products p ON si.product_id = p.pos_id AND si.store_id = p.store_id
