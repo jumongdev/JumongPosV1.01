@@ -95,7 +95,7 @@ tailwind.config = {
           </span>
           <span class="text-[11px] text-gray-400 dark:text-[#4a4a7a] hidden sm:block" x-text="'Updated: '+$store.app.lastRefresh"></span>
           <select class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] text-gray-700 dark:text-slate-200 rounded-lg px-2 py-1.5 min-w-[140px]"
-            @change="$store.app.setStore($event.target.value)">
+            x-model="$store.app.storeId" @change="$store.app.setStore($event.target.value)">
             <option value="">All Stores</option>
             <template x-for="s in $store.app.stores" :key="s.storeId">
               <option :value="s.storeId" x-text="s.storeName || s.storeId"></option>
