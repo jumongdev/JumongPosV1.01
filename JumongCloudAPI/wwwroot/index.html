@@ -52,7 +52,8 @@ tailwind.config = {
         { id:'available', icon:'📈', label:'Stock' },
         { id:'warehouse', icon:'🏭', label:'Warehouse' },
         { id:'customers', icon:'👥', label:'Customers' },
-        { id:'users', icon:'⚙️', label:'Users' }
+        { id:'users', icon:'⚙️', label:'Users' },
+        { id:'analytics', icon:'📊', label:'Analytics' }
       ]" :key="item.id">
         <a href="#" @click.prevent="$store.app.switchSection(item.id)"
           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200"
@@ -992,6 +993,73 @@ tailwind.config = {
                 </tbody>
               </table>
             </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <!-- ANALYTICS SECTION                                  -->
+      <!-- ═══════════════════════════════════════════════════ -->
+      <div x-show="$store.app.section === 'analytics'" x-transition.opacity>
+        <div x-data="productAnalytics">
+          <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
+            <!-- Header -->
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[#222255]">
+              <div class="flex items-center gap-3">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">PRODUCT ANALYTICS</h3>
+                <div class="flex gap-1">
+                  <button @click="setSort('qty')" class="text-[10px] px-2 py-1 rounded"
+                    :class="sortBy==='qty' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">Top Selling</button>
+                  <button @click="setSort('profit')" class="text-[10px] px-2 py-1 rounded"
+                    :class="sortBy==='profit' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">Most Profitable</button>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <select x-model="limit" class="text-[10px] bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] text-gray-700 dark:text-slate-200 rounded px-1.5 py-1">
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                </select>
+                <button @click="exportCSV('analytics')" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CSV</button>
+              </div>
+            </div>
+            <!-- Body -->
+            <div class="p-4">
+              <template x-if="loading"><div class="flex justify-center py-8"><span class="spinner"></span></div></template>
+              <template x-if="!loading && filtered.length===0"><div class="text-center py-8 text-gray-400">No product data in selected period</div></template>
+              <template x-if="filtered.length > 0">
+                <div class="overflow-x-auto">
+                  <table class="w-full text-xs">
+                    <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                      <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">#</th>
+                      <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Product</th>
+                      <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Barcode</th>
+                      <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Category</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Qty Sold</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Revenue</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Cost</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Profit</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Margin</th>
+                    </tr></thead>
+                    <tbody>
+                      <template x-for="(p,i) in filtered" :key="p.productName">
+                        <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                          <td class="px-2 py-2 text-gray-400" x-text="i+1"></td>
+                          <td class="px-2 py-2 font-medium text-gray-700 dark:text-slate-200" x-text="p.productName"></td>
+                          <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa]" x-text="p.barcode || '—'"></td>
+                          <td class="px-2 py-2"><span x-show="p.category" class="text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded" x-text="p.category"></span><span x-show="!p.category" class="text-gray-400">—</span></td>
+                          <td class="px-2 py-2 text-right font-medium" x-text="fmtInt(p.totalQty)"></td>
+                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(p.totalRevenue)"></span></td>
+                          <td class="px-2 py-2 text-right text-red-500">&#8369;<span x-text="fmt(p.totalCost)"></span></td>
+                          <td class="px-2 py-2 text-right font-semibold" :class="p.totalProfit>0?'text-emerald-400':'text-red-400'">&#8369;<span x-text="fmt(p.totalProfit)"></span></td>
+                          <td class="px-2 py-2 text-right" :class="marginClass(p.marginPct)"><span x-text="p.marginPct"></span>%</td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </template>
+            </div>
           </div>
         </div>
       </div>

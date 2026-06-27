@@ -97,6 +97,7 @@ document.addEventListener('alpine:init', () => {
       if (section === 'warehouse') dispatchEvent(new CustomEvent('load-warehouse'));
       if (section === 'products') dispatchEvent(new CustomEvent('load-products'));
       if (section === 'available') { dispatchEvent(new CustomEvent('load-stock')); dispatchEvent(new CustomEvent('load-receiving')) }
+      if (section === 'analytics') dispatchEvent(new CustomEvent('load-analytics'));
     },
     setStore(val) {
       this.storeId = val;
@@ -623,6 +624,28 @@ document.addEventListener('alpine:init', () => {
   }));
 });
 
+/* ── Product Analytics ──────────────────────────────── */
+Alpine.data('productAnalytics', () => ({
+  d: [], loading: true, collapsed: false, sortBy: 'qty', limit: 10,
+  async init() {
+    window.addEventListener('load-analytics', () => this.load());
+    window.addEventListener('refresh-data', () => this.load());
+    await this.load();
+  },
+  async load() {
+    this.loading = true;
+    try {
+      const params = Alpine.store('app').filterParams.replace('&', '');
+      this.d = await fetchJSON(API + '/top-products?limit=50&sort=' + this.sortBy + (params ? '&' + params : ''));
+      Alpine.store('app').cache.analytics = this.d;
+    } catch (e) { this.d = [] }
+    this.loading = false;
+  },
+  setSort(s) { this.sortBy = s; this.load() },
+  get filtered() { return this.d.slice(0, this.limit) },
+  marginClass(m) { const v = parseFloat(m); return v > 20 ? 'text-emerald-400' : v > 0 ? 'text-amber-400' : 'text-red-400' }
+}));
+
 /* ── CSV Export ──────────────────────────────────────── */
 window.exportCSV = (name) => {
   const map = {
@@ -635,7 +658,8 @@ window.exportCSV = (name) => {
     shifts: ['Close Date,Store,Sales,Cash,E-Wallet,Credit,Voided,Expenses,Cash on Hand,Variance,User', d => d.map(x => [x.closeDate, x.storeId, x.totalSales, x.totalCash, x.totalEwallet, x.totalCredit, x.totalVoided, x.totalExpenses, x.cashOnHand, x.difference, x.userName])],
     voids: ['Invoice,Action,Item,Reason,Qty,Amount,Cashier,Date', d => d.map(x => [x.invoiceNo, x.action, x.productName, x.reason, x.quantity, x.amount, x.userName, x.createdAt])],
     receiving: ['Product,Barcode,Qty Added,Before,After,Reference,Cashier,Store,Date', d => d.map(x => [x.productName, x.barcode, x.quantityAdded, x.stockBefore, x.stockAfter, x.reference, x.userName, x.storeId, x.createdAt])],
-    stock: ['Product,Barcode,Category,Stock,Price,Cost', d => d.map(x => [x.name, x.barcode, x.category, x.stockQty, x.price, x.cost])]
+    stock: ['Product,Barcode,Category,Stock,Price,Cost', d => d.map(x => [x.name, x.barcode, x.category, x.stockQty, x.price, x.cost])],
+    analytics: ['Product,Barcode,Category,Qty Sold,Revenue,Cost,Profit,Margin%', d => d.map(x => [x.productName, x.barcode, x.category, x.totalQty, x.totalRevenue, x.totalCost, x.totalProfit, x.marginPct + '%'])]
   };
   const cache = Alpine.store('app').cache[name] || Alpine.store('app').cache[name.replace('wh-', '')];
   if (!cache || !cache.length) { toast('No data to export', 'error'); return }
@@ -659,7 +683,7 @@ window.exportCSV = (name) => {
   downloadCSV(csv, name);
 };
 
-window.exportAllCSV = () => { ['sales', 'trends', 'peakhours', 'saleprofits', 'cashiers', 'expenses', 'shifts', 'voids', 'receiving', 'stock'].forEach(n => { if (Alpine.store('app').cache[n]) exportCSV(n) }) };
+window.exportAllCSV = () => { ['sales', 'trends', 'peakhours', 'saleprofits', 'cashiers', 'expenses', 'shifts', 'voids', 'receiving', 'stock', 'analytics'].forEach(n => { if (Alpine.store('app').cache[n]) exportCSV(n) }) };
 
 function downloadCSV(csv, name) {
   const blob = new Blob([csv], { type: 'text/csv' });

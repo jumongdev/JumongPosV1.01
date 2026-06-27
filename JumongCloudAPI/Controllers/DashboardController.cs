@@ -127,26 +127,50 @@ public class DashboardController : ControllerBase
         }
 
         [HttpGet("top-products")]
-        public IActionResult GetTopProducts([FromQuery] int limit = 10, [FromQuery] string? storeId = null, [FromQuery] string? range = null)
+        public IActionResult GetTopProducts([FromQuery] int limit = 10, [FromQuery] string? storeId = null, [FromQuery] string? range = null, [FromQuery] string? sort = "qty")
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
             var tf = TimeframeClause(range, "s.sale_date", cmd);
             if (string.IsNullOrEmpty(range) || range == "all") tf = "";
+            var orderBy = sort == "profit"
+                ? "ORDER BY total_profit DESC"
+                : "ORDER BY total_qty DESC";
             cmd.CommandText = $@"
-                SELECT si.product_name, SUM(si.quantity) AS total_qty, SUM(si.total_price) AS total_amount
+                SELECT si.product_name,
+                       COALESCE(p.barcode, '') AS barcode,
+                       COALESCE(p.category, '') AS category,
+                       SUM(si.quantity) AS total_qty,
+                       SUM(si.total_price) AS total_revenue,
+                       SUM(si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS total_cost
                 FROM sale_items si
-                JOIN sales s ON si.sale_id = s.pos_id
+                JOIN sales s ON si.sale_id = s.pos_id AND si.store_id = s.store_id
+                LEFT JOIN products p ON si.product_id = p.pos_id AND si.store_id = p.store_id
                 WHERE s.is_voided = false {StoreFilter(storeId, "s")}{tf}
-                GROUP BY si.product_name
-                ORDER BY total_qty DESC
+                GROUP BY si.product_name, p.barcode, p.category
+                {orderBy}
                 LIMIT @limit";
             cmd.Parameters.AddWithValue("limit", limit);
             if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
             var data = new List<object>();
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
-                data.Add(new { productName = reader.GetString(0), totalQty = reader.GetInt32(1), totalAmount = reader.GetDecimal(2) });
+            {
+                var revenue = reader.GetDecimal(4);
+                var cost = reader.GetDecimal(5);
+                var profit = revenue - cost;
+                var margin = revenue > 0 ? (profit / revenue * 100).ToString("F1") : "0.0";
+                data.Add(new {
+                    productName = reader.GetString(0),
+                    barcode = reader.GetString(1),
+                    category = reader.GetString(2),
+                    totalQty = reader.GetInt32(3),
+                    totalRevenue = revenue,
+                    totalCost = cost,
+                    totalProfit = profit,
+                    marginPct = margin
+                });
+            }
             return Ok(data);
         }
 
