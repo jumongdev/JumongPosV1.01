@@ -54,6 +54,7 @@ document.addEventListener('alpine:init', () => {
     lastRefresh: '',
     cache: {},
     editorOpen: false,
+    saleModalOpen: false, saleInvoiceNo: '', saleItems: [], saleLoading: false,
     _sidebarOpen: localStorage.getItem('sidebar') !== 'collapsed',
     _whBadge: 0,
 
@@ -62,10 +63,21 @@ document.addEventListener('alpine:init', () => {
       localStorage.setItem('theme', this.darkMode ? 'dark' : 'light');
       document.documentElement.classList.toggle('dark', this.darkMode);
     },
-    _showSaleItems(invoiceNo) {
-      const el = document.querySelector('[x-data="saleItemsModal"]');
-      if (el && el.__x) el.__x.$data.show(invoiceNo);
+    async _showSaleItems(invoiceNo) {
+      this.saleInvoiceNo = invoiceNo;
+      this.saleModalOpen = true;
+      this.saleLoading = true;
+      try {
+        this.saleItems = await fetchJSON(API + '/sale-items?invoiceNo=' + encodeURIComponent(invoiceNo));
+      } catch (e) { this.saleItems = [] }
+      this.saleLoading = false;
     },
+    saleTotalRevenue() { return this.saleItems.reduce((s, x) => s + x.totalPrice, 0) },
+    saleTotalCost() { return this.saleItems.reduce((s, x) => s + x.totalCost, 0) },
+    saleProfit() { return this.saleTotalRevenue() - this.saleTotalCost() },
+    saleMargin() { const r = this.saleTotalRevenue(); return r > 0 ? (this.saleProfit() / r * 100).toFixed(1) : '0.0' },
+    saleProfitClass(v) { return v > 0 ? 'text-emerald-400' : 'text-red-400' },
+    saleMarginClass(v) { const m = parseFloat(v); return m > 20 ? 'text-emerald-400' : m > 0 ? 'text-amber-400' : 'text-red-400' },
     switchSection(section) {
       this.section = section;
       document.getElementById('sidebar')?.classList.remove('open');
@@ -388,27 +400,6 @@ document.addEventListener('alpine:init', () => {
       reader.onload = (ev) => { this.imageData = ev.target.result };
       reader.readAsDataURL(file);
     }
-  }));
-
-  /* ── Sale Items Modal ──────────────────────────────── */
-  Alpine.data('saleItemsModal', () => ({
-    open: false, invoiceNo: '', items: [], loading: false,
-    async show(invoiceNo) {
-      this.invoiceNo = invoiceNo;
-      this.open = true;
-      this.loading = true;
-      try {
-        this.items = await fetchJSON(API + '/sale-items?invoiceNo=' + encodeURIComponent(invoiceNo));
-      } catch (e) { this.items = [] }
-      this.loading = false;
-    },
-    close() { this.open = false; this.items = [] },
-    get totalRevenue() { return this.items.reduce((s, x) => s + x.totalPrice, 0) },
-    get totalCost() { return this.items.reduce((s, x) => s + x.totalCost, 0) },
-    get profit() { return this.totalRevenue - this.totalCost },
-    get margin() { return this.totalRevenue > 0 ? (this.profit / this.totalRevenue * 100).toFixed(1) : '0.0' },
-    profitClass(v) { return v > 0 ? 'text-emerald-400' : 'text-red-400' },
-    marginClass(v) { const m = parseFloat(v); return m > 20 ? 'text-emerald-400' : m > 0 ? 'text-amber-400' : 'text-red-400' }
   }));
 
   /* ── Warehouse ──────────────────────────────────────── */
