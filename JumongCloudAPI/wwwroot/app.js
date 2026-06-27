@@ -53,6 +53,7 @@ document.addEventListener('alpine:init', () => {
     storeMap: {},
     lastRefresh: '',
     cache: {},
+    editorOpen: false,
     _sidebarOpen: localStorage.getItem('sidebar') !== 'collapsed',
     _whBadge: 0,
 
@@ -308,7 +309,7 @@ document.addEventListener('alpine:init', () => {
 
   /* ── Master Products ────────────────────────────────── */
   Alpine.data('masterProducts', () => ({
-    d: [], loading: true, catFilter: '', editorOpen: false, editingId: null,
+    d: [], loading: true, catFilter: '', editingId: null,
     async init() { window.addEventListener('load-products', () => this.load()); await this.load() },
     async load() {
       this.loading = true;
@@ -326,9 +327,9 @@ document.addEventListener('alpine:init', () => {
     marginClass(m) { const v = parseFloat(m); return v > 20 ? 'text-emerald-400' : v > 0 ? 'text-amber-400' : 'text-red-400' },
     openEditor(id) {
       this.editingId = id || null;
-      this.editorOpen = true;
+      Alpine.store('app').editorOpen = true;
     },
-    closeEditor() { this.editorOpen = false; this.editingId = null },
+    closeEditor() { Alpine.store('app').editorOpen = false; this.editingId = null },
     async deleteProduct(id) {
       const p = this.d.find(x => x.id === id); if (!p) return;
       if (!confirm('Delete "' + p.name + '"?')) return;
@@ -347,7 +348,7 @@ document.addEventListener('alpine:init', () => {
     name: '', barcode: '', category: '', price: 0, cost: 0, imageData: '',
     units: [], productId: null, categories: [],
     async init() {
-      this.$watch('$store.app.section', () => { if (this.$store.app.section !== 'products') this.$el.closest('.modal-box')?.classList.remove('show') });
+      this.$watch('$store.app.section', () => { if (this.$store.app.section !== 'products') Alpine.store('app').editorOpen = false });
       try { this.categories = await fetchJSON(API + '/products/categories') } catch (e) {}
     },
     open(id) {
@@ -377,7 +378,7 @@ document.addEventListener('alpine:init', () => {
           if (!r.ok) throw new Error('Failed'); toast('Product created', 'success');
         }
         this.productId = null;
-        document.querySelector('[x-data=masterProducts]')?.__x?.$data.closeEditor();
+        Alpine.store('app').editorOpen = false;
         dispatchEvent(new CustomEvent('load-products'));
       } catch (e) { toast('Save failed: ' + e.message, 'error') }
     },
