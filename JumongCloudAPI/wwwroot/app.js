@@ -332,7 +332,7 @@ document.addEventListener('alpine:init', () => {
 
   /* ── Master Products ────────────────────────────────── */
   Alpine.data('masterProducts', () => ({
-    d: [], loading: true, catFilter: '', editingId: null,
+    d: [], loading: true, search: '', catFilter: '', editingId: null,
     async init() { window.addEventListener('load-products', () => this.load()); await this.load() },
     async load() {
       this.loading = true;
@@ -343,8 +343,10 @@ document.addEventListener('alpine:init', () => {
     },
     get categories() { const c = []; this.d.forEach(x => { if (x.category && !c.includes(x.category)) c.push(x.category) }); return c.sort() },
     get filtered() {
-      if (!this.catFilter) return this.d;
-      return this.d.filter(x => x.category === this.catFilter)
+      let items = this.d;
+      if (this.search) { const q = this.search.toLowerCase(); items = items.filter(x => (x.name || '').toLowerCase().includes(q) || (x.barcode || '').toLowerCase().includes(q) || (x.category || '').toLowerCase().includes(q)) }
+      if (this.catFilter) items = items.filter(x => x.category === this.catFilter);
+      return items;
     },
     margin(p) { return p.price > 0 ? ((p.price - p.cost) / p.price * 100).toFixed(1) : '0.0' },
     marginClass(m) { const v = parseFloat(m); return v > 20 ? 'text-emerald-400' : v > 0 ? 'text-amber-400' : 'text-red-400' },
