@@ -1,3 +1,5 @@
+using System.Drawing;
+using System.IO;
 using JumongPosV1._01.Models;
 using JumongPosV1._01.Services;
 
@@ -104,7 +106,7 @@ public class ProductSearchForm : Form
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             MultiSelect = false,
             AutoGenerateColumns = false,
-            RowTemplate = { Height = 32 },
+            RowTemplate = { Height = 50 },
             EnableHeadersVisualStyles = false,
             ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
             {
@@ -125,12 +127,20 @@ public class ProductSearchForm : Form
             }
         };
 
+        _dgv.Columns.Add(new DataGridViewImageColumn
+        {
+            HeaderText = "",
+            Width = 55,
+            ImageLayout = DataGridViewImageCellLayout.Zoom,
+            DefaultCellStyle = new DataGridViewCellStyle { Padding = new Padding(3) },
+            Resizable = DataGridViewTriState.False
+        });
         _dgv.Columns.Add(new DataGridViewTextBoxColumn
         {
             DataPropertyName = "ProductName",
             HeaderText = "Product Name",
             AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
-            FillWeight = 65,
+            FillWeight = 60,
             DefaultCellStyle = new DataGridViewCellStyle
             {
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
@@ -154,7 +164,7 @@ public class ProductSearchForm : Form
             DataPropertyName = "PriceDisplay",
             HeaderText = "Price",
             AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
-            FillWeight = 10,
+            FillWeight = 14,
             DefaultCellStyle = new DataGridViewCellStyle
             {
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
@@ -169,7 +179,7 @@ public class ProductSearchForm : Form
             DataPropertyName = "StockDisplay",
             HeaderText = "Stock",
             AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
-            FillWeight = 9,
+            FillWeight = 10,
             DefaultCellStyle = new DataGridViewCellStyle
             {
                 Alignment = DataGridViewContentAlignment.MiddleCenter,
@@ -186,7 +196,12 @@ public class ProductSearchForm : Form
 
         _dgv.CellFormatting += (s, e) =>
         {
-            if (e.ColumnIndex == 3 && e.RowIndex >= 0 && e.RowIndex < _results.Count)
+            if (e.ColumnIndex == 0 && e.RowIndex >= 0 && e.RowIndex < _results.Count)
+            {
+                e.Value = Base64ToImage(_results[e.RowIndex].ImageData);
+                e.FormattingApplied = true;
+            }
+            else if (e.ColumnIndex == 4 && e.RowIndex >= 0 && e.RowIndex < _results.Count)
             {
                 var prod = _results[e.RowIndex];
                 var threshold = ProductService.GetLowStockThreshold();
@@ -277,5 +292,17 @@ public class ProductSearchForm : Form
         SelectedProduct = _results[_dgv.CurrentRow.Index];
         DialogResult = DialogResult.OK;
         Close();
+    }
+
+    private static Image? Base64ToImage(string? data)
+    {
+        if (string.IsNullOrWhiteSpace(data)) return null;
+        try
+        {
+            var bytes = Convert.FromBase64String(data);
+            using var ms = new MemoryStream(bytes);
+            return Image.FromStream(ms);
+        }
+        catch { return null; }
     }
 }

@@ -147,7 +147,7 @@ public class DashboardController : ControllerBase
                 FROM sale_items si
                 JOIN sales s ON si.sale_id = s.pos_id AND si.store_id = s.store_id
                 LEFT JOIN products p ON si.product_id = p.pos_id AND si.store_id = p.store_id
-                WHERE s.is_voided = false {StoreFilter(storeId, "s")}{tf}
+                WHERE s.is_voided = false AND si.is_voided = false {StoreFilter(storeId, "s")}{tf}
                 GROUP BY si.product_name, p.barcode, p.category
                 {orderBy}
                 LIMIT @limit";
