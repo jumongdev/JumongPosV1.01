@@ -1384,5 +1384,20 @@ tailwind.config = {
   <script src="components.js"></script>
   <script src="app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+  <script>
+  (async () => {
+    try {
+      const stores = await fetchJSON(API + '/stores');
+      Alpine.store('app').stores = stores;
+      stores.forEach(s => Alpine.store('app').storeMap[s.storeId] = s.storeName || '');
+      const sel = document.getElementById('storeSelect');
+      if (sel) {
+        sel.innerHTML = '<option value="">All Stores</option>' +
+          stores.map(s => '<option value="' + esc(s.storeId) + '">' + esc(s.storeName || s.storeId) + '</option>').join('');
+      }
+    } catch (e) {}
+    document.documentElement.classList.toggle('dark', Alpine.store('app').darkMode);
+  })();
+  </script>
 </body>
 </html>
