@@ -588,10 +588,17 @@ public class DashboardController : ControllerBase
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
 
+            var storeFilter = "";
+            if (!string.IsNullOrEmpty(storeId))
+            {
+                cmd.Parameters.AddWithValue("sid", storeId);
+                storeFilter = " AND store_id = @sid";
+            }
+
             // Get sale-level info
             string? paymentMethod = null, referenceNo = null;
             decimal? ewPaid = null, grandTotal = null;
-            cmd.CommandText = "SELECT payment_method, reference_no, ew_paid, grand_total FROM sales WHERE invoice_no = @inv";
+            cmd.CommandText = "SELECT payment_method, reference_no, ew_paid, grand_total FROM sales WHERE invoice_no = @inv" + storeFilter;
             cmd.Parameters.AddWithValue("inv", invoiceNo);
             using (var r = cmd.ExecuteReader())
             {
@@ -605,6 +612,7 @@ public class DashboardController : ControllerBase
             }
 
             // Get items
+            var saleFilter = "WHERE si.sale_id = (SELECT pos_id FROM sales WHERE invoice_no = @inv" + storeFilter + ") AND si.is_voided = false";
             cmd.CommandText = @"
                 SELECT si.product_name, si.barcode, si.quantity, si.price, si.total_price,
                        COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0) AS unit_cost, si.qty_per_unit,
@@ -613,7 +621,7 @@ public class DashboardController : ControllerBase
                        p.pos_id AS product_pos_id
                 FROM sale_items si
                 LEFT JOIN products p ON si.product_id = p.pos_id AND si.store_id = p.store_id
-                WHERE si.sale_id = (SELECT pos_id FROM sales WHERE invoice_no = @inv) AND si.is_voided = false
+                " + saleFilter + @"
                 ORDER BY si.product_name";
             var items = new List<object>();
             using var reader = cmd.ExecuteReader();

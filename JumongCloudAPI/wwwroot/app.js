@@ -64,7 +64,7 @@ document.addEventListener('alpine:init', () => {
       localStorage.setItem('theme', this.darkMode ? 'dark' : 'light');
       document.documentElement.classList.toggle('dark', this.darkMode);
     },
-    async _showSaleItems(invoiceNo) {
+    async _showSaleItems(invoiceNo, storeId) {
       this.saleInvoiceNo = invoiceNo;
       this.saleModalOpen = true;
       this.saleLoading = true;
@@ -73,7 +73,9 @@ document.addEventListener('alpine:init', () => {
       this.saleEwPaid = 0;
       this.saleGrandTotal = 0;
       try {
-        const data = await fetchJSON(API + '/sale-items?invoiceNo=' + encodeURIComponent(invoiceNo));
+        let url = API + '/sale-items?invoiceNo=' + encodeURIComponent(invoiceNo);
+        if (storeId) url += '&storeId=' + encodeURIComponent(storeId);
+        const data = await fetchJSON(url);
         this.saleItems = data.items || [];
         this.salePaymentMethod = data.paymentMethod || '';
         this.saleReferenceNo = data.referenceNo || '';

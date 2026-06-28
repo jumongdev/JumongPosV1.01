@@ -277,7 +277,7 @@ tailwind.config = {
                   <tbody>
                     <template x-for="x in paged" :key="x.invoiceNo">
                       <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                        <td class="px-3 py-2"><a href="#" @click.prevent="$store.app._showSaleItems(x.invoiceNo)" class="text-cyan-700 dark:text-cyan-400 hover:underline font-medium" x-text="x.invoiceNo"></a></td>
+                        <td class="px-3 py-2"><a href="#" @click.prevent="$store.app._showSaleItems(x.invoiceNo, x.storeId)" class="text-cyan-700 dark:text-cyan-400 hover:underline font-medium" x-text="x.invoiceNo"></a></td>
                         <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.saleDate).toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})+' '+new Date(x.saleDate).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Manila'})"></td>
                         <td class="px-3 py-2 text-right font-medium">&#8369;<span x-text="fmt(x.revenue)"></span></td>
                         <td class="px-3 py-2 text-right text-red-500">&#8369;<span x-text="fmt(x.cost)"></span></td>
@@ -333,7 +333,7 @@ tailwind.config = {
                     <tbody>
                       <template x-for="x in paged" :key="x.invoiceNo">
                         <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]" :style="x.isVoided ? 'opacity:0.5' : ''">
-                        <td class="px-3 py-2"><a href="#" @click.prevent="$store.app._showSaleItems(x.invoiceNo)" class="text-cyan-700 dark:text-cyan-400 hover:underline font-medium" x-text="x.invoiceNo"></a></td>
+                        <td class="px-3 py-2"><a href="#" @click.prevent="$store.app._showSaleItems(x.invoiceNo, x.storeId)" class="text-cyan-700 dark:text-cyan-400 hover:underline font-medium" x-text="x.invoiceNo"></a></td>
                           <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.saleDate).toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})+' '+new Date(x.saleDate).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Manila'})"></td>
                           <td class="px-3 py-2 text-right font-medium">&#8369;<span x-text="fmt(x.grandTotal)"></span></td>
                           <td class="px-3 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded font-semibold" :class="badgeClass(x.paymentMethod, x.isVoided)"><span x-text="x.isVoided ? 'VOID' : x.paymentMethod"></span></span></td>
@@ -386,7 +386,7 @@ tailwind.config = {
                     <tbody>
                       <template x-for="x in paged" :key="x.invoiceNo+x.productName+x.createdAt">
                         <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                          <td class="px-2 py-2"><a href="#" @click.prevent="$store.app._showSaleItems(x.invoiceNo)" class="text-cyan-700 dark:text-cyan-400 hover:underline" x-text="x.invoiceNo"></a></td>
+                          <td class="px-2 py-2"><a href="#" @click.prevent="$store.app._showSaleItems(x.invoiceNo, x.storeId)" class="text-cyan-700 dark:text-cyan-400 hover:underline" x-text="x.invoiceNo"></a></td>
                           <td class="px-2 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400" x-text="x.action==='VoidSale' ? 'FULL VOID' : 'ITEM VOID'"></span></td>
                           <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.productName || '—'"></td>
                           <td class="px-2 py-2 text-amber-600 dark:text-amber-400 max-w-[160px] truncate" x-text="x.reason || '—'"></td>

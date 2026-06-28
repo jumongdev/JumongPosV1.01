@@ -115,6 +115,28 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 
 **Impact:** POS search now shows full product names in a wide popup instead of truncated dropdown. Cashier name prominently displayed. Master update shows progress. Stock receiving product picker works correctly with Enter key. Print checklist button restored.
 
+### v1.0.55 — Cloud Dashboard Rewrite (Tailwind+Alpine), Product Analytics, Store Selector Fix
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/index.html` | **Full rewrite** — Tailwind CSS utility classes, Alpine.js reactive binding, collapsed sidebar, dark/light toggle, all panels modernized |
+| `JumongCloudAPI/wwwroot/app.js` | **New file** — Alpine store, components (summaryCards, profitCards, trendsChart, etc.), CSV export, toast notifications |
+| `JumongCloudAPI/wwwroot/style.css` | **New file** — custom scrollbar, animations, print, modal, x-cloak styles |
+| `JumongCloudAPI/Controllers/DashboardController.cs:129-175` | `GetTopProducts` enhanced: added `sort=profit` param, returns barcode, category, totalQty, revenue, cost, profit, marginPct |
+| `JumongCloudAPI/Controllers/DashboardController.cs:583-633` | `GetSaleItems` returns `paymentMethod`, `referenceNo`, `ewPaid`, `grandTotal` alongside items |
+| `JumongCloudAPI/wwwroot/app.js:43-127` | Fixed Add Product modal always visible on page load — `editorOpen` moved to Alpine store |
+| `JumongCloudAPI/wwwroot/index.html` | Fixed store name badges — `text-cyan-300` → `text-cyan-700 dark:text-cyan-300` with `bg-cyan-100 dark:bg-cyan-900/20` |
+| `JumongCloudAPI/wwwroot/index.html` | Fixed invoice links showing `...` — added `x-text="x.invoiceNo"` to all 3 invoice `<a>` tags |
+| `JumongCloudAPI/wwwroot/index.html` | Fixed invoice click not showing sale details — sale modal state moved to Alpine store, `saleItemsModal` component removed |
+| `JumongCloudAPI/wwwroot/index.html` | **Product Analytics panel** added with Top Selling / Most Profitable tabs, sidebar nav item, CSV export |
+| `JumongCloudAPI/wwwroot/app.js` | Fixed product search — split `search` and `catFilter` into separate properties |
+| `JumongCloudAPI/wwwroot/app.js` | Fixed EDIT button — added `$watch('$store.app.editorOpen')`, moved `editingId` to store |
+| `JumongCloudAPI/wwwroot/app.js` | **Fixed store selector empty** — moved store loading inside `alpine:init` callback; populate `<select>` via `innerHTML` instead of `x-for` |
+| `JumongCloudAPI/wwwroot/app.js` | Alpine.js loading order fixed: deferred in head, app.js sync at end of body (defer broke component registration) |
+| `JumongCloudAPI/Controllers/DashboardController.cs:129-175` | Fixed Most Profitable query — added `total_profit` to SELECT list (ORDER BY referenced non-existent alias) |
+
+**Impact:** Cloud dashboard modernized with Tailwind CSS and Alpine.js. Product Analytics shows top-selling and most profitable products. Store selector works reliably. Search, edit, and sale detail modals work correctly. Most Profitable tab shows data instead of empty.
+
 ### v1.0.53 — Email Report ₱ Encoding Fix
 
 | File | Change |
