@@ -140,7 +140,8 @@ public class DashboardController : ControllerBase
                 SELECT si.product_name,
                        COALESCE(p.barcode, '') AS barcode,
                        COALESCE(p.category, '') AS category,
-                       SUM(si.quantity * COALESCE(si.qty_per_unit, 1)) AS total_qty,
+                       COALESCE(si.unit_name, '') AS unit_name,
+                       SUM(si.quantity) AS total_qty,
                        SUM(si.total_price) AS total_revenue,
                        SUM(si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS total_cost,
                        SUM(si.total_price) - SUM(si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS total_profit
@@ -148,7 +149,7 @@ public class DashboardController : ControllerBase
                 JOIN sales s ON si.sale_id = s.pos_id AND si.store_id = s.store_id
                 LEFT JOIN products p ON si.product_id = p.pos_id AND si.store_id = p.store_id
                 WHERE s.is_voided = false AND si.is_voided = false {StoreFilter(storeId, "s")}{tf}
-                GROUP BY si.product_name, p.barcode, p.category
+                GROUP BY si.product_name, p.barcode, p.category, si.unit_name
                 {orderBy}
                 LIMIT @limit";
             cmd.Parameters.AddWithValue("limit", limit);
@@ -157,15 +158,16 @@ public class DashboardController : ControllerBase
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
-                var revenue = reader.GetDecimal(4);
-                var cost = reader.GetDecimal(5);
+                var revenue = reader.GetDecimal(5);
+                var cost = reader.GetDecimal(6);
                 var profit = revenue - cost;
                 var margin = revenue > 0 ? (profit / revenue * 100).ToString("F1") : "0.0";
                 data.Add(new {
                     productName = reader.GetString(0),
                     barcode = reader.GetString(1),
                     category = reader.GetString(2),
-                    totalQty = reader.GetInt32(3),
+                    unitName = reader.GetString(3),
+                    totalQty = reader.GetInt32(4),
                     totalRevenue = revenue,
                     totalCost = cost,
                     totalProfit = profit,
