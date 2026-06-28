@@ -4,13 +4,6 @@
    ═══════════════════════════════════════════════════════ */
 
 const API = '/api/dashboard';
-const PAGE_SIZE = 20;
-
-/* ── Utilities ──────────────────────────────────────── */
-window.fmt = n => Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-window.fmtInt = n => Number(n || 0).toLocaleString('en-PH');
-window.esc = s => (s + '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-window.shortStore = (sid, name) => (name && name.trim()) ? name.trim() : (sid ? sid.replace('STORE-', '').slice(0, 12) : 'Unknown');
 
 async function fetchJSON(url) {
   try {

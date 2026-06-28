@@ -1,6 +1,14 @@
 /* ── Alpine Component Registrations ──────────────────── */
 // Loaded BEFORE Alpine CDN. Registers in alpine:init so
 // Alpine.store/Alpine.data exist when initTree processes DOM.
+
+/* Constants & utilities needed by Alpine components at init time */
+const PAGE_SIZE = 20;
+window.fmt = n => Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+window.fmtInt = n => Number(n || 0).toLocaleString('en-PH');
+window.esc = s => (s + '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+window.shortStore = (sid, name) => (name && name.trim()) ? name.trim() : (sid ? sid.replace('STORE-', '').slice(0, 12) : 'Unknown');
+
 document.addEventListener('alpine:init', () => {
 
 Alpine.store('app', {
