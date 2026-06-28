@@ -140,7 +140,7 @@ public class DashboardController : ControllerBase
                 SELECT si.product_name,
                        COALESCE(p.barcode, '') AS barcode,
                        COALESCE(p.category, '') AS category,
-                       SUM(si.quantity) AS total_qty,
+                       SUM(si.quantity * COALESCE(si.qty_per_unit, 1)) AS total_qty,
                        SUM(si.total_price) AS total_revenue,
                        SUM(si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS total_cost,
                        SUM(si.total_price) - SUM(si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS total_profit
