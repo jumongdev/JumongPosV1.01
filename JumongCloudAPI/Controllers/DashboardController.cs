@@ -202,14 +202,15 @@ public class DashboardController : ControllerBase
         }
 
         [HttpGet("void-logs")]
-        public IActionResult GetVoidLogs([FromQuery] int limit = 50, [FromQuery] string? storeId = null)
+        public IActionResult GetVoidLogs([FromQuery] int limit = 50, [FromQuery] string? storeId = null, [FromQuery] string? range = null)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
+            var tf = TimeframeClause(range, "vl.created_at", cmd);
+            cmd.CommandText = $@"
                 SELECT vl.invoice_no, vl.action, vl.reason, vl.product_name, vl.quantity, vl.amount, vl.user_name, vl.created_at, vl.store_id
                 FROM void_logs vl
-                WHERE 1=1 " + StoreFilter(storeId, "vl") + @"
+                WHERE 1=1 {StoreFilter(storeId, "vl")}{tf}
                 ORDER BY vl.created_at DESC, vl.pos_id
                 LIMIT @limit";
             cmd.Parameters.AddWithValue("limit", limit);
