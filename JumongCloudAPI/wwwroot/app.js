@@ -40,7 +40,8 @@ function toast(msg, type = 'info') {
 }
 
 /* ── Alpine Store ───────────────────────────────────── */
-document.addEventListener('alpine:init', () => {
+// Components registered immediately (Alpine loaded first via <script> before app.js)
+// No need for alpine:init wrapper — Alpine.data/Alpine.store are synchronous
   Alpine.store('app', {
     section: 'dashboard',
     storeId: '',
@@ -645,7 +646,6 @@ document.addEventListener('alpine:init', () => {
     document.addEventListener('visibilitychange', () => { if (!document.hidden) Alpine.store('app').refreshAll() });
     Alpine.store('app').refreshAll();
   })();
-});
 
 /* ── Product Analytics ──────────────────────────────── */
 Alpine.data('productAnalytics', () => ({
