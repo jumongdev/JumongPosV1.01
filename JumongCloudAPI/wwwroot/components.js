@@ -270,7 +270,7 @@ Alpine.store('app', {
 
   /* ── Stock Status ───────────────────────────────────── */
   Alpine.data('stockStatus', () => ({
-    d: null, loading: false,
+    d: [], loading: false, search: '', catFilter: '', page: 0,
     async init() { await this.load(); window.addEventListener('refresh-data', () => this.load()) },
     async load() {
       this.loading = true;
@@ -279,7 +279,21 @@ Alpine.store('app', {
         Alpine.store('app').cache.stock = this.d;
       } catch (e) { this.d = [] }
       this.loading = false;
+      this.page = 0;
     },
+    setFilter(c) { this.catFilter = c; this.page = 0 },
+    get categories() { const c = []; this.d.forEach(x => { if (x.category && !c.includes(x.category)) c.push(x.category) }); return c.sort() },
+    get filtered() {
+      let items = this.d;
+      if (this.search) { const q = this.search.toLowerCase(); items = items.filter(x => (x.name || '').toLowerCase().includes(q) || (x.barcode || '').toLowerCase().includes(q)) }
+      if (this.catFilter) items = items.filter(x => x.category === this.catFilter);
+      return items;
+    },
+    get total() { return this.filtered.length },
+    get pages() { return Math.ceil(this.total / PAGE_SIZE) },
+    get paged() { return this.filtered.slice(this.page * PAGE_SIZE, (this.page + 1) * PAGE_SIZE) },
+    prev() { if (this.page > 0) this.page-- },
+    next() { if (this.page < this.pages - 1) this.page++ },
     stockClass(qty) { return qty === 0 ? 'text-red-400' : qty < 10 ? 'text-amber-400' : '' }
   }));
 
