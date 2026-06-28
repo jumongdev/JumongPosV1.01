@@ -589,7 +589,7 @@ Alpine.store('app', {
 
   /* ── Product Analytics ──────────────────────────────── */
   Alpine.data('productAnalytics', () => ({
-    d: [], loading: true, collapsed: false, sortBy: 'qty', limit: 10,
+    d: [], loading: true, collapsed: false, sortBy: 'qty', limit: 20, page: 0, catFilter: '',
     async init() {
       window.addEventListener('load-analytics', () => this.load());
       window.addEventListener('refresh-data', () => this.load());
@@ -599,13 +599,25 @@ Alpine.store('app', {
       this.loading = true;
       try {
         const params = Alpine.store('app').filterParams.replace('&', '');
-        this.d = await fetchJSON(API + '/top-products?limit=50&sort=' + this.sortBy + (params ? '&' + params : ''));
+        this.d = await fetchJSON(API + '/top-products?limit=5000&sort=' + this.sortBy + (params ? '&' + params : ''));
         Alpine.store('app').cache.analytics = this.d;
       } catch (e) { this.d = [] }
       this.loading = false;
+      this.page = 0;
     },
     setSort(s) { this.sortBy = s; this.load() },
-    get filtered() { return this.d.slice(0, this.limit) },
+    setLimit(v) { this.limit = parseInt(v); this.page = 0 },
+    setFilter(c) { this.catFilter = c; this.page = 0 },
+    get categories() { const c = []; this.d.forEach(x => { if (x.category && !c.includes(x.category)) c.push(x.category) }); return c.sort() },
+    get filtered() {
+      if (!this.catFilter) return this.d;
+      return this.d.filter(x => x.category === this.catFilter);
+    },
+    get total() { return this.filtered.length },
+    get pages() { return Math.ceil(this.total / this.limit) },
+    get paged() { return this.filtered.slice(this.page * this.limit, (this.page + 1) * this.limit) },
+    prev() { if (this.page > 0) this.page-- },
+    next() { if (this.page < this.pages - 1) this.page++ },
     marginClass(m) { const v = parseFloat(m); return v > 20 ? 'text-emerald-400' : v > 0 ? 'text-amber-400' : 'text-red-400' }
   }));
 

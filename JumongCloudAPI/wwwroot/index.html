@@ -1011,10 +1011,17 @@ tailwind.config = {
                 </div>
               </div>
               <div class="flex items-center gap-2">
-                <select x-model="limit" class="text-[10px] bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] text-gray-700 dark:text-slate-200 rounded px-1.5 py-1">
+                <select @change="setFilter($event.target.value)" class="text-[10px] bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] text-gray-700 dark:text-slate-200 rounded px-1.5 py-1 max-w-[100px]">
+                  <option value="">All Categories</option>
+                  <template x-for="c in categories" :key="c">
+                    <option :value="c" x-text="c"></option>
+                  </template>
+                </select>
+                <select @change="setLimit($event.target.value)" class="text-[10px] bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] text-gray-700 dark:text-slate-200 rounded px-1.5 py-1">
                   <option value="10">10</option>
                   <option value="25">25</option>
                   <option value="50">50</option>
+                  <option value="100">100</option>
                 </select>
                 <button @click="exportCSV('analytics')" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CSV</button>
               </div>
@@ -1022,8 +1029,8 @@ tailwind.config = {
             <!-- Body -->
             <div class="p-4">
               <template x-if="loading"><div class="flex justify-center py-8"><span class="spinner"></span></div></template>
-              <template x-if="!loading && filtered.length===0"><div class="text-center py-8 text-gray-400">No product data in selected period</div></template>
-              <template x-if="filtered.length > 0">
+              <template x-if="!loading && paged.length===0 && total===0"><div class="text-center py-8 text-gray-400">No product data in selected period</div></template>
+              <template x-if="total > 0">
                 <div class="overflow-x-auto">
                   <table class="w-full text-xs">
                     <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
@@ -1039,7 +1046,7 @@ tailwind.config = {
                       <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Margin</th>
                     </tr></thead>
                     <tbody>
-                        <template x-for="(p,i) in filtered" :key="p.productName + p.unitName">
+                        <template x-for="(p,i) in paged" :key="p.productName + p.unitName">
                         <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                           <td class="px-2 py-2 text-gray-400" x-text="i+1"></td>
                           <td class="px-2 py-2 font-medium text-gray-700 dark:text-slate-200" x-text="p.productName"></td>
@@ -1057,6 +1064,13 @@ tailwind.config = {
                   </table>
                 </div>
               </template>
+              <div class="flex items-center justify-between px-3 py-2 text-xs text-gray-400" x-show="pages > 1">
+                <span x-text="'Page '+(page+1)+' of '+pages+' ('+total+' rows)'"></span>
+                <div class="flex gap-2">
+                  <button :disabled="page===0" @click="prev()" class="px-3 py-1 rounded border border-gray-200 dark:border-[#222255] disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-[#181848]">Prev</button>
+                  <button :disabled="page>=pages-1" @click="next()" class="px-3 py-1 rounded border border-gray-200 dark:border-[#222255] disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-[#181848]">Next</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
