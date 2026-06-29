@@ -1,6 +1,7 @@
 using System.Data;
 using System.Data.SQLite;
 using JumongPosV1._01.Data;
+using JumongPosV1._01.Helpers;
 using JumongPosV1._01.Models;
 using Npgsql;
 
@@ -109,7 +110,7 @@ public class StockService
                         pgCmd.Parameters.AddWithValue("sid", StoreId);
                         pgCmd.ExecuteNonQuery();
                     }
-                    catch { }
+                    catch (Exception ex) { ErrorLogger.Log("StockService.ConfirmReceiving(updatePg)", ex); }
                 }
             }
 

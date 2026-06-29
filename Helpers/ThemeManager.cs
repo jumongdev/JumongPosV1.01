@@ -65,6 +65,7 @@ public class Theme
     // ── Sidebar (MainForm) ──
     public Color SidebarBg { get; init; }
     public Color SidebarCardBg { get; init; }
+    public Color SidebarFg { get; init; }
     public Color SidebarHoverBg { get; init; }
     public Color SidebarTitleAccent { get; init; }
     public Color SidebarUserInfo { get; init; }
@@ -130,6 +131,7 @@ public static class ThemeManager
 
         SidebarBg           = Color.FromArgb(30, 30, 45),
         SidebarCardBg        = Color.FromArgb(40, 40, 58),
+        SidebarFg           = Color.White,
         SidebarHoverBg       = Color.FromArgb(55, 55, 78),
         SidebarTitleAccent   = Color.FromArgb(100, 180, 255),
         SidebarUserInfo      = Color.FromArgb(150, 150, 170),
@@ -193,6 +195,7 @@ public static class ThemeManager
 
         SidebarBg           = Color.FromArgb(244, 245, 250),
         SidebarCardBg        = Color.White,
+        SidebarFg           = Color.FromArgb(30, 30, 46),
         SidebarHoverBg       = Color.FromArgb(230, 231, 240),
         SidebarTitleAccent   = Color.FromArgb(24, 95, 165),
         SidebarUserInfo      = Color.FromArgb(110, 110, 140),

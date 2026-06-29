@@ -56,11 +56,11 @@ static class Program
             return;
         }
 
-        Application.ThreadException += (_, e) => { LogCrash(e.Exception); SendErrorEmail(e.Exception); };
+        Application.ThreadException += (_, e) => { ErrorLogger.Log("Unhandled", e.Exception); LogCrash(e.Exception); SendErrorEmail(e.Exception); };
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {
             if (e.ExceptionObject is Exception ex)
-            { LogCrash(ex); SendErrorEmail(ex); }
+            { ErrorLogger.Log("Unhandled", ex); LogCrash(ex); SendErrorEmail(ex); }
         };
 
         EmailService.FlushQueue();
@@ -69,12 +69,15 @@ static class Program
         if (login.ShowDialog() != DialogResult.OK)
             return;
 
+        ErrorLogger.Log("Startup", $"App v{AppVersion.Current} started by {login.CurrentUser?.Username ?? "unknown"}");
+
         try
         {
             Application.Run(new MainForm(login.CurrentUser!));
         }
         catch (Exception ex)
         {
+            ErrorLogger.Log("MainForm.Run", ex);
             LogCrash(ex);
             MessageBox.Show($"Application error:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }

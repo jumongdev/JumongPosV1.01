@@ -86,6 +86,26 @@ public class ProductUnitService
         return null;
     }
 
+    public static Dictionary<int, ProductUnit> GetDefaultsByProductIds(List<int> productIds)
+    {
+        var result = new Dictionary<int, ProductUnit>();
+        if (productIds.Count == 0) return result;
+
+        using var conn = DatabaseHelper.GetConnection();
+        conn.Open();
+        var placeholders = string.Join(",", productIds.Select((_, i) => $"@p{i}"));
+        using var cmd = new SQLiteCommand($"SELECT * FROM ProductUnits WHERE IsDefault = 1 AND ProductId IN ({placeholders})", conn);
+        for (var i = 0; i < productIds.Count; i++)
+            cmd.Parameters.AddWithValue($"@p{i}", productIds[i]);
+        using var rdr = cmd.ExecuteReader();
+        while (rdr.Read())
+        {
+            var unit = Map(rdr);
+            result[unit.ProductId] = unit;
+        }
+        return result;
+    }
+
     public static void Save(ProductUnit u)
     {
         using var conn = DatabaseHelper.GetConnection();

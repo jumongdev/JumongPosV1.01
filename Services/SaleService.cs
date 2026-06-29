@@ -1,5 +1,6 @@
 using System.Data.SQLite;
 using JumongPosV1._01.Data;
+using JumongPosV1._01.Helpers;
 using JumongPosV1._01.Models;
 
 namespace JumongPosV1._01.Services;
@@ -500,7 +501,7 @@ public class SaleService
                         });
                     }
                 }
-                catch { }
+                catch (Exception ex) { ErrorLogger.Log("SaleService.VoidSale(syncCloud)", ex); }
             }
         }
         catch
@@ -623,7 +624,7 @@ public class SaleService
                 if (updatedSale != null && updatedSale.Items.Count > 0)
                     _ = SyncService.SyncSale(updatedSale, updatedSale.Items);
             }
-            catch { }
+            catch (Exception ex) { ErrorLogger.Log("SaleService.VoidItem(syncSale)", ex); }
             try
             {
                 if (paymentMethod == "Credit" && customerId.HasValue)
@@ -652,7 +653,7 @@ public class SaleService
                     }
                 }
             }
-            catch { }
+            catch (Exception ex) { ErrorLogger.Log("SaleService.VoidItem(syncCreditTxns)", ex); }
         }
         catch
         {

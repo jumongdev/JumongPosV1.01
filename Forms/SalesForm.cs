@@ -39,6 +39,8 @@ public partial class SalesForm : Form
     private static Color CBlueLight    => ThemeManager.Current.StatusBlueLight;
     private static Color CBlueMid      => ThemeManager.Current.StatusBlueMid;
     private static Color CBlueDark     => ThemeManager.Current.StatusBlueDark;
+    private static Color CInputBg      => ThemeManager.Current.InputBg;
+    private static Color CInputFg      => ThemeManager.Current.InputFg;
     private static Color CRedLight     => ThemeManager.Current.StatusRedLight;
     private static Color CRedDark      => ThemeManager.Current.StatusRedDark;
     private static Color CAmberLight   => ThemeManager.Current.StatusAmberLight;
@@ -964,8 +966,8 @@ public partial class SalesForm : Form
         {
             Font = new Font("Segoe UI", 16F, FontStyle.Bold),
             BorderStyle = BorderStyle.FixedSingle,
-            BackColor = Color.FromArgb(245, 246, 250),
-            ForeColor = CText
+            BackColor = CInputBg,
+            ForeColor = CInputFg
         };
         txtBarcode.KeyDown += txtBarcode_KeyDown;
 
@@ -1241,7 +1243,7 @@ public partial class SalesForm : Form
         var gap = 12;
 
         var topH      = 44;
-        var custH     = 36;
+        var custH     = 42;
         var searchH   = 52;
         var rightW    = Math.Max(280, Math.Min(320, (int)(w * 0.27)));
         var leftW     = w - rightW - 1;
@@ -1267,9 +1269,9 @@ public partial class SalesForm : Form
         _pnlCustomerBar.Location = new Point(0, topH);
         _pnlCustomerBar.Size     = new Size(leftW, custH);
         var cc = _pnlCustomerBar.Controls;
-        cc[0].Location = new Point(12, 9);   cc[0].Size = new Size(18, 18);
-        cc[1].Location = new Point(34, 8);   cc[1].Size = new Size(leftW - 160, 20);
-        cc[2].Location = new Point(leftW - 120, 9); cc[2].Size = new Size(100, 18);
+        cc[0].Location = new Point(12, (custH - 28) / 2); cc[0].Size = new Size(28, 28);
+        cc[1].Location = new Point(38, (custH - 20) / 2); cc[1].Size = new Size(leftW - 220, 20);
+        cc[2].Location = new Point(leftW - 140, (custH - 20) / 2); cc[2].Size = new Size(120, 20);
 
         _pnlSearch.Location = new Point(0, topH + custH);
         _pnlSearch.Size     = new Size(leftW, searchH);
@@ -1325,15 +1327,17 @@ public partial class SalesForm : Form
         var rcs = _pnlTotals.Controls;
         var ry  = m;
 
-        rcs[0].Location = new Point(m, ry);       rcs[0].Size = new Size(pw, 16); ry += 18;
-        lblGrandTotal.Location = new Point(m, ry); lblGrandTotal.Size = new Size(pw, 40); ry += 42;
+        rcs[0].Location = new Point(m, ry);        rcs[0].Size = new Size(pw, 18); ry += 22;
+        lblGrandTotal.Location = new Point(m, ry); lblGrandTotal.Size = new Size(pw, 54); ry += 58;
         rcs[2].Location = new Point(m, ry);        rcs[2].Size = new Size(pw, 16); ry += 22;
         rcs[3].Location = new Point(m, ry);        rcs[3].Size = new Size(pw, 1);  ry += 12;
         rcs[4].Location = new Point(m, ry);        rcs[4].Size = new Size(pw / 2, 22);
-        lblSubTotal.Location = new Point(m + pw / 2, ry); lblSubTotal.Size = new Size(pw / 2, 22); ry += 24;
+        lblSubTotal.Location = new Point(m + pw / 2, ry); lblSubTotal.Size = new Size(pw / 2, 22); ry += 28;
         rcs[6].Location = new Point(m, ry);        rcs[6].Size = new Size(pw / 2, 22);
-        rcs[7].Location = new Point(m + pw / 2, ry); rcs[7].Size = new Size(pw / 2, 22); ry += 26;
-        rcs[8].Location = new Point(m, ry);        rcs[8].Size = new Size(pw, 1); ry += 16;
+        rcs[7].Location = new Point(m + pw / 2, ry); rcs[7].Size = new Size(pw / 2, 22); ry += 28;
+        rcs[8].Location = new Point(m, ry);        rcs[8].Size = new Size(pw / 2, 22);
+        rcs[9].Location = new Point(m + pw / 2, ry); rcs[9].Size = new Size(pw / 2, 22); ry += 28;
+        rcs[10].Location = new Point(m, ry);       rcs[10].Size = new Size(pw, 1); ry += 14;
         btnPay.Location = new Point(m, ry);       btnPay.Size = new Size(pw, 52);
     }
 

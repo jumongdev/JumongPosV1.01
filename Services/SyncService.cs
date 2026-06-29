@@ -2,6 +2,7 @@ using System.Data.SQLite;
 using System.Text;
 using System.Text.Json;
 using JumongPosV1._01.Data;
+using JumongPosV1._01.Helpers;
 using JumongPosV1._01.Models;
 
 namespace JumongPosV1._01.Services;
@@ -331,7 +332,7 @@ public static class SyncService
                 var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
                 EnqueueFailed(endpoint, json);
             }
-            catch { }
+            catch (Exception ex2) { ErrorLogger.Log("SyncService.PostAsync(enqueue)", ex2); }
         }
     }
 
@@ -345,7 +346,7 @@ public static class SyncService
             cmd.Parameters.AddWithValue("@id", saleId);
             cmd.ExecuteNonQuery();
         }
-        catch { }
+        catch (Exception ex) { ErrorLogger.Log("SyncService.MarkSynced", ex); }
     }
 
     private static string ToUtcString(string? localTime)
@@ -374,7 +375,7 @@ public static class SyncService
             cmd.Parameters.AddWithValue("err", error);
             cmd.ExecuteNonQuery();
         }
-        catch { }
+        catch (Exception ex) { ErrorLogger.Log("SyncService.LogSync", ex); }
     }
 
     private static void EnqueueFailed(string endpoint, string json)
@@ -390,7 +391,7 @@ public static class SyncService
             cmd.Parameters.AddWithValue("p", json);
             cmd.ExecuteNonQuery();
         }
-        catch { }
+        catch (Exception ex) { ErrorLogger.Log("SyncService.EnqueueFailed", ex); }
     }
 
     public static async Task RetryFailedAsync()
@@ -406,7 +407,7 @@ public static class SyncService
             while (reader.Read())
                 failed.Add((reader.GetInt32(0), reader.GetString(1), reader.GetString(2)));
         }
-        catch { return; }
+        catch (Exception ex) { ErrorLogger.Log("SyncService.RetryFailedAsync(read)", ex); return; }
 
         if (failed == null || failed.Count == 0) return;
 
@@ -427,12 +428,12 @@ public static class SyncService
                             if (doc.RootElement.TryGetProperty("sale", out var saleEl) && saleEl.TryGetProperty("posId", out var posIdEl))
                                 MarkSynced(posIdEl.GetInt32());
                         }
-                        catch { }
+                        catch (Exception ex) { ErrorLogger.Log("SyncService.RetryFailedAsync(parse)", ex); }
                     }
                     RemoveFromQueue(id);
                 }
             }
-            catch { }
+            catch (Exception ex) { ErrorLogger.Log("SyncService.RetryFailedAsync(post)", ex); }
         }
     }
 
@@ -446,7 +447,7 @@ public static class SyncService
             cmd.Parameters.AddWithValue("id", id);
             cmd.ExecuteNonQuery();
         }
-        catch { }
+        catch (Exception ex) { ErrorLogger.Log("SyncService.RemoveFromQueue", ex); }
     }
 
     public static void EnsureSyncQueueTable()
@@ -460,7 +461,7 @@ public static class SyncService
                 conn);
             cmd.ExecuteNonQuery();
         }
-        catch { }
+        catch (Exception ex) { ErrorLogger.Log("SyncService.EnsureSyncQueueTable", ex); }
     }
 
     public static async Task<int> DownloadMasterCatalog(IProgress<string>? progress = null)

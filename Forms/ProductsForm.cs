@@ -127,21 +127,24 @@ public partial class ProductsForm : Form
     private void SetReadOnly(bool readOnly)
     {
         _isEditing = !readOnly;
-        txtName.ReadOnly = readOnly;
-        txtBarcode.ReadOnly = readOnly;
+        if (readOnly)
+        {
+            UpdateDisplayLabels();
+            txtName.Visible = false;   _lblNameDisplay.Visible = true;
+            txtBarcode.Visible = false; _lblBarcodeDisplay.Visible = true;
+            txtPrice.Visible = false;   _lblPriceDisplay.Visible = true;
+            txtCost.Visible = false;    _lblCostDisplay.Visible = true;
+            txtStock.Visible = false;   _lblStockDisplay.Visible = true;
+        }
+        else
+        {
+            _lblNameDisplay.Visible = false;   txtName.Visible = true;
+            _lblBarcodeDisplay.Visible = false; txtBarcode.Visible = true;
+            _lblPriceDisplay.Visible = false;   txtPrice.Visible = true;
+            _lblCostDisplay.Visible = false;    txtCost.Visible = true;
+            _lblStockDisplay.Visible = false;   txtStock.Visible = true;
+        }
         cmbCategory.Enabled = !readOnly;
-        txtPrice.ReadOnly = readOnly;
-        txtCost.ReadOnly = readOnly;
-        txtStock.ReadOnly = true;
-
-        var inputBg = readOnly ? Color.FromArgb(20, 20, 35) : ThemeManager.Current.InputBg;
-        txtName.BackColor = inputBg;
-        txtBarcode.BackColor = inputBg;
-        cmbCategory.BackColor = inputBg;
-        txtPrice.BackColor = inputBg;
-        txtCost.BackColor = inputBg;
-        txtStock.BackColor = ThemeManager.Current.PanelBg;
-
         btnStockMovement.Visible = true;
     }
 
@@ -170,10 +173,10 @@ public partial class ProductsForm : Form
         try
         {
             var bytes = Convert.FromBase64String(data);
-            using var ms = new MemoryStream(bytes);
+            var ms = new MemoryStream(bytes);
             return Image.FromStream(ms);
         }
-        catch { return null; }
+        catch (Exception ex) { ErrorLogger.Log("ProductsForm.Base64ToImage", ex); return null; }
     }
 
     private void btnNew_Click(object? sender, EventArgs e)
@@ -446,10 +449,12 @@ public partial class ProductsForm : Form
 
         var lblPageTitle = new Label { Text = "\uD83D\uDCE6 PRODUCT MANAGEMENT", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(20, 12), Size = new Size(300, 28) };
 
-        txtSearch = new TextBox { Font = new Font("Segoe UI", 10F), Location = new Point(340, 12), Size = new Size(220, 28), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg };
+        var searchY = 12;
+        var searchH = 28;
+        txtSearch = new TextBox { Font = new Font("Segoe UI", 10F), Location = new Point(340, searchY), Size = new Size(220, searchH), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg };
         txtSearch.TextChanged += TriggerSearch;
 
-        var lblSearchIcon = new Label { Text = "\uD83D\uDD0D", Font = new Font("Segoe UI", 10F), Location = new Point(315, 14), Size = new Size(25, 22), TextAlign = ContentAlignment.MiddleRight };
+        var lblSearchIcon = new Label { Text = "\uD83D\uDD0D", Font = new Font("Segoe UI", 10F), Location = new Point(340 - 25 - 5, searchY), Size = new Size(25, searchH), TextAlign = ContentAlignment.MiddleRight };
 
         var lblCatFilter = new Label { Text = "Category:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(580, 16), Size = new Size(65, 20), TextAlign = ContentAlignment.MiddleRight };
         cmbFilterCategory = new ComboBox { Location = new Point(650, 12), Size = new Size(150, 28), DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, BackColor = inputBg, ForeColor = inputFg };
@@ -553,7 +558,13 @@ public partial class ProductsForm : Form
         AddComboField("CATEGORY", ref cmbCategory, ref y, pnlRight, inputBg, inputFg, dimText);
         AddField("PRICE", ref txtPrice, ref y, pnlRight, inputBg, inputFg, dimText, HorizontalAlignment.Right);
         AddField("COST", ref txtCost, ref y, pnlRight, inputBg, inputFg, dimText, HorizontalAlignment.Right);
-        AddField("STOCK", ref txtStock, ref y, pnlRight, Color.FromArgb(20, 20, 35), Color.FromArgb(140, 140, 170), dimText, HorizontalAlignment.Right);
+        AddField("STOCK", ref txtStock, ref y, pnlRight, ThemeManager.Current.PanelBg, ThemeManager.Current.TextMuted, dimText, HorizontalAlignment.Right);
+
+        _lblNameDisplay = MakeDisplayLabel(txtName, t.PanelBg, t.TextPrimary);
+        _lblBarcodeDisplay = MakeDisplayLabel(txtBarcode, t.PanelBg, t.TextPrimary);
+        _lblPriceDisplay = MakeDisplayLabel(txtPrice, t.PanelBg, t.TextPrimary, HorizontalAlignment.Right);
+        _lblCostDisplay = MakeDisplayLabel(txtCost, t.PanelBg, t.TextPrimary, HorizontalAlignment.Right);
+        _lblStockDisplay = MakeDisplayLabel(txtStock, t.PanelBg, t.TextMuted, HorizontalAlignment.Right);
 
         _picProduct = new PictureBox
         {
@@ -594,7 +605,7 @@ public partial class ProductsForm : Form
         btnPrintChecklist = new Button { Text = "\uD83D\uDCCB CHECKLIST", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(15, y), Size = new Size(310, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentGreen, ForeColor = Color.White, Cursor = Cursors.Hand };
         btnPrintChecklist.Click += btnPrintChecklist_Click;
 
-        pnlRight.Controls.AddRange(new Control[] { lblFormTitle, btnStockMovement, btnNew, btnEdit, btnUnits, btnSave, btnCancel, btnDelete, btnPrintChecklist });
+        pnlRight.Controls.AddRange(new Control[] { lblFormTitle, _lblNameDisplay, _lblBarcodeDisplay, _lblPriceDisplay, _lblCostDisplay, _lblStockDisplay, btnStockMovement, btnNew, btnEdit, btnUnits, btnSave, btnCancel, btnDelete, btnPrintChecklist });
 
         // Product creation/editing only via cloud master catalog
         btnNew.Visible = false;
@@ -655,11 +666,41 @@ public partial class ProductsForm : Form
         ForeColor = t.TextPrimary;
     }
 
+    private void UpdateDisplayLabels()
+    {
+        _lblNameDisplay.Text = txtName.Text;
+        _lblBarcodeDisplay.Text = txtBarcode.Text;
+        _lblPriceDisplay.Text = txtPrice.Text;
+        _lblCostDisplay.Text = txtCost.Text;
+        _lblStockDisplay.Text = txtStock.Text;
+    }
+
+    private Label MakeDisplayLabel(TextBox source, Color bg, Color fg, HorizontalAlignment align = HorizontalAlignment.Left)
+    {
+        return new Label
+        {
+            Location = source.Location,
+            Size = source.Size,
+            BackColor = bg,
+            ForeColor = fg,
+            Font = source.Font,
+            TextAlign = align switch
+            {
+                HorizontalAlignment.Right => ContentAlignment.MiddleRight,
+                _ => ContentAlignment.MiddleLeft
+            },
+            BorderStyle = BorderStyle.FixedSingle,
+            Visible = false,
+            Text = source.Text
+        };
+    }
+
     private TextBox txtSearch = null!;
     private ComboBox cmbFilterCategory = null!;
     private Label lblMetricTotal = null!, lblMetricLow = null!, lblMetricOut = null!, lblMetricRetail = null!, lblMetricCost = null!;
     private DataGridView dgvProducts = null!;
     private TextBox txtName = null!, txtBarcode = null!, txtPrice = null!, txtCost = null!, txtStock = null!;
+    private Label _lblNameDisplay = null!, _lblBarcodeDisplay = null!, _lblPriceDisplay = null!, _lblCostDisplay = null!, _lblStockDisplay = null!;
     private ComboBox cmbCategory = null!;
     private Button btnNew = null!, btnEdit = null!, btnUnits = null!, btnStockMovement = null!, btnCancel = null!, btnSave = null!, btnDelete = null!;
     private Button btnPrintChecklist = null!;

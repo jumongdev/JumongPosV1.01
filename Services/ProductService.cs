@@ -193,56 +193,27 @@ public class ProductService
     public static List<Product> Search(string keyword, string? category = null, string? stockFilter = null)
     {
         var list = new List<Product>();
-        if (CloudDatabaseHelper.IsConfigured)
-        {
-            try
-            {
-                using var pgConn = CloudDatabaseHelper.GetConnection()!;
-                pgConn.Open();
-                var sql = "SELECT * FROM products WHERE is_active = 1";
-                if (!string.IsNullOrEmpty(keyword))
-                    sql += " AND (name ILIKE @q OR barcode ILIKE @q)";
-                if (!string.IsNullOrEmpty(category))
-                    sql += " AND category = @cat";
-                if (stockFilter == "low")
-                    sql += " AND stock_qty > 0 AND stock_qty <= @thresh";
-                else if (stockFilter == "out")
-                    sql += " AND stock_qty = 0";
-                sql += " ORDER BY name";
-                using var cmd = new NpgsqlCommand(sql, pgConn);
-                if (!string.IsNullOrEmpty(keyword))
-                    cmd.Parameters.AddWithValue("q", $"%{keyword}%");
-                if (!string.IsNullOrEmpty(category))
-                    cmd.Parameters.AddWithValue("cat", category);
-                if (stockFilter == "low")
-                    cmd.Parameters.AddWithValue("thresh", GetLowStockThreshold());
-                using var rdr = cmd.ExecuteReader();
-                while (rdr.Read()) list.Add(MapPg(rdr));
-                if (list.Count > 0) return list;
-            }
-            catch { }
-        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var sql2 = "SELECT * FROM Products WHERE IsActive = 1";
+        var sql = "SELECT * FROM Products WHERE IsActive = 1";
         if (!string.IsNullOrEmpty(keyword))
-            sql2 += " AND (Name LIKE @q OR Barcode LIKE @q)";
+            sql += " AND (Name LIKE @q OR Barcode LIKE @q)";
         if (!string.IsNullOrEmpty(category))
-            sql2 += " AND Category = @cat";
+            sql += " AND Category = @cat";
         if (stockFilter == "low")
-            sql2 += " AND StockQty > 0 AND StockQty <= @thresh";
+            sql += " AND StockQty > 0 AND StockQty <= @thresh";
         else if (stockFilter == "out")
-            sql2 += " AND StockQty = 0";
-        sql2 += " ORDER BY Name";
-        using var cmd2 = new SQLiteCommand(sql2, conn);
+            sql += " AND StockQty = 0";
+        sql += " ORDER BY Name LIMIT 200";
+        using var cmd = new SQLiteCommand(sql, conn);
         if (!string.IsNullOrEmpty(keyword))
-            cmd2.Parameters.AddWithValue("@q", $"%{keyword}%");
+            cmd.Parameters.AddWithValue("@q", $"%{keyword}%");
         if (!string.IsNullOrEmpty(category))
-            cmd2.Parameters.AddWithValue("@cat", category);
+            cmd.Parameters.AddWithValue("@cat", category);
         if (stockFilter == "low")
-            cmd2.Parameters.AddWithValue("@thresh", GetLowStockThreshold());
-        using var rdr2 = cmd2.ExecuteReader();
-        while (rdr2.Read()) list.Add(Map(rdr2));
+            cmd.Parameters.AddWithValue("@thresh", GetLowStockThreshold());
+        using var rdr = cmd.ExecuteReader();
+        while (rdr.Read()) list.Add(Map(rdr));
         return list;
     }
 

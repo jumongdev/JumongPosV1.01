@@ -74,7 +74,7 @@ public partial class MainForm : Form
     private void StartSyncRetry()
     {
         var syncTimer = new System.Windows.Forms.Timer { Interval = 30000 };
-        syncTimer.Tick += async (_, _) => { try { await SyncService.RetryFailedAsync(); } catch { } };
+        syncTimer.Tick += async (_, _) => { try { await SyncService.RetryFailedAsync(); } catch (Exception ex) { ErrorLogger.Log("MainForm.StartSyncRetry", ex); } };
         syncTimer.Start();
     }
 
@@ -111,7 +111,7 @@ public partial class MainForm : Form
                         ? $"    Online Orders ({count})"
                         : "    Online Orders";
             }
-            catch { }
+            catch (Exception ex) { ErrorLogger.Log("MainForm.StartTransferPoll", ex); }
         };
         _transferTimer.Start();
     }
@@ -223,7 +223,7 @@ public partial class MainForm : Form
             else
             {
                 btn.BackColor = t.SidebarCardBg;
-                btn.ForeColor = Color.White;
+                btn.ForeColor = t.SidebarFg;
                 btn.FlatAppearance.MouseOverBackColor = t.SidebarHoverBg;
             }
         }
@@ -346,7 +346,7 @@ public partial class MainForm : Form
         var darkBg = t.SidebarBg;
         var cardBg = t.SidebarCardBg;
         var accent = t.AccentBlue;
-        var textColor = Color.White;
+        var textColor = t.SidebarFg;
         var hoverBg = t.SidebarHoverBg;
 
         BackColor = darkBg;

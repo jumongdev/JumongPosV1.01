@@ -1,5 +1,3 @@
-using System.Drawing;
-using System.IO;
 using JumongPosV1._01.Helpers;
 using JumongPosV1._01.Models;
 using JumongPosV1._01.Services;
@@ -20,18 +18,11 @@ public class ProductSearchForm : Form
         }
     }
 
-    public void ApplyTheme()
-    {
-        var t = ThemeManager.Current;
-        BackColor = t.CanvasBg;
-        ForeColor = t.TextPrimary;
-    }
-
     private readonly TextBox _txtSearch;
     private readonly DataGridView _dgv;
     private List<Product> _results = new();
 
-    private static Color CHeaderBg    => ThemeManager.Current.SidebarTitleAccent;
+    private static Color CHeaderBg    => ThemeManager.Current.StatusBlueMid;
     private static Color CHeaderText  => Color.White;
     private static Color CSurface     => ThemeManager.Current.SurfaceBg;
     private static Color CCard        => ThemeManager.Current.CardBg;
@@ -39,7 +30,9 @@ public class ProductSearchForm : Form
     private static Color CText        => ThemeManager.Current.TextPrimary;
     private static Color CTextMuted   => ThemeManager.Current.TextSecondary;
     private static Color CTextHint    => ThemeManager.Current.TextHint;
-    private static Color CBlueMid     => ThemeManager.Current.SidebarTitleAccent;
+    private static Color CInputBg     => ThemeManager.Current.InputBg;
+    private static Color CInputFg     => ThemeManager.Current.InputFg;
+    private static Color CBlueMid     => ThemeManager.Current.StatusBlueMid;
     private static Color CGreenDark   => ThemeManager.Current.StatusGreenDark;
     private static Color CGreenMid    => ThemeManager.Current.StatusGreenMid;
     private static Color CRedDark     => ThemeManager.Current.StatusRedDark;
@@ -92,12 +85,13 @@ public class ProductSearchForm : Form
             Size = new Size(clientW, 30),
             Font = new Font("Segoe UI", 12F),
             BorderStyle = BorderStyle.FixedSingle,
-            ForeColor = CText,
-            BackColor = CCard
+            ForeColor = CInputFg,
+            BackColor = CInputBg
         };
         _txtSearch.TextChanged += (_, _) => DoSearch();
         _txtSearch.KeyDown += OnSearchKeyDown;
-        _txtSearch.GotFocus += (_, _) => _txtSearch.BackColor = ThemeManager.Current.DgvSelection;
+        _txtSearch.GotFocus += (_, _) => _txtSearch.BackColor = CCard;
+        _txtSearch.LostFocus += (_, _) => _txtSearch.BackColor = CInputBg;
         _txtSearch.LostFocus += (_, _) => _txtSearch.BackColor = CCard;
 
         _dgv = new DataGridView
@@ -114,16 +108,16 @@ public class ProductSearchForm : Form
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             MultiSelect = false,
             AutoGenerateColumns = false,
-            RowTemplate = { Height = 50 },
+            RowTemplate = { Height = 32 },
             EnableHeadersVisualStyles = false,
             ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
             {
-                BackColor = ThemeManager.Current.DgvHeaderBg,
+                BackColor = CBlueMid,
                 ForeColor = ThemeManager.Current.DgvHeaderFg,
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 Alignment = DataGridViewContentAlignment.MiddleCenter,
-                SelectionBackColor = ThemeManager.Current.DgvHeaderBg,
-                SelectionForeColor = ThemeManager.Current.DgvHeaderFg
+                SelectionBackColor = CBlueMid,
+                SelectionForeColor = CHeaderText
             },
             DefaultCellStyle = new DataGridViewCellStyle
             {
@@ -135,20 +129,12 @@ public class ProductSearchForm : Form
             }
         };
 
-        _dgv.Columns.Add(new DataGridViewImageColumn
-        {
-            HeaderText = "",
-            Width = 55,
-            ImageLayout = DataGridViewImageCellLayout.Zoom,
-            DefaultCellStyle = new DataGridViewCellStyle { Padding = new Padding(3) },
-            Resizable = DataGridViewTriState.False
-        });
         _dgv.Columns.Add(new DataGridViewTextBoxColumn
         {
             DataPropertyName = "ProductName",
             HeaderText = "Product Name",
             AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
-            FillWeight = 60,
+            FillWeight = 65,
             DefaultCellStyle = new DataGridViewCellStyle
             {
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
@@ -172,7 +158,7 @@ public class ProductSearchForm : Form
             DataPropertyName = "PriceDisplay",
             HeaderText = "Price",
             AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
-            FillWeight = 14,
+            FillWeight = 10,
             DefaultCellStyle = new DataGridViewCellStyle
             {
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
@@ -187,7 +173,7 @@ public class ProductSearchForm : Form
             DataPropertyName = "StockDisplay",
             HeaderText = "Stock",
             AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
-            FillWeight = 10,
+            FillWeight = 9,
             DefaultCellStyle = new DataGridViewCellStyle
             {
                 Alignment = DataGridViewContentAlignment.MiddleCenter,
@@ -204,12 +190,7 @@ public class ProductSearchForm : Form
 
         _dgv.CellFormatting += (s, e) =>
         {
-            if (e.ColumnIndex == 0 && e.RowIndex >= 0 && e.RowIndex < _results.Count)
-            {
-                e.Value = Base64ToImage(_results[e.RowIndex].ImageData);
-                e.FormattingApplied = true;
-            }
-            else if (e.ColumnIndex == 4 && e.RowIndex >= 0 && e.RowIndex < _results.Count)
+            if (e.ColumnIndex == 3 && e.RowIndex >= 0 && e.RowIndex < _results.Count)
             {
                 var prod = _results[e.RowIndex];
                 var threshold = ProductService.GetLowStockThreshold();
@@ -236,7 +217,7 @@ public class ProductSearchForm : Form
         {
             Location = new Point(leftM, 560),
             Size = new Size(clientW, 4),
-            BackColor = ThemeManager.Current.DgvHeaderBg
+            BackColor = CBlueMid
         };
 
         Controls.AddRange(new Control[] { pnlHeader, lblHint, _txtSearch, _dgv, pnlFooter });
@@ -278,9 +259,10 @@ public class ProductSearchForm : Form
         }
 
         _results = ProductService.Search(text);
+        var defaultUnits = ProductUnitService.GetDefaultsByProductIds(_results.Select(p => p.Id).ToList());
         var display = _results.Select(p =>
         {
-            var defaultUnit = ProductUnitService.GetDefault(p.Id);
+            var defaultUnit = defaultUnits.TryGetValue(p.Id, out var u) ? u : null;
             var displayPrice = defaultUnit?.Price ?? p.Price;
             return new
             {
@@ -300,17 +282,5 @@ public class ProductSearchForm : Form
         SelectedProduct = _results[_dgv.CurrentRow.Index];
         DialogResult = DialogResult.OK;
         Close();
-    }
-
-    private static Image? Base64ToImage(string? data)
-    {
-        if (string.IsNullOrWhiteSpace(data)) return null;
-        try
-        {
-            var bytes = Convert.FromBase64String(data);
-            using var ms = new MemoryStream(bytes);
-            return Image.FromStream(ms);
-        }
-        catch { return null; }
     }
 }

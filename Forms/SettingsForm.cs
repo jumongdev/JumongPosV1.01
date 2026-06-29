@@ -421,28 +421,31 @@ public partial class SettingsForm : Form
                 sCmd.ExecuteNonQuery();
             };
             var lblTzHint = new Label { Text = "All timestamps use this timezone regardless of system clock.", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(128, 128, 128), Location = new Point(15, dy + 28), Size = new Size(400, 20) };
-            dy += 56;
-            var lblTheme = new Label { Text = "App Theme:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, dy), Size = new Size(140, 25) };
-            var cmbTheme = new ComboBox { Location = new Point(180, dy), Size = new Size(180, 25), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = inputBg, ForeColor = inputFg, FlatStyle = FlatStyle.Flat };
-            cmbTheme.Items.AddRange(new string[] { "Dark", "Light" });
-            cmbTheme.SelectedItem = ThemeManager.Current.Name;
-            cmbTheme.SelectedIndexChanged += (_, _) =>
-            {
-                var sel = cmbTheme.SelectedItem?.ToString() ?? "Dark";
-                ThemeManager.SwitchTheme(sel);
-                MainForm.ApplyThemeToChildren();
-            };
-            var lblThemeHint = new Label { Text = "Switch between Dark and Light appearance. Changes apply immediately.", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(128, 128, 128), Location = new Point(15, dy + 28), Size = new Size(400, 20) };
-            dy += 56;
-            MakeSection("DISPLAY SETUP", 370, new Control[] {
+            MakeSection("DISPLAY SETUP", 310, new Control[] {
                 lblPos, cmbPosScreen, lblCust, cmbCustomerScreen,
                 lblEmailSched, numEmailScheduleHour, lblEmailSchedHint,
                 chkEnableOnlineOrders, chkCustomerDisplay, lblRestart,
                 lblLowStock, numLowStock, lblLowStockHint,
-                lblTz, cmbTimezone, lblTzHint,
-                lblTheme, cmbTheme, lblThemeHint
+                lblTz, cmbTimezone, lblTzHint
             });
         }
+
+        // ═══════════════════════════════════════════
+        // App Theme (visible to all users)
+        // ═══════════════════════════════════════════
+        var ty = 40;
+        var lblTheme = new Label { Text = "App Theme:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, ty), Size = new Size(140, 25) };
+        var cmbTheme = new ComboBox { Location = new Point(180, ty), Size = new Size(180, 25), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = inputBg, ForeColor = inputFg, FlatStyle = FlatStyle.Flat };
+        cmbTheme.Items.AddRange(new string[] { "Dark", "Light" });
+        cmbTheme.SelectedItem = ThemeManager.Current.Name;
+        cmbTheme.SelectedIndexChanged += (_, _) =>
+        {
+            var sel = cmbTheme.SelectedItem?.ToString() ?? "Dark";
+            ThemeManager.SwitchTheme(sel);
+            MainForm.ApplyThemeToChildren();
+        };
+        var lblThemeHint = new Label { Text = "Switch between Dark and Light appearance. Changes apply immediately.", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(128, 128, 128), Location = new Point(15, ty + 28), Size = new Size(400, 20) };
+        MakeSection("THEME", 80, new Control[] { lblTheme, cmbTheme, lblThemeHint });
 
         // ═══════════════════════════════════════════
         // 3. CLOUD SYNC
