@@ -193,6 +193,69 @@ public partial class MainForm : Form
         catch { }
     }
 
+    public void ApplyTheme()
+    {
+        var t = ThemeManager.Current;
+        BackColor = t.SidebarBg;
+        ForeColor = Color.White;
+
+        foreach (var c in Controls)
+        {
+            if (c is Label lbl)
+            {
+                if (lbl.Text == "JUMONG POS")
+                    lbl.ForeColor = t.SidebarTitleAccent;
+                else if (lbl.Text.StartsWith("Logged in as"))
+                    lbl.ForeColor = t.SidebarUserInfo;
+            }
+            if (c is Panel p && p.Size.Height == 1 && p.Size.Width == 400)
+                p.BackColor = t.SidebarDivider;
+        }
+
+        foreach (var btn in _menuButtons)
+        {
+            if (btn == btnLogout)
+            {
+                btn.BackColor = t.SidebarLogoutBg;
+                btn.ForeColor = t.SidebarLogoutFg;
+                btn.FlatAppearance.MouseOverBackColor = t.SidebarLogoutHover;
+            }
+            else
+            {
+                btn.BackColor = t.SidebarCardBg;
+                btn.ForeColor = Color.White;
+                btn.FlatAppearance.MouseOverBackColor = t.SidebarHoverBg;
+            }
+        }
+    }
+
+    public static void ApplyThemeToChildren()
+    {
+        var openForms = Application.OpenForms;
+        for (var i = 0; i < openForms.Count; i++)
+        {
+            var f = openForms[i];
+            if (f is MainForm mf) mf.ApplyTheme();
+            else if (f is SalesForm sf) sf.ApplyTheme();
+            else if (f is ProductsForm pf) pf.ApplyTheme();
+            else if (f is ReportsForm rf) rf.ApplyTheme();
+            else if (f is SettingsForm setf) setf.ApplyTheme();
+            else if (f is StockReceivingForm srf) srf.ApplyTheme();
+            else if (f is StockMovementForm smf) smf.ApplyTheme();
+            else if (f is EndShiftForm esf) esf.ApplyTheme();
+            else if (f is ExpensesForm ef) ef.ApplyTheme();
+            else if (f is UsersForm uf) uf.ApplyTheme();
+            else if (f is CreditManagementForm cmf) cmf.ApplyTheme();
+            else if (f is CustomersForm cf) cf.ApplyTheme();
+            else if (f is PendingOrdersForm pof) pof.ApplyTheme();
+            else if (f is VoidLogForm vlf) vlf.ApplyTheme();
+            else if (f is ProductUnitsForm puf) puf.ApplyTheme();
+            else if (f is LoginForm lf) lf.ApplyTheme();
+            else if (f is CustomerDisplayForm cdf) cdf.ApplyTheme();
+            else if (f is PaymentForm pmf) pmf.ApplyTheme();
+        }
+    }
+
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
         _schedulerTimer?.Stop();
@@ -279,11 +342,12 @@ public partial class MainForm : Form
 
     private void InitializeComponent()
     {
-        var darkBg = Color.FromArgb(30, 30, 45);
-        var cardBg = Color.FromArgb(40, 40, 58);
-        var accent = Color.FromArgb(72, 126, 176);
+        var t = ThemeManager.Current;
+        var darkBg = t.SidebarBg;
+        var cardBg = t.SidebarCardBg;
+        var accent = t.AccentBlue;
         var textColor = Color.White;
-        var hoverBg = Color.FromArgb(55, 55, 78);
+        var hoverBg = t.SidebarHoverBg;
 
         BackColor = darkBg;
         Text = $"Jumong POS v{AppVersion.Current}";
@@ -295,7 +359,7 @@ public partial class MainForm : Form
         {
             Text = "JUMONG POS",
             Font = new Font("Segoe UI", 24F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(100, 180, 255),
+            ForeColor = t.SidebarTitleAccent,
             Location = new Point(0, 25),
             Size = new Size(520, 40),
             TextAlign = ContentAlignment.MiddleCenter
@@ -307,7 +371,7 @@ public partial class MainForm : Form
                 ? $"Logged in as: {_currentUser.Username}  ({_currentUser.Role})"
                 : $"Logged in as: {_currentUser.FullName}  ({_currentUser.Role})",
             Font = new Font("Segoe UI", 9F),
-            ForeColor = Color.FromArgb(150, 150, 170),
+            ForeColor = t.SidebarUserInfo,
             Location = new Point(0, 65),
             Size = new Size(520, 20),
             TextAlign = ContentAlignment.MiddleCenter
@@ -317,7 +381,7 @@ public partial class MainForm : Form
         {
             Location = new Point(60, 95),
             Size = new Size(400, 1),
-            BackColor = Color.FromArgb(60, 60, 80)
+            BackColor = t.SidebarDivider
         };
 
         btnPOS = CreateMenuButton("POS / Sales", 0, 120, btnPOS_Click, cardBg, textColor, hoverBg);
@@ -332,7 +396,7 @@ public partial class MainForm : Form
         btnUsers.Visible = _currentUser.Role == "Admin";
         btnEndShift = CreateMenuButton("End Shift", 0, 615, btnEndShift_Click, cardBg, textColor, hoverBg);
         btnSettings = CreateMenuButton("Settings", 0, 670, btnSettings_Click, cardBg, textColor, hoverBg);
-        btnLogout = CreateMenuButton("Logout", 0, 725, btnLogout_Click, Color.FromArgb(50, 35, 35), Color.FromArgb(231, 76, 60), Color.FromArgb(70, 45, 45));
+        btnLogout = CreateMenuButton("Logout", 0, 725, btnLogout_Click, t.SidebarLogoutBg, t.SidebarLogoutFg, t.SidebarLogoutHover);
 
         Controls.AddRange(new Control[] { title, userInfo, divider, btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnOnlineOrders, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout });
 

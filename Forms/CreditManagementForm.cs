@@ -40,11 +40,11 @@ public partial class CreditManagementForm : Form
         lblD90.Text = $"61-90D: \u20b1{aging.D90:N2}";
         lblD90Plus.Text = $"90+D: \u20b1{aging.D90Plus:N2}";
 
-        lblCurrent.ForeColor = aging.Current > 0 ? Color.FromArgb(46, 204, 113) : Color.FromArgb(140, 140, 170);
-        lblD30.ForeColor = aging.D30 > 0 ? Color.FromArgb(243, 156, 18) : Color.FromArgb(140, 140, 170);
-        lblD60.ForeColor = aging.D60 > 0 ? Color.FromArgb(230, 126, 34) : Color.FromArgb(140, 140, 170);
-        lblD90.ForeColor = aging.D90 > 0 ? Color.FromArgb(231, 76, 60) : Color.FromArgb(140, 140, 170);
-        lblD90Plus.ForeColor = aging.D90Plus > 0 ? Color.FromArgb(192, 57, 43) : Color.FromArgb(140, 140, 170);
+        lblCurrent.ForeColor = aging.Current > 0 ? ThemeManager.Current.AccentGreen : ThemeManager.Current.TextMuted;
+        lblD30.ForeColor = aging.D30 > 0 ? ThemeManager.Current.AccentOrange : ThemeManager.Current.TextMuted;
+        lblD60.ForeColor = aging.D60 > 0 ? ThemeManager.Current.AccentOrange : ThemeManager.Current.TextMuted;
+        lblD90.ForeColor = aging.D90 > 0 ? ThemeManager.Current.AccentRed : ThemeManager.Current.TextMuted;
+        lblD90Plus.ForeColor = aging.D90Plus > 0 ? ThemeManager.Current.AccentRed : ThemeManager.Current.TextMuted;
     }
 
     private void RefreshCustomerList()
@@ -104,7 +104,7 @@ public partial class CreditManagementForm : Form
         var availText = c.HasCreditLimit ? $" | Available: \u20b1{c.AvailableCredit:N2}" : "";
         var overText = c.IsOverLimit ? " [OVER LIMIT!]" : "";
         lblCustomerInfo.Text = $"{c.Name} | Balance: \u20b1{c.CreditBalance:N2}{todayText}{limitText}{availText}{overText}";
-        lblCustomerInfo.ForeColor = c.IsOverLimit ? Color.FromArgb(231, 76, 60) : Color.FromArgb(0, 245, 255);
+        lblCustomerInfo.ForeColor = c.IsOverLimit ? ThemeManager.Current.AccentRed : ThemeManager.Current.AccentCyan;
         LoadTransactions(c.Id);
     }
 
@@ -112,35 +112,35 @@ public partial class CreditManagementForm : Form
     {
         dgvTrans.AutoGenerateColumns = false;
         dgvTrans.Columns.Clear();
-        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "CreatedAt", HeaderText = "DATE", Width = 120, DefaultCellStyle = new DataGridViewCellStyle { Format = "yyyy-MM-dd HH:mm", ForeColor = Color.FromArgb(200, 200, 220) } });
-        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Type", HeaderText = "TYPE", Width = 70, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(0, 245, 255) } });
-        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "InvoiceNo", HeaderText = "INVOICE", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(200, 200, 220) } });
-        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Description", HeaderText = "DESCRIPTION", Width = 180, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(230, 230, 245) } });
-        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "PaymentMethod", HeaderText = "METHOD", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(200, 200, 220) } });
-        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "ReferenceNo", HeaderText = "REF NO", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(200, 200, 220) } });
-        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Debit", HeaderText = "DEBIT", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = Color.FromArgb(231, 76, 60) } });
-        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Credit", HeaderText = "CREDIT", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = Color.FromArgb(46, 204, 113) } });
-        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Balance", HeaderText = "BALANCE", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 245, 255) } });
+        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "CreatedAt", HeaderText = "DATE", Width = 120, DefaultCellStyle = new DataGridViewCellStyle { Format = "yyyy-MM-dd HH:mm", ForeColor = ThemeManager.Current.TextSecondary } });
+        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Type", HeaderText = "TYPE", Width = 70, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.AccentCyan } });
+        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "InvoiceNo", HeaderText = "INVOICE", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextSecondary } });
+        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Description", HeaderText = "DESCRIPTION", Width = 180, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextPrimary } });
+        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "PaymentMethod", HeaderText = "METHOD", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextSecondary } });
+        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "ReferenceNo", HeaderText = "REF NO", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextSecondary } });
+        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Debit", HeaderText = "DEBIT", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = ThemeManager.Current.AccentRed } });
+        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Credit", HeaderText = "CREDIT", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = ThemeManager.Current.AccentGreen } });
+        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Balance", HeaderText = "BALANCE", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = ThemeManager.Current.AccentCyan } });
         dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "AgingBucket", HeaderText = "AGING", Width = 80 });
 
         dgvTrans.DataSource = CreditService.GetByCustomer(customerId, _dateFrom, _dateTo);
         dgvTrans.RowHeadersVisible = false;
-        dgvTrans.BackgroundColor = Color.FromArgb(20, 20, 40);
+        dgvTrans.BackgroundColor = ThemeManager.Current.PanelBg;
         dgvTrans.BorderStyle = BorderStyle.None;
-        dgvTrans.GridColor = Color.FromArgb(40, 40, 70);
-        dgvTrans.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(25, 25, 50);
-        dgvTrans.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(0, 245, 255);
+        dgvTrans.GridColor = ThemeManager.Current.BorderColor;
+        dgvTrans.ColumnHeadersDefaultCellStyle.BackColor = ThemeManager.Current.DgvHeaderBg;
+        dgvTrans.ColumnHeadersDefaultCellStyle.ForeColor = ThemeManager.Current.AccentCyan;
         dgvTrans.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         dgvTrans.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
         dgvTrans.ColumnHeadersHeight = 30;
         dgvTrans.EnableHeadersVisualStyles = false;
-        dgvTrans.DefaultCellStyle.SelectionBackColor = Color.FromArgb(40, 40, 80);
+        dgvTrans.DefaultCellStyle.SelectionBackColor = ThemeManager.Current.DgvSelection;
         dgvTrans.DefaultCellStyle.SelectionForeColor = Color.White;
         dgvTrans.DefaultCellStyle.Padding = new Padding(4, 2, 4, 2);
         dgvTrans.RowTemplate.Height = 28;
-        dgvTrans.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(15, 15, 32);
-        dgvTrans.DefaultCellStyle.BackColor = Color.FromArgb(22, 22, 45);
-        dgvTrans.DefaultCellStyle.ForeColor = Color.FromArgb(230, 230, 245);
+        dgvTrans.AlternatingRowsDefaultCellStyle.BackColor = ThemeManager.Current.DgvRowAlt;
+        dgvTrans.DefaultCellStyle.BackColor = ThemeManager.Current.DgvRowNormal;
+        dgvTrans.DefaultCellStyle.ForeColor = ThemeManager.Current.TextPrimary;
 
         dgvTrans.CellFormatting += (_, args) =>
         {
@@ -150,9 +150,9 @@ public partial class CreditManagementForm : Form
                 if (args.ColumnIndex == dgvTrans.Columns["AgingBucket"]?.Index)
                 {
                     args.Value = t.AgingBucket;
-                    if (t.AgingDays > 90) args.CellStyle!.ForeColor = Color.FromArgb(192, 57, 43);
-                    else if (t.AgingDays > 60) args.CellStyle!.ForeColor = Color.FromArgb(231, 76, 60);
-                    else if (t.AgingDays > 30) args.CellStyle!.ForeColor = Color.FromArgb(230, 126, 34);
+                    if (t.AgingDays > 90) args.CellStyle!.ForeColor = ThemeManager.Current.AccentRed;
+                    else if (t.AgingDays > 60) args.CellStyle!.ForeColor = ThemeManager.Current.AccentRed;
+                    else if (t.AgingDays > 30) args.CellStyle!.ForeColor = ThemeManager.Current.AccentOrange;
                 }
             }
         };
@@ -171,47 +171,42 @@ public partial class CreditManagementForm : Form
             Size = new Size(420, 380),
             FormBorderStyle = FormBorderStyle.Sizable,
             StartPosition = FormStartPosition.CenterParent,
-            BackColor = Color.FromArgb(10, 10, 26)
+            BackColor = ThemeManager.Current.CanvasBg
         };
 
-        var pnlBg = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(10, 10, 26) };
-        var neonCyan = Color.FromArgb(0, 245, 255);
-        var dimText = Color.FromArgb(140, 140, 170);
-        var inputBg = Color.FromArgb(30, 30, 55);
-        var inputFg = Color.FromArgb(230, 230, 245);
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var borderColor = Color.FromArgb(40, 40, 70);
+        var pnlBg = new Panel { Dock = DockStyle.Fill, BackColor = ThemeManager.Current.CanvasBg };
+        var t = ThemeManager.Current;
 
         var limitText = _selectedCustomer.HasCreditLimit ? $" | Limit: \u20b1{_selectedCustomer.CreditLimit:N2}" : "";
         var lblInfo = new Label
         {
             Text = $"{_selectedCustomer.Name} | Balance: \u20b1{_selectedCustomer.CreditBalance:N2} | Today: \u20b1{todayBalance:N2}{limitText}",
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            ForeColor = neonCyan,
+            ForeColor = t.AccentCyan,
             Location = new Point(15, 12),
             Size = new Size(380, 22)
         };
 
-        var lblCash = new Label { Text = "Cash:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, 45), Size = new Size(80, 20) };
-        var txtCash = new TextBox { Font = new Font("Segoe UI", 12F), Location = new Point(100, 42), Size = new Size(160, 25), TextAlign = HorizontalAlignment.Right, BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg };
+        var lblCash = new Label { Text = "Cash:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = t.TextMuted, Location = new Point(15, 45), Size = new Size(80, 20) };
+        var txtCash = new TextBox { Font = new Font("Segoe UI", 12F), Location = new Point(100, 42), Size = new Size(160, 25), TextAlign = HorizontalAlignment.Right, BorderStyle = BorderStyle.FixedSingle, BackColor = t.InputBg, ForeColor = t.InputFg };
 
-        var lblEw = new Label { Text = "E-Wallet:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, 77), Size = new Size(80, 20) };
-        var txtEw = new TextBox { Font = new Font("Segoe UI", 12F), Location = new Point(100, 74), Size = new Size(160, 25), TextAlign = HorizontalAlignment.Right, BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg };
+        var lblEw = new Label { Text = "E-Wallet:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = t.TextMuted, Location = new Point(15, 77), Size = new Size(80, 20) };
+        var txtEw = new TextBox { Font = new Font("Segoe UI", 12F), Location = new Point(100, 74), Size = new Size(160, 25), TextAlign = HorizontalAlignment.Right, BorderStyle = BorderStyle.FixedSingle, BackColor = t.InputBg, ForeColor = t.InputFg };
 
         var lblTotal = new Label
         {
             Text = "Total: \u20b10.00",
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-            ForeColor = neonCyan,
+            ForeColor = t.AccentCyan,
             Location = new Point(15, 107),
             Size = new Size(200, 25)
         };
 
-        var lblEwRef = new Label { Text = "Ref No:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, 137), Size = new Size(80, 20) };
-        var txtEwRef = new TextBox { Font = new Font("Segoe UI", 10F), Location = new Point(100, 135), Size = new Size(280, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg };
+        var lblEwRef = new Label { Text = "Ref No:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = t.TextMuted, Location = new Point(15, 137), Size = new Size(80, 20) };
+        var txtEwRef = new TextBox { Font = new Font("Segoe UI", 10F), Location = new Point(100, 135), Size = new Size(280, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = t.InputBg, ForeColor = t.InputFg };
 
-        var lblNotes = new Label { Text = "Notes:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, 167), Size = new Size(80, 20) };
-        var txtNotes = new TextBox { Font = new Font("Segoe UI", 9F), Location = new Point(100, 165), Size = new Size(280, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg };
+        var lblNotes = new Label { Text = "Notes:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = t.TextMuted, Location = new Point(15, 167), Size = new Size(80, 20) };
+        var txtNotes = new TextBox { Font = new Font("Segoe UI", 9F), Location = new Point(100, 165), Size = new Size(280, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = t.InputBg, ForeColor = t.InputFg };
 
         void UpdateTotal()
         {
@@ -233,7 +228,7 @@ public partial class CreditManagementForm : Form
             Size = new Size(250, 40),
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
-            BackColor = Color.FromArgb(46, 204, 113),
+            BackColor = ThemeManager.Current.AccentGreen,
             ForeColor = Color.White,
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
             Cursor = Cursors.Hand,
@@ -247,7 +242,7 @@ public partial class CreditManagementForm : Form
             Size = new Size(250, 35),
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
-            BackColor = Color.FromArgb(149, 165, 166),
+            BackColor = ThemeManager.Current.AccentGrey,
             ForeColor = Color.White,
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
             Cursor = Cursors.Hand,
@@ -308,7 +303,7 @@ public partial class CreditManagementForm : Form
             Size = new Size(700, 500),
             StartPosition = FormStartPosition.CenterParent,
             FormBorderStyle = FormBorderStyle.Sizable,
-            BackColor = Color.FromArgb(10, 10, 26)
+            BackColor = ThemeManager.Current.CanvasBg
         };
 
         var txtStmt = new TextBox
@@ -318,14 +313,14 @@ public partial class CreditManagementForm : Form
             ScrollBars = ScrollBars.Both,
             Font = new Font("Consolas", 10F),
             Dock = DockStyle.Fill,
-            BackColor = Color.FromArgb(20, 20, 40),
-            ForeColor = Color.FromArgb(230, 230, 245),
+            BackColor = ThemeManager.Current.PanelBg,
+            ForeColor = ThemeManager.Current.TextPrimary,
             BorderStyle = BorderStyle.None,
             Text = stmt
         };
 
-        var pnlBtn = new Panel { Dock = DockStyle.Bottom, Height = 50, BackColor = Color.FromArgb(10, 10, 26) };
-        var btnPrint = new Button { Text = "PRINT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(180, 10), Size = new Size(100, 30), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(72, 126, 176), ForeColor = Color.White, Cursor = Cursors.Hand };
+        var pnlBtn = new Panel { Dock = DockStyle.Bottom, Height = 50, BackColor = ThemeManager.Current.CanvasBg };
+        var btnPrint = new Button { Text = "PRINT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(180, 10), Size = new Size(100, 30), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = ThemeManager.Current.AccentBlue, ForeColor = Color.White, Cursor = Cursors.Hand };
         btnPrint.Click += (_, _) =>
         {
             var doc = new System.Drawing.Printing.PrintDocument();
@@ -345,9 +340,9 @@ public partial class CreditManagementForm : Form
             using var dlg = new PrintDialog { Document = doc };
             if (dlg.ShowDialog() == DialogResult.OK) doc.Print();
         };
-        var btnCopy = new Button { Text = "COPY", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(290, 10), Size = new Size(100, 30), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(149, 165, 166), ForeColor = Color.White, Cursor = Cursors.Hand };
+        var btnCopy = new Button { Text = "COPY", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(290, 10), Size = new Size(100, 30), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = ThemeManager.Current.AccentGrey, ForeColor = Color.White, Cursor = Cursors.Hand };
         btnCopy.Click += (_, _) => Clipboard.SetText(stmt);
-        var btnClose = new Button { Text = "CLOSE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(400, 10), Size = new Size(100, 30), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(231, 76, 60), ForeColor = Color.White, Cursor = Cursors.Hand, DialogResult = DialogResult.OK };
+        var btnClose = new Button { Text = "CLOSE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(400, 10), Size = new Size(100, 30), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = ThemeManager.Current.AccentRed, ForeColor = Color.White, Cursor = Cursors.Hand, DialogResult = DialogResult.OK };
         pnlBtn.Controls.AddRange(new Control[] { btnPrint, btnCopy, btnClose });
         viewForm.Controls.AddRange(new Control[] { txtStmt, pnlBtn });
         viewForm.ShowDialog();
@@ -363,18 +358,15 @@ public partial class CreditManagementForm : Form
             Size = new Size(340, 200),
             FormBorderStyle = FormBorderStyle.Sizable,
             StartPosition = FormStartPosition.CenterParent,
-            BackColor = Color.FromArgb(10, 10, 26)
+            BackColor = ThemeManager.Current.CanvasBg
         };
 
-        var neonCyan = Color.FromArgb(0, 245, 255);
-        var dimText = Color.FromArgb(140, 140, 170);
-        var inputBg = Color.FromArgb(30, 30, 55);
-        var inputFg = Color.FromArgb(230, 230, 245);
+        var t = ThemeManager.Current;
 
-        var lbl = new Label { Text = $"Credit limit for {_selectedCustomer.Name}:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = neonCyan, Location = new Point(15, 15), Size = new Size(300, 20) };
-        var txtLimit = new TextBox { Font = new Font("Segoe UI", 12F), Location = new Point(15, 42), Size = new Size(200, 25), TextAlign = HorizontalAlignment.Right, BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Text = _selectedCustomer.CreditLimit > 0 ? _selectedCustomer.CreditLimit.ToString("N2") : "" };
-        var lblHint = new Label { Text = "(Leave blank or 0 for no limit)", Font = new Font("Segoe UI", 8F), ForeColor = dimText, Location = new Point(15, 72), Size = new Size(220, 18) };
-        var btnOk = new Button { Text = "SAVE", Location = new Point(110, 100), Size = new Size(100, 30), DialogResult = DialogResult.OK, FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(72, 126, 176), ForeColor = Color.White, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand };
+        var lbl = new Label { Text = $"Credit limit for {_selectedCustomer.Name}:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = t.AccentCyan, Location = new Point(15, 15), Size = new Size(300, 20) };
+        var txtLimit = new TextBox { Font = new Font("Segoe UI", 12F), Location = new Point(15, 42), Size = new Size(200, 25), TextAlign = HorizontalAlignment.Right, BorderStyle = BorderStyle.FixedSingle, BackColor = t.InputBg, ForeColor = t.InputFg, Text = _selectedCustomer.CreditLimit > 0 ? _selectedCustomer.CreditLimit.ToString("N2") : "" };
+        var lblHint = new Label { Text = "(Leave blank or 0 for no limit)", Font = new Font("Segoe UI", 8F), ForeColor = t.TextMuted, Location = new Point(15, 72), Size = new Size(220, 18) };
+        var btnOk = new Button { Text = "SAVE", Location = new Point(110, 100), Size = new Size(100, 30), DialogResult = DialogResult.OK, FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = ThemeManager.Current.AccentBlue, ForeColor = Color.White, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand };
         limitForm.Controls.AddRange(new Control[] { lbl, txtLimit, lblHint, btnOk });
         limitForm.AcceptButton = btnOk;
 
@@ -393,8 +385,8 @@ public partial class CreditManagementForm : Form
     private void ToggleView(ViewMode mode)
     {
         _viewMode = mode;
-        var active = Color.FromArgb(72, 126, 176);
-        var inactive = Color.FromArgb(30, 30, 55);
+        var active = ThemeManager.Current.AccentBlue;
+        var inactive = ThemeManager.Current.InputBg;
         btnTodayDebt.BackColor = mode == ViewMode.TodayDebt ? active : inactive;
         btnAllDebt.BackColor = mode == ViewMode.AllDebt ? active : inactive;
         btnOverLimit.BackColor = mode == ViewMode.OverLimit ? active : inactive;
@@ -424,35 +416,35 @@ public partial class CreditManagementForm : Form
         var payments = CreditService.GetAllPayments(_dateFrom, _dateTo, _paymentFilter == "All" ? null : _paymentFilter, txtSearchCustomer.Text.Trim());
         dgvTrans.AutoGenerateColumns = false;
         dgvTrans.Columns.Clear();
-        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "CreatedAt", HeaderText = "DATE/TIME", Width = 130, DefaultCellStyle = new DataGridViewCellStyle { Format = "yyyy-MM-dd HH:mm", ForeColor = Color.FromArgb(200, 200, 220) } });
-        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "CustomerName", HeaderText = "CUSTOMER", Width = 150, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(230, 230, 245) } });
-        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Description", HeaderText = "DESCRIPTION", Width = 250, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(200, 200, 220) } });
-        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "PaymentMethod", HeaderText = "METHOD", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(200, 200, 220) } });
-        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "ReferenceNo", HeaderText = "REF NO", Width = 100, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(200, 200, 220) } });
-        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Credit", HeaderText = "AMOUNT", Width = 100, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(46, 204, 113) } });
+        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "CreatedAt", HeaderText = "DATE/TIME", Width = 130, DefaultCellStyle = new DataGridViewCellStyle { Format = "yyyy-MM-dd HH:mm", ForeColor = ThemeManager.Current.TextSecondary } });
+        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "CustomerName", HeaderText = "CUSTOMER", Width = 150, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextPrimary } });
+        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Description", HeaderText = "DESCRIPTION", Width = 250, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextSecondary } });
+        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "PaymentMethod", HeaderText = "METHOD", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextSecondary } });
+        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "ReferenceNo", HeaderText = "REF NO", Width = 100, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextSecondary } });
+        dgvTrans.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Credit", HeaderText = "AMOUNT", Width = 100, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = ThemeManager.Current.AccentGreen } });
 
         dgvTrans.DataSource = payments;
         dgvTrans.RowHeadersVisible = false;
-        dgvTrans.BackgroundColor = Color.FromArgb(20, 20, 40);
+        dgvTrans.BackgroundColor = ThemeManager.Current.PanelBg;
         dgvTrans.BorderStyle = BorderStyle.None;
-        dgvTrans.GridColor = Color.FromArgb(40, 40, 70);
-        dgvTrans.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(25, 25, 50);
-        dgvTrans.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(0, 245, 255);
+        dgvTrans.GridColor = ThemeManager.Current.BorderColor;
+        dgvTrans.ColumnHeadersDefaultCellStyle.BackColor = ThemeManager.Current.DgvHeaderBg;
+        dgvTrans.ColumnHeadersDefaultCellStyle.ForeColor = ThemeManager.Current.AccentCyan;
         dgvTrans.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         dgvTrans.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
         dgvTrans.ColumnHeadersHeight = 30;
         dgvTrans.EnableHeadersVisualStyles = false;
-        dgvTrans.DefaultCellStyle.SelectionBackColor = Color.FromArgb(40, 40, 80);
+        dgvTrans.DefaultCellStyle.SelectionBackColor = ThemeManager.Current.DgvSelection;
         dgvTrans.DefaultCellStyle.SelectionForeColor = Color.White;
         dgvTrans.DefaultCellStyle.Padding = new Padding(4, 2, 4, 2);
         dgvTrans.RowTemplate.Height = 28;
-        dgvTrans.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(15, 15, 32);
-        dgvTrans.DefaultCellStyle.BackColor = Color.FromArgb(22, 22, 45);
-        dgvTrans.DefaultCellStyle.ForeColor = Color.FromArgb(230, 230, 245);
+        dgvTrans.AlternatingRowsDefaultCellStyle.BackColor = ThemeManager.Current.DgvRowAlt;
+        dgvTrans.DefaultCellStyle.BackColor = ThemeManager.Current.DgvRowNormal;
+        dgvTrans.DefaultCellStyle.ForeColor = ThemeManager.Current.TextPrimary;
 
         var summary = CreditService.GetPaymentSummary(_dateFrom, _dateTo);
         lblPaySummary.Text = $"TOTAL: \u20b1{summary.TotalPayments:N2}  |  CASH: \u20b1{summary.TotalCash:N2}  |  E-WALLET: \u20b1{summary.TotalEWallet:N2}  |  OTHER: \u20b1{summary.TotalOther:N2}  |  RECORDS: {payments.Count}";
-        lblPaySummary.ForeColor = Color.FromArgb(46, 204, 113);
+        lblPaySummary.ForeColor = ThemeManager.Current.AccentGreen;
     }
 
     private void ShowCustomerView()
@@ -469,18 +461,9 @@ public partial class CreditManagementForm : Form
 
     private void InitializeComponent()
     {
-        var canvasBg = Color.FromArgb(10, 10, 26);
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var inputBg = Color.FromArgb(30, 30, 55);
-        var inputFg = Color.FromArgb(230, 230, 245);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var dimText = Color.FromArgb(140, 140, 170);
-        var borderColor = Color.FromArgb(40, 40, 70);
-        var accentGreen = Color.FromArgb(46, 204, 113);
-        var accentBlue = Color.FromArgb(72, 126, 176);
-        var accentPurple = Color.FromArgb(155, 89, 182);
+        var t = ThemeManager.Current;
 
-        BackColor = canvasBg;
+        BackColor = t.CanvasBg;
         Text = "Credit Management";
         StartPosition = FormStartPosition.CenterScreen;
         WindowState = FormWindowState.Maximized;
@@ -489,16 +472,16 @@ public partial class CreditManagementForm : Form
         MinimizeBox = true;
 
         // ── TOP TOOLBAR ──
-        var pnlToolbar = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = panelBg };
-        pnlToolbar.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawLine(pen, 0, pnlToolbar.Height - 1, pnlToolbar.Width, pnlToolbar.Height - 1); };
+        var pnlToolbar = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = t.PanelBg };
+        pnlToolbar.Paint += (s, e) => { using var pen = new Pen(t.BorderColor, 1); e.Graphics.DrawLine(pen, 0, pnlToolbar.Height - 1, pnlToolbar.Width, pnlToolbar.Height - 1); };
 
-        var lblPageTitle = new Label { Text = "\uD83D\uDCB3 CREDIT MANAGEMENT", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(20, 12), Size = new Size(250, 28) };
-        lblTotalReceivables = new Label { Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(600, 12), Size = new Size(300, 25), TextAlign = ContentAlignment.MiddleRight, AutoSize = false };
-        lblDebtorsCount = new Label { Font = new Font("Segoe UI", 9F), ForeColor = dimText, Location = new Point(900, 12), Size = new Size(120, 25), TextAlign = ContentAlignment.MiddleRight, AutoSize = false };
+        var lblPageTitle = new Label { Text = "\uD83D\uDCB3 CREDIT MANAGEMENT", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = t.AccentCyan, Location = new Point(20, 12), Size = new Size(250, 28) };
+        lblTotalReceivables = new Label { Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = t.AccentCyan, Location = new Point(600, 12), Size = new Size(300, 25), TextAlign = ContentAlignment.MiddleRight, AutoSize = false };
+        lblDebtorsCount = new Label { Font = new Font("Segoe UI", 9F), ForeColor = t.TextMuted, Location = new Point(900, 12), Size = new Size(120, 25), TextAlign = ContentAlignment.MiddleRight, AutoSize = false };
         pnlToolbar.Controls.AddRange(new Control[] { lblPageTitle, lblTotalReceivables, lblDebtorsCount });
 
         // ── METRICS BAR (Aging) ──
-        var pnlMetrics = new Panel { Dock = DockStyle.Top, Height = 30, BackColor = canvasBg };
+        var pnlMetrics = new Panel { Dock = DockStyle.Top, Height = 30, BackColor = t.CanvasBg };
         lblCurrent = new Label { Font = new Font("Segoe UI", 8F, FontStyle.Bold), Location = new Point(15, 5), Size = new Size(130, 18), TextAlign = ContentAlignment.MiddleLeft };
         lblD30 = new Label { Font = new Font("Segoe UI", 8F, FontStyle.Bold), Location = new Point(155, 5), Size = new Size(130, 18), TextAlign = ContentAlignment.MiddleLeft };
         lblD60 = new Label { Font = new Font("Segoe UI", 8F, FontStyle.Bold), Location = new Point(295, 5), Size = new Size(130, 18), TextAlign = ContentAlignment.MiddleLeft };
@@ -507,59 +490,59 @@ public partial class CreditManagementForm : Form
         pnlMetrics.Controls.AddRange(new Control[] { lblCurrent, lblD30, lblD60, lblD90, lblD90Plus });
 
         // ── MAIN PANEL ──
-        var pnlMain = new Panel { Dock = DockStyle.Fill, BackColor = canvasBg };
+        var pnlMain = new Panel { Dock = DockStyle.Fill, BackColor = t.CanvasBg };
         var margin = 10;
 
         // VIEW MODE BUTTONS
-        var pnlViewMode = new Panel { Location = new Point(margin, margin), Size = new Size(500, 35), BackColor = panelBg };
-        pnlViewMode.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlViewMode.Width - 1, pnlViewMode.Height - 1); };
-        btnTodayDebt = new Button { Text = "TODAY", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(30, 30, 55), ForeColor = Color.White, Location = new Point(5, 3), Size = new Size(90, 28), Cursor = Cursors.Hand };
+        var pnlViewMode = new Panel { Location = new Point(margin, margin), Size = new Size(500, 35), BackColor = t.PanelBg };
+        pnlViewMode.Paint += (s, e) => { using var pen = new Pen(t.BorderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlViewMode.Width - 1, pnlViewMode.Height - 1); };
+        btnTodayDebt = new Button { Text = "TODAY", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = ThemeManager.Current.InputBg, ForeColor = Color.White, Location = new Point(5, 3), Size = new Size(90, 28), Cursor = Cursors.Hand };
         btnTodayDebt.Click += (_, _) => ToggleView(ViewMode.TodayDebt);
-        btnAllDebt = new Button { Text = "ALL DEBTORS", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentBlue, ForeColor = Color.White, Location = new Point(100, 3), Size = new Size(100, 28), Cursor = Cursors.Hand };
+        btnAllDebt = new Button { Text = "ALL DEBTORS", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentBlue, ForeColor = Color.White, Location = new Point(100, 3), Size = new Size(100, 28), Cursor = Cursors.Hand };
         btnAllDebt.Click += (_, _) => ToggleView(ViewMode.AllDebt);
-        btnOverLimit = new Button { Text = "OVER LIMIT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(30, 30, 55), ForeColor = Color.White, Location = new Point(205, 3), Size = new Size(100, 28), Cursor = Cursors.Hand };
+        btnOverLimit = new Button { Text = "OVER LIMIT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = ThemeManager.Current.InputBg, ForeColor = Color.White, Location = new Point(205, 3), Size = new Size(100, 28), Cursor = Cursors.Hand };
         btnOverLimit.Click += (_, _) => ToggleView(ViewMode.OverLimit);
-        btnPaymentHistory = new Button { Text = "PAYMENTS", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(30, 30, 55), ForeColor = Color.White, Location = new Point(310, 3), Size = new Size(100, 28), Cursor = Cursors.Hand };
+        btnPaymentHistory = new Button { Text = "PAYMENTS", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = ThemeManager.Current.InputBg, ForeColor = Color.White, Location = new Point(310, 3), Size = new Size(100, 28), Cursor = Cursors.Hand };
         btnPaymentHistory.Click += (_, _) => ToggleView(ViewMode.PaymentHistory);
         pnlViewMode.Controls.AddRange(new Control[] { btnTodayDebt, btnAllDebt, btnOverLimit, btnPaymentHistory });
 
         // SEARCH & DATE FILTER
-        txtSearchCustomer = new TextBox { Font = new Font("Segoe UI", 9F), Location = new Point(margin, 48), Size = new Size(180, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg };
+        txtSearchCustomer = new TextBox { Font = new Font("Segoe UI", 9F), Location = new Point(margin, 48), Size = new Size(180, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = t.InputBg, ForeColor = t.InputFg };
         txtSearchCustomer.TextChanged += (_, _) => { if (_viewMode == ViewMode.PaymentHistory) LoadPaymentHistory(); else RefreshCustomerList(); };
 
-        lblDateFrom = new Label { Text = "From:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(195, 50), Size = new Size(35, 20) };
-        dtpFrom = new DateTimePicker { Location = new Point(233, 48), Size = new Size(110, 25), Format = DateTimePickerFormat.Short, Value = _dateFrom, BackColor = inputBg, ForeColor = inputFg };
+        lblDateFrom = new Label { Text = "From:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = t.TextMuted, Location = new Point(195, 50), Size = new Size(35, 20) };
+        dtpFrom = new DateTimePicker { Location = new Point(233, 48), Size = new Size(110, 25), Format = DateTimePickerFormat.Short, Value = _dateFrom, BackColor = t.InputBg, ForeColor = t.InputFg };
         dtpFrom.ValueChanged += (_, _) => { _dateFrom = dtpFrom.Value.Date; ApplyDateFilter(); };
 
-        lblDateTo = new Label { Text = "To:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(353, 50), Size = new Size(25, 20) };
-        dtpTo = new DateTimePicker { Location = new Point(381, 48), Size = new Size(110, 25), Format = DateTimePickerFormat.Short, Value = _dateTo, BackColor = inputBg, ForeColor = inputFg };
+        lblDateTo = new Label { Text = "To:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = t.TextMuted, Location = new Point(353, 50), Size = new Size(25, 20) };
+        dtpTo = new DateTimePicker { Location = new Point(381, 48), Size = new Size(110, 25), Format = DateTimePickerFormat.Short, Value = _dateTo, BackColor = t.InputBg, ForeColor = t.InputFg };
         dtpTo.ValueChanged += (_, _) => { _dateTo = dtpTo.Value.Date; ApplyDateFilter(); };
 
-        cmbPaymentFilter = new ComboBox { Font = new Font("Segoe UI", 9F), Location = new Point(501, 48), Size = new Size(100, 25), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = inputBg, ForeColor = inputFg, FlatStyle = FlatStyle.Flat, Visible = false };
+        cmbPaymentFilter = new ComboBox { Font = new Font("Segoe UI", 9F), Location = new Point(501, 48), Size = new Size(100, 25), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = t.InputBg, ForeColor = t.InputFg, FlatStyle = FlatStyle.Flat, Visible = false };
         cmbPaymentFilter.Items.AddRange(new object[] { "All", "Cash", "E-Wallet" });
         cmbPaymentFilter.SelectedIndex = 0;
         cmbPaymentFilter.SelectedIndexChanged += (_, _) => { _paymentFilter = cmbPaymentFilter.Text; LoadPaymentHistory(); };
 
         // LEFT PANEL - Customer List
-        var pnlLeft = new Panel { Location = new Point(margin, 85), Size = new Size(300, 400), BackColor = panelBg };
-        pnlLeft.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlLeft.Width - 1, pnlLeft.Height - 1); };
-        lblCustLabel = new Label { Text = "CUSTOMERS", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(12, 8), Size = new Size(200, 18) };
-        lstCustomers = new ListBox { Font = new Font("Segoe UI", 9F), Location = new Point(8, 30), Size = new Size(284, 200), BorderStyle = BorderStyle.None, BackColor = panelBg, ForeColor = inputFg };
+        var pnlLeft = new Panel { Location = new Point(margin, 85), Size = new Size(300, 400), BackColor = t.PanelBg };
+        pnlLeft.Paint += (s, e) => { using var pen = new Pen(t.BorderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlLeft.Width - 1, pnlLeft.Height - 1); };
+        lblCustLabel = new Label { Text = "CUSTOMERS", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = t.TextMuted, Location = new Point(12, 8), Size = new Size(200, 18) };
+        lstCustomers = new ListBox { Font = new Font("Segoe UI", 9F), Location = new Point(8, 30), Size = new Size(284, 200), BorderStyle = BorderStyle.None, BackColor = t.PanelBg, ForeColor = t.InputFg };
         lstCustomers.SelectedIndexChanged += lstCustomers_SelectedIndexChanged;
 
-        btnPayCredit = new Button { Text = "\uD83D\uDCB5 RECEIVE PAYMENT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentGreen, ForeColor = Color.White, Location = new Point(8, 245), Size = new Size(284, 35), Cursor = Cursors.Hand };
+        btnPayCredit = new Button { Text = "\uD83D\uDCB5 RECEIVE PAYMENT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentGreen, ForeColor = Color.White, Location = new Point(8, 245), Size = new Size(284, 35), Cursor = Cursors.Hand };
         btnPayCredit.Click += btnPayCredit_Click;
-        btnStatement = new Button { Text = "\uD83D\uDCC4 STATEMENT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentBlue, ForeColor = Color.White, Location = new Point(8, 285), Size = new Size(284, 35), Cursor = Cursors.Hand };
+        btnStatement = new Button { Text = "\uD83D\uDCC4 STATEMENT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentBlue, ForeColor = Color.White, Location = new Point(8, 285), Size = new Size(284, 35), Cursor = Cursors.Hand };
         btnStatement.Click += btnStatement_Click;
-        btnSetLimit = new Button { Text = "\u2699\uFE0F SET CREDIT LIMIT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentPurple, ForeColor = Color.White, Location = new Point(8, 325), Size = new Size(284, 35), Cursor = Cursors.Hand };
+        btnSetLimit = new Button { Text = "\u2699\uFE0F SET CREDIT LIMIT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentPurple, ForeColor = Color.White, Location = new Point(8, 325), Size = new Size(284, 35), Cursor = Cursors.Hand };
         btnSetLimit.Click += btnSetLimit_Click;
         pnlLeft.Controls.AddRange(new Control[] { lblCustLabel, lstCustomers, btnPayCredit, btnStatement, btnSetLimit });
 
         // RIGHT PANEL - Transactions
-        var pnlRight = new Panel { Location = new Point(320, 85), Size = new Size(500, 400), BackColor = panelBg };
-        pnlRight.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlRight.Width - 1, pnlRight.Height - 1); };
-        lblCustomerInfo = new Label { Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(12, 8), Size = new Size(476, 22), TextAlign = ContentAlignment.MiddleLeft, AutoSize = false };
-        lblPaySummary = new Label { Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = accentGreen, Location = new Point(12, 8), Size = new Size(476, 22), TextAlign = ContentAlignment.MiddleLeft, AutoSize = false, Visible = false };
+        var pnlRight = new Panel { Location = new Point(320, 85), Size = new Size(500, 400), BackColor = t.PanelBg };
+        pnlRight.Paint += (s, e) => { using var pen = new Pen(t.BorderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlRight.Width - 1, pnlRight.Height - 1); };
+        lblCustomerInfo = new Label { Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = t.AccentCyan, Location = new Point(12, 8), Size = new Size(476, 22), TextAlign = ContentAlignment.MiddleLeft, AutoSize = false };
+        lblPaySummary = new Label { Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = t.AccentGreen, Location = new Point(12, 8), Size = new Size(476, 22), TextAlign = ContentAlignment.MiddleLeft, AutoSize = false, Visible = false };
         dgvTrans = new DataGridView { Location = new Point(8, 34), Size = new Size(484, 358), SelectionMode = DataGridViewSelectionMode.FullRowSelect, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false, AllowUserToResizeRows = false, MultiSelect = false, Font = new Font("Segoe UI", 9F), CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal };
         pnlRight.Controls.AddRange(new Control[] { lblCustomerInfo, lblPaySummary, dgvTrans });
 
@@ -609,6 +592,13 @@ public partial class CreditManagementForm : Form
 
         dgv.Location = new Point(8, 34);
         dgv.Size = new Size(rightW - 16, availH - 42);
+    }
+
+    public void ApplyTheme()
+    {
+        var t = ThemeManager.Current;
+        BackColor = t.CanvasBg;
+        ForeColor = t.TextPrimary;
     }
 
     private ListBox lstCustomers = null!;

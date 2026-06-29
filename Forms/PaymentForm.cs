@@ -21,24 +21,24 @@ public partial class PaymentForm : Form
     public string  EwReferenceNo { get; private set; } = "";
     public int     PointsUsed    { get; private set; }
 
-    private static readonly Color CSurface    = Color.FromArgb(244, 245, 250);
-    private static readonly Color CCard       = Color.White;
-    private static readonly Color CBorder     = Color.FromArgb(220, 221, 230);
-    private static readonly Color CBorderLt   = Color.FromArgb(236, 237, 243);
-    private static readonly Color CText       = Color.FromArgb(30, 30, 46);
-    private static readonly Color CTextMuted  = Color.FromArgb(110, 110, 140);
-    private static readonly Color CTextHint   = Color.FromArgb(160, 160, 190);
-    private static readonly Color CTopbar     = Color.FromArgb(26, 26, 46);
-    private static readonly Color CTopbarAccent = Color.FromArgb(126, 184, 247);
-    private static readonly Color CGreenDark  = Color.FromArgb(39, 80, 10);
-    private static readonly Color CGreenMid   = Color.FromArgb(99, 153, 34);
-    private static readonly Color CGreenLight = Color.FromArgb(234, 243, 222);
-    private static readonly Color CBlueLight  = Color.FromArgb(230, 241, 251);
-    private static readonly Color CBlueMid    = Color.FromArgb(24, 95, 165);
-    private static readonly Color CBlueDark   = Color.FromArgb(12, 68, 124);
-    private static readonly Color CAmberLight = Color.FromArgb(250, 238, 218);
-    private static readonly Color CAmberDark  = Color.FromArgb(99, 56, 6);
-    private static readonly Color CAmberMid   = Color.FromArgb(186, 117, 23);
+    private static Color CSurface     => ThemeManager.Current.SurfaceBg;
+    private static Color CCard        => ThemeManager.Current.CardBg;
+    private static Color CBorder      => ThemeManager.Current.BorderColor;
+    private static Color CBorderLt    => ThemeManager.Current.BorderLight;
+    private static Color CText        => ThemeManager.Current.TextPrimary;
+    private static Color CTextMuted   => ThemeManager.Current.TextSecondary;
+    private static Color CTextHint    => ThemeManager.Current.TextHint;
+    private static Color CTopbar      => ThemeManager.Current.TopbarBg;
+    private static Color CTopbarAccent=> ThemeManager.Current.TopbarAccent;
+    private static Color CGreenDark   => ThemeManager.Current.StatusGreenDark;
+    private static Color CGreenMid    => ThemeManager.Current.StatusGreenMid;
+    private static Color CGreenLight  => ThemeManager.Current.StatusGreenLight;
+    private static Color CBlueLight   => ThemeManager.Current.StatusBlueLight;
+    private static Color CBlueMid     => ThemeManager.Current.StatusBlueMid;
+    private static Color CBlueDark    => ThemeManager.Current.StatusBlueDark;
+    private static Color CAmberLight  => ThemeManager.Current.StatusAmberLight;
+    private static Color CAmberDark   => ThemeManager.Current.StatusAmberDark;
+    private static Color CAmberMid    => ThemeManager.Current.StatusAmberMid;
 
     private string _activeMethod = "Cash";
 
@@ -659,6 +659,13 @@ public partial class PaymentForm : Form
             pnlCash, pnlEwallet, pnlSplit, pnlCredit,
             lblPointsInfo, btnConfirm
         });
+    }
+
+    public void ApplyTheme()
+    {
+        var t = ThemeManager.Current;
+        BackColor = t.SurfaceBg;
+        ForeColor = t.TextPrimary;
     }
 
     private Label    lblTotalAmount = null!;

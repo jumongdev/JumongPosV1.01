@@ -25,12 +25,12 @@ public partial class StockReceivingForm : Form
         if (results.Count == 1) _currentProduct = results[0];
         else if (results.Count > 1)
         {
-            using var picker = new Form { Text = "Select Product", Size = new Size(800, 500), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = Color.FromArgb(10, 10, 26) };
-            var pnlPicker = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(10, 10, 26) };
-            var dgv = new DataGridView { Location = new Point(10, 10), Size = new Size(760, 400), ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = Color.FromArgb(20, 20, 40), BorderStyle = BorderStyle.None, GridColor = Color.FromArgb(40, 40, 70), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = Color.FromArgb(0, 245, 255), Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = Color.FromArgb(230, 230, 245), SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) } };
+            using var picker = new Form { Text = "Select Product", Size = new Size(800, 500), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = ThemeManager.Current.CanvasBg };
+            var pnlPicker = new Panel { Dock = DockStyle.Fill, BackColor = ThemeManager.Current.CanvasBg };
+            var dgv = new DataGridView { Location = new Point(10, 10), Size = new Size(760, 400), ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = ThemeManager.Current.PanelBg, BorderStyle = BorderStyle.None, GridColor = ThemeManager.Current.DgvGrid, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = ThemeManager.Current.DgvHeaderBg, ForeColor = ThemeManager.Current.AccentCyan, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = ThemeManager.Current.DgvRowNormal, ForeColor = ThemeManager.Current.TextPrimary, SelectionBackColor = ThemeManager.Current.DgvSelection, SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = ThemeManager.Current.DgvRowAlt } };
             dgv.DataSource = results.Select(p => new { p.Id, p.Name, p.Barcode, p.Category, Price = p.Price.ToString("N2"), p.StockQty }).ToList();
             if (dgv.Columns["Name"] != null) { dgv.Columns["Name"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; }
-            var btnOk = new Button { Text = "SELECT", Font = new Font("Segoe UI", 10F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(72, 126, 176), ForeColor = Color.White, Location = new Point(350, 420), Size = new Size(100, 30), Cursor = Cursors.Hand };
+            var btnOk = new Button { Text = "SELECT", Font = new Font("Segoe UI", 10F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = ThemeManager.Current.AccentBlue, ForeColor = Color.White, Location = new Point(350, 420), Size = new Size(100, 30), Cursor = Cursors.Hand };
             btnOk.Click += (_, _) => { if (dgv.SelectedRows.Count > 0) { _currentProduct = results[dgv.SelectedRows[0].Index]; picker.Close(); } };
             dgv.CellDoubleClick += (_, _) => btnOk.PerformClick();
             dgv.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; btnOk.PerformClick(); } };
@@ -88,16 +88,16 @@ public partial class StockReceivingForm : Form
                 return;
             }
 
-            using var picker = new Form { Text = "Pending Warehouse Transfers", Size = new Size(750, 500), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = Color.FromArgb(10, 10, 26) };
-            var pnl = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(10, 10, 26) };
-            var lbl = new Label { Text = "Select a transfer to receive:", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 245, 255), Location = new Point(12, 10), Size = new Size(700, 25) };
+            using var picker = new Form { Text = "Pending Warehouse Transfers", Size = new Size(750, 500), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = ThemeManager.Current.CanvasBg };
+            var pnl = new Panel { Dock = DockStyle.Fill, BackColor = ThemeManager.Current.CanvasBg };
+            var lbl = new Label { Text = "Select a transfer to receive:", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = ThemeManager.Current.AccentCyan, Location = new Point(12, 10), Size = new Size(700, 25) };
 
-            var dgv = new DataGridView { Location = new Point(12, 42), Size = new Size(710, 370), ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = Color.FromArgb(20, 20, 40), BorderStyle = BorderStyle.None, GridColor = Color.FromArgb(40, 40, 70), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = Color.FromArgb(0, 245, 255), Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = Color.FromArgb(230, 230, 245), SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) } };
+            var dgv = new DataGridView { Location = new Point(12, 42), Size = new Size(710, 370), ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = ThemeManager.Current.PanelBg, BorderStyle = BorderStyle.None, GridColor = ThemeManager.Current.DgvGrid, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = ThemeManager.Current.DgvHeaderBg, ForeColor = ThemeManager.Current.AccentCyan, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = ThemeManager.Current.DgvRowNormal, ForeColor = ThemeManager.Current.TextPrimary, SelectionBackColor = ThemeManager.Current.DgvSelection, SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = ThemeManager.Current.DgvRowAlt } };
             dgv.DataSource = transfers.Select(t => new { t.OrderId, t.ClientName, Total = t.TotalAmount.ToString("N2"), Notes = t.Notes ?? "", Date = t.CreatedAt.ToString("yyyy-MM-dd HH:mm") }).ToList();
             if (dgv.Columns["OrderId"] != null) { dgv.Columns["OrderId"].Width = 60; }
             if (dgv.Columns["ClientName"] != null) { dgv.Columns["ClientName"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; }
 
-            var btnReceive = new Button { Text = "RECEIVE SELECTED", Font = new Font("Segoe UI", 10F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(46, 204, 113), ForeColor = Color.White, Location = new Point(280, 422), Size = new Size(180, 35), Cursor = Cursors.Hand };
+            var btnReceive = new Button { Text = "RECEIVE SELECTED", Font = new Font("Segoe UI", 10F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = ThemeManager.Current.AccentGreen, ForeColor = Color.White, Location = new Point(280, 422), Size = new Size(180, 35), Cursor = Cursors.Hand };
             btnReceive.Click += async (s, ev) =>
             {
                 if (dgv.SelectedRows.Count == 0) return;
@@ -205,16 +205,16 @@ public partial class StockReceivingForm : Form
 
     private void ShowTrail()
     {
-        using var form = new Form { Text = "Stock Receiving History", WindowState = FormWindowState.Maximized, StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = Color.FromArgb(10, 10, 26) };
-        var pnlToolbar = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = Color.FromArgb(20, 20, 40) };
-        var searchBox = new TextBox { Location = new Point(15, 18), Size = new Size(150, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = Color.FromArgb(30, 30, 55), ForeColor = Color.FromArgb(230, 230, 245) };
+        using var form = new Form { Text = "Stock Receiving History", WindowState = FormWindowState.Maximized, StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = ThemeManager.Current.CanvasBg };
+        var pnlToolbar = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = ThemeManager.Current.PanelBg };
+        var searchBox = new TextBox { Location = new Point(15, 18), Size = new Size(150, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = ThemeManager.Current.InputBg, ForeColor = ThemeManager.Current.InputFg };
         var dtpDate = new DateTimePicker { Location = new Point(175, 18), Size = new Size(130, 25), Format = DateTimePickerFormat.Short, Value = TimeHelper.Today };
-        var btnFilter = new Button { Text = "FILTER", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(72, 126, 176), ForeColor = Color.White, Location = new Point(315, 16), Size = new Size(70, 28), Cursor = Cursors.Hand };
-        var btnPrint = new Button { Text = "\uD83D\uDDAB PRINT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(46, 204, 113), ForeColor = Color.White, Location = new Point(393, 16), Size = new Size(80, 28), Cursor = Cursors.Hand };
-        var lblTitle = new Label { Text = "\uD83D\uDCE6 RECEIVING HISTORY", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 245, 255), Location = new Point(490, 15), Size = new Size(350, 30), AutoSize = false };
+        var btnFilter = new Button { Text = "FILTER", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = ThemeManager.Current.AccentBlue, ForeColor = Color.White, Location = new Point(315, 16), Size = new Size(70, 28), Cursor = Cursors.Hand };
+        var btnPrint = new Button { Text = "\uD83D\uDDAB PRINT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = ThemeManager.Current.AccentGreen, ForeColor = Color.White, Location = new Point(393, 16), Size = new Size(80, 28), Cursor = Cursors.Hand };
+        var lblTitle = new Label { Text = "\uD83D\uDCE6 RECEIVING HISTORY", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = ThemeManager.Current.AccentCyan, Location = new Point(490, 15), Size = new Size(350, 30), AutoSize = false };
         pnlToolbar.Controls.AddRange(new Control[] { searchBox, dtpDate, btnFilter, btnPrint, lblTitle });
 
-        var dgv = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = Color.FromArgb(20, 20, 40), BorderStyle = BorderStyle.None, GridColor = Color.FromArgb(40, 40, 70), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = Color.FromArgb(0, 245, 255), Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 35, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = Color.FromArgb(230, 230, 245), SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White }, RowTemplate = { Height = 30 }, AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) } };
+        var dgv = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = ThemeManager.Current.PanelBg, BorderStyle = BorderStyle.None, GridColor = ThemeManager.Current.DgvGrid, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = ThemeManager.Current.DgvHeaderBg, ForeColor = ThemeManager.Current.AccentCyan, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 35, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = ThemeManager.Current.DgvRowNormal, ForeColor = ThemeManager.Current.TextPrimary, SelectionBackColor = ThemeManager.Current.DgvSelection, SelectionForeColor = Color.White }, RowTemplate = { Height = 30 }, AlternatingRowsDefaultCellStyle = { BackColor = ThemeManager.Current.DgvRowAlt } };
 
         dgv.AutoGenerateColumns = false;
         dgv.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "DATE/TIME", DataPropertyName = "CreatedAt", Width = 150 });
@@ -263,15 +263,19 @@ public partial class StockReceivingForm : Form
 
     private void InitializeComponent()
     {
-        var canvasBg = Color.FromArgb(10, 10, 26);
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var inputBg = Color.FromArgb(30, 30, 55);
-        var inputFg = Color.FromArgb(230, 230, 245);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var dimText = Color.FromArgb(140, 140, 170);
-        var borderColor = Color.FromArgb(40, 40, 70);
-        var accentGreen = Color.FromArgb(46, 204, 113);
-        var accentBlue = Color.FromArgb(72, 126, 176);
+        var t = ThemeManager.Current;
+        var canvasBg = t.CanvasBg;
+        var panelBg = t.PanelBg;
+        var inputBg = t.InputBg;
+        var inputFg = t.InputFg;
+        var neonTitle = t.AccentCyan;
+        var dimText = t.TextMuted;
+        var borderColor = t.BorderColor;
+        var accentGreen = t.AccentGreen;
+        var accentBlue = t.AccentBlue;
+        var accentRed = t.AccentRed;
+        var accentOrange = t.AccentOrange;
+        var accentPurple = t.AccentPurple;
 
         BackColor = canvasBg;
         Text = "Stock Receiving";
@@ -322,7 +326,7 @@ public partial class StockReceivingForm : Form
         var pnlPending = new Panel { Location = new Point(margin, 180), Size = new Size(100, 300), BackColor = panelBg };
         pnlPending.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlPending.Width - 1, pnlPending.Height - 1); };
         var lblPendingTitle = new Label { Text = "PENDING ITEMS", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(12, 8), Size = new Size(150, 20) };
-        dgvPending = new DataGridView { Location = new Point(8, 40), Size = new Size(100, 200), ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = panelBg, BorderStyle = BorderStyle.None, GridColor = Color.FromArgb(40, 40, 70), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, SelectionMode = DataGridViewSelectionMode.FullRowSelect, Font = new Font("Segoe UI", 9F), CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal, ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = neonTitle, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = inputFg, SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) } };
+        dgvPending = new DataGridView { Location = new Point(8, 40), Size = new Size(100, 200), ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = panelBg, BorderStyle = BorderStyle.None, GridColor = t.DgvGrid, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, SelectionMode = DataGridViewSelectionMode.FullRowSelect, Font = new Font("Segoe UI", 9F), CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal, ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = t.DgvHeaderBg, ForeColor = neonTitle, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = t.DgvRowNormal, ForeColor = inputFg, SelectionBackColor = t.DgvSelection, SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = t.DgvRowAlt } };
         dgvPending.Columns.Add("Product", "PRODUCT");
         dgvPending.Columns.Add("Barcode", "BARCODE");
         dgvPending.Columns.Add("Current", "CURRENT");
@@ -342,7 +346,7 @@ public partial class StockReceivingForm : Form
         txtReference = new TextBox { Location = new Point(200, 12), Size = new Size(180, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F) };
         btnConfirm = new Button { Text = "\u2705 CONFIRM RECEIVING", Font = new Font("Segoe UI", 10F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentBlue, ForeColor = Color.White, Location = new Point(400, 5), Size = new Size(180, 35), Cursor = Cursors.Hand };
         btnConfirm.Click += (_, _) => ConfirmReceiving();
-        btnTrail = new Button { Text = "\uD83D\uDCCB HISTORY", Font = new Font("Segoe UI", 10F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(149, 165, 166), ForeColor = Color.White, Location = new Point(590, 5), Size = new Size(120, 35), Cursor = Cursors.Hand };
+        btnTrail = new Button { Text = "\uD83D\uDCCB HISTORY", Font = new Font("Segoe UI", 10F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentGrey, ForeColor = Color.White, Location = new Point(590, 5), Size = new Size(120, 35), Cursor = Cursors.Hand };
         btnTrail.Click += (_, _) => ShowTrail();
         pnlBottom.Controls.AddRange(new Control[] { lblCount, lblRefLabel, txtReference, btnConfirm, btnTrail });
 
@@ -382,6 +386,13 @@ public partial class StockReceivingForm : Form
 
         dgvPending.Location = new Point(8, 40);
         dgvPending.Size = new Size(w - 16, availH - 48);
+    }
+
+    public void ApplyTheme()
+    {
+        var t = ThemeManager.Current;
+        BackColor = t.CanvasBg;
+        ForeColor = t.TextPrimary;
     }
 
     private TextBox txtBarcode = null!;

@@ -521,7 +521,7 @@ public class DatabaseHelper
         using var seedMissing = new SQLiteCommand(
             "INSERT OR IGNORE INTO Settings (Key, Value) VALUES " +
             "('SmtpHost', ''), ('SmtpPort', '587'), ('SmtpUser', ''), ('SmtpPass', ''), ('SmtpTo', ''), " +
-            "('AppTimezone', '480'), ('LastMasterSync', '')",
+            "('AppTimezone', '480'), ('LastMasterSync', ''), ('AppTheme', 'Dark')",
             conn);
         seedMissing.ExecuteNonQuery();
 

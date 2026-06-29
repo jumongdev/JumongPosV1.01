@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.IO;
+using JumongPosV1._01.Helpers;
 using JumongPosV1._01.Models;
 using JumongPosV1._01.Services;
 
@@ -19,23 +20,30 @@ public class ProductSearchForm : Form
         }
     }
 
+    public void ApplyTheme()
+    {
+        var t = ThemeManager.Current;
+        BackColor = t.CanvasBg;
+        ForeColor = t.TextPrimary;
+    }
+
     private readonly TextBox _txtSearch;
     private readonly DataGridView _dgv;
     private List<Product> _results = new();
 
-    private static readonly Color CHeaderBg    = Color.FromArgb(24, 95, 165);
-    private static readonly Color CHeaderText  = Color.White;
-    private static readonly Color CSurface     = Color.FromArgb(244, 245, 250);
-    private static readonly Color CCard        = Color.White;
-    private static readonly Color CBorderLight = Color.FromArgb(236, 237, 243);
-    private static readonly Color CText        = Color.FromArgb(30, 30, 46);
-    private static readonly Color CTextMuted   = Color.FromArgb(110, 110, 140);
-    private static readonly Color CTextHint    = Color.FromArgb(160, 160, 190);
-    private static readonly Color CBlueMid     = Color.FromArgb(24, 95, 165);
-    private static readonly Color CGreenDark   = Color.FromArgb(39, 80, 10);
-    private static readonly Color CGreenMid    = Color.FromArgb(99, 153, 34);
-    private static readonly Color CRedDark     = Color.FromArgb(163, 45, 45);
-    private static readonly Color CAmberDark   = Color.FromArgb(99, 56, 6);
+    private static Color CHeaderBg    => ThemeManager.Current.SidebarTitleAccent;
+    private static Color CHeaderText  => Color.White;
+    private static Color CSurface     => ThemeManager.Current.SurfaceBg;
+    private static Color CCard        => ThemeManager.Current.CardBg;
+    private static Color CBorderLight => ThemeManager.Current.BorderLight;
+    private static Color CText        => ThemeManager.Current.TextPrimary;
+    private static Color CTextMuted   => ThemeManager.Current.TextSecondary;
+    private static Color CTextHint    => ThemeManager.Current.TextHint;
+    private static Color CBlueMid     => ThemeManager.Current.SidebarTitleAccent;
+    private static Color CGreenDark   => ThemeManager.Current.StatusGreenDark;
+    private static Color CGreenMid    => ThemeManager.Current.StatusGreenMid;
+    private static Color CRedDark     => ThemeManager.Current.StatusRedDark;
+    private static Color CAmberDark   => ThemeManager.Current.StatusAmberDark;
 
     public ProductSearchForm()
     {
@@ -89,7 +97,7 @@ public class ProductSearchForm : Form
         };
         _txtSearch.TextChanged += (_, _) => DoSearch();
         _txtSearch.KeyDown += OnSearchKeyDown;
-        _txtSearch.GotFocus += (_, _) => _txtSearch.BackColor = Color.FromArgb(240, 246, 255);
+        _txtSearch.GotFocus += (_, _) => _txtSearch.BackColor = ThemeManager.Current.DgvSelection;
         _txtSearch.LostFocus += (_, _) => _txtSearch.BackColor = CCard;
 
         _dgv = new DataGridView
@@ -110,12 +118,12 @@ public class ProductSearchForm : Form
             EnableHeadersVisualStyles = false,
             ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
             {
-                BackColor = Color.FromArgb(44, 62, 80),
-                ForeColor = Color.FromArgb(200, 215, 230),
+                BackColor = ThemeManager.Current.DgvHeaderBg,
+                ForeColor = ThemeManager.Current.DgvHeaderFg,
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 Alignment = DataGridViewContentAlignment.MiddleCenter,
-                SelectionBackColor = Color.FromArgb(44, 62, 80),
-                SelectionForeColor = Color.FromArgb(200, 215, 230)
+                SelectionBackColor = ThemeManager.Current.DgvHeaderBg,
+                SelectionForeColor = ThemeManager.Current.DgvHeaderFg
             },
             DefaultCellStyle = new DataGridViewCellStyle
             {
@@ -228,7 +236,7 @@ public class ProductSearchForm : Form
         {
             Location = new Point(leftM, 560),
             Size = new Size(clientW, 4),
-            BackColor = Color.FromArgb(44, 62, 80)
+            BackColor = ThemeManager.Current.DgvHeaderBg
         };
 
         Controls.AddRange(new Control[] { pnlHeader, lblHint, _txtSearch, _dgv, pnlFooter });

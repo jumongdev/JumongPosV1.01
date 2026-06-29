@@ -21,14 +21,14 @@ public partial class CustomersForm : Form
     {
         dgvCustomers.AutoGenerateColumns = false;
         dgvCustomers.Columns.Clear();
-        dgvCustomers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Id", HeaderText = "ID", Width = 45, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, ForeColor = Color.FromArgb(140, 140, 170) } });
-        dgvCustomers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Name", HeaderText = "NAME", Width = 160, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(230, 230, 245) } });
-        dgvCustomers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Phone", HeaderText = "PHONE", Width = 110, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(200, 200, 220) } });
-        dgvCustomers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Email", HeaderText = "EMAIL", Width = 140, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(200, 200, 220) } });
-        dgvCustomers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Address", HeaderText = "ADDRESS", Width = 140, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(200, 200, 220) } });
-        dgvCustomers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "LoyaltyPoints", HeaderText = "POINTS", Width = 65, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, ForeColor = Color.FromArgb(243, 156, 18), Font = new Font("Segoe UI", 9F, FontStyle.Bold) } });
-        dgvCustomers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "CreditBalance", HeaderText = "CREDIT BAL", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = Color.FromArgb(231, 76, 60), Font = new Font("Segoe UI", 9F, FontStyle.Bold) } });
-        dgvCustomers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "CreditLimit", HeaderText = "CREDIT LIMIT", Width = 95, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = Color.FromArgb(140, 140, 170) } });
+        dgvCustomers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Id", HeaderText = "ID", Width = 45, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, ForeColor = ThemeManager.Current.TextMuted } });
+        dgvCustomers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Name", HeaderText = "NAME", Width = 160, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextPrimary } });
+        dgvCustomers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Phone", HeaderText = "PHONE", Width = 110, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextSecondary } });
+        dgvCustomers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Email", HeaderText = "EMAIL", Width = 140, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextSecondary } });
+        dgvCustomers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Address", HeaderText = "ADDRESS", Width = 140, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextSecondary } });
+        dgvCustomers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "LoyaltyPoints", HeaderText = "POINTS", Width = 65, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, ForeColor = ThemeManager.Current.AccentOrange, Font = new Font("Segoe UI", 9F, FontStyle.Bold) } });
+        dgvCustomers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "CreditBalance", HeaderText = "CREDIT BAL", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = ThemeManager.Current.AccentRed, Font = new Font("Segoe UI", 9F, FontStyle.Bold) } });
+        dgvCustomers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "CreditLimit", HeaderText = "CREDIT LIMIT", Width = 95, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = ThemeManager.Current.TextMuted } });
         dgvCustomers.Columns.Add(new DataGridViewCheckBoxColumn { DataPropertyName = "IsActive", HeaderText = "ACTIVE", Width = 55 });
 
         var data = keyword switch
@@ -132,26 +132,14 @@ public partial class CustomersForm : Form
         txtCreditLimit.Clear();
         chkActive.Checked = true;
         lblFormTitle.Text = "NEW CUSTOMER";
-        lblFormTitle.ForeColor = Color.FromArgb(0, 245, 255);
+        lblFormTitle.ForeColor = ThemeManager.Current.AccentCyan;
     }
 
     private void InitializeComponent()
     {
-        var canvasBg = Color.FromArgb(10, 10, 26);
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var inputBg = Color.FromArgb(30, 30, 55);
-        var inputFg = Color.FromArgb(230, 230, 245);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var metaText = Color.FromArgb(230, 230, 245);
-        var dimText = Color.FromArgb(140, 140, 170);
-        var accentBlue = Color.FromArgb(72, 126, 176);
-        var accentGreen = Color.FromArgb(46, 204, 113);
-        var accentRed = Color.FromArgb(231, 76, 60);
-        var accentOrange = Color.FromArgb(243, 156, 18);
-        var accentPurple = Color.FromArgb(155, 89, 182);
-        var borderColor = Color.FromArgb(40, 40, 70);
+        var t = ThemeManager.Current;
 
-        BackColor = canvasBg;
+        BackColor = t.CanvasBg;
         Text = "Manage Customers";
         StartPosition = FormStartPosition.CenterScreen;
         WindowState = FormWindowState.Maximized;
@@ -164,11 +152,11 @@ public partial class CustomersForm : Form
         {
             Dock = DockStyle.Top,
             Height = 50,
-            BackColor = panelBg
+            BackColor = t.PanelBg
         };
         pnlToolbar.Paint += (s, e) =>
         {
-            using var pen = new Pen(borderColor, 1);
+            using var pen = new Pen(t.BorderColor, 1);
             e.Graphics.DrawLine(pen, 0, pnlToolbar.Height - 1, pnlToolbar.Width, pnlToolbar.Height - 1);
         };
 
@@ -176,7 +164,7 @@ public partial class CustomersForm : Form
         {
             Text = "\u2699 CUSTOMER MANAGEMENT",
             Font = new Font("Segoe UI", 13F, FontStyle.Bold),
-            ForeColor = neonTitle,
+            ForeColor = t.AccentCyan,
             Location = new Point(20, 12),
             Size = new Size(300, 28),
             AutoSize = false
@@ -188,8 +176,8 @@ public partial class CustomersForm : Form
             Location = new Point(340, 12),
             Size = new Size(250, 28),
             BorderStyle = BorderStyle.FixedSingle,
-            BackColor = inputBg,
-            ForeColor = inputFg
+            BackColor = t.InputBg,
+            ForeColor = t.InputFg
         };
         txtSearch.TextChanged += (_, _) => LoadCustomers(txtSearch.Text.Trim());
 
@@ -210,7 +198,7 @@ public partial class CustomersForm : Form
             Size = new Size(120, 28),
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
-            BackColor = accentOrange,
+            BackColor = t.AccentOrange,
             ForeColor = Color.White,
             Cursor = Cursors.Hand,
             Visible = _currentUser?.Role == "Admin"
@@ -230,33 +218,33 @@ public partial class CustomersForm : Form
         {
             Dock = DockStyle.Top,
             Height = 40,
-            BackColor = canvasBg
+            BackColor = t.CanvasBg
         };
 
-        lblMetricTotal = CreateMetricLabel(20, dimText);
+        lblMetricTotal = CreateMetricLabel(20, t.TextMuted);
         lblMetricTotal.Size = new Size(180, 20);
-        lblMetricCredit = CreateMetricLabel(200, accentRed);
+        lblMetricCredit = CreateMetricLabel(200, t.AccentRed);
         lblMetricCredit.Size = new Size(200, 20);
-        lblMetricDebtors = CreateMetricLabel(400, accentOrange);
+        lblMetricDebtors = CreateMetricLabel(400, t.AccentOrange);
         lblMetricDebtors.Size = new Size(200, 20);
-        lblMetricPoints = CreateMetricLabel(600, accentGreen);
+        lblMetricPoints = CreateMetricLabel(600, t.AccentGreen);
         lblMetricPoints.Size = new Size(200, 20);
 
         pnlMetrics.Controls.AddRange(new Control[] { lblMetricTotal, lblMetricCredit, lblMetricDebtors, lblMetricPoints });
 
         // ── MAIN SPLIT ──
-        var pnlMain = new Panel { Dock = DockStyle.Fill, BackColor = canvasBg };
+        var pnlMain = new Panel { Dock = DockStyle.Fill, BackColor = t.CanvasBg };
 
         // LEFT PANEL - Data Grid
         var pnlLeft = new Panel
         {
             Location = new Point(10, 10),
             Size = new Size(600, 400),
-            BackColor = panelBg
+            BackColor = t.PanelBg
         };
         pnlLeft.Paint += (s, e) =>
         {
-            using var pen = new Pen(borderColor, 1);
+            using var pen = new Pen(t.BorderColor, 1);
             e.Graphics.DrawRectangle(pen, 0, 0, pnlLeft.Width - 1, pnlLeft.Height - 1);
         };
 
@@ -264,7 +252,7 @@ public partial class CustomersForm : Form
         {
             Text = "CUSTOMER ROSTER",
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            ForeColor = dimText,
+            ForeColor = t.TextMuted,
             Location = new Point(12, 8),
             Size = new Size(200, 20)
         };
@@ -273,7 +261,7 @@ public partial class CustomersForm : Form
         {
             Location = new Point(8, 32),
             Size = new Size(584, 360),
-            BackgroundColor = panelBg,
+            BackgroundColor = t.PanelBg,
             BorderStyle = BorderStyle.None,
             RowHeadersVisible = false,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
@@ -283,23 +271,23 @@ public partial class CustomersForm : Form
             AllowUserToResizeRows = false,
             MultiSelect = false,
             Font = new Font("Segoe UI", 9F),
-            GridColor = borderColor,
+            GridColor = t.BorderColor,
             ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single,
             CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal
         };
-        dgvCustomers.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(25, 25, 50);
-        dgvCustomers.ColumnHeadersDefaultCellStyle.ForeColor = neonTitle;
+        dgvCustomers.ColumnHeadersDefaultCellStyle.BackColor = ThemeManager.Current.DgvHeaderBg;
+        dgvCustomers.ColumnHeadersDefaultCellStyle.ForeColor = t.AccentCyan;
         dgvCustomers.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         dgvCustomers.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
         dgvCustomers.ColumnHeadersHeight = 30;
         dgvCustomers.EnableHeadersVisualStyles = false;
-        dgvCustomers.DefaultCellStyle.SelectionBackColor = Color.FromArgb(40, 40, 80);
+        dgvCustomers.DefaultCellStyle.SelectionBackColor = ThemeManager.Current.DgvSelection;
         dgvCustomers.DefaultCellStyle.SelectionForeColor = Color.White;
         dgvCustomers.DefaultCellStyle.Padding = new Padding(4, 2, 4, 2);
         dgvCustomers.RowTemplate.Height = 28;
-        dgvCustomers.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(15, 15, 32);
-        dgvCustomers.DefaultCellStyle.BackColor = Color.FromArgb(22, 22, 45);
-        dgvCustomers.DefaultCellStyle.ForeColor = metaText;
+        dgvCustomers.AlternatingRowsDefaultCellStyle.BackColor = ThemeManager.Current.DgvRowAlt;
+        dgvCustomers.DefaultCellStyle.BackColor = ThemeManager.Current.DgvRowNormal;
+        dgvCustomers.DefaultCellStyle.ForeColor = t.TextPrimary;
         dgvCustomers.SelectionChanged += DgvCustomers_SelectionChanged;
         dgvCustomers.DoubleClick += DgvCustomers_DoubleClick;
 
@@ -310,11 +298,11 @@ public partial class CustomersForm : Form
         {
             Location = new Point(625, 10),
             Size = new Size(340, 400),
-            BackColor = panelBg
+            BackColor = t.PanelBg
         };
         pnlRight.Paint += (s, e) =>
         {
-            using var pen = new Pen(borderColor, 1);
+            using var pen = new Pen(t.BorderColor, 1);
             e.Graphics.DrawRectangle(pen, 0, 0, pnlRight.Width - 1, pnlRight.Height - 1);
         };
 
@@ -322,24 +310,24 @@ public partial class CustomersForm : Form
         {
             Text = "NEW CUSTOMER",
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-            ForeColor = neonTitle,
+            ForeColor = t.AccentCyan,
             Location = new Point(15, 10),
             Size = new Size(310, 25),
             TextAlign = ContentAlignment.MiddleLeft
         };
 
         var y = 42;
-        AddField("NAME", ref txtName, ref y, pnlRight, inputBg, inputFg, metaText);
-        AddField("PHONE", ref txtPhone, ref y, pnlRight, inputBg, inputFg, metaText);
-        AddField("EMAIL", ref txtEmail, ref y, pnlRight, inputBg, inputFg, metaText);
-        AddField("ADDRESS", ref txtAddress, ref y, pnlRight, inputBg, inputFg, metaText);
+        AddField("NAME", ref txtName, ref y, pnlRight, t.InputBg, t.InputFg, t.TextPrimary);
+        AddField("PHONE", ref txtPhone, ref y, pnlRight, t.InputBg, t.InputFg, t.TextPrimary);
+        AddField("EMAIL", ref txtEmail, ref y, pnlRight, t.InputBg, t.InputFg, t.TextPrimary);
+        AddField("ADDRESS", ref txtAddress, ref y, pnlRight, t.InputBg, t.InputFg, t.TextPrimary);
 
         // Credit Limit field
         var lblCredLimit = new Label
         {
             Text = "CREDIT LIMIT",
             Font = new Font("Segoe UI", 7.5F, FontStyle.Bold),
-            ForeColor = dimText,
+            ForeColor = t.TextMuted,
             Location = new Point(15, y),
             Size = new Size(80, 16),
             TextAlign = ContentAlignment.MiddleLeft
@@ -349,8 +337,8 @@ public partial class CustomersForm : Form
             Location = new Point(15, y + 16),
             Size = new Size(140, 26),
             BorderStyle = BorderStyle.FixedSingle,
-            BackColor = inputBg,
-            ForeColor = inputFg,
+            BackColor = t.InputBg,
+            ForeColor = t.InputFg,
             Font = new Font("Segoe UI", 10F),
             TextAlign = HorizontalAlignment.Right
         };
@@ -358,7 +346,7 @@ public partial class CustomersForm : Form
         {
             Text = "(0 = unlimited)",
             Font = new Font("Segoe UI", 7F),
-            ForeColor = Color.FromArgb(100, 100, 130),
+            ForeColor = ThemeManager.Current.TextMuted,
             Location = new Point(160, y + 19),
             Size = new Size(80, 16)
         };
@@ -370,7 +358,7 @@ public partial class CustomersForm : Form
             Text = "Active (allow orders)",
             Checked = true,
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            ForeColor = inputFg,
+            ForeColor = t.InputFg,
             Location = new Point(15, y),
             Size = new Size(200, 20)
         };
@@ -386,7 +374,7 @@ public partial class CustomersForm : Form
             Size = new Size(95, 34),
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
-            BackColor = accentBlue,
+            BackColor = t.AccentBlue,
             ForeColor = Color.White,
             Cursor = Cursors.Hand
         };
@@ -404,7 +392,7 @@ public partial class CustomersForm : Form
             Size = new Size(100, 34),
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
-            BackColor = accentGreen,
+            BackColor = t.AccentGreen,
             ForeColor = Color.White,
             Cursor = Cursors.Hand
         };
@@ -418,7 +406,7 @@ public partial class CustomersForm : Form
             Size = new Size(200, 34),
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
-            BackColor = accentPurple,
+            BackColor = t.AccentPurple,
             ForeColor = Color.White,
             Cursor = Cursors.Hand
         };
@@ -440,7 +428,7 @@ public partial class CustomersForm : Form
             Size = new Size(200, 34),
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
-            BackColor = accentOrange,
+            BackColor = t.AccentOrange,
             ForeColor = Color.White,
             Cursor = Cursors.Hand
         };
@@ -462,7 +450,7 @@ public partial class CustomersForm : Form
             Size = new Size(200, 34),
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
-            BackColor = accentRed,
+            BackColor = t.AccentRed,
             ForeColor = Color.White,
             Cursor = Cursors.Hand
         };
@@ -546,7 +534,7 @@ public partial class CustomersForm : Form
             txtCreditLimit.Text = c.CreditLimit > 0 ? c.CreditLimit.ToString("N2") : "";
             chkActive.Checked = c.IsActive;
             lblFormTitle.Text = $"EDIT: {c.Name}";
-            lblFormTitle.ForeColor = Color.FromArgb(46, 204, 113);
+            lblFormTitle.ForeColor = ThemeManager.Current.AccentGreen;
         }
     }
 
@@ -594,11 +582,7 @@ public partial class CustomersForm : Form
         var totalPaid = txns.Where(t => t.Type == "Payment").Sum(t => t.Credit);
         var totalCharged = txns.Where(t => t.Type == "Sale").Sum(t => t.Debit);
 
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var inputBg = Color.FromArgb(30, 30, 55);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var metaText = Color.FromArgb(230, 230, 245);
-        var borderColor = Color.FromArgb(40, 40, 70);
+        var t = ThemeManager.Current;
 
         using var form = new Form
         {
@@ -606,14 +590,14 @@ public partial class CustomersForm : Form
             Size = new Size(900, 550),
             StartPosition = FormStartPosition.CenterParent,
             FormBorderStyle = FormBorderStyle.Sizable,
-            BackColor = Color.FromArgb(10, 10, 26)
+            BackColor = ThemeManager.Current.CanvasBg
         };
 
         var summaryLabel = new Label
         {
             Text = $"Current Balance: \u20b1{customer.CreditBalance:N2}  |  Total Charged: \u20b1{totalCharged:N2}  |  Total Paid: \u20b1{totalPaid:N2}  |  Transactions: {txns.Count}",
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-            ForeColor = neonTitle,
+            ForeColor = t.AccentCyan,
             Location = new Point(15, 15),
             Size = new Size(850, 25)
         };
@@ -625,28 +609,28 @@ public partial class CustomersForm : Form
             ReadOnly = true,
             AllowUserToAddRows = false,
             RowHeadersVisible = false,
-            BackgroundColor = panelBg,
+            BackgroundColor = t.PanelBg,
             BorderStyle = BorderStyle.None,
             Font = new Font("Segoe UI", 9F),
-            GridColor = borderColor,
+            GridColor = t.BorderColor,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
             Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
         };
         dgv.AutoGenerateColumns = false;
-        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(25, 25, 50);
-        dgv.ColumnHeadersDefaultCellStyle.ForeColor = neonTitle;
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = ThemeManager.Current.DgvHeaderBg;
+        dgv.ColumnHeadersDefaultCellStyle.ForeColor = t.AccentCyan;
         dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         dgv.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
         dgv.ColumnHeadersHeight = 30;
         dgv.EnableHeadersVisualStyles = false;
-        dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(40, 40, 80);
+        dgv.DefaultCellStyle.SelectionBackColor = ThemeManager.Current.DgvSelection;
         dgv.DefaultCellStyle.SelectionForeColor = Color.White;
         dgv.DefaultCellStyle.Padding = new Padding(4, 2, 4, 2);
         dgv.RowTemplate.Height = 28;
-        dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(15, 15, 32);
-        dgv.DefaultCellStyle.BackColor = Color.FromArgb(22, 22, 45);
-        dgv.DefaultCellStyle.ForeColor = metaText;
+        dgv.AlternatingRowsDefaultCellStyle.BackColor = ThemeManager.Current.DgvRowAlt;
+        dgv.DefaultCellStyle.BackColor = ThemeManager.Current.DgvRowNormal;
+        dgv.DefaultCellStyle.ForeColor = t.TextPrimary;
 
         dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "CreatedAt", HeaderText = "DATE", Width = 130 });
         dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Type", HeaderText = "TYPE", Width = 75 });
@@ -654,9 +638,9 @@ public partial class CustomersForm : Form
         dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Description", HeaderText = "DESCRIPTION", Width = 260 });
         dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "PaymentMethod", HeaderText = "METHOD", Width = 85 });
         dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "ReferenceNo", HeaderText = "REF NO", Width = 95 });
-        dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Debit", HeaderText = "DEBIT", Width = 85, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", ForeColor = Color.FromArgb(231, 76, 60), Alignment = DataGridViewContentAlignment.MiddleRight } });
-        dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Credit", HeaderText = "CREDIT", Width = 85, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", ForeColor = Color.FromArgb(46, 204, 113), Alignment = DataGridViewContentAlignment.MiddleRight } });
-        dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Balance", HeaderText = "BALANCE", Width = 95, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = Color.FromArgb(0, 245, 255) } });
+        dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Debit", HeaderText = "DEBIT", Width = 85, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", ForeColor = ThemeManager.Current.AccentRed, Alignment = DataGridViewContentAlignment.MiddleRight } });
+        dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Credit", HeaderText = "CREDIT", Width = 85, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", ForeColor = ThemeManager.Current.AccentGreen, Alignment = DataGridViewContentAlignment.MiddleRight } });
+        dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Balance", HeaderText = "BALANCE", Width = 95, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = ThemeManager.Current.AccentCyan } });
         dgv.DataSource = txns.OrderBy(t => t.CreatedAt).ToList();
 
         var btnClose = new Button
@@ -667,7 +651,7 @@ public partial class CustomersForm : Form
             Size = new Size(100, 32),
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
-            BackColor = Color.FromArgb(72, 126, 176),
+            BackColor = ThemeManager.Current.AccentBlue,
             ForeColor = Color.White,
             Cursor = Cursors.Hand,
             Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
@@ -682,10 +666,7 @@ public partial class CustomersForm : Form
     {
         var sales = SaleService.GetSalesByCustomer(customer.Id);
 
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var metaText = Color.FromArgb(230, 230, 245);
-        var borderColor = Color.FromArgb(40, 40, 70);
+        var t = ThemeManager.Current;
 
         using var form = new Form
         {
@@ -693,14 +674,14 @@ public partial class CustomersForm : Form
             Size = new Size(900, 550),
             StartPosition = FormStartPosition.CenterParent,
             FormBorderStyle = FormBorderStyle.Sizable,
-            BackColor = Color.FromArgb(10, 10, 26)
+            BackColor = ThemeManager.Current.CanvasBg
         };
 
         var summaryLabel = new Label
         {
             Text = $"Total Purchases: {sales.Count}  |  Total Spent: \u20b1{sales.Where(s => !s.IsVoided).Sum(s => s.GrandTotal):N2}",
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-            ForeColor = neonTitle,
+            ForeColor = t.AccentCyan,
             Location = new Point(15, 15),
             Size = new Size(850, 25)
         };
@@ -712,32 +693,32 @@ public partial class CustomersForm : Form
             ReadOnly = true,
             AllowUserToAddRows = false,
             RowHeadersVisible = false,
-            BackgroundColor = panelBg,
+            BackgroundColor = t.PanelBg,
             BorderStyle = BorderStyle.None,
             Font = new Font("Segoe UI", 9F),
-            GridColor = borderColor,
+            GridColor = t.BorderColor,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
             Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
         };
         dgv.AutoGenerateColumns = false;
-        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(25, 25, 50);
-        dgv.ColumnHeadersDefaultCellStyle.ForeColor = neonTitle;
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = ThemeManager.Current.DgvHeaderBg;
+        dgv.ColumnHeadersDefaultCellStyle.ForeColor = t.AccentCyan;
         dgv.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         dgv.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
         dgv.ColumnHeadersHeight = 30;
         dgv.EnableHeadersVisualStyles = false;
-        dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(40, 40, 80);
+        dgv.DefaultCellStyle.SelectionBackColor = ThemeManager.Current.DgvSelection;
         dgv.DefaultCellStyle.SelectionForeColor = Color.White;
         dgv.DefaultCellStyle.Padding = new Padding(4, 2, 4, 2);
         dgv.RowTemplate.Height = 28;
-        dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(15, 15, 32);
-        dgv.DefaultCellStyle.BackColor = Color.FromArgb(22, 22, 45);
-        dgv.DefaultCellStyle.ForeColor = metaText;
+        dgv.AlternatingRowsDefaultCellStyle.BackColor = ThemeManager.Current.DgvRowAlt;
+        dgv.DefaultCellStyle.BackColor = ThemeManager.Current.DgvRowNormal;
+        dgv.DefaultCellStyle.ForeColor = t.TextPrimary;
 
         dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "InvoiceNo", HeaderText = "INVOICE", Width = 110 });
         dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "SaleDate", HeaderText = "DATE", Width = 140, DefaultCellStyle = new DataGridViewCellStyle { Format = "yyyy-MM-dd HH:mm" } });
-        dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "GrandTotal", HeaderText = "TOTAL", Width = 95, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = Color.FromArgb(0, 245, 255), Font = new Font("Segoe UI", 9F, FontStyle.Bold) } });
+        dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "GrandTotal", HeaderText = "TOTAL", Width = 95, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = ThemeManager.Current.AccentCyan, Font = new Font("Segoe UI", 9F, FontStyle.Bold) } });
         dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "PaymentMethod", HeaderText = "METHOD", Width = 90 });
         dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "OrderType", HeaderText = "TYPE", Width = 80 });
         dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Status", HeaderText = "STATUS", Width = 80 });
@@ -751,7 +732,7 @@ public partial class CustomersForm : Form
             if (e1.ColumnIndex == dgv.Columns["Status"]?.Index)
             {
                 e1.Value = row.IsVoided ? "VOIDED" : "COMPLETED";
-                e1.CellStyle!.ForeColor = row.IsVoided ? Color.FromArgb(231, 76, 60) : Color.FromArgb(46, 204, 113);
+                e1.CellStyle!.ForeColor = row.IsVoided ? ThemeManager.Current.AccentRed : ThemeManager.Current.AccentGreen;
                 e1.CellStyle.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
             }
         };
@@ -768,7 +749,7 @@ public partial class CustomersForm : Form
                 Size = new Size(700, 450),
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.Sizable,
-                BackColor = Color.FromArgb(10, 10, 26)
+                BackColor = ThemeManager.Current.CanvasBg
             };
 
             var itemGrid = new DataGridView
@@ -778,31 +759,31 @@ public partial class CustomersForm : Form
                 ReadOnly = true,
                 AllowUserToAddRows = false,
                 RowHeadersVisible = false,
-                BackgroundColor = panelBg,
+                BackgroundColor = t.PanelBg,
                 BorderStyle = BorderStyle.None,
                 Font = new Font("Segoe UI", 9F),
-                GridColor = borderColor,
+                GridColor = t.BorderColor,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
             };
             itemGrid.AutoGenerateColumns = false;
-            itemGrid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(25, 25, 50);
-            itemGrid.ColumnHeadersDefaultCellStyle.ForeColor = neonTitle;
+            itemGrid.ColumnHeadersDefaultCellStyle.BackColor = ThemeManager.Current.DgvHeaderBg;
+            itemGrid.ColumnHeadersDefaultCellStyle.ForeColor = t.AccentCyan;
             itemGrid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             itemGrid.ColumnHeadersHeight = 30;
             itemGrid.EnableHeadersVisualStyles = false;
-            itemGrid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(40, 40, 80);
+            itemGrid.DefaultCellStyle.SelectionBackColor = ThemeManager.Current.DgvSelection;
             itemGrid.DefaultCellStyle.SelectionForeColor = Color.White;
             itemGrid.RowTemplate.Height = 28;
-            itemGrid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(15, 15, 32);
-            itemGrid.DefaultCellStyle.BackColor = Color.FromArgb(22, 22, 45);
-            itemGrid.DefaultCellStyle.ForeColor = metaText;
+            itemGrid.AlternatingRowsDefaultCellStyle.BackColor = ThemeManager.Current.DgvRowAlt;
+            itemGrid.DefaultCellStyle.BackColor = ThemeManager.Current.DgvRowNormal;
+            itemGrid.DefaultCellStyle.ForeColor = t.TextPrimary;
 
             itemGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "ProductName", HeaderText = "PRODUCT", Width = 250 });
             itemGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "UnitName", HeaderText = "UNIT", Width = 60 });
             itemGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Quantity", HeaderText = "QTY", Width = 55, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter } });
             itemGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Price", HeaderText = "PRICE", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight } });
-            itemGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "TotalPrice", HeaderText = "TOTAL", Width = 100, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = Color.FromArgb(0, 245, 255), Font = new Font("Segoe UI", 9F, FontStyle.Bold) } });
+            itemGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "TotalPrice", HeaderText = "TOTAL", Width = 100, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = ThemeManager.Current.AccentCyan, Font = new Font("Segoe UI", 9F, FontStyle.Bold) } });
             itemGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "IsVoided", HeaderText = "VOIDED", Width = 60 });
             itemGrid.DataSource = full.Items;
 
@@ -813,7 +794,7 @@ public partial class CustomersForm : Form
                 if (ev.ColumnIndex == itemGrid.Columns["IsVoided"]?.Index)
                 {
                     ev.Value = si.IsVoided ? "YES" : "NO";
-                    ev.CellStyle!.ForeColor = si.IsVoided ? Color.FromArgb(231, 76, 60) : Color.FromArgb(46, 204, 113);
+                    ev.CellStyle!.ForeColor = si.IsVoided ? ThemeManager.Current.AccentRed : ThemeManager.Current.AccentGreen;
                     ev.CellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
                 }
             };
@@ -823,7 +804,7 @@ public partial class CustomersForm : Form
             {
                 Text = $"Grand Total: \u20b1{full.GrandTotal:N2}    |    Effective: \u20b1{effectiveTotal:N2}",
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = neonTitle,
+                ForeColor = t.AccentCyan,
                 Location = new Point(15, 365),
                 Size = new Size(655, 25),
                 Anchor = AnchorStyles.Bottom | AnchorStyles.Left
@@ -837,7 +818,7 @@ public partial class CustomersForm : Form
                 Size = new Size(100, 30),
                 FlatStyle = FlatStyle.Flat,
                 FlatAppearance = { BorderSize = 0 },
-                BackColor = Color.FromArgb(72, 126, 176),
+                BackColor = ThemeManager.Current.AccentBlue,
                 ForeColor = Color.White,
                 Cursor = Cursors.Hand,
                 Anchor = AnchorStyles.Bottom,
@@ -858,7 +839,7 @@ public partial class CustomersForm : Form
             Size = new Size(120, 28),
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
-            BackColor = Color.FromArgb(72, 126, 176),
+            BackColor = ThemeManager.Current.AccentBlue,
             ForeColor = Color.White,
             Cursor = Cursors.Hand,
             Anchor = AnchorStyles.Top | AnchorStyles.Right
@@ -873,7 +854,7 @@ public partial class CustomersForm : Form
             Size = new Size(100, 32),
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
-            BackColor = Color.FromArgb(72, 126, 176),
+            BackColor = ThemeManager.Current.AccentBlue,
             ForeColor = Color.White,
             Cursor = Cursors.Hand,
             Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
@@ -882,6 +863,13 @@ public partial class CustomersForm : Form
 
         form.Controls.AddRange(new Control[] { summaryLabel, dgv, btnReceipt, btnClose });
         form.ShowDialog();
+    }
+
+    public void ApplyTheme()
+    {
+        var t = ThemeManager.Current;
+        BackColor = t.CanvasBg;
+        ForeColor = t.TextPrimary;
     }
 
     private TextBox txtSearch = null!;

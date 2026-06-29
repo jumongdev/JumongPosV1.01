@@ -197,11 +197,12 @@ private void btnEmail_Click(object? sender, EventArgs e)
 
     private void btnHistory_Click(object? sender, EventArgs e)
     {
-        var canvasBg = Color.FromArgb(10, 10, 26);
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var borderColor = Color.FromArgb(40, 40, 70);
-        var accentBlue = Color.FromArgb(72, 126, 176);
+        var t2 = ThemeManager.Current;
+        var canvasBg = t2.CanvasBg;
+        var panelBg = t2.PanelBg;
+        var neonTitle = t2.AccentCyan;
+        var borderColor = t2.BorderColor;
+        var accentBlue = t2.AccentBlue;
         var isAdmin = _currentUser.Role == "Admin";
 
         using var form = new Form { Text = "Shift History", WindowState = FormWindowState.Maximized, StartPosition = FormStartPosition.CenterScreen, FormBorderStyle = FormBorderStyle.Sizable, MaximizeBox = true, BackColor = canvasBg };
@@ -210,7 +211,7 @@ private void btnEmail_Click(object? sender, EventArgs e)
         var lblTitle = new Label { Text = "\uD83D\uDCCB SHIFT HISTORY", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(20, 12), Size = new Size(250, 28) };
         pnlToolbar.Controls.Add(lblTitle);
 
-        var dgv = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = panelBg, BorderStyle = BorderStyle.None, GridColor = Color.FromArgb(40, 40, 70), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = neonTitle, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = Color.FromArgb(230, 230, 245), SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) } };
+        var dgv = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = panelBg, BorderStyle = BorderStyle.None, GridColor = t2.DgvGrid, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = t2.DgvHeaderBg, ForeColor = neonTitle, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = t2.DgvRowNormal, ForeColor = t2.TextPrimary, SelectionBackColor = t2.DgvSelection, SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = t2.DgvRowAlt } };
         dgv.DataSource = DailyCloseService.GetHistory();
 
         var financialColumns = new[] { "TotalSales", "TotalCash", "TotalEWallet", "TotalCredit", "TotalVoided", "Difference", "Denom1000", "Denom500", "Denom200", "Denom100", "Denom50", "Denom20", "DenomCoins", "CashOnHand" };
@@ -233,7 +234,7 @@ private void btnEmail_Click(object? sender, EventArgs e)
             var cashOnHand = dc.Denom1000 * 1000m + dc.Denom500 * 500m + dc.Denom200 * 200m + dc.Denom100 * 100m + dc.Denom50 * 50m + dc.Denom20 * 20m + dc.DenomCoins;
             PrinterService.PrintAuditEndShiftReport(cashOnHand, dc.Difference, dc.UserName, closeDate, dc.Notes, dc.TotalSales, dc.TotalCash, dc.TotalEWallet, dc.TotalCredit, dc.TotalVoided, expenses, gcashTxns, creditCustomers, creditPayments, dc.Denom1000, dc.Denom500, dc.Denom200, dc.Denom100, dc.Denom50, dc.Denom20, dc.DenomCoins);
         };
-        var btnTrends = new Button { Text = "\uD83D\uDCCA TRENDS", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(170, 10), Size = new Size(100, 30), BackColor = Color.FromArgb(46, 204, 113), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+        var btnTrends = new Button { Text = "\uD83D\uDCCA TRENDS", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(170, 10), Size = new Size(100, 30), BackColor = t2.AccentGreen, ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
         btnTrends.Click += (_, __) =>
         {
             var data = DailyCloseService.GetShiftComparison();
@@ -242,14 +243,14 @@ private void btnEmail_Click(object? sender, EventArgs e)
             tt.Paint += (s, ev) => { using var pen = new Pen(borderColor, 1); ev.Graphics.DrawLine(pen, 0, tt.Height - 1, tt.Width, tt.Height - 1); };
             var tl = new Label { Text = "\uD83D\uDCCA SHIFT COMPARISON — DAILY TRENDS (60 days)", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(20, 12), Size = new Size(500, 28) };
             tt.Controls.Add(tl);
-            var td = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = panelBg, BorderStyle = BorderStyle.None, GridColor = Color.FromArgb(40, 40, 70), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = neonTitle, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = Color.FromArgb(230, 230, 245), SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) } };
+            var td = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = panelBg, BorderStyle = BorderStyle.None, GridColor = t2.DgvGrid, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = t2.DgvHeaderBg, ForeColor = neonTitle, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = t2.DgvRowNormal, ForeColor = t2.TextPrimary, SelectionBackColor = t2.DgvSelection, SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = t2.DgvRowAlt } };
             td.AutoGenerateColumns = false;
             td.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Date", HeaderText = "DATE", Width = 120 });
             td.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "ShiftCount", HeaderText = "SHIFTS", Width = 80 });
-            td.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "TotalSales", HeaderText = "TOTAL SALES", Width = 120, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", ForeColor = Color.FromArgb(230, 230, 245) } });
-            td.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "TotalExpenses", HeaderText = "EXPENSES", Width = 120, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", ForeColor = Color.FromArgb(243, 156, 18) } });
+            td.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "TotalSales", HeaderText = "TOTAL SALES", Width = 120, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", ForeColor = t2.TextPrimary } });
+            td.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "TotalExpenses", HeaderText = "EXPENSES", Width = 120, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", ForeColor = t2.AccentOrange } });
             td.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "AvgVariance", HeaderText = "AVG OVER/SHORT", Width = 140, DefaultCellStyle = new DataGridViewCellStyle { Format = "+0.00;-0.00;0", Font = new Font("Segoe UI", 10F, FontStyle.Bold) } });
-            td.CellFormatting += (s, ev) => { if (ev.ColumnIndex == 4 && ev.Value is decimal d && ev.CellStyle != null) { ev.CellStyle.ForeColor = d >= 0 ? Color.FromArgb(46, 204, 113) : Color.FromArgb(231, 76, 60); ev.Value = (d >= 0 ? "+" : "") + d.ToString("N2"); } };
+            td.CellFormatting += (s, ev) => { if (ev.ColumnIndex == 4 && ev.Value is decimal d && ev.CellStyle != null) { ev.CellStyle.ForeColor = d >= 0 ? t2.AccentGreen : t2.AccentRed; ev.Value = (d >= 0 ? "+" : "") + d.ToString("N2"); } };
             td.DataSource = data.Select(x => new { Date = x.Date, ShiftCount = x.ShiftCount, TotalSales = x.TotalSales, TotalExpenses = x.TotalExpenses, AvgVariance = x.AvgVariance }).ToList();
             var tc = new Button { Text = "CLOSE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(20, 10), Size = new Size(100, 30), BackColor = accentBlue, ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
             tc.Click += (_, __) => tf.Close();
@@ -258,7 +259,7 @@ private void btnEmail_Click(object? sender, EventArgs e)
             tf.Controls.AddRange(new Control[] { td, tp, tt });
             tf.ShowDialog();
         };
-        var btnClose = new Button { Text = "CLOSE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(170, 10), Size = new Size(100, 30), BackColor = Color.FromArgb(149, 165, 166), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+        var btnClose = new Button { Text = "CLOSE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(170, 10), Size = new Size(100, 30), BackColor = t2.AccentGrey, ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
         btnClose.Click += (_, __) => form.Close();
         var pnlBtn = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = canvasBg };
         pnlBtn.Controls.AddRange(new Control[] { btnReprint, btnTrends, btnClose });
@@ -275,18 +276,19 @@ private void btnEmail_Click(object? sender, EventArgs e)
 
     private void InitializeComponent()
     {
-        var canvasBg = Color.FromArgb(10, 10, 26);
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var inputBg = Color.FromArgb(30, 30, 55);
-        var inputFg = Color.FromArgb(230, 230, 245);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var dimText = Color.FromArgb(140, 140, 170);
-        var borderColor = Color.FromArgb(40, 40, 70);
-        var accentBlue = Color.FromArgb(72, 126, 176);
-        var accentGreen = Color.FromArgb(46, 204, 113);
-        var accentRed = Color.FromArgb(231, 76, 60);
-        var accentOrange = Color.FromArgb(243, 156, 18);
-        var accentPurple = Color.FromArgb(155, 89, 182);
+        var t = ThemeManager.Current;
+        var canvasBg = t.CanvasBg;
+        var panelBg = t.PanelBg;
+        var inputBg = t.InputBg;
+        var inputFg = t.InputFg;
+        var neonTitle = t.AccentCyan;
+        var dimText = t.TextMuted;
+        var borderColor = t.BorderColor;
+        var accentBlue = t.AccentBlue;
+        var accentGreen = t.AccentGreen;
+        var accentRed = t.AccentRed;
+        var accentOrange = t.AccentOrange;
+        var accentPurple = t.AccentPurple;
 
         BackColor = canvasBg;
         Text = "End Shift";
@@ -352,7 +354,7 @@ private void btnEmail_Click(object? sender, EventArgs e)
         btnHistory.Click += btnHistory_Click;
         btnExpenses = new Button { Text = "\uD83D\uDCB8 EXPENSES", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(0, 45), Size = new Size(110, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentOrange, ForeColor = Color.White, Cursor = Cursors.Hand };
         btnExpenses.Click += btnExpenses_Click;
-        btnPrintReport = new Button { Text = "\uD83D\uDDA8\uFE0F PRINT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(115, 45), Size = new Size(110, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(52, 152, 219), ForeColor = Color.White, Cursor = Cursors.Hand };
+        btnPrintReport = new Button { Text = "\uD83D\uDDA8\uFE0F PRINT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(115, 45), Size = new Size(110, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentBlue, ForeColor = Color.White, Cursor = Cursors.Hand };
         btnPrintReport.Click += btnPrintReport_Click;
         btnEmail = new Button { Text = "\uD83D\uDCE7 EMAIL", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(230, 45), Size = new Size(100, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentPurple, ForeColor = Color.White, Cursor = Cursors.Hand };
         btnEmail.Click += btnEmail_Click;
@@ -386,11 +388,11 @@ private void btnEmail_Click(object? sender, EventArgs e)
         pnlActions.Size = new Size(availW, actionsH);
     }
 
-    private Label MakeValueLabel(Color? color = null) => new() { Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = color ?? Color.FromArgb(230, 230, 245), Location = new Point(360, 0), Size = new Size(110, 22), TextAlign = ContentAlignment.MiddleRight };
+    private Label MakeValueLabel(Color? color = null) => new() { Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = color ?? ThemeManager.Current.TextPrimary, Location = new Point(360, 0), Size = new Size(110, 22), TextAlign = ContentAlignment.MiddleRight };
 
     private void AddSummaryRow(Panel parent, int x, ref int y, string label, Label value)
     {
-        var lbl = new Label { Text = label, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(140, 140, 170), Location = new Point(x, y), Size = new Size(200, 22) };
+        var lbl = new Label { Text = label, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = ThemeManager.Current.TextMuted, Location = new Point(x, y), Size = new Size(200, 22) };
         value.Location = new Point(parent.Width - 160, y);
         value.Size = new Size(130, 22);
         value.Anchor = AnchorStyles.Top | AnchorStyles.Right;
@@ -400,17 +402,24 @@ private void btnEmail_Click(object? sender, EventArgs e)
 
     private NumericUpDown MakeNum()
     {
-        var n = new NumericUpDown { Maximum = 9999, Width = 100, BackColor = Color.FromArgb(30, 30, 55), ForeColor = Color.FromArgb(230, 230, 245) };
+        var n = new NumericUpDown { Maximum = 9999, Width = 100, BackColor = ThemeManager.Current.InputBg, ForeColor = ThemeManager.Current.TextPrimary };
         n.ValueChanged += Denom_ValueChanged;
         return n;
     }
 
     private void AddDenomRow(Panel parent, int x, ref int y, string label, NumericUpDown num)
     {
-        var lbl = new Label { Text = label, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(140, 140, 170), Location = new Point(x, y), Size = new Size(100, 25) };
+        var lbl = new Label { Text = label, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = ThemeManager.Current.TextMuted, Location = new Point(x, y), Size = new Size(100, 25) };
         num.Location = new Point(120, y);
         parent.Controls.AddRange(new Control[] { lbl, num });
         y += 28;
+    }
+
+    public void ApplyTheme()
+    {
+        var t = ThemeManager.Current;
+        BackColor = t.CanvasBg;
+        ForeColor = t.TextPrimary;
     }
 
     private Label lblDate = null!, lblCashierName = null!, lblTotalExpenses = null!;

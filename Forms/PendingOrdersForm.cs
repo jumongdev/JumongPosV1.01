@@ -1,3 +1,4 @@
+using JumongPosV1._01.Helpers;
 using JumongPosV1._01.Models;
 using JumongPosV1._01.Services;
 
@@ -8,18 +9,25 @@ public class PendingOrdersForm : Form
     private readonly User _currentUser;
     private readonly CustomerDisplayForm? _customerDisplay;
     private List<PendingTransfer> _transfers = new();
+    public void ApplyTheme()
+    {
+        var t = ThemeManager.Current;
+        BackColor = t.CanvasBg;
+        ForeColor = t.TextPrimary;
+    }
+
     private DataGridView dgvOrders = null!;
     private Button btnProcess = null!;
     private Button btnRefresh = null!;
     private Label lblStatus = null!;
 
-    private static readonly Color CSurface = Color.FromArgb(10, 10, 26);
-    private static readonly Color CCard = Color.FromArgb(22, 22, 45);
-    private static readonly Color CText = Color.FromArgb(230, 230, 245);
-    private static readonly Color CTextMuted = Color.FromArgb(140, 140, 170);
-    private static readonly Color CAccent = Color.FromArgb(72, 126, 176);
-    private static readonly Color CGreen = Color.FromArgb(46, 204, 113);
-    private static readonly Color CBorder = Color.FromArgb(40, 40, 70);
+    private static Color CSurface => ThemeManager.Current.CanvasBg;
+    private static Color CCard => ThemeManager.Current.PanelBg;
+    private static Color CText => ThemeManager.Current.TextPrimary;
+    private static Color CTextMuted => ThemeManager.Current.TextMuted;
+    private static Color CAccent => ThemeManager.Current.AccentBlue;
+    private static Color CGreen => ThemeManager.Current.AccentGreen;
+    private static Color CBorder => ThemeManager.Current.BorderColor;
 
     public PendingOrdersForm(User user, CustomerDisplayForm? customerDisplay = null)
     {
@@ -148,7 +156,7 @@ public class PendingOrdersForm : Form
             {
                 BackColor = CSurface,
                 ForeColor = CText,
-                SelectionBackColor = Color.FromArgb(40, 40, 80),
+                SelectionBackColor = ThemeManager.Current.DgvSelection,
                 SelectionForeColor = Color.White
             },
             RowTemplate = { Height = 36 }

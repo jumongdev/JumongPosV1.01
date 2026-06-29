@@ -105,12 +105,7 @@ public partial class ProductUnitsForm : Form
 
     private void InitializeComponent()
     {
-        var canvasBg = Color.FromArgb(10, 10, 26);
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var inputBg = Color.FromArgb(30, 30, 55);
-        var inputFg = Color.FromArgb(230, 230, 245);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var dimText = Color.FromArgb(140, 140, 170);
+        var t = ThemeManager.Current;
 
         Text = "Manage Product Units";
         ClientSize = new Size(600, 420);
@@ -118,12 +113,12 @@ public partial class ProductUnitsForm : Form
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
         ControlBox = false;
-        BackColor = canvasBg;
+        BackColor = t.CanvasBg;
 
         lblTitle = new Label
         {
             Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-            ForeColor = neonTitle,
+            ForeColor = t.AccentCyan,
             Location = new Point(15, 15),
             Size = new Size(570, 25)
         };
@@ -132,9 +127,9 @@ public partial class ProductUnitsForm : Form
         {
             Location = new Point(15, 50),
             Size = new Size(570, 180),
-            BackgroundColor = panelBg,
+            BackgroundColor = t.PanelBg,
             BorderStyle = BorderStyle.None,
-            GridColor = Color.FromArgb(40, 40, 70),
+            GridColor = t.BorderColor,
             AllowUserToAddRows = false,
             AllowUserToDeleteRows = false,
             ReadOnly = true,
@@ -142,26 +137,26 @@ public partial class ProductUnitsForm : Form
             MultiSelect = false,
             RowHeadersVisible = false,
             Font = new Font("Segoe UI", 9F),
-            ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = neonTitle, Font = new Font("Segoe UI", 9F, FontStyle.Bold) },
+            ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = t.DgvHeaderBg, ForeColor = t.AccentCyan, Font = new Font("Segoe UI", 9F, FontStyle.Bold) },
             ColumnHeadersHeight = 30,
             EnableHeadersVisualStyles = false,
-            DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = inputFg, SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White },
+            DefaultCellStyle = new DataGridViewCellStyle { BackColor = t.DgvRowNormal, ForeColor = t.InputFg, SelectionBackColor = t.DgvSelection, SelectionForeColor = Color.White },
             RowTemplate = { Height = 28 },
-            AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) }
+            AlternatingRowsDefaultCellStyle = { BackColor = t.DgvRowAlt }
         };
         dgvUnits.SelectionChanged += dgvUnits_SelectionChanged;
 
         // Edit fields
         var y = 245;
-        AddField("Unit Name:", ref txtUnitName, ref y, inputBg, inputFg, dimText);
-        AddField("Price:", ref txtPrice, ref y, inputBg, inputFg, dimText);
+        AddField("Unit Name:", ref txtUnitName, ref y, t.InputBg, t.InputFg, t.TextMuted);
+        AddField("Price:", ref txtPrice, ref y, t.InputBg, t.InputFg, t.TextMuted);
         var lblQty = new Label
         {
             Text = "Qty Per Unit:",
             Location = new Point(15, y),
             Size = new Size(85, 25),
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            ForeColor = dimText
+            ForeColor = t.TextMuted
         };
         nudQtyPerUnit = new NumericUpDown
         {
@@ -170,8 +165,8 @@ public partial class ProductUnitsForm : Form
             Minimum = 1,
             Maximum = 999999,
             Value = 1,
-            BackColor = inputBg,
-            ForeColor = inputFg
+            BackColor = t.InputBg,
+            ForeColor = t.InputFg
         };
         Controls.Add(lblQty);
         Controls.Add(nudQtyPerUnit);
@@ -183,8 +178,8 @@ public partial class ProductUnitsForm : Form
             Location = new Point(15, y),
             Size = new Size(120, 25),
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            ForeColor = inputFg,
-            BackColor = canvasBg
+            ForeColor = t.InputFg,
+            BackColor = t.CanvasBg
         };
         Controls.Add(chkDefault);
         y += 35;
@@ -195,7 +190,7 @@ public partial class ProductUnitsForm : Form
             Location = new Point(15, y),
             Size = new Size(80, 35),
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-            BackColor = Color.FromArgb(72, 126, 176),
+            BackColor = t.AccentBlue,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
@@ -209,7 +204,7 @@ public partial class ProductUnitsForm : Form
             Location = new Point(100, y),
             Size = new Size(80, 35),
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-            BackColor = Color.FromArgb(46, 204, 113),
+            BackColor = t.AccentGreen,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
@@ -223,7 +218,7 @@ public partial class ProductUnitsForm : Form
             Location = new Point(185, y),
             Size = new Size(80, 35),
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-            BackColor = Color.FromArgb(231, 76, 60),
+            BackColor = t.AccentRed,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
@@ -238,7 +233,7 @@ public partial class ProductUnitsForm : Form
             Location = new Point(500, y),
             Size = new Size(85, 35),
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-            BackColor = Color.FromArgb(149, 165, 166),
+            BackColor = t.AccentGrey,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
@@ -271,6 +266,13 @@ public partial class ProductUnitsForm : Form
         Controls.Add(lbl);
         Controls.Add(box);
         y += 30;
+    }
+
+    public void ApplyTheme()
+    {
+        var t = ThemeManager.Current;
+        BackColor = t.CanvasBg;
+        ForeColor = t.TextPrimary;
     }
 
     private Label lblTitle = null!;

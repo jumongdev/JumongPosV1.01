@@ -22,29 +22,29 @@ public partial class UsersForm : Form
         var data = UserService.GetAll();
         dgvUsers.AutoGenerateColumns = false;
         dgvUsers.Columns.Clear();
-        dgvUsers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Id", HeaderText = "ID", Width = 45, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, ForeColor = Color.FromArgb(140, 140, 170) } });
-        dgvUsers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Username", HeaderText = "USERNAME", Width = 130, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(230, 230, 245) } });
-        dgvUsers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "FullName", HeaderText = "FULL NAME", Width = 180, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(200, 200, 220) } });
-        dgvUsers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Role", HeaderText = "ROLE", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(0, 245, 255), Font = new Font("Segoe UI", 9F, FontStyle.Bold) } });
+        dgvUsers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Id", HeaderText = "ID", Width = 45, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, ForeColor = ThemeManager.Current.TextMuted } });
+        dgvUsers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Username", HeaderText = "USERNAME", Width = 130, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextPrimary } });
+        dgvUsers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "FullName", HeaderText = "FULL NAME", Width = 180, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextSecondary } });
+        dgvUsers.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Role", HeaderText = "ROLE", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.AccentCyan, Font = new Font("Segoe UI", 9F, FontStyle.Bold) } });
         dgvUsers.Columns.Add(new DataGridViewCheckBoxColumn { DataPropertyName = "IsActive", HeaderText = "ACTIVE", Width = 70, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter } });
         dgvUsers.DataSource = data;
         dgvUsers.RowHeadersVisible = false;
-        dgvUsers.BackgroundColor = Color.FromArgb(20, 20, 40);
+        dgvUsers.BackgroundColor = ThemeManager.Current.PanelBg;
         dgvUsers.BorderStyle = BorderStyle.None;
-        dgvUsers.GridColor = Color.FromArgb(40, 40, 70);
-        dgvUsers.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(25, 25, 50);
-        dgvUsers.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(0, 245, 255);
+        dgvUsers.GridColor = ThemeManager.Current.BorderColor;
+        dgvUsers.ColumnHeadersDefaultCellStyle.BackColor = ThemeManager.Current.DgvHeaderBg;
+        dgvUsers.ColumnHeadersDefaultCellStyle.ForeColor = ThemeManager.Current.AccentCyan;
         dgvUsers.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         dgvUsers.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
         dgvUsers.ColumnHeadersHeight = 30;
         dgvUsers.EnableHeadersVisualStyles = false;
-        dgvUsers.DefaultCellStyle.SelectionBackColor = Color.FromArgb(40, 40, 80);
+        dgvUsers.DefaultCellStyle.SelectionBackColor = ThemeManager.Current.DgvSelection;
         dgvUsers.DefaultCellStyle.SelectionForeColor = Color.White;
         dgvUsers.DefaultCellStyle.Padding = new Padding(4, 2, 4, 2);
         dgvUsers.RowTemplate.Height = 28;
-        dgvUsers.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(15, 15, 32);
-        dgvUsers.DefaultCellStyle.BackColor = Color.FromArgb(22, 22, 45);
-        dgvUsers.DefaultCellStyle.ForeColor = Color.FromArgb(230, 230, 245);
+        dgvUsers.AlternatingRowsDefaultCellStyle.BackColor = ThemeManager.Current.DgvRowAlt;
+        dgvUsers.DefaultCellStyle.BackColor = ThemeManager.Current.DgvRowNormal;
+        dgvUsers.DefaultCellStyle.ForeColor = ThemeManager.Current.TextPrimary;
     }
 
     private void btnSave_Click(object? sender, EventArgs e)
@@ -104,23 +104,14 @@ public partial class UsersForm : Form
         cmbRole.SelectedIndex = 0;
         chkActive.Checked = true;
         lblFormTitle.Text = "NEW USER";
-        lblFormTitle.ForeColor = Color.FromArgb(0, 245, 255);
+        lblFormTitle.ForeColor = ThemeManager.Current.AccentCyan;
     }
 
     private void InitializeComponent()
     {
-        var canvasBg = Color.FromArgb(10, 10, 26);
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var inputBg = Color.FromArgb(30, 30, 55);
-        var inputFg = Color.FromArgb(230, 230, 245);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var dimText = Color.FromArgb(140, 140, 170);
-        var borderColor = Color.FromArgb(40, 40, 70);
-        var accentBlue = Color.FromArgb(72, 126, 176);
-        var accentGreen = Color.FromArgb(46, 204, 113);
-        var accentRed = Color.FromArgb(231, 76, 60);
+        var t = ThemeManager.Current;
 
-        BackColor = canvasBg;
+        BackColor = t.CanvasBg;
         Text = "Manage Users";
         StartPosition = FormStartPosition.CenterScreen;
         WindowState = FormWindowState.Maximized;
@@ -129,20 +120,20 @@ public partial class UsersForm : Form
         MinimizeBox = true;
 
         // ── TOP TOOLBAR ──
-        var pnlToolbar = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = panelBg };
-        pnlToolbar.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawLine(pen, 0, pnlToolbar.Height - 1, pnlToolbar.Width, pnlToolbar.Height - 1); };
+        var pnlToolbar = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = t.PanelBg };
+        pnlToolbar.Paint += (s, e) => { using var pen = new Pen(t.BorderColor, 1); e.Graphics.DrawLine(pen, 0, pnlToolbar.Height - 1, pnlToolbar.Width, pnlToolbar.Height - 1); };
 
-        var lblPageTitle = new Label { Text = "\uD83D\uDC64 USER MANAGEMENT", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(20, 12), Size = new Size(300, 28) };
+        var lblPageTitle = new Label { Text = "\uD83D\uDC64 USER MANAGEMENT", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = t.AccentCyan, Location = new Point(20, 12), Size = new Size(300, 28) };
         pnlToolbar.Controls.Add(lblPageTitle);
 
         // ── MAIN SPLIT ──
-        var pnlMain = new Panel { Dock = DockStyle.Fill, BackColor = canvasBg };
+        var pnlMain = new Panel { Dock = DockStyle.Fill, BackColor = t.CanvasBg };
 
         // LEFT - Grid
-        var pnlLeft = new Panel { Location = new Point(10, 10), Size = new Size(600, 400), BackColor = panelBg };
-        pnlLeft.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlLeft.Width - 1, pnlLeft.Height - 1); };
+        var pnlLeft = new Panel { Location = new Point(10, 10), Size = new Size(600, 400), BackColor = t.PanelBg };
+        pnlLeft.Paint += (s, e) => { using var pen = new Pen(t.BorderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlLeft.Width - 1, pnlLeft.Height - 1); };
 
-        var lblGridTitle = new Label { Text = "USER ROSTER", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(12, 8), Size = new Size(200, 20) };
+        var lblGridTitle = new Label { Text = "USER ROSTER", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = t.TextMuted, Location = new Point(12, 8), Size = new Size(200, 20) };
         dgvUsers = new DataGridView
         {
             Location = new Point(8, 32),
@@ -167,40 +158,40 @@ public partial class UsersForm : Form
                 cmbRole.Text = u.Role;
                 chkActive.Checked = u.IsActive;
                 lblFormTitle.Text = $"EDIT: {u.FullName}";
-                lblFormTitle.ForeColor = accentGreen;
+                lblFormTitle.ForeColor = t.AccentGreen;
             }
         };
         pnlLeft.Controls.AddRange(new Control[] { lblGridTitle, dgvUsers });
 
         // RIGHT - Entry Card
-        var pnlRight = new Panel { Location = new Point(625, 10), Size = new Size(340, 400), BackColor = panelBg };
-        pnlRight.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlRight.Width - 1, pnlRight.Height - 1); };
+        var pnlRight = new Panel { Location = new Point(625, 10), Size = new Size(340, 400), BackColor = t.PanelBg };
+        pnlRight.Paint += (s, e) => { using var pen = new Pen(t.BorderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlRight.Width - 1, pnlRight.Height - 1); };
 
-        lblFormTitle = new Label { Text = "NEW USER", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(15, 10), Size = new Size(310, 25), TextAlign = ContentAlignment.MiddleLeft };
+        lblFormTitle = new Label { Text = "NEW USER", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = t.AccentCyan, Location = new Point(15, 10), Size = new Size(310, 25), TextAlign = ContentAlignment.MiddleLeft };
 
         var y = 42;
-        AddField("USERNAME", ref txtUsername, ref y, pnlRight, inputBg, inputFg, dimText);
-        AddField("FULL NAME", ref txtFullName, ref y, pnlRight, inputBg, inputFg, dimText);
-        AddField("PASSWORD", ref txtPassword, ref y, pnlRight, inputBg, inputFg, dimText, HorizontalAlignment.Left, true);
+        AddField("USERNAME", ref txtUsername, ref y, pnlRight, t.InputBg, t.InputFg, t.TextMuted);
+        AddField("FULL NAME", ref txtFullName, ref y, pnlRight, t.InputBg, t.InputFg, t.TextMuted);
+        AddField("PASSWORD", ref txtPassword, ref y, pnlRight, t.InputBg, t.InputFg, t.TextMuted, HorizontalAlignment.Left, true);
 
-        var lblRole = new Label { Text = "ROLE", Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, y), Size = new Size(80, 16), TextAlign = ContentAlignment.MiddleLeft };
-        cmbRole = new ComboBox { Location = new Point(15, y + 16), Size = new Size(150, 26), DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 10F) };
+        var lblRole = new Label { Text = "ROLE", Font = new Font("Segoe UI", 7.5F, FontStyle.Bold), ForeColor = t.TextMuted, Location = new Point(15, y), Size = new Size(80, 16), TextAlign = ContentAlignment.MiddleLeft };
+        cmbRole = new ComboBox { Location = new Point(15, y + 16), Size = new Size(150, 26), DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, BackColor = t.InputBg, ForeColor = t.InputFg, Font = new Font("Segoe UI", 10F) };
         cmbRole.Items.AddRange(new[] { "Admin", "Cashier" });
         cmbRole.SelectedIndex = 0;
         pnlRight.Controls.AddRange(new Control[] { lblRole, cmbRole });
         y += 48;
 
-        chkActive = new CheckBox { Text = "Active", Location = new Point(15, y), Size = new Size(100, 26), ForeColor = inputFg, Font = new Font("Segoe UI", 10F), BackColor = Color.Transparent, Checked = true };
+        chkActive = new CheckBox { Text = "Active", Location = new Point(15, y), Size = new Size(100, 26), ForeColor = t.InputFg, Font = new Font("Segoe UI", 10F), BackColor = Color.Transparent, Checked = true };
         pnlRight.Controls.Add(chkActive);
         y += 35;
 
-        var btnNew = new Button { Text = "+ NEW", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(15, y), Size = new Size(95, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentBlue, ForeColor = Color.White, Cursor = Cursors.Hand };
+        var btnNew = new Button { Text = "+ NEW", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(15, y), Size = new Size(95, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentBlue, ForeColor = Color.White, Cursor = Cursors.Hand };
         btnNew.Click += (_, _) => { ClearForm(); txtUsername.Focus(); };
 
-        btnSave = new Button { Text = "\u2714 SAVE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(115, y), Size = new Size(100, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentGreen, ForeColor = Color.White, Cursor = Cursors.Hand };
+        btnSave = new Button { Text = "\u2714 SAVE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(115, y), Size = new Size(100, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentGreen, ForeColor = Color.White, Cursor = Cursors.Hand };
         btnSave.Click += btnSave_Click;
 
-        btnDelete = new Button { Text = "\u2716 DELETE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(220, y), Size = new Size(95, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentRed, ForeColor = Color.White, Cursor = Cursors.Hand };
+        btnDelete = new Button { Text = "\u2716 DELETE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(220, y), Size = new Size(95, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentRed, ForeColor = Color.White, Cursor = Cursors.Hand };
         btnDelete.Click += btnDelete_Click;
 
         pnlRight.Controls.AddRange(new Control[] { lblFormTitle, btnNew, btnSave, btnDelete });
@@ -236,6 +227,13 @@ public partial class UsersForm : Form
 
         dgv.Location = new Point(8, 32);
         dgv.Size = new Size(leftW - 16, availH - 40);
+    }
+
+    public void ApplyTheme()
+    {
+        var t = ThemeManager.Current;
+        BackColor = t.CanvasBg;
+        ForeColor = t.TextPrimary;
     }
 
     private DataGridView dgvUsers = null!;

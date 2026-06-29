@@ -51,15 +51,7 @@ public partial class LoginForm : Form
 
     private static decimal? PromptOpeningBalance(User user)
     {
-        var canvasBg = Color.FromArgb(10, 10, 26);
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var inputBg = Color.FromArgb(30, 30, 55);
-        var inputFg = Color.FromArgb(230, 230, 245);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var dimText = Color.FromArgb(140, 140, 170);
-        var borderColor = Color.FromArgb(40, 40, 70);
-        var accentGreen = Color.FromArgb(46, 204, 113);
-        var accentGrey = Color.FromArgb(149, 165, 166);
+        var t = ThemeManager.Current;
 
         var cashierName = string.IsNullOrEmpty(user.FullName) ? user.Username : user.FullName;
         decimal? result = null;
@@ -72,23 +64,23 @@ public partial class LoginForm : Form
             FormBorderStyle = FormBorderStyle.FixedDialog,
             MaximizeBox = false,
             MinimizeBox = false,
-            BackColor = canvasBg,
+            BackColor = t.CanvasBg,
             ShowInTaskbar = false,
             Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath)
         };
 
-        var pnlToolbar = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = panelBg };
-        pnlToolbar.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawLine(pen, 0, pnlToolbar.Height - 1, pnlToolbar.Width, pnlToolbar.Height - 1); };
-        var lblTitle = new Label { Text = "\uD83D\uDCB0 OPENING DRAWER BALANCE", Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(20, 12), Size = new Size(420, 28) };
+        var pnlToolbar = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = t.PanelBg };
+        pnlToolbar.Paint += (s, e) => { using var pen = new Pen(t.BorderColor, 1); e.Graphics.DrawLine(pen, 0, pnlToolbar.Height - 1, pnlToolbar.Width, pnlToolbar.Height - 1); };
+        var lblTitle = new Label { Text = "\uD83D\uDCB0 OPENING DRAWER BALANCE", Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = t.AccentCyan, Location = new Point(20, 12), Size = new Size(420, 28) };
         pnlToolbar.Controls.Add(lblTitle);
 
-        var pnlContent = new Panel { Dock = DockStyle.Fill, BackColor = canvasBg };
+        var pnlContent = new Panel { Dock = DockStyle.Fill, BackColor = t.CanvasBg };
 
         var lblWelcome = new Label
         {
             Text = $"Welcome, {cashierName}",
             Font = new Font("Segoe UI", 13F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(230, 230, 245),
+            ForeColor = t.TextPrimary,
             Location = new Point(30, 15),
             Size = new Size(400, 24)
         };
@@ -98,7 +90,7 @@ public partial class LoginForm : Form
         {
             Text = "A new shift session requires an opening\ncash drawer balance before you can proceed.",
             Font = new Font("Segoe UI", 9F),
-            ForeColor = dimText,
+            ForeColor = t.TextMuted,
             Location = new Point(30, 42),
             Size = new Size(400, 36)
         };
@@ -108,15 +100,15 @@ public partial class LoginForm : Form
         {
             Location = new Point(15, 95),
             Size = new Size(415, 85),
-            BackColor = panelBg
+            BackColor = t.PanelBg
         };
-        pnlInput.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlInput.Width - 1, pnlInput.Height - 1); };
+        pnlInput.Paint += (s, e) => { using var pen = new Pen(t.BorderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlInput.Width - 1, pnlInput.Height - 1); };
 
         var lblAmount = new Label
         {
             Text = "Amount in Drawer (\u20b1):",
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-            ForeColor = neonTitle,
+            ForeColor = t.AccentCyan,
             Location = new Point(15, 10),
             Size = new Size(200, 22)
         };
@@ -130,8 +122,8 @@ public partial class LoginForm : Form
             Value = 0,
             Location = new Point(15, 38),
             Size = new Size(385, 30),
-            BackColor = inputBg,
-            ForeColor = inputFg,
+            BackColor = t.InputBg,
+            ForeColor = t.InputFg,
             Font = new Font("Segoe UI", 16F, FontStyle.Bold),
             ThousandsSeparator = true,
             TextAlign = HorizontalAlignment.Center,
@@ -147,7 +139,7 @@ public partial class LoginForm : Form
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
-            BackColor = accentGreen,
+            BackColor = t.AccentGreen,
             ForeColor = Color.White,
             Location = new Point(30, 200),
             Size = new Size(400, 44),
@@ -162,7 +154,7 @@ public partial class LoginForm : Form
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
-            BackColor = accentGrey,
+            BackColor = t.AccentGrey,
             ForeColor = Color.White,
             Location = new Point(30, 250),
             Size = new Size(400, 34),
@@ -185,8 +177,7 @@ public partial class LoginForm : Form
 
     private void InitializeComponent()
     {
-        var darkBg = Color.FromArgb(30, 30, 45);
-        var accent = Color.FromArgb(100, 180, 255);
+        var t = ThemeManager.Current;
 
         Text = "Jumong POS - Login";
         ClientSize = new Size(380, 320);
@@ -194,21 +185,21 @@ public partial class LoginForm : Form
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
         MinimizeBox = false;
-        BackColor = Color.FromArgb(248, 249, 252);
+        BackColor = t.SurfaceBg;
         Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
 
         var pnlHeader = new Panel
         {
             Location = new Point(0, 0),
             Size = new Size(380, 80),
-            BackColor = darkBg
+            BackColor = t.SidebarBg
         };
 
         var lblTitle = new Label
         {
             Text = "JUMONG POS",
             Font = new Font("Segoe UI", 20F, FontStyle.Bold),
-            ForeColor = accent,
+            ForeColor = t.SidebarTitleAccent,
             Location = new Point(0, 20),
             Size = new Size(380, 40),
             TextAlign = ContentAlignment.MiddleCenter
@@ -219,7 +210,7 @@ public partial class LoginForm : Form
         {
             Text = "Username",
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(80, 80, 90),
+            ForeColor = t.TextMuted,
             Location = new Point(40, 105),
             Size = new Size(300, 18)
         };
@@ -237,7 +228,7 @@ public partial class LoginForm : Form
         {
             Text = "Password",
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(80, 80, 90),
+            ForeColor = t.TextMuted,
             Location = new Point(40, 165),
             Size = new Size(300, 18)
         };
@@ -256,7 +247,7 @@ public partial class LoginForm : Form
         lblError = new Label
         {
             Font = new Font("Segoe UI", 9F),
-            ForeColor = Color.FromArgb(231, 76, 60),
+            ForeColor = t.AccentRed,
             Location = new Point(40, 225),
             Size = new Size(300, 20),
             TextAlign = ContentAlignment.MiddleCenter
@@ -268,7 +259,7 @@ public partial class LoginForm : Form
             Font = new Font("Segoe UI", 12F, FontStyle.Bold),
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
-            BackColor = Color.FromArgb(46, 204, 113),
+            BackColor = t.AccentGreen,
             ForeColor = Color.White,
             Location = new Point(100, 255),
             Size = new Size(180, 45),
@@ -277,6 +268,13 @@ public partial class LoginForm : Form
         btnLogin.Click += btnLogin_Click;
 
         Controls.AddRange(new Control[] { pnlHeader, lblUser, txtUsername, lblPass, txtPassword, lblError, btnLogin });
+    }
+
+    public void ApplyTheme()
+    {
+        var t = ThemeManager.Current;
+        BackColor = t.CanvasBg;
+        ForeColor = t.TextPrimary;
     }
 
     private TextBox txtUsername = null!;

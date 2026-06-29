@@ -22,28 +22,28 @@ public partial class SalesForm : Form
     private Label _lblUpdateBanner = null!;
     private Label _lblMasterBanner = null!;
 
-    private static readonly Color CTopbar      = Color.FromArgb(26, 26, 46);
-    private static readonly Color CTopbarChip  = Color.FromArgb(37, 37, 64);
-    private static readonly Color CTopbarBorder= Color.FromArgb(56, 56, 96);
-    private static readonly Color CTopbarText  = Color.FromArgb(170, 170, 204);
-    private static readonly Color CTopbarAccent= Color.FromArgb(126, 184, 247);
-    private static readonly Color CSurface     = Color.FromArgb(244, 245, 250);
-    private static readonly Color CCard        = Color.White;
-    private static readonly Color CBorder      = Color.FromArgb(220, 221, 230);
-    private static readonly Color CBorderLight = Color.FromArgb(236, 237, 243);
-    private static readonly Color CText        = Color.FromArgb(30, 30, 46);
-    private static readonly Color CTextMuted   = Color.FromArgb(110, 110, 140);
-    private static readonly Color CTextHint    = Color.FromArgb(160, 160, 190);
-    private static readonly Color CGreenDark   = Color.FromArgb(39, 80, 10);
-    private static readonly Color CGreenMid    = Color.FromArgb(99, 153, 34);
-    private static readonly Color CBlueLight   = Color.FromArgb(230, 241, 251);
-    private static readonly Color CBlueMid     = Color.FromArgb(24, 95, 165);
-    private static readonly Color CBlueDark    = Color.FromArgb(12, 68, 124);
-    private static readonly Color CRedLight    = Color.FromArgb(252, 235, 235);
-    private static readonly Color CRedDark     = Color.FromArgb(163, 45, 45);
-    private static readonly Color CAmberLight  = Color.FromArgb(250, 238, 218);
-    private static readonly Color CAmberDark   = Color.FromArgb(99, 56, 6);
-    private static readonly Color CAmberMid    = Color.FromArgb(186, 117, 23);
+    private static Color CTopbar       => ThemeManager.Current.TopbarBg;
+    private static Color CTopbarChip   => ThemeManager.Current.TopbarChip;
+    private static Color CTopbarBorder => ThemeManager.Current.TopbarBorder;
+    private static Color CTopbarText   => ThemeManager.Current.TopbarText;
+    private static Color CTopbarAccent => ThemeManager.Current.TopbarAccent;
+    private static Color CSurface      => ThemeManager.Current.SurfaceBg;
+    private static Color CCard         => ThemeManager.Current.CardBg;
+    private static Color CBorder       => ThemeManager.Current.BorderColor;
+    private static Color CBorderLight  => ThemeManager.Current.BorderLight;
+    private static Color CText         => ThemeManager.Current.TextPrimary;
+    private static Color CTextMuted    => ThemeManager.Current.TextSecondary;
+    private static Color CTextHint     => ThemeManager.Current.TextHint;
+    private static Color CGreenDark    => ThemeManager.Current.StatusGreenDark;
+    private static Color CGreenMid     => ThemeManager.Current.StatusGreenMid;
+    private static Color CBlueLight    => ThemeManager.Current.StatusBlueLight;
+    private static Color CBlueMid      => ThemeManager.Current.StatusBlueMid;
+    private static Color CBlueDark     => ThemeManager.Current.StatusBlueDark;
+    private static Color CRedLight     => ThemeManager.Current.StatusRedLight;
+    private static Color CRedDark      => ThemeManager.Current.StatusRedDark;
+    private static Color CAmberLight   => ThemeManager.Current.StatusAmberLight;
+    private static Color CAmberDark    => ThemeManager.Current.StatusAmberDark;
+    private static Color CAmberMid     => ThemeManager.Current.StatusAmberMid;
 
     public SalesForm(User? user, CustomerDisplayForm customerDisplay)
     {
@@ -1357,6 +1357,13 @@ public partial class SalesForm : Form
     private Panel _pnlTopbar = null!;
     private Panel _pnlCustomerBar = null!;
     private Panel _pnlSearch = null!;
+    public void ApplyTheme()
+    {
+        var t = ThemeManager.Current;
+        BackColor = t.SurfaceBg;
+        ForeColor = t.TextPrimary;
+    }
+
     private Panel _pnlCart = null!;
     private Panel _pnlTotals = null!;
     private Label _lblTime = null!;

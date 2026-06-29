@@ -2,6 +2,7 @@
 using System.Runtime.InteropServices;
 using JumongPosV1._01.Data;
 using JumongPosV1._01.Forms;
+using JumongPosV1._01.Helpers;
 using JumongPosV1._01.Services;
 
 namespace JumongPosV1._01;
@@ -45,6 +46,7 @@ static class Program
         try
         {
             DatabaseHelper.Initialize();
+            ThemeManager.LoadTheme();
             AutoBackup();
         }
         catch (Exception ex)

@@ -23,15 +23,16 @@ public partial class StockMovementForm : Form
 
     private void InitializeComponent()
     {
-        var canvasBg = Color.FromArgb(10, 10, 26);
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var inputBg = Color.FromArgb(30, 30, 55);
-        var inputFg = Color.FromArgb(230, 230, 245);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var dimText = Color.FromArgb(140, 140, 170);
-        var borderColor = Color.FromArgb(40, 40, 70);
-        var accentGreen = Color.FromArgb(46, 204, 113);
-        var accentRed = Color.FromArgb(231, 76, 60);
+        var t = ThemeManager.Current;
+        var canvasBg = t.CanvasBg;
+        var panelBg = t.PanelBg;
+        var inputBg = t.InputBg;
+        var inputFg = t.InputFg;
+        var neonTitle = t.AccentCyan;
+        var dimText = t.TextMuted;
+        var borderColor = t.BorderColor;
+        var accentGreen = t.AccentGreen;
+        var accentRed = t.AccentRed;
 
         BackColor = canvasBg;
         Text = $"Stock Movement - {_product.Name} ({_product.Barcode})";
@@ -48,7 +49,7 @@ public partial class StockMovementForm : Form
         var lblPageTitle = new Label { Text = $"\uD83D\uDCE6 STOCK MOVEMENT: {_product.Name.ToUpper()}", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(20, 12), Size = new Size(500, 28) };
         lblCurrentStock = new Label { Text = $"CURRENT STOCK: {_product.StockQty}", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = stockColor, Location = new Point(540, 12), Size = new Size(200, 28) };
 
-        var btnClose = new Button { Text = "\u2716 CLOSE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(0, 8), Size = new Size(110, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(149, 165, 166), ForeColor = Color.White, Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right };
+        var btnClose = new Button { Text = "\u2716 CLOSE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(0, 8), Size = new Size(110, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentGrey, ForeColor = Color.White, Cursor = Cursors.Hand, Anchor = AnchorStyles.Top | AnchorStyles.Right };
         btnClose.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
 
         pnlToolbar.Controls.AddRange(new Control[] { lblPageTitle, lblCurrentStock, btnClose });
@@ -84,17 +85,17 @@ public partial class StockMovementForm : Form
             RowHeadersVisible = false,
             BackgroundColor = panelBg,
             BorderStyle = BorderStyle.None,
-            GridColor = Color.FromArgb(40, 40, 70),
+            GridColor = t.DgvGrid,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             Font = new Font("Segoe UI", 9F),
             CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
-            ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = neonTitle, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Alignment = DataGridViewContentAlignment.MiddleCenter },
+            ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = t.DgvHeaderBg, ForeColor = neonTitle, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Alignment = DataGridViewContentAlignment.MiddleCenter },
             ColumnHeadersHeight = 30,
             EnableHeadersVisualStyles = false,
-            DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = inputFg, SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White, Padding = new Padding(4, 2, 4, 2) },
+            DefaultCellStyle = new DataGridViewCellStyle { BackColor = t.DgvRowNormal, ForeColor = inputFg, SelectionBackColor = t.DgvSelection, SelectionForeColor = Color.White, Padding = new Padding(4, 2, 4, 2) },
             RowTemplate = { Height = 28 },
-            AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) }
+            AlternatingRowsDefaultCellStyle = { BackColor = t.DgvRowAlt }
         };
 
         _dgv.AutoGenerateColumns = false;
@@ -149,15 +150,15 @@ public partial class StockMovementForm : Form
             var sale = SaleService.GetByInvoiceNo(inv);
             if (sale == null) return;
 
-            using var receipt = new Form { Text = $"Receipt - {inv}", Size = new Size(600, 500), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = Color.FromArgb(10, 10, 26) };
+            using var receipt = new Form { Text = $"Receipt - {inv}", Size = new Size(600, 500), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = ThemeManager.Current.CanvasBg };
             
             var padding = 10;
             var clientW = receipt.ClientSize.Width - (padding * 2);
             var clientH = receipt.ClientSize.Height;
 
-            var pnlTool = new Panel { Location = new Point(padding, 0), Size = new Size(clientW, 45), BackColor = Color.FromArgb(20, 20, 40) };
-            var lblTitle = new Label { Text = $"INVOICE: {inv}", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(15, 12), Size = new Size(350, 25) };
-            var btnReprint = new Button { Text = " REPRINT", Font = new Font("Segoe UI", 10F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(72, 126, 176), ForeColor = Color.White, Cursor = Cursors.Hand, Size = new Size(120, 32), Location = new Point(pnlTool.Width - 135, 6) };
+            var pnlTool = new Panel { Location = new Point(padding, 0), Size = new Size(clientW, 45), BackColor = ThemeManager.Current.PanelBg };
+            var lblTitle = new Label { Text = $"INVOICE: {inv}", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = ThemeManager.Current.AccentCyan, Location = new Point(15, 12), Size = new Size(350, 25) };
+            var btnReprint = new Button { Text = " REPRINT", Font = new Font("Segoe UI", 10F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = ThemeManager.Current.AccentBlue, ForeColor = Color.White, Cursor = Cursors.Hand, Size = new Size(120, 32), Location = new Point(pnlTool.Width - 135, 6) };
             btnReprint.Click += (_, _) =>
             {
                 var activeItems = sale.Items.Where(x => !x.IsVoided).ToList();
@@ -183,12 +184,12 @@ public partial class StockMovementForm : Form
             };
             pnlTool.Controls.AddRange(new Control[] { lblTitle, btnReprint });
 
-            var info = new Label { Text = $"Cashier: {sale.UserId}  |  Customer: {sale.CustomerName ?? "Walk-in"}  |  Payment: {sale.PaymentMethod}  |  Total: \u20b1{sale.GrandTotal:N2}", Location = new Point(padding, clientH - 40), Size = new Size(clientW, 30), Font = new Font("Segoe UI", 9F), ForeColor = dimText, BackColor = Color.FromArgb(20, 20, 40), TextAlign = ContentAlignment.MiddleLeft };
+            var info = new Label { Text = $"Cashier: {sale.UserId}  |  Customer: {sale.CustomerName ?? "Walk-in"}  |  Payment: {sale.PaymentMethod}  |  Total: \u20b1{sale.GrandTotal:N2}", Location = new Point(padding, clientH - 40), Size = new Size(clientW, 30), Font = new Font("Segoe UI", 9F), ForeColor = dimText, BackColor = ThemeManager.Current.PanelBg, TextAlign = ContentAlignment.MiddleLeft };
 
             var gridY = pnlTool.Bottom + padding;
             var gridH = info.Top - gridY - padding;
 
-            var dgvReceipt = new DataGridView { Location = new Point(padding, gridY), Size = new Size(clientW, gridH), ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = Color.FromArgb(20, 20, 40), BorderStyle = BorderStyle.None, GridColor = Color.FromArgb(40, 40, 70), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(25, 25, 50), ForeColor = neonTitle, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(22, 22, 45), ForeColor = inputFg, SelectionBackColor = Color.FromArgb(40, 40, 80), SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = Color.FromArgb(15, 15, 32) } };
+            var dgvReceipt = new DataGridView { Location = new Point(padding, gridY), Size = new Size(clientW, gridH), ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = ThemeManager.Current.PanelBg, BorderStyle = BorderStyle.None, GridColor = ThemeManager.Current.DgvGrid, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = ThemeManager.Current.DgvHeaderBg, ForeColor = ThemeManager.Current.AccentCyan, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = ThemeManager.Current.DgvRowNormal, ForeColor = ThemeManager.Current.TextPrimary, SelectionBackColor = ThemeManager.Current.DgvSelection, SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = ThemeManager.Current.DgvRowAlt } };
             dgvReceipt.AutoGenerateColumns = false;
             dgvReceipt.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "ITEM", DataPropertyName = "ProductName", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
             dgvReceipt.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "QTY", DataPropertyName = "Quantity", Width = 50 });
@@ -200,7 +201,7 @@ public partial class StockMovementForm : Form
                 if (ef.RowIndex < 0) return;
                 if (dgvReceipt.Rows[ef.RowIndex].DataBoundItem is SaleItem si && si.IsVoided)
                 {
-                    ef.CellStyle!.ForeColor = Color.FromArgb(231, 76, 60);
+                    ef.CellStyle!.ForeColor = ThemeManager.Current.AccentRed;
                     ef.CellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Strikeout);
                 }
             };
@@ -297,7 +298,7 @@ public partial class StockMovementForm : Form
 
             _product.StockQty = stockAfter;
             lblCurrentStock.Text = $"CURRENT STOCK: {stockAfter}";
-            lblCurrentStock.ForeColor = stockAfter == 0 ? Color.FromArgb(231, 76, 60) : Color.FromArgb(46, 204, 113);
+            lblCurrentStock.ForeColor = stockAfter == 0 ? ThemeManager.Current.AccentRed : ThemeManager.Current.AccentGreen;
 
             RefreshGrid(_dgv);
             numAdjustQty.Value = 0;
@@ -316,6 +317,13 @@ public partial class StockMovementForm : Form
         dgv.SuspendLayout();
         dgv.DataSource = StockService.GetTrail(_product.Id, 500);
         dgv.ResumeLayout();
+    }
+
+    public void ApplyTheme()
+    {
+        var t = ThemeManager.Current;
+        BackColor = t.CanvasBg;
+        ForeColor = t.TextPrimary;
     }
 
     private Label lblCurrentStock = null!;

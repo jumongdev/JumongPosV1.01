@@ -30,30 +30,30 @@ public partial class ReportsForm : Form
 
         dgvSales.AutoGenerateColumns = false;
         dgvSales.Columns.Clear();
-        dgvSales.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "InvoiceNo", HeaderText = "INVOICE", Width = 220, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(0, 245, 255) } });
-        dgvSales.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "SaleDate", HeaderText = "DATE", Width = 140, DefaultCellStyle = new DataGridViewCellStyle { Format = "yyyy-MM-dd HH:mm", ForeColor = Color.FromArgb(200, 200, 220) } });
-        dgvSales.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "EffectiveTotal", HeaderText = "TOTAL", Width = 100, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = Color.FromArgb(0, 245, 255), Font = new Font("Segoe UI", 9F, FontStyle.Bold) } });
-        dgvSales.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "PaymentMethod", HeaderText = "METHOD", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(200, 200, 220) } });
-        dgvSales.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "OrderType", HeaderText = "TYPE", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(200, 200, 220) } });
+        dgvSales.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "InvoiceNo", HeaderText = "INVOICE", Width = 220, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.AccentCyan } });
+        dgvSales.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "SaleDate", HeaderText = "DATE", Width = 140, DefaultCellStyle = new DataGridViewCellStyle { Format = "yyyy-MM-dd HH:mm", ForeColor = ThemeManager.Current.TextSecondary } });
+        dgvSales.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "EffectiveTotal", HeaderText = "TOTAL", Width = 100, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = ThemeManager.Current.AccentCyan, Font = new Font("Segoe UI", 9F, FontStyle.Bold) } });
+        dgvSales.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "PaymentMethod", HeaderText = "METHOD", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextSecondary } });
+        dgvSales.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "OrderType", HeaderText = "TYPE", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextSecondary } });
         dgvSales.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Status", HeaderText = "STATUS", Width = 90 });
         dgvSales.DataSource = sales;
         dgvSales.RowHeadersVisible = false;
-        dgvSales.BackgroundColor = Color.FromArgb(20, 20, 40);
+        dgvSales.BackgroundColor = ThemeManager.Current.PanelBg;
         dgvSales.BorderStyle = BorderStyle.None;
-        dgvSales.GridColor = Color.FromArgb(40, 40, 70);
-        dgvSales.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(25, 25, 50);
-        dgvSales.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(0, 245, 255);
+        dgvSales.GridColor = ThemeManager.Current.DgvGrid;
+        dgvSales.ColumnHeadersDefaultCellStyle.BackColor = ThemeManager.Current.DgvHeaderBg;
+        dgvSales.ColumnHeadersDefaultCellStyle.ForeColor = ThemeManager.Current.AccentCyan;
         dgvSales.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         dgvSales.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
         dgvSales.ColumnHeadersHeight = 30;
         dgvSales.EnableHeadersVisualStyles = false;
-        dgvSales.DefaultCellStyle.SelectionBackColor = Color.FromArgb(40, 40, 80);
+        dgvSales.DefaultCellStyle.SelectionBackColor = ThemeManager.Current.DgvSelection;
         dgvSales.DefaultCellStyle.SelectionForeColor = Color.White;
         dgvSales.DefaultCellStyle.Padding = new Padding(4, 2, 4, 2);
         dgvSales.RowTemplate.Height = 28;
-        dgvSales.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(15, 15, 32);
-        dgvSales.DefaultCellStyle.BackColor = Color.FromArgb(22, 22, 45);
-        dgvSales.DefaultCellStyle.ForeColor = Color.FromArgb(230, 230, 245);
+        dgvSales.AlternatingRowsDefaultCellStyle.BackColor = ThemeManager.Current.DgvRowAlt;
+        dgvSales.DefaultCellStyle.BackColor = ThemeManager.Current.DgvRowNormal;
+        dgvSales.DefaultCellStyle.ForeColor = ThemeManager.Current.TextPrimary;
 
         dgvSales.CellFormatting += (s, e) =>
         {
@@ -63,7 +63,7 @@ public partial class ReportsForm : Form
                 e.Value = row.IsVoided ? "VOIDED" : "COMPLETED";
                 if (e.CellStyle != null)
                 {
-                    e.CellStyle.ForeColor = row.IsVoided ? Color.FromArgb(231, 76, 60) : Color.FromArgb(46, 204, 113);
+                    e.CellStyle.ForeColor = row.IsVoided ? ThemeManager.Current.AccentRed : ThemeManager.Current.AccentGreen;
                     e.CellStyle.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
                 }
             }
@@ -151,19 +151,19 @@ public partial class ReportsForm : Form
 
     private int ShowItemPicker(string prompt, string[] items)
     {
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var inputBg = Color.FromArgb(30, 30, 55);
-        var inputFg = Color.FromArgb(230, 230, 245);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var borderColor = Color.FromArgb(40, 40, 70);
+        var panelBg = ThemeManager.Current.PanelBg;
+        var inputBg = ThemeManager.Current.InputBg;
+        var inputFg = ThemeManager.Current.InputFg;
+        var neonTitle = ThemeManager.Current.AccentCyan;
+        var borderColor = ThemeManager.Current.BorderColor;
 
-        using var form = new Form { Text = prompt, Size = new Size(420, 380), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = Color.FromArgb(10, 10, 26) };
+        using var form = new Form { Text = prompt, Size = new Size(420, 380), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = ThemeManager.Current.CanvasBg };
         var lbl = new Label { Text = prompt, Location = new Point(15, 15), Size = new Size(380, 20), ForeColor = neonTitle, Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
         var lb = new ListBox { Location = new Point(15, 42), Size = new Size(380, 240), BackColor = panelBg, ForeColor = inputFg, BorderStyle = BorderStyle.None, Font = new Font("Segoe UI", 9F) };
         lb.Items.AddRange(items);
         var result = -1;
-        var btnOk = new Button { Text = "OK", Location = new Point(110, 295), Size = new Size(90, 35), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(72, 126, 176), ForeColor = Color.White, Cursor = Cursors.Hand, DialogResult = DialogResult.OK };
-        var btnCancel = new Button { Text = "Cancel", Location = new Point(210, 295), Size = new Size(90, 35), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(149, 165, 166), ForeColor = Color.White, Cursor = Cursors.Hand, DialogResult = DialogResult.Cancel };
+        var btnOk = new Button { Text = "OK", Location = new Point(110, 295), Size = new Size(90, 35), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = ThemeManager.Current.AccentBlue, ForeColor = Color.White, Cursor = Cursors.Hand, DialogResult = DialogResult.OK };
+        var btnCancel = new Button { Text = "Cancel", Location = new Point(210, 295), Size = new Size(90, 35), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = ThemeManager.Current.AccentGrey, ForeColor = Color.White, Cursor = Cursors.Hand, DialogResult = DialogResult.Cancel };
         lb.DoubleClick += (s, e) => { result = lb.SelectedIndex; form.Close(); };
         lb.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { result = lb.SelectedIndex; form.Close(); } };
         form.Controls.AddRange(new Control[] { lbl, lb, btnOk, btnCancel });
@@ -175,18 +175,19 @@ public partial class ReportsForm : Form
 
     private void InitializeComponent()
     {
-        var canvasBg = Color.FromArgb(10, 10, 26);
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var inputBg = Color.FromArgb(30, 30, 55);
-        var inputFg = Color.FromArgb(230, 230, 245);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var dimText = Color.FromArgb(140, 140, 170);
-        var borderColor = Color.FromArgb(40, 40, 70);
-        var accentGreen = Color.FromArgb(46, 204, 113);
-        var accentRed = Color.FromArgb(231, 76, 60);
-        var accentOrange = Color.FromArgb(243, 156, 18);
-        var accentBlue = Color.FromArgb(72, 126, 176);
-        var accentPurple = Color.FromArgb(155, 89, 182);
+        var t = ThemeManager.Current;
+        var canvasBg = t.CanvasBg;
+        var panelBg = t.PanelBg;
+        var inputBg = t.InputBg;
+        var inputFg = t.InputFg;
+        var neonTitle = t.AccentCyan;
+        var dimText = t.TextMuted;
+        var borderColor = t.BorderColor;
+        var accentGreen = t.AccentGreen;
+        var accentRed = t.AccentRed;
+        var accentOrange = t.AccentOrange;
+        var accentBlue = t.AccentBlue;
+        var accentPurple = t.AccentPurple;
 
         BackColor = canvasBg;
         Text = "Sales Reports";
@@ -275,7 +276,7 @@ public partial class ReportsForm : Form
         btnVoidItem.Click += btnVoidItem_Click;
         actionBtns.Add(btnVoidItem);
 
-        btnVoidLog = new Button { Text = "\uD83D\uDCCB VOID LOG", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(510, 5), Size = new Size(120, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(149, 165, 166), ForeColor = Color.White, Cursor = Cursors.Hand };
+        btnVoidLog = new Button { Text = "\uD83D\uDCCB VOID LOG", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(510, 5), Size = new Size(120, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentGrey, ForeColor = Color.White, Cursor = Cursors.Hand };
         btnVoidLog.Click += btnVoidLog_Click;
         actionBtns.Add(btnVoidLog);
 
@@ -304,6 +305,13 @@ public partial class ReportsForm : Form
 
         dgv.Location = new Point(8, 32);
         dgv.Size = new Size(availW - 16, availH - 40);
+    }
+
+    public void ApplyTheme()
+    {
+        var t = ThemeManager.Current;
+        BackColor = t.CanvasBg;
+        ForeColor = t.TextPrimary;
     }
 
     private DataGridView dgvSales = null!;

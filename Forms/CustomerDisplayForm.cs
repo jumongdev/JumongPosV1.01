@@ -26,7 +26,7 @@ public partial class CustomerDisplayForm : Form
         DoubleBuffered = true;
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
         Text = "Customer Display";
-        BackColor = Color.FromArgb(250, 250, 252);
+        BackColor = ThemeManager.Current.CanvasBg;
         FormBorderStyle = sameScreen ? FormBorderStyle.Sizable : FormBorderStyle.None;
         StartPosition = FormStartPosition.Manual;
         ShowInTaskbar = sameScreen;
@@ -101,7 +101,7 @@ public partial class CustomerDisplayForm : Form
             {
                 TryLoadImage(_slideshowPb, "assets\\promo.png");
                 if (_slideshowPb.Image == null)
-                    _slideshowPb.BackColor = Color.FromArgb(30, 30, 45);
+                    _slideshowPb.BackColor = ThemeManager.Current.SidebarBg;
             }
         }
         else
@@ -180,7 +180,7 @@ public partial class CustomerDisplayForm : Form
             {
                 Text = "No items yet.",
                 Font = new Font("Segoe UI", 14F),
-                ForeColor = Color.FromArgb(180, 180, 190),
+                ForeColor = ThemeManager.Current.TextHint,
                 Size = new Size(pnlItems.Width - 25, 30),
                 Margin = new Padding(0, 20, 0, 0),
                 TextAlign = ContentAlignment.MiddleCenter
@@ -194,14 +194,14 @@ public partial class CustomerDisplayForm : Form
             {
                 Size = new Size(pnlItems.Width - 25, 38),
                 Margin = new Padding(0, 0, 0, 4),
-                BackColor = Color.FromArgb(248, 249, 252)
+                BackColor = ThemeManager.Current.SurfaceBg
             };
 
             var qtyLabel = new Label
             {
                 Text = $"{item.Quantity}x",
                 Font = new Font("Segoe UI", 13F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(72, 126, 176),
+                ForeColor = ThemeManager.Current.AccentBlue,
                 Location = new Point(5, 4),
                 Size = new Size(55, 30),
                 TextAlign = ContentAlignment.MiddleLeft
@@ -211,7 +211,7 @@ public partial class CustomerDisplayForm : Form
             {
                 Text = item.ProductName,
                 Font = new Font("Segoe UI", 13F),
-                ForeColor = Color.FromArgb(44, 44, 44),
+                ForeColor = ThemeManager.Current.TextPrimary,
                 Location = new Point(65, 4),
                 Size = new Size(row.Width - 330, 30),
                 TextAlign = ContentAlignment.MiddleLeft
@@ -221,7 +221,7 @@ public partial class CustomerDisplayForm : Form
             {
                 Text = $"\u20b1{item.Price:N2}",
                 Font = new Font("Segoe UI", 13F),
-                ForeColor = Color.FromArgb(100, 100, 100),
+                ForeColor = ThemeManager.Current.TextMuted,
                 Location = new Point(row.Width - 260, 4),
                 Size = new Size(100, 30),
                 TextAlign = ContentAlignment.MiddleRight
@@ -231,7 +231,7 @@ public partial class CustomerDisplayForm : Form
             {
                 Text = $"\u20b1{item.TotalPrice:N2}",
                 Font = new Font("Segoe UI", 13F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(44, 44, 44),
+                ForeColor = ThemeManager.Current.TextPrimary,
                 Location = new Point(row.Width - 150, 4),
                 Size = new Size(140, 30),
                 TextAlign = ContentAlignment.MiddleRight
@@ -272,6 +272,13 @@ public partial class CustomerDisplayForm : Form
         }
     }
 
+    public void ApplyTheme()
+    {
+        var t = ThemeManager.Current;
+        BackColor = t.CanvasBg;
+        ForeColor = t.TextPrimary;
+    }
+
     private Panel _left = null!, _right = null!, _sepPanel = null!;
     private Label _colHeaders = null!, _lblPromoTitle = null!, _lblGcashTitle = null!;
     private int _leftW, _rightW;
@@ -293,7 +300,7 @@ public partial class CustomerDisplayForm : Form
         {
             Text = "WALK-IN",
             Font = new Font("Segoe UI", 14F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(100, 180, 255),
+            ForeColor = ThemeManager.Current.SidebarTitleAccent,
             TextAlign = ContentAlignment.MiddleLeft
         };
 
@@ -301,20 +308,20 @@ public partial class CustomerDisplayForm : Form
         {
             Text = "CUSTOMER: Walk-in",
             Font = new Font("Segoe UI", 20F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(44, 44, 44),
+            ForeColor = ThemeManager.Current.TextPrimary,
             TextAlign = ContentAlignment.MiddleLeft
         };
 
         _sepPanel = new Panel
         {
-            BackColor = Color.FromArgb(72, 126, 176)
+            BackColor = ThemeManager.Current.AccentBlue
         };
 
         _colHeaders = new Label
         {
             Text = "QTY   ITEM                                                      PRICE          TOTAL",
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(140, 140, 160)
+            ForeColor = ThemeManager.Current.TextSecondary
         };
 
         pnlItems = new FlowLayoutPanel
@@ -329,7 +336,7 @@ public partial class CustomerDisplayForm : Form
         {
             Text = "TOTAL: \u20b10.00",
             Font = new Font("Segoe UI", 28F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(46, 204, 113),
+            ForeColor = ThemeManager.Current.AccentGreen,
             TextAlign = ContentAlignment.MiddleRight
         };
 
@@ -337,7 +344,7 @@ public partial class CustomerDisplayForm : Form
 
         _right = new Panel
         {
-            BackColor = Color.FromArgb(248, 249, 252),
+            BackColor = ThemeManager.Current.SurfaceBg,
             BorderStyle = BorderStyle.FixedSingle
         };
 
@@ -345,14 +352,14 @@ public partial class CustomerDisplayForm : Form
         {
             Text = "PROMOS",
             Font = new Font("Segoe UI", 14F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(72, 126, 176),
+            ForeColor = ThemeManager.Current.AccentBlue,
             TextAlign = ContentAlignment.MiddleCenter
         };
 
         pbPromo = new PictureBox
         {
             SizeMode = PictureBoxSizeMode.Zoom,
-            BackColor = Color.FromArgb(235, 236, 240),
+            BackColor = ThemeManager.Current.BorderColor,
             BorderStyle = BorderStyle.FixedSingle
         };
  
@@ -360,7 +367,7 @@ public partial class CustomerDisplayForm : Form
         {
             Text = "SCAN TO PAY VIA GCASH",
             Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-            ForeColor = Color.FromArgb(44, 44, 44),
+            ForeColor = ThemeManager.Current.TextPrimary,
             TextAlign = ContentAlignment.MiddleCenter
         };
  

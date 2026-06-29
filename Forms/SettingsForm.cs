@@ -259,16 +259,17 @@ public partial class SettingsForm : Form
 
     private void InitializeComponent()
     {
-        var canvasBg = Color.FromArgb(10, 10, 26);
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var inputBg = Color.FromArgb(30, 30, 55);
-        var inputFg = Color.FromArgb(230, 230, 245);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var dimText = Color.FromArgb(140, 140, 170);
-        var borderColor = Color.FromArgb(40, 40, 70);
-        var accentBlue = Color.FromArgb(72, 126, 176);
-        var accentRed = Color.FromArgb(231, 76, 60);
-        var accentGreen = Color.FromArgb(46, 204, 113);
+        var t = ThemeManager.Current;
+        var canvasBg = t.CanvasBg;
+        var panelBg = t.PanelBg;
+        var inputBg = t.InputBg;
+        var inputFg = t.InputFg;
+        var neonTitle = t.AccentCyan;
+        var dimText = t.TextMuted;
+        var borderColor = t.BorderColor;
+        var accentBlue = t.AccentBlue;
+        var accentRed = t.AccentRed;
+        var accentGreen = t.AccentGreen;
 
         BackColor = canvasBg;
         Text = "Settings";
@@ -393,7 +394,7 @@ public partial class SettingsForm : Form
             var lblLowStockHint = new Label { Text = "Products at or below this qty show orange.", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(128, 128, 128), Location = new Point(225, dy + 26), Size = new Size(200, 22) };
             dy = dy + 56 + 10; // bottom of LowStock section + gap
             int tzMinutes;
-            using (var sc = DatabaseHelper.GetConnection()) { sc.Open(); using var scmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'AppTimezone'", sc); tzMinutes = int.TryParse(scmd.ExecuteScalar()?.ToString(), out var t) ? t : 480; }
+            using (var sc = DatabaseHelper.GetConnection()) { sc.Open(); using var scmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'AppTimezone'", sc); tzMinutes = int.TryParse(scmd.ExecuteScalar()?.ToString(), out var tzVal) ? tzVal : 480; }
             var lblTz = new Label { Text = "Timezone:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, dy), Size = new Size(140, 25) };
             var cmbTimezone = new ComboBox { Location = new Point(180, dy), Size = new Size(260, 25), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = inputBg, ForeColor = inputFg, FlatStyle = FlatStyle.Flat };
             cmbTimezone.Items.AddRange(new object[] {
@@ -420,12 +421,26 @@ public partial class SettingsForm : Form
                 sCmd.ExecuteNonQuery();
             };
             var lblTzHint = new Label { Text = "All timestamps use this timezone regardless of system clock.", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(128, 128, 128), Location = new Point(15, dy + 28), Size = new Size(400, 20) };
-            MakeSection("DISPLAY SETUP", 310, new Control[] {
+            dy += 56;
+            var lblTheme = new Label { Text = "App Theme:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, dy), Size = new Size(140, 25) };
+            var cmbTheme = new ComboBox { Location = new Point(180, dy), Size = new Size(180, 25), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = inputBg, ForeColor = inputFg, FlatStyle = FlatStyle.Flat };
+            cmbTheme.Items.AddRange(new string[] { "Dark", "Light" });
+            cmbTheme.SelectedItem = ThemeManager.Current.Name;
+            cmbTheme.SelectedIndexChanged += (_, _) =>
+            {
+                var sel = cmbTheme.SelectedItem?.ToString() ?? "Dark";
+                ThemeManager.SwitchTheme(sel);
+                MainForm.ApplyThemeToChildren();
+            };
+            var lblThemeHint = new Label { Text = "Switch between Dark and Light appearance. Changes apply immediately.", Font = new Font("Segoe UI", 8F), ForeColor = Color.FromArgb(128, 128, 128), Location = new Point(15, dy + 28), Size = new Size(400, 20) };
+            dy += 56;
+            MakeSection("DISPLAY SETUP", 370, new Control[] {
                 lblPos, cmbPosScreen, lblCust, cmbCustomerScreen,
                 lblEmailSched, numEmailScheduleHour, lblEmailSchedHint,
                 chkEnableOnlineOrders, chkCustomerDisplay, lblRestart,
                 lblLowStock, numLowStock, lblLowStockHint,
-                lblTz, cmbTimezone, lblTzHint
+                lblTz, cmbTimezone, lblTzHint,
+                lblTheme, cmbTheme, lblThemeHint
             });
         }
 
@@ -438,7 +453,7 @@ public partial class SettingsForm : Form
             txtCloudApiUrl = new TextBox { Location = new Point(180, cy), Size = new Size(350, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = "https://jumong-pos-api-p285q.ondigitalocean.app/api" };
             var lblCloudApi = new Label { Text = "API URL:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, cy), Size = new Size(140, 25) };
             cy += 32;
-            lblStoreId = new Label { Text = SyncService.StoreId, Font = new Font("Consolas", 9F, FontStyle.Bold), ForeColor = Color.FromArgb(0, 245, 255), Location = new Point(180, cy), Size = new Size(350, 25), TextAlign = ContentAlignment.MiddleLeft };
+            lblStoreId = new Label { Text = SyncService.StoreId, Font = new Font("Consolas", 9F, FontStyle.Bold), ForeColor = t.AccentCyan, Location = new Point(180, cy), Size = new Size(350, 25), TextAlign = ContentAlignment.MiddleLeft };
             var lblStoreIdLabel = new Label { Text = "Store ID:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, cy), Size = new Size(140, 25) };
             cy += 32;
             var txtStoreName = new TextBox { Location = new Point(180, cy), Size = new Size(350, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, Font = new Font("Segoe UI", 9F), Text = SyncService.StoreName, PlaceholderText = "e.g. Main Branch" };
@@ -778,12 +793,13 @@ public partial class SettingsForm : Form
 
     private void btnSyncLog_Click(object? sender, EventArgs e)
     {
-        var canvasBg = Color.FromArgb(10, 10, 26);
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var borderColor = Color.FromArgb(40, 40, 70);
-        var accentGreen = Color.FromArgb(46, 204, 113);
-        var accentRed = Color.FromArgb(231, 76, 60);
+        var t = ThemeManager.Current;
+        var canvasBg = t.CanvasBg;
+        var panelBg = t.PanelBg;
+        var neonTitle = t.AccentCyan;
+        var borderColor = t.BorderColor;
+        var accentGreen = t.AccentGreen;
+        var accentRed = t.AccentRed;
 
         using var form = new Form { Text = "Cloud Sync Log", WindowState = FormWindowState.Maximized, StartPosition = FormStartPosition.CenterScreen, FormBorderStyle = FormBorderStyle.Sizable, MaximizeBox = true, BackColor = canvasBg };
 
@@ -931,6 +947,13 @@ public partial class SettingsForm : Form
     private NumericUpDown numMarginRight = new();
     private ComboBox cmbPosScreen = null!;
     private ComboBox cmbCustomerScreen = null!;
+    public void ApplyTheme()
+    {
+        var t = ThemeManager.Current;
+        BackColor = t.CanvasBg;
+        ForeColor = t.TextPrimary;
+    }
+
     private NumericUpDown numEmailScheduleHour = new();
     private CheckBox chkEnableOnlineOrders = new();
     private CheckBox chkCustomerDisplay = new();

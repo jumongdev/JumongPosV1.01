@@ -46,31 +46,32 @@ public partial class ProductsForm : Form
         var data = ProductService.Search(keyword, cat, _stockFilter);
         dgvProducts.AutoGenerateColumns = false;
         dgvProducts.Columns.Clear();
-        dgvProducts.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Id", HeaderText = "ID", Width = 45, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, ForeColor = Color.FromArgb(140, 140, 170) } });
-        dgvProducts.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Name", HeaderText = "PRODUCT NAME", Width = 250, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(230, 230, 245) } });
-        dgvProducts.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Barcode", HeaderText = "BARCODE", Width = 120, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(200, 200, 220) } });
-        dgvProducts.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Category", HeaderText = "CATEGORY", Width = 100, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = Color.FromArgb(200, 200, 220) } });
-        dgvProducts.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Price", HeaderText = "PRICE", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = Color.FromArgb(0, 245, 255) } });
-        dgvProducts.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Cost", HeaderText = "COST", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = Color.FromArgb(231, 76, 60) } });
-        dgvProducts.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "StockQty", HeaderText = "STOCK", Width = 65, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, ForeColor = Color.FromArgb(230, 230, 245), Font = new Font("Segoe UI", 9F, FontStyle.Bold) } });
+        var tDgv = ThemeManager.Current;
+        dgvProducts.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Id", HeaderText = "ID", Width = 45, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, ForeColor = tDgv.TextMuted } });
+        dgvProducts.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Name", HeaderText = "PRODUCT NAME", Width = 250, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = tDgv.TextPrimary } });
+        dgvProducts.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Barcode", HeaderText = "BARCODE", Width = 120, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = tDgv.TextSecondary } });
+        dgvProducts.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Category", HeaderText = "CATEGORY", Width = 100, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = tDgv.TextSecondary } });
+        dgvProducts.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Price", HeaderText = "PRICE", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = tDgv.AccentCyan } });
+        dgvProducts.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Cost", HeaderText = "COST", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = tDgv.AccentRed } });
+        dgvProducts.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "StockQty", HeaderText = "STOCK", Width = 65, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, ForeColor = tDgv.TextPrimary, Font = new Font("Segoe UI", 9F, FontStyle.Bold) } });
         dgvProducts.DataSource = data;
         dgvProducts.RowHeadersVisible = false;
-        dgvProducts.BackgroundColor = Color.FromArgb(20, 20, 40);
+        dgvProducts.BackgroundColor = tDgv.PanelBg;
         dgvProducts.BorderStyle = BorderStyle.None;
-        dgvProducts.GridColor = Color.FromArgb(40, 40, 70);
-        dgvProducts.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(25, 25, 50);
-        dgvProducts.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(0, 245, 255);
+        dgvProducts.GridColor = tDgv.DgvGrid;
+        dgvProducts.ColumnHeadersDefaultCellStyle.BackColor = tDgv.DgvHeaderBg;
+        dgvProducts.ColumnHeadersDefaultCellStyle.ForeColor = tDgv.DgvHeaderFg;
         dgvProducts.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
         dgvProducts.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
         dgvProducts.ColumnHeadersHeight = 30;
         dgvProducts.EnableHeadersVisualStyles = false;
-        dgvProducts.DefaultCellStyle.SelectionBackColor = Color.FromArgb(40, 40, 80);
+        dgvProducts.DefaultCellStyle.SelectionBackColor = tDgv.DgvSelection;
         dgvProducts.DefaultCellStyle.SelectionForeColor = Color.White;
         dgvProducts.DefaultCellStyle.Padding = new Padding(4, 2, 4, 2);
         dgvProducts.RowTemplate.Height = 28;
-        dgvProducts.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(15, 15, 32);
-        dgvProducts.DefaultCellStyle.BackColor = Color.FromArgb(22, 22, 45);
-        dgvProducts.DefaultCellStyle.ForeColor = Color.FromArgb(230, 230, 245);
+        dgvProducts.AlternatingRowsDefaultCellStyle.BackColor = tDgv.DgvRowAlt;
+        dgvProducts.DefaultCellStyle.BackColor = tDgv.DgvRowNormal;
+        dgvProducts.DefaultCellStyle.ForeColor = tDgv.TextPrimary;
         _suppressSearch = false;
     }
 
@@ -82,13 +83,13 @@ public partial class ProductsForm : Form
             {
                 if (val.StockQty == 0)
                 {
-                    e.CellStyle!.ForeColor = Color.FromArgb(231, 76, 60);
-                    e.CellStyle.SelectionForeColor = Color.FromArgb(231, 76, 60);
+                    e.CellStyle!.ForeColor = ThemeManager.Current.AccentRed;
+                    e.CellStyle.SelectionForeColor = ThemeManager.Current.AccentRed;
                 }
                 else if (val.StockQty <= ProductService.GetLowStockThreshold())
                 {
-                    e.CellStyle!.ForeColor = Color.FromArgb(243, 156, 18);
-                    e.CellStyle.SelectionForeColor = Color.FromArgb(243, 156, 18);
+                    e.CellStyle!.ForeColor = ThemeManager.Current.AccentOrange;
+                    e.CellStyle.SelectionForeColor = ThemeManager.Current.AccentOrange;
                 }
             }
         }
@@ -105,9 +106,10 @@ public partial class ProductsForm : Form
         lblMetricRetail.Text = $"RETAIL: \u20b1{retailValue:N2}";
         lblMetricCost.Text = $"COST: \u20b1{costValue:N2}";
 
-        lblMetricTotal.ForeColor = _stockFilter == null ? Color.FromArgb(0, 245, 255) : Color.FromArgb(140, 140, 170);
-        lblMetricLow.ForeColor = _stockFilter == "low" ? Color.FromArgb(243, 156, 18) : Color.FromArgb(140, 140, 170);
-        lblMetricOut.ForeColor = _stockFilter == "out" ? Color.FromArgb(231, 76, 60) : Color.FromArgb(140, 140, 170);
+        var tStats = ThemeManager.Current;
+        lblMetricTotal.ForeColor = _stockFilter == null ? tStats.AccentCyan : tStats.TextMuted;
+        lblMetricLow.ForeColor = _stockFilter == "low" ? tStats.AccentOrange : tStats.TextMuted;
+        lblMetricOut.ForeColor = _stockFilter == "out" ? tStats.AccentRed : tStats.TextMuted;
     }
 
     private void ToggleStockFilter(string? filter)
@@ -132,13 +134,13 @@ public partial class ProductsForm : Form
         txtCost.ReadOnly = readOnly;
         txtStock.ReadOnly = true;
 
-        var inputBg = readOnly ? Color.FromArgb(20, 20, 35) : Color.FromArgb(30, 30, 55);
+        var inputBg = readOnly ? Color.FromArgb(20, 20, 35) : ThemeManager.Current.InputBg;
         txtName.BackColor = inputBg;
         txtBarcode.BackColor = inputBg;
         cmbCategory.BackColor = inputBg;
         txtPrice.BackColor = inputBg;
         txtCost.BackColor = inputBg;
-        txtStock.BackColor = Color.FromArgb(20, 20, 35);
+        txtStock.BackColor = ThemeManager.Current.PanelBg;
 
         btnStockMovement.Visible = true;
     }
@@ -415,19 +417,20 @@ public partial class ProductsForm : Form
 
     private void InitializeComponent()
     {
-        var canvasBg = Color.FromArgb(10, 10, 26);
-        var panelBg = Color.FromArgb(20, 20, 40);
-        var inputBg = Color.FromArgb(30, 30, 55);
-        var inputFg = Color.FromArgb(230, 230, 245);
-        var neonTitle = Color.FromArgb(0, 245, 255);
-        var metaText = Color.FromArgb(230, 230, 245);
-        var dimText = Color.FromArgb(140, 140, 170);
-        var borderColor = Color.FromArgb(40, 40, 70);
-        var accentBlue = Color.FromArgb(72, 126, 176);
-        var accentGreen = Color.FromArgb(46, 204, 113);
-        var accentRed = Color.FromArgb(231, 76, 60);
-        var accentOrange = Color.FromArgb(243, 156, 18);
-        var accentPurple = Color.FromArgb(155, 89, 182);
+        var t = ThemeManager.Current;
+        var canvasBg = t.CanvasBg;
+        var panelBg = t.PanelBg;
+        var inputBg = t.InputBg;
+        var inputFg = t.InputFg;
+        var neonTitle = t.AccentCyan;
+        var metaText = t.TextPrimary;
+        var dimText = t.TextMuted;
+        var borderColor = t.BorderColor;
+        var accentBlue = t.AccentBlue;
+        var accentGreen = t.AccentGreen;
+        var accentRed = t.AccentRed;
+        var accentOrange = t.AccentOrange;
+        var accentPurple = t.AccentPurple;
 
         BackColor = canvasBg;
         Text = "Manage Products";
@@ -643,6 +646,13 @@ public partial class ProductsForm : Form
 
         dgv.Location = new Point(8, 32);
         dgv.Size = new Size(leftW - 16, availH - 40);
+    }
+
+    public void ApplyTheme()
+    {
+        var t = ThemeManager.Current;
+        BackColor = t.CanvasBg;
+        ForeColor = t.TextPrimary;
     }
 
     private TextBox txtSearch = null!;
