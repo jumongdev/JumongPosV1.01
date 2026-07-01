@@ -28,7 +28,7 @@ tailwind.config = {
 <body class="bg-gray-50 dark:bg-[#080816] text-gray-900 dark:text-slate-200 min-h-screen" x-data x-cloak>
 
   <!-- ── Toast Container ── -->
-  <div id="toastContainer" class="fixed top-20 right-4 z-50 flex flex-col gap-2 no-print"></div>
+  <div id="toastContainer" class="fixed top-20 right-4 z-70 flex flex-col gap-2 no-print"></div>
 
   <!-- ── Sidebar ── -->
   <aside id="sidebar" class="sidebar fixed top-0 left-0 bottom-0 w-[220px] z-40 flex flex-col border-r border-gray-200 dark:border-[#222255] bg-white dark:bg-gradient-to-b dark:from-[#10102a] dark:to-[#16163a] no-print overflow-hidden"
@@ -71,6 +71,10 @@ tailwind.config = {
       <div class="text-[10px] text-gray-400 dark:text-[#4a4a7a] uppercase tracking-wider">v1.0.5 &middot; Cloud Dashboard</div>
     </div>
   </aside>
+
+  <!-- ── Mobile Sidebar Backdrop ── -->
+  <div class="mobile-backdrop collapsed no-print" :class="{ 'collapsed': !$store.app._sidebarOpen }"
+    @click="$store.app._sidebarOpen = false" @touchmove.prevent x-show="window.innerWidth < 768"></div>
 
   <!-- ── Main Content ── -->
   <div class="min-h-screen transition-all duration-250"
@@ -165,7 +169,7 @@ tailwind.config = {
         </div>
 
         <!-- Profit Cards -->
-        <div x-data="profitCards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+        <div x-data="profitCards" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
           <template x-if="loading"><div class="col-span-full flex items-center justify-center py-6 text-gray-400"><span class="spinner mr-2"></span>Loading...</div></template>
           <template x-if="d">
             <template x-for="(card,i) in [

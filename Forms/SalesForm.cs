@@ -176,18 +176,21 @@ public partial class SalesForm : Form
 
     private bool PromptOrderType()
     {
-        using var otForm = new OrderTypeForm();
-        if (otForm.ShowDialog() != DialogResult.OK) return false;
+        while (true)
+        {
+            using var otForm = new OrderTypeForm();
+            if (otForm.ShowDialog() != DialogResult.OK) return false;
 
-        _orderType = otForm.SelectedType;
-        if (_orderType == "Walk-in") return true;
+            _orderType = otForm.SelectedType;
+            if (_orderType == "Walk-in") return true;
 
-        using var custForm = new SelectCustomerForm(_orderType);
-        if (custForm.ShowDialog() != DialogResult.OK) return false;
+            using var custForm = new SelectCustomerForm(_orderType);
+            if (custForm.ShowDialog() != DialogResult.OK) continue;
 
-        _selectedCustomer = custForm.SelectedCustomer;
-        UpdateCustomerDisplay();
-        return true;
+            _selectedCustomer = custForm.SelectedCustomer;
+            UpdateCustomerDisplay();
+            return true;
+        }
     }
 
     private void UpdateCustomerDisplay()

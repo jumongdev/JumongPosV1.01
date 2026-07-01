@@ -67,5 +67,63 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:0 0 0 3px rgba(0
 
 /* Preserve column alignment in modals */
 .modal-body table th{position:sticky;top:0;z-index:1}
+
+/* ── Mobile Responsive Sidebar Drawer ── */
+@media (max-width: 767px) {
+  .sidebar {
+    width: 280px !important;
+    z-index: 60 !important;
+    transform: translateX(-100%);
+    transition: transform .25s ease, width 0s;
+    box-shadow: 4px 0 32px rgba(0,0,0,0.4);
+  }
+  .sidebar.collapsed {
+    width: 280px !important;
+    transform: translateX(-100%);
+  }
+  .sidebar:not(.collapsed) {
+    transform: translateX(0);
+  }
+  .sidebar .nav-label {
+    display: block !important;
+    opacity: 1 !important;
+    width: auto !important;
+  }
+  .sidebar a {
+    justify-content: flex-start !important;
+    padding: 11px 12px !important;
+  }
+  .sidebar .sidebar-footer {display:none}
+  .min-h-screen {
+    margin-left: 0 !important;
+  }
+}
+
+/* Mobile backdrop overlay */
+.mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  transition: opacity .25s ease;
+  pointer-events: auto;
+}
+.mobile-backdrop.collapsed {
+  pointer-events: none;
+  opacity: 0;
+}
+
+/* Larger touch targets on mobile */
+@media (max-width: 640px) {
+  button, a, select, input, .btn-like {
+    cursor: default;
+  }
+  .sidebar a {
+    min-height: 44px;
+  }
+}
+
 /* Alpine cloak */
 [x-cloak]{display:none!important}

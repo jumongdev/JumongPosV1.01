@@ -26,7 +26,7 @@ Alpine.store('app', {
     editorOpen: false, editingId: null, editingProductData: null,
     saleModalOpen: false, saleInvoiceNo: '', saleItems: [], saleLoading: false,
     salePaymentMethod: '', saleReferenceNo: '', saleEwPaid: 0, saleGrandTotal: 0,
-    _sidebarOpen: localStorage.getItem('sidebar') !== 'collapsed',
+    _sidebarOpen: window.innerWidth < 768 ? false : localStorage.getItem('sidebar') !== 'collapsed',
     _whBadge: 0,
 
     toggleDark() {
