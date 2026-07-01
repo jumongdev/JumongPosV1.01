@@ -620,7 +620,7 @@ tailwind.config = {
                   <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Actions</th>
                 </tr></thead>
                 <tbody>
-                  <template x-for="x in filtered" :key="x.id">
+                  <template x-for="(x,i) in filtered" :key="i">
                     <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                       <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.id"></td>
                       <td class="px-3 py-2 text-center"><img x-show="x.imageData" :src="x.imageData" class="w-8 h-8 object-cover rounded mx-auto" :alt="x.name"></td>
@@ -824,7 +824,7 @@ tailwind.config = {
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
                 </tr></thead>
                 <tbody>
-                  <template x-for="x in filtered" :key="x.id">
+                  <template x-for="(x,i) in filtered" :key="i">
                     <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                       <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.id"></td>
                       <td class="px-3 py-2 font-medium" x-text="x.name"></td>
@@ -854,7 +854,7 @@ tailwind.config = {
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
                 </tr></thead>
                 <tbody>
-                  <template x-for="x in filtered" :key="x.id">
+                  <template x-for="(x,i) in filtered" :key="i">
                     <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                       <td class="px-3 py-2" x-text="x.id"></td>
                       <td class="px-3 py-2 font-medium" x-text="x.name"></td>
@@ -881,7 +881,7 @@ tailwind.config = {
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
                 </tr></thead>
                 <tbody>
-                  <template x-for="x in filtered" :key="x.id">
+                  <template x-for="(x,i) in filtered" :key="i">
                     <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                       <td class="px-3 py-2" x-text="x.id"></td>
                       <td class="px-3 py-2" x-text="x.clientName"></td>
@@ -958,7 +958,7 @@ tailwind.config = {
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Store</th>
                 </tr></thead>
                 <tbody>
-                  <template x-for="x in d" :key="x.id">
+                  <template x-for="(x,i) in d" :key="i">
                     <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                       <td class="px-3 py-2 font-medium" x-text="x.name"></td>
                       <td class="px-3 py-2" x-text="x.phone || ''"></td>
@@ -996,7 +996,7 @@ tailwind.config = {
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Store ID</th>
                 </tr></thead>
                 <tbody>
-                  <template x-for="x in d" :key="x.id">
+                  <template x-for="(x,i) in d" :key="i">
                     <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                       <td class="px-3 py-2 font-medium" x-text="x.username"></td>
                       <td class="px-3 py-2" x-text="x.fullName || ''"></td>
@@ -1402,7 +1402,7 @@ tailwind.config = {
                 <th class="text-center px-2 py-2 border-b border-gray-200 dark:border-[#222255]"></th>
               </tr></thead>
               <tbody>
-                <template x-for="x in filteredMaster" :key="x.id">
+                 <template x-for="(x,i) in filteredMaster" :key="i">
                   <tr class="border-b border-gray-50 dark:border-[#222255]/40">
                     <td class="px-2 py-2" x-text="x.id"></td>
                     <td class="px-2 py-2" x-text="x.name"></td>
