@@ -118,21 +118,9 @@ tailwind.config = {
       <!-- ═══════════════════════════════════════════════ -->
       <div x-show="$store.app.section === 'dashboard'" x-transition.opacity>
 
-        <!-- Date Range Bar -->
+        <!-- Date Filters -->
         <div class="flex flex-wrap items-center gap-1.5 mb-4 no-print">
-          <template x-for="b in [
-            { id:'today', label:'TODAY' }, { id:'yesterday', label:'YESTERDAY' },
-            { id:'week', label:'WEEK' }, { id:'month', label:'MONTH' },
-            { id:'all', label:'ALL TIME' }, { id:'custom', label:'CUSTOM' }
-          ]" :key="b.id">
-            <button @click="$store.app.setRange(b.id)"
-              class="text-xs px-3.5 py-1.5 rounded-full transition-all font-medium"
-              :class="$store.app.range === b.id
-                ? 'bg-cyan-600 text-white shadow-sm'
-                : 'bg-gray-100 dark:bg-[#16163a] text-gray-500 dark:text-[#7878aa] border border-gray-200 dark:border-[#222255] hover:bg-gray-200 dark:hover:bg-[#181848]'"
-              x-text="b.label"></button>
-          </template>
-          <div class="flex items-center gap-1.5 ml-2 flex-wrap">
+          <div class="flex items-center gap-1.5 flex-wrap">
             <input type="date" x-model="$store.app.singleDate"
               @change="$store.app.setSingleDate($store.app.singleDate)"
               class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1 text-gray-700 dark:text-slate-200 max-w-[140px]"

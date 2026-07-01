@@ -17,7 +17,7 @@ Alpine.store('app', {
     range: 'today',
     customFrom: '',
     customTo: '',
-    singleDate: '',
+    singleDate: new Date().toISOString().slice(0, 10),
     rangeFrom: '',
     rangeTo: '',
     darkMode: localStorage.getItem('theme') === 'dark',
