@@ -599,15 +599,6 @@ Alpine.store('app', {
         this.load();
       } catch (e) { toast('Error: ' + e.message, 'error') }
     },
-    async syncFromMaster() {
-      if (!confirm('Sync all warehouse products from master catalog?\nPrices, names, and barcodes will be updated. Your box_qty settings will be preserved.')) return;
-      try {
-        const r = await fetch(API + '/warehouse/sync-from-master', { method: 'POST' });
-        const j = await r.json();
-        toast('Updated: ' + (j.updated || 0) + ', Deactivated: ' + (j.deactivated || 0), 'success');
-        this.load();
-      } catch (e) { toast('Error: ' + e.message, 'error') }
-    },
     get filteredMaster() {
       if (!this.masterSearch) return this.masterImportList || [];
       const q = this.masterSearch.toLowerCase();
