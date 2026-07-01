@@ -1302,10 +1302,17 @@ public class DashboardController : ControllerBase
             if (!string.IsNullOrEmpty(status)) { filters.Add("o.status = @st"); cmd.Parameters.AddWithValue("st", status); }
             if (clientId.HasValue) { filters.Add("o.client_id = @ci"); cmd.Parameters.AddWithValue("ci", clientId.Value); }
             var where = filters.Count > 0 ? " WHERE " + string.Join(" AND ", filters) : "";
-            cmd.CommandText = $"SELECT o.id, o.client_id, o.client_name, o.status, o.notes, o.total_amount, o.created_at, o.updated_at FROM wh_orders o{where} ORDER BY o.created_at DESC LIMIT 200";
+            cmd.CommandText = $@"
+                SELECT o.id, o.client_id, o.client_name, o.status, o.notes, o.total_amount, o.created_at, o.updated_at,
+                       COALESCE(SUM(CASE WHEN oi.received_qty < oi.base_qty THEN 1 ELSE 0 END), 0) > 0 AS has_shortage
+                FROM wh_orders o
+                LEFT JOIN wh_order_items oi ON oi.order_id = o.id
+                {where}
+                GROUP BY o.id
+                ORDER BY o.created_at DESC LIMIT 200";
             var data = new List<object>();
             using var r = cmd.ExecuteReader();
-            while (r.Read()) data.Add(new { id = r.GetInt32(0), clientId = r.GetInt32(1), clientName = r.GetString(2), status = r.GetString(3), notes = r.IsDBNull(4) ? "" : r.GetString(4), totalAmount = r.GetDecimal(5), createdAt = r.GetDateTime(6), updatedAt = r.GetDateTime(7) });
+            while (r.Read()) data.Add(new { id = r.GetInt32(0), clientId = r.GetInt32(1), clientName = r.GetString(2), status = r.GetString(3), notes = r.IsDBNull(4) ? "" : r.GetString(4), totalAmount = r.GetDecimal(5), createdAt = r.GetDateTime(6), updatedAt = r.GetDateTime(7), hasShortage = r.GetBoolean(8) });
             return Ok(data);
         }
 
@@ -1335,6 +1342,33 @@ public class DashboardController : ControllerBase
                 baseUnitName = r.GetString(6),
                 productId = r.GetInt32(7),
                 masterId = r.GetInt32(8)
+            });
+            return Ok(items);
+        }
+
+        [HttpGet("warehouse/orders/{id}/items")]
+        public IActionResult WhGetOrderItems(int id)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT oi.product_id, oi.product_name, oi.base_qty, oi.base_unit_name,
+                       COALESCE(wp.barcode, '') AS barcode, wp.master_product_id,
+                       oi.received_qty
+                FROM wh_order_items oi
+                LEFT JOIN wh_products wp ON oi.product_id = wp.id
+                WHERE oi.order_id = @oid ORDER BY oi.product_name";
+            cmd.Parameters.AddWithValue("oid", id);
+            var items = new List<object>();
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) items.Add(new {
+                productId = r.GetInt32(0),
+                productName = r.GetString(1),
+                baseQty = r.GetInt32(2),
+                baseUnitName = r.GetString(3),
+                barcode = r.GetString(4),
+                masterProductId = r.IsDBNull(5) ? 0 : r.GetInt32(5),
+                receivedQty = r.GetInt32(6)
             });
             return Ok(items);
         }
@@ -1420,37 +1454,88 @@ public class DashboardController : ControllerBase
         }
 
         [HttpPut("warehouse/orders/{id}/receive")]
-        public IActionResult WhReceiveOrder(int id)
+        public IActionResult WhReceiveOrder(int id, [FromBody] WhReceiveRequest? body = null)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var tx = conn.BeginTransaction();
             try
             {
                 using var cmd = conn.CreateCommand(); cmd.Transaction = tx;
-                cmd.CommandText = "UPDATE wh_orders SET status = 'received', updated_at = NOW() WHERE id = @id AND status = 'shipped'";
+                cmd.CommandText = "UPDATE wh_orders SET status = @status, updated_at = NOW() WHERE id = @id AND status = 'shipped'";
                 cmd.Parameters.AddWithValue("id", id);
+                cmd.Parameters.AddWithValue("status", "received");
                 var rows = cmd.ExecuteNonQuery();
                 if (rows == 0) { tx.Rollback(); return BadRequest(new { error = "Order not found or not in shipped status" }); }
 
-                using var itemsCmd = conn.CreateCommand(); itemsCmd.Transaction = tx;
-                itemsCmd.CommandText = @"
-                    SELECT oi.product_name, oi.base_qty, oi.base_unit_name, wp.barcode, wp.master_product_id
+                // Build a set of received productIds for quick lookup
+                var receivedIds = new HashSet<int>();
+                if (body?.Items != null)
+                    foreach (var ri in body.Items)
+                        if (ri.ProductId > 0) receivedIds.Add(ri.ProductId);
+
+                // Update received_qty per item, restock shortages
+                using var allItems = conn.CreateCommand(); allItems.Transaction = tx;
+                allItems.CommandText = @"
+                    SELECT oi.product_id, oi.product_name, oi.base_qty, oi.base_unit_name,
+                           COALESCE(wp.barcode, '') AS barcode, wp.master_product_id
                     FROM wh_order_items oi
                     LEFT JOIN wh_products wp ON oi.product_id = wp.id
-                    WHERE oi.order_id = @oid";
-                itemsCmd.Parameters.AddWithValue("oid", id);
-                var items = new List<object>();
-                using var r = itemsCmd.ExecuteReader();
-                while (r.Read()) items.Add(new {
-                    productName = r.GetString(0),
-                    baseQty = r.GetInt32(1),
-                    baseUnitName = r.GetString(2),
-                    barcode = r.IsDBNull(3) ? "" : r.GetString(3),
-                    masterProductId = r.IsDBNull(4) ? 0 : r.GetInt32(4)
-                });
+                    WHERE oi.order_id = @oid ORDER BY oi.product_name";
+                allItems.Parameters.AddWithValue("oid", id);
+                var returnedItems = new List<object>();
+                var shortages = new List<object>();
+                using var r2 = allItems.ExecuteReader();
+                while (r2.Read())
+                {
+                    var productId = r2.GetInt32(0);
+                    var productName = r2.GetString(1);
+                    var baseQty = r2.GetInt32(2);
+                    var baseUnitName = r2.GetString(3);
+                    var barcode = r2.GetString(4);
+                    var masterProductId = r2.IsDBNull(5) ? 0 : r2.GetInt32(5);
+
+                    if (receivedIds.Contains(productId) || body == null || body.Items == null)
+                    {
+                        // This item was received
+                        using var upd = conn.CreateCommand(); upd.Transaction = tx;
+                        upd.CommandText = "UPDATE wh_order_items SET received_qty = @rq WHERE order_id = @oid AND product_id = @pid";
+                        upd.Parameters.AddWithValue("rq", baseQty);
+                        upd.Parameters.AddWithValue("oid", id);
+                        upd.Parameters.AddWithValue("pid", productId);
+                        upd.ExecuteNonQuery();
+
+                        returnedItems.Add(new { productId, productName, baseQty, baseUnitName, barcode, masterProductId });
+                    }
+                    else
+                    {
+                        // Shortage — restock warehouse
+                        using var restock = conn.CreateCommand(); restock.Transaction = tx;
+                        restock.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @qty WHERE id = @pid";
+                        restock.Parameters.AddWithValue("qty", baseQty);
+                        restock.Parameters.AddWithValue("pid", productId);
+                        restock.ExecuteNonQuery();
+
+                        shortages.Add(new { productId, productName, baseQty });
+
+                        using var upd = conn.CreateCommand(); upd.Transaction = tx;
+                        upd.CommandText = "UPDATE wh_order_items SET received_qty = 0 WHERE order_id = @oid AND product_id = @pid";
+                        upd.Parameters.AddWithValue("oid", id);
+                        upd.Parameters.AddWithValue("pid", productId);
+                        upd.ExecuteNonQuery();
+                    }
+                }
+
+                // If there were shortages, mark order as partial
+                if (shortages.Count > 0)
+                {
+                    using var partialCmd = conn.CreateCommand(); partialCmd.Transaction = tx;
+                    partialCmd.CommandText = "UPDATE wh_orders SET status = 'partial', updated_at = NOW() WHERE id = @id";
+                    partialCmd.Parameters.AddWithValue("id", id);
+                    partialCmd.ExecuteNonQuery();
+                }
 
                 tx.Commit();
-                return Ok(new { success = true, orderId = id, items });
+                return Ok(new { success = true, orderId = id, items = returnedItems, shortages });
             }
             catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
         }
@@ -1462,6 +1547,17 @@ public class DashboardController : ControllerBase
     public class WhOrderDto { public int ClientId { get; set; } public string? ClientName { get; set; } public string? Notes { get; set; } public List<WhOrderItemDto>? Items { get; set; } }
     public class WhOrderItemDto { public int ProductId { get; set; } public string ProductName { get; set; } = ""; public string? UnitType { get; set; } public int Qty { get; set; } public decimal Price { get; set; } public decimal TotalPrice { get; set; } public int BaseQty { get; set; } public string? BaseUnitName { get; set; } public int BoxQtyPerUnit { get; set; } = 1; }
     public class WhStatusDto { public string Status { get; set; } = ""; }
+    public class WhReceiveRequest
+    {
+        public List<WhReceivedItemDto>? Items { get; set; }
+    }
+    public class WhReceivedItemDto
+    {
+        public int ProductId { get; set; }
+        public int BaseQty { get; set; }
+        public string ProductName { get; set; } = "";
+        public string? Barcode { get; set; }
+    }
 
     public class SeedProductDto
     {

@@ -546,10 +546,13 @@ Alpine.store('app', {
     async receiveOrder(id) {
       if (!confirm('Mark order #' + id + ' as received?')) return;
       try {
-        const r = await fetch(API + '/warehouse/orders/' + id + '/receive', { method: 'PUT' });
+        const r = await fetch(API + '/warehouse/orders/' + id + '/receive', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{}' });
         const j = await r.json();
         if (!r.ok) throw new Error(j.error || 'Failed');
-        toast('Order #' + id + ' received', 'success');
+        if (j.shortages && j.shortages.length > 0)
+          toast('Order #' + id + ' received with ' + j.shortages.length + ' shortage(s)', 'warning');
+        else
+          toast('Order #' + id + ' received', 'success');
         this.load();
         this.updateBadge();
       } catch (e) { toast('Error: ' + e.message, 'error') }

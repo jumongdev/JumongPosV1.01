@@ -64,63 +64,59 @@ public class PendingOrdersForm : Form
         if (transfer == null) return;
 
         btnProcess.Enabled = false;
-        btnProcess.Text = "Processing...";
+        btnProcess.Text = "Loading items...";
 
         try
         {
-            // Match items to local products
-            var items = new List<(int ProductId, string ProductName, string Barcode, int StockBefore, int Qty)>();
-            var unmatched = new List<TransferItem>();
-
-            foreach (var ti in transfer.Items)
+            // Fetch order items from cloud (product name, barcode, base_qty)
+            var allItems = await SyncService.GetTransferItemsAsync(transfer.OrderId);
+            if (allItems == null || allItems.Count == 0)
             {
-                var found = ProductService.GetByBarcode(ti.Barcode)
-                         ?? ProductService.GetAll().FirstOrDefault(p =>
-                            p.Name.Equals(ti.ProductName, StringComparison.OrdinalIgnoreCase));
-                if (found == null)
-                {
-                    unmatched.Add(ti);
-                    continue;
-                }
-                items.Add((found.Id, found.Name, found.Barcode ?? "", found.StockQty, ti.BaseQty));
-            }
-
-            if (unmatched.Count > 0 && items.Count == 0)
-            {
-                MessageBox.Show("No items could be matched to local products.\nPlease add these products first.", "Cannot Process", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Could not load items for this order.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            if (unmatched.Count > 0)
+            // Show item picker with checkboxes
+            var (checkedItems, hasUnmatched) = ShowItemPicker(allItems);
+            if (checkedItems == null) return; // user cancelled
+
+            if (checkedItems.Count == 0)
             {
-                var msg = "Some items could not be matched to local products:\n";
-                foreach (var u in unmatched)
-                    msg += $"\n  • {u.ProductName} ({u.BaseQty} {u.BaseUnitName})";
-                msg += "\n\nDo you want to receive the matched items only?";
-                if (MessageBox.Show(msg, "Unmatched Items", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
-                    return;
+                MessageBox.Show("No items selected. Receiving cancelled.", "No Items", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
             }
 
-            if (items.Count == 0) return;
-
-            // Mark transfer as received on cloud
-            var received = await SyncService.MarkTransferReceivedAsync(transfer.OrderId);
-            if (received == null)
+            // Send checked items to cloud (restocks shortages)
+            var result = await SyncService.MarkTransferReceivedAsync(transfer.OrderId, checkedItems);
+            if (result == null || !result.Success)
             {
                 MessageBox.Show("Failed to confirm transfer on cloud.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
-            // Add stock locally
+            // Add stock locally for checked items
             var userName = _currentUser?.FullName ?? _currentUser?.Username ?? "System";
-            var error = StockService.ConfirmReceiving(items, _currentUser?.Id ?? 0, userName, $"WH-Transfer #{transfer.OrderId}");
-            if (error != null)
+            var receivingItems = new List<(int ProductId, string ProductName, string Barcode, int StockBefore, int Qty)>();
+            foreach (var ci in checkedItems)
             {
-                MessageBox.Show($"Stock receiving error: {error}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
+                var found = ProductService.GetByBarcode(ci.Barcode)
+                         ?? ProductService.GetAll().FirstOrDefault(p =>
+                            p.Name.Equals(ci.ProductName, StringComparison.OrdinalIgnoreCase));
+                if (found != null)
+                    receivingItems.Add((found.Id, found.Name, found.Barcode ?? "", found.StockQty, ci.BaseQty));
             }
 
-            MessageBox.Show($"Transfer #{transfer.OrderId} received — {items.Count} item(s) added to stock.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (receivingItems.Count > 0)
+            {
+                var error = StockService.ConfirmReceiving(receivingItems, _currentUser?.Id ?? 0, userName, $"WH-Transfer #{transfer.OrderId}");
+                if (error != null)
+                    MessageBox.Show($"Stock receiving error: {error}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+
+            var shortageMsg = (result.Shortages != null && result.Shortages.Count > 0)
+                ? $"\n{result.Shortages.Count} item(s) reported as shortage."
+                : "";
+            MessageBox.Show($"Transfer #{transfer.OrderId} received — {receivingItems.Count} item(s) added to stock.{shortageMsg}", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
             _ = LoadTransfers();
         }
         catch (Exception ex)
@@ -132,6 +128,120 @@ public class PendingOrdersForm : Form
             btnProcess.Enabled = true;
             btnProcess.Text = "\uD83D\uDCCB Process Order";
         }
+    }
+
+    private (List<TransferItem>? Checked, bool HasUnmatched) ShowItemPicker(List<TransferItem> items)
+    {
+        var checkedItems = new List<TransferItem>();
+        var hasUnmatched = false;
+
+        using var picker = new Form
+        {
+            Text = "Receive Warehouse Transfer",
+            Size = new Size(650, 500),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.Sizable,
+            BackColor = CSurface
+        };
+
+        var lbl = new Label
+        {
+            Text = "Uncheck items that did not arrive:",
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            ForeColor = CAccent,
+            Location = new Point(12, 12),
+            Size = new Size(600, 22)
+        };
+
+        var panel = new Panel
+        {
+            Location = new Point(12, 42),
+            Size = new Size(600, 370),
+            AutoScroll = true,
+            BackColor = CCard,
+            BorderStyle = BorderStyle.FixedSingle
+        };
+
+        var checkboxes = new Dictionary<int, CheckBox>();
+        var y = 5;
+        foreach (var item in items)
+        {
+            var found = ProductService.GetByBarcode(item.Barcode)
+                     ?? ProductService.GetAll().FirstOrDefault(p =>
+                        p.Name.Equals(item.ProductName, StringComparison.OrdinalIgnoreCase));
+            if (found == null)
+            {
+                hasUnmatched = true;
+                var lblUnmatched = new Label
+                {
+                    Text = $"\u26A0 {item.ProductName} — {item.BaseQty} {item.BaseUnitName} (not found in POS)",
+                    Location = new Point(8, y),
+                    Size = new Size(570, 24),
+                    Font = new Font("Segoe UI", 9F),
+                    ForeColor = ThemeManager.Current.AccentRed
+                };
+                panel.Controls.Add(lblUnmatched);
+                y += 28;
+                continue;
+            }
+
+            var cb = new CheckBox
+            {
+                Text = $"{item.ProductName} — {item.BaseQty} {item.BaseUnitName} (barcode: {item.Barcode})",
+                Location = new Point(5, y),
+                Size = new Size(580, 24),
+                Font = new Font("Segoe UI", 9F),
+                ForeColor = CText,
+                Checked = true,
+                Tag = item
+            };
+            panel.Controls.Add(cb);
+            checkboxes[item.ProductId] = cb;
+            y += 28;
+        }
+
+        if (y < panel.Height) panel.Height = y + 10;
+
+        var btnOk = new Button
+        {
+            Text = "RECEIVE CHECKED",
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = CGreen,
+            ForeColor = Color.White,
+            Location = new Point(12, panel.Bottom + 12),
+            Size = new Size(200, 40),
+            Cursor = Cursors.Hand,
+            DialogResult = DialogResult.OK
+        };
+
+        var btnCancel = new Button
+        {
+            Text = "CANCEL",
+            Font = new Font("Segoe UI", 10F),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = CCard,
+            ForeColor = CText,
+            Location = new Point(220, panel.Bottom + 12),
+            Size = new Size(120, 40),
+            Cursor = Cursors.Hand,
+            DialogResult = DialogResult.Cancel
+        };
+
+        picker.Controls.AddRange(new Control[] { lbl, panel, btnOk, btnCancel });
+        picker.AcceptButton = btnOk;
+        picker.CancelButton = btnCancel;
+
+        if (picker.ShowDialog() == DialogResult.OK)
+        {
+            foreach (var cb in checkboxes.Values)
+            {
+                if (cb.Checked && cb.Tag is TransferItem ti)
+                    checkedItems.Add(ti);
+            }
+        }
+
+        return (checkedItems.Count > 0 ? checkedItems : null, hasUnmatched);
     }
 
     private void InitializeComponent()

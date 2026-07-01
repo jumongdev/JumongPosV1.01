@@ -13,6 +13,7 @@ public class PendingTransfer
 
 public class TransferItem
 {
+    public int ProductId { get; set; }
     public string ProductName { get; set; } = "";
     public int BaseQty { get; set; }
     public string BaseUnitName { get; set; } = "Piece";

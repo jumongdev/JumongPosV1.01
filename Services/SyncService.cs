@@ -743,21 +743,49 @@ public static class SyncService
         catch { return null; }
     }
 
-    public static async Task<List<TransferItem>?> MarkTransferReceivedAsync(int orderId)
+    public static async Task<List<TransferItem>?> GetTransferItemsAsync(int orderId)
+    {
+        try
+        {
+            var url = ApiUrl.TrimEnd('/') + $"/dashboard/warehouse/orders/{orderId}/items";
+            var json = await _client.GetStringAsync(url);
+            return JsonSerializer.Deserialize<List<TransferItem>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch { return null; }
+    }
+
+    public static async Task<ReceiveResult?> MarkTransferReceivedAsync(int orderId, List<TransferItem>? receivedItems = null)
     {
         try
         {
             var url = ApiUrl.TrimEnd('/') + $"/dashboard/warehouse/orders/{orderId}/receive";
-            var response = await _client.PutAsync(url, null);
+            var body = receivedItems != null
+                ? JsonSerializer.Serialize(new { items = receivedItems.Select(i => new { i.ProductId, i.BaseQty, i.ProductName, i.Barcode }) })
+                : "{}";
+            var content = new StringContent(body, Encoding.UTF8, "application/json");
+            var response = await _client.PutAsync(url, content);
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
-                var result = JsonSerializer.Deserialize<JsonElement>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                if (result.TryGetProperty("items", out var itemsEl))
-                    return JsonSerializer.Deserialize<List<TransferItem>>(itemsEl.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                return JsonSerializer.Deserialize<ReceiveResult>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             }
         }
         catch { }
         return null;
     }
+}
+
+public class ReceiveResult
+{
+    public bool Success { get; set; }
+    public int OrderId { get; set; }
+    public List<TransferItem>? Items { get; set; }
+    public List<ShortageItem>? Shortages { get; set; }
+}
+
+public class ShortageItem
+{
+    public int ProductId { get; set; }
+    public string ProductName { get; set; } = "";
+    public int BaseQty { get; set; }
 }

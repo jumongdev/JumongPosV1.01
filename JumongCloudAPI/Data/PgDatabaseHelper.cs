@@ -408,6 +408,7 @@ public static class PgDatabaseHelper
             ALTER TABLE wh_clients ADD COLUMN IF NOT EXISTS store_id TEXT NOT NULL DEFAULT '';
             ALTER TABLE wh_order_items ADD COLUMN IF NOT EXISTS base_qty INTEGER NOT NULL DEFAULT 0;
             ALTER TABLE wh_order_items ADD COLUMN IF NOT EXISTS base_unit_name TEXT NOT NULL DEFAULT 'Piece';
+            ALTER TABLE wh_order_items ADD COLUMN IF NOT EXISTS received_qty INTEGER NOT NULL DEFAULT 0;
         ";
         whMig.ExecuteNonQuery();
     }

@@ -75,53 +75,12 @@ public partial class SalesForm : Form
         catch { }
     }
 
-    public void LoadFromTransfer(int orderId, string customerName, List<TransferItem> items)
-    {
-        _onlineOrderId = orderId;
-        _orderType = "Online";
-        _selectedCustomer = null;
-        var custs = CustomerService.Search(customerName);
-        if (custs.Count > 0)
-            _selectedCustomer = custs[0];
-        UpdateCustomerDisplay();
-        _skipOrderTypePrompt = true;
-
-        foreach (var ti in items)
-        {
-            var prod = ProductService.GetByBarcode(ti.Barcode)
-                    ?? ProductService.GetAll().FirstOrDefault(p =>
-                        p.Name.Equals(ti.ProductName, StringComparison.OrdinalIgnoreCase));
-            if (prod == null) continue;
-
-            var qtyPerUnit = 1;
-            var unit = ProductUnitService.GetDefault(prod.Id);
-            if (unit != null) qtyPerUnit = unit.QtyPerUnit;
-
-            var cartItem = new SaleItem
-            {
-                ProductId = prod.Id,
-                ProductName = prod.Name,
-                Barcode = prod.Barcode ?? "",
-                Price = prod.Price,
-                UnitCost = prod.Cost * qtyPerUnit,
-                Quantity = ti.BaseQty,
-                TotalPrice = prod.Price * ti.BaseQty,
-                QtyPerUnit = qtyPerUnit,
-                UnitName = ti.BaseUnitName
-            };
-            _cart.Add(cartItem);
-        }
-        RefreshCart();
-        UpdateTotals();
-    }
-
     protected override void OnLoad(EventArgs e)
     {
         base.OnLoad(e);
         var screen = Screen.FromControl(this);
         Location = screen.WorkingArea.Location;
-        if (!_skipOrderTypePrompt)
-            PromptNextTransaction();
+        PromptNextTransaction();
 
         _ = CheckForUpdatesAsync();
     }
@@ -159,9 +118,6 @@ public partial class SalesForm : Form
         }
         catch { }
     }
-
-    private bool _skipOrderTypePrompt;
-    private int _onlineOrderId;
 
     private bool PromptNextTransaction()
     {
@@ -807,9 +763,6 @@ public partial class SalesForm : Form
             else
                 MessageBox.Show("Receipt sent to " + _selectedCustomer.Email, "Email Sent", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
-
-        if (_onlineOrderId > 0)
-            _ = SyncService.MarkTransferReceivedAsync(_onlineOrderId);
 
         _cart.Clear();
         RefreshCart();

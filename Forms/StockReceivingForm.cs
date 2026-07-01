@@ -105,8 +105,8 @@ public partial class StockReceivingForm : Form
                 btnReceive.Enabled = false;
                 btnReceive.Text = "Processing...";
 
-                var items = await SyncService.MarkTransferReceivedAsync(orderId);
-                if (items == null || items.Count == 0)
+                var result = await SyncService.MarkTransferReceivedAsync(orderId);
+                if (result == null || !result.Success || result.Items == null || result.Items.Count == 0)
                 {
                     MessageBox.Show("Failed to receive transfer or no items found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     btnReceive.Enabled = true;
@@ -115,7 +115,7 @@ public partial class StockReceivingForm : Form
                 }
 
                 var matched = 0;
-                foreach (var item in items)
+                foreach (var item in result.Items)
                 {
                     var product = StockService.Search(item.ProductName).FirstOrDefault() ??
                                   (!string.IsNullOrEmpty(item.Barcode) ? StockService.GetByBarcode(item.Barcode) : null);
@@ -130,7 +130,10 @@ public partial class StockReceivingForm : Form
                 picker.Close();
                 RefreshPendingGrid();
                 txtReference.Text = "WH-Transfer #" + orderId;
-                MessageBox.Show($"{matched} of {items.Count} item(s) received from transfer #{orderId}.", "Transfer Received", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                var shortageMsg = (result.Shortages != null && result.Shortages.Count > 0)
+                    ? $"\n{result.Shortages.Count} item(s) reported as shortage."
+                    : "";
+                MessageBox.Show($"{matched} of {result.Items.Count} item(s) received from transfer #{orderId}.{shortageMsg}", "Transfer Received", MessageBoxButtons.OK, MessageBoxIcon.Information);
             };
 
             pnl.Controls.AddRange(new Control[] { lbl, dgv, btnReceive });
