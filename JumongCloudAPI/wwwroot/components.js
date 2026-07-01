@@ -17,6 +17,9 @@ Alpine.store('app', {
     range: 'today',
     customFrom: '',
     customTo: '',
+    singleDate: '',
+    rangeFrom: '',
+    rangeTo: '',
     darkMode: localStorage.getItem('theme') === 'dark',
     isOnline: true,
     stores: [],
@@ -73,11 +76,32 @@ Alpine.store('app', {
     setStore(val) { this.storeId = val; this.refreshAll() },
     setRange(range) {
       this.range = range;
-      if (range !== 'custom') { this.customFrom = ''; this.customTo = '' }
+      if (range !== 'custom') { this.customFrom = ''; this.customTo = ''; this.singleDate = ''; this.rangeFrom = ''; this.rangeTo = '' }
       this.refreshAll();
     },
     applyCustom() {
       if (!this.customFrom || !this.customTo) { toast('Select both dates', 'error'); return }
+      this.range = 'custom';
+      this.singleDate = '';
+      this.rangeFrom = '';
+      this.rangeTo = '';
+      this.refreshAll();
+    },
+    setSingleDate(val) {
+      if (!val) return;
+      this.singleDate = val;
+      this.customFrom = '';
+      this.customTo = '';
+      this.rangeFrom = '';
+      this.rangeTo = '';
+      this.range = 'custom';
+      this.refreshAll();
+    },
+    setDateRange() {
+      if (!this.rangeFrom || !this.rangeTo) { toast('Select both dates', 'error'); return }
+      this.singleDate = '';
+      this.customFrom = '';
+      this.customTo = '';
       this.range = 'custom';
       this.refreshAll();
     },
@@ -87,6 +111,8 @@ Alpine.store('app', {
     },
     get storeParam() { return this.storeId ? '&storeId=' + encodeURIComponent(this.storeId) : '' },
     get rangeParam() {
+      if (this.singleDate) return '&range=custom&date=' + this.singleDate;
+      if (this.rangeFrom && this.rangeTo) return '&range=custom&date=' + this.rangeFrom + '&date_to=' + this.rangeTo;
       if (this.range === 'custom' && this.customFrom) return '&range=custom&date=' + this.customFrom;
       return '&range=' + this.range;
     },

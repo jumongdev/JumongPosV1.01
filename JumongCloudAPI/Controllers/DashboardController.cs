@@ -17,13 +17,30 @@ public class DashboardController : ControllerBase
     private string TimeframeClause(string? range, string col, NpgsqlCommand cmd)
     {
         if (string.IsNullOrEmpty(range) || range == "all") return "";
+
+        var qDate = HttpContext.Request.Query["date"].FirstOrDefault();
+        var qDateTo = HttpContext.Request.Query["date_to"].FirstOrDefault();
+
+        if (!string.IsNullOrEmpty(qDateTo) && !string.IsNullOrEmpty(qDate)
+            && DateTime.TryParse(qDate, out var dt) && DateTime.TryParse(qDateTo, out var dt2))
+        {
+            cmd.Parameters.AddWithValue("date_from", dt);
+            cmd.Parameters.AddWithValue("date_to", dt2);
+            return $" AND {col}::date >= @date_from AND {col}::date <= @date_to";
+        }
+        if (!string.IsNullOrEmpty(qDate) && DateTime.TryParse(qDate, out var d))
+        {
+            cmd.Parameters.AddWithValue("date", d);
+            return $" AND {col}::date = @date";
+        }
+
         return range switch
         {
             "today"    => $" AND {col}::date = CURRENT_DATE",
             "yesterday"=> $" AND {col}::date = CURRENT_DATE - INTERVAL '1 day'",
             "week"     => $" AND {col} >= CURRENT_DATE - INTERVAL '7 days'",
             "month"    => $" AND {col} >= CURRENT_DATE - INTERVAL '30 days'",
-            _          => $" AND {col}::date = @date"
+            _          => ""
         };
     }
 
@@ -62,7 +79,6 @@ public class DashboardController : ControllerBase
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
             if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
-            if (!string.IsNullOrEmpty(date) && (string.IsNullOrEmpty(range) || range == "custom")) cmd.Parameters.AddWithValue("date", DateTime.Parse(date));
 
             var tfSales = TimeframeClause(range, "sale_date", cmd);
             var tfExp = TimeframeClause(range, "timestamp", cmd);

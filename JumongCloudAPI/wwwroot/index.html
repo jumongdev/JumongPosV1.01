@@ -132,14 +132,20 @@ tailwind.config = {
                 : 'bg-gray-100 dark:bg-[#16163a] text-gray-500 dark:text-[#7878aa] border border-gray-200 dark:border-[#222255] hover:bg-gray-200 dark:hover:bg-[#181848]'"
               x-text="b.label"></button>
           </template>
-          <div class="flex items-center gap-1.5 ml-2"
-            x-show="$store.app.range === 'custom'">
-            <input type="date" x-model="$store.app.customFrom"
-              class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1 text-gray-700 dark:text-slate-200">
-            <span class="text-xs text-gray-400">to</span>
-            <input type="date" x-model="$store.app.customTo"
-              class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1 text-gray-700 dark:text-slate-200">
-            <button @click="$store.app.applyCustom()" class="text-xs px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium">APPLY</button>
+          <div class="flex items-center gap-1.5 ml-2 flex-wrap">
+            <input type="date" x-model="$store.app.singleDate"
+              @change="$store.app.setSingleDate($store.app.singleDate)"
+              class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1 text-gray-700 dark:text-slate-200 max-w-[140px]"
+              title="Select a single date">
+            <span class="text-xs text-gray-400 hidden sm:inline">|</span>
+            <input type="date" x-model="$store.app.rangeFrom"
+              class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1 text-gray-700 dark:text-slate-200 max-w-[140px]"
+              placeholder="From">
+            <span class="text-xs text-gray-400">→</span>
+            <input type="date" x-model="$store.app.rangeTo"
+              class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1 text-gray-700 dark:text-slate-200 max-w-[140px]"
+              placeholder="To">
+            <button @click="$store.app.setDateRange()" class="text-xs px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium">GO</button>
           </div>
         </div>
 
