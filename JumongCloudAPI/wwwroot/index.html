@@ -433,7 +433,7 @@ tailwind.config = {
                       <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Credit</th>
                     </tr></thead>
                     <tbody>
-                      <template x-for="x in d" :key="x.cashier">
+                      <template x-for="(x,i) in d" :key="i">
                         <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                           <td class="px-3 py-2 font-medium" x-text="x.cashier"></td>
                           <td class="px-3 py-2 text-right" x-text="fmtInt(x.totalSales)"></td>
@@ -633,7 +633,7 @@ tailwind.config = {
                       <td class="px-3 py-2">
                         <template x-if="x.units && x.units.length">
                           <div>
-                            <template x-for="u in x.units" :key="u.unitName">
+                            <template x-for="(u,i) in x.units" :key="i">
                               <div class="text-[11px] leading-snug whitespace-nowrap"><span x-text="u.unitName"></span>: &#8369;<span x-text="fmt(u.price)"></span><span x-show="u.isDefault" class="text-cyan-400 font-bold ml-0.5" title="Default">*</span></div>
                             </template>
                           </div>
@@ -958,7 +958,7 @@ tailwind.config = {
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Store</th>
                 </tr></thead>
                 <tbody>
-                  <template x-for="x in d" :key="x.name+x.phone">
+                  <template x-for="x in d" :key="x.id">
                     <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                       <td class="px-3 py-2 font-medium" x-text="x.name"></td>
                       <td class="px-3 py-2" x-text="x.phone || ''"></td>
@@ -996,7 +996,7 @@ tailwind.config = {
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Store ID</th>
                 </tr></thead>
                 <tbody>
-                  <template x-for="x in d" :key="x.username">
+                  <template x-for="x in d" :key="x.id">
                     <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                       <td class="px-3 py-2 font-medium" x-text="x.username"></td>
                       <td class="px-3 py-2" x-text="x.fullName || ''"></td>
@@ -1065,7 +1065,7 @@ tailwind.config = {
                       <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Margin</th>
                     </tr></thead>
                     <tbody>
-                        <template x-for="(p,i) in paged" :key="p.productName + p.unitName">
+                        <template x-for="(p,i) in paged" :key="i">
                         <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                           <td class="px-2 py-2 text-gray-400" x-text="i+1"></td>
                           <td class="px-2 py-2 font-medium text-gray-700 dark:text-slate-200" x-text="p.productName"></td>
@@ -1135,7 +1135,7 @@ tailwind.config = {
                   <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Margin</th>
                 </tr></thead>
                 <tbody>
-                  <template x-for="x in $store.app.saleItems" :key="x.productName+x.quantity">
+                  <template x-for="(x,i) in $store.app.saleItems" :key="i">
                     <tr class="border-b border-gray-50 dark:border-[#222255]/40">
                       <td class="px-2 py-2" x-text="x.productName"></td>
                       <td class="px-2 py-2 text-right" x-text="x.quantity"></td>
@@ -1358,7 +1358,7 @@ tailwind.config = {
                 <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Total</th>
               </tr></thead>
               <tbody>
-                <template x-for="x in orderViewItems" :key="x.productName">
+                <template x-for="(x,i) in orderViewItems" :key="i">
                   <tr class="border-b border-gray-50 dark:border-[#222255]/40">
                     <td class="px-2 py-2" x-text="x.productName"></td>
                     <td class="px-2 py-2" x-text="x.unitType"></td>
