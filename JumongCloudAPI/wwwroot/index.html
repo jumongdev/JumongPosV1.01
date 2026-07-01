@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Jumong POS ΓÇö Cloud Dashboard</title>
+<title>Jumong POS — Cloud Dashboard</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
 tailwind.config = {
@@ -46,13 +46,13 @@ tailwind.config = {
     </div>
     <nav class="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
       <template x-for="item in [
-        { id:'dashboard', icon:'≡ƒôè', label:'Dashboard' },
-        { id:'products', icon:'≡ƒôª', label:'Products' },
-        { id:'available', icon:'≡ƒôê', label:'Stock' },
-        { id:'warehouse', icon:'≡ƒÅ¡', label:'Warehouse' },
-        { id:'customers', icon:'≡ƒæÑ', label:'Customers' },
-        { id:'users', icon:'ΓÜÖ∩╕Å', label:'Users' },
-        { id:'analytics', icon:'≡ƒôè', label:'Analytics' }
+        { id:'dashboard', icon:'📊', label:'Dashboard' },
+        { id:'products', icon:'📦', label:'Products' },
+        { id:'available', icon:'📉', label:'Stock' },
+        { id:'warehouse', icon:'🏢', label:'Warehouse' },
+        { id:'customers', icon:'👥', label:'Customers' },
+        { id:'users', icon:'⚙️', label:'Users' },
+        { id:'analytics', icon:'📈', label:'Analytics' }
       ]" :key="item.id">
         <a href="#" @click.prevent="$store.app.switchSection(item.id)"
           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200"
@@ -113,9 +113,9 @@ tailwind.config = {
     <!-- ΓöÇΓöÇ Main Body ΓöÇΓöÇ -->
     <main class="p-4 md:p-5 space-y-4">
 
-      <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+      <!-- ═══════════════════════════════════════════════ -->
       <!-- DASHBOARD SECTION                              -->
-      <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+      <!-- ═══════════════════════════════════════════════ -->
       <div x-show="$store.app.section === 'dashboard'" x-transition.opacity>
 
         <!-- Date Filters -->
@@ -129,7 +129,7 @@ tailwind.config = {
             <input type="date" x-model="$store.app.rangeFrom"
               class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1 text-gray-700 dark:text-slate-200 max-w-[140px]"
               placeholder="From">
-            <span class="text-xs text-gray-400">ΓåÆ</span>
+            <span class="text-xs text-gray-400">→</span>
             <input type="date" x-model="$store.app.rangeTo"
               class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1 text-gray-700 dark:text-slate-200 max-w-[140px]"
               placeholder="To">
@@ -144,13 +144,13 @@ tailwind.config = {
           </template>
           <template x-if="d">
             <template x-for="(card,i) in [
-              { label:'Today Revenue', val:'Γé▒'+fmt(d.todayRevenue), sub:d.todaySales+' sales today', icon:'≡ƒÆ░' },
-              { label:'Total Revenue', val:'Γé▒'+fmt(d.totalRevenue), sub:fmtInt(d.totalSales)+' total sales', icon:'≡ƒôê' },
-              { label:'Cash Sales', val:'Γé▒'+fmt(d.totalCashSales), sub:'', icon:'≡ƒÆ╡' },
-              { label:'E-Wallet Sales', val:'Γé▒'+fmt(d.totalEwalletSales), sub:'', icon:'≡ƒô▒' },
-              { label:'Credit Sales', val:'Γé▒'+fmt(d.totalCreditSales), sub:'', icon:'≡ƒôï', cls:'text-amber-600 dark:text-amber-400' },
-              { label:'Products / Customers', val:fmtInt(d.totalProducts)+' / '+fmtInt(d.totalCustomers), sub:'', icon:'≡ƒôª' },
-              { label:'Voided Amount', val:'Γé▒'+fmt(d.totalVoided), sub:'', icon:'ΓÜá∩╕Å', cls:'text-red-600 dark:text-red-400' }
+              { label:'Today Revenue', val:'₱'+fmt(d.todayRevenue), sub:d.todaySales+' sales today', icon:'💰' },
+              { label:'Total Revenue', val:'₱'+fmt(d.totalRevenue), sub:fmtInt(d.totalSales)+' total sales', icon:'📈' },
+              { label:'Cash Sales', val:'₱'+fmt(d.totalCashSales), sub:'', icon:'💵' },
+              { label:'E-Wallet Sales', val:'₱'+fmt(d.totalEwalletSales), sub:'', icon:'📱' },
+              { label:'Credit Sales', val:'₱'+fmt(d.totalCreditSales), sub:'', icon:'📋', cls:'text-amber-600 dark:text-amber-400' },
+              { label:'Products / Customers', val:fmtInt(d.totalProducts)+' / '+fmtInt(d.totalCustomers), sub:'', icon:'📦' },
+              { label:'Voided Amount', val:'₱'+fmt(d.totalVoided), sub:'', icon:'⚠️', cls:'text-red-600 dark:text-red-400' }
             ]" :key="i">
               <div class="relative bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl p-4 hover:shadow-lg dark:hover:shadow-cyan-900/10 transition-all">
                 <span class="absolute top-3 right-3 text-2xl opacity-10" x-text="card.icon"></span>
@@ -167,12 +167,12 @@ tailwind.config = {
           <template x-if="loading"><div class="col-span-full flex items-center justify-center py-6 text-gray-400"><span class="spinner mr-2"></span>Loading...</div></template>
           <template x-if="d">
             <template x-for="(card,i) in [
-              { label:'Net Profit', val:'Γé▒'+fmt(d.netProfit), sub:'Revenue - Expenses', cls:profitClass(d.netProfit) },
+              { label:'Net Profit', val:'₱'+fmt(d.netProfit), sub:'Revenue - Expenses', cls:profitClass(d.netProfit) },
               { label:'Net Margin', val:d.netMargin+'%', sub:'Gross: '+d.grossMargin+'%', cls:d.netMargin>=0?'text-emerald-400':'text-red-400' },
-              { label:'Total Expenses', val:'Γé▒'+fmt(d.totalExpenses), sub:'', cls:'text-red-400' },
-              { label:'Avg Transaction', val:'Γé▒'+fmt(d.avgTransaction), sub:'Min: Γé▒'+fmt(d.minTransaction)+' / Max: Γé▒'+fmt(d.maxTransaction) },
+              { label:'Total Expenses', val:'₱'+fmt(d.totalExpenses), sub:'', cls:'text-red-400' },
+              { label:'Avg Transaction', val:'₱'+fmt(d.avgTransaction), sub:'Min: ₱'+fmt(d.minTransaction)+' / Max: ₱'+fmt(d.maxTransaction) },
               { label:'Void Rate', val:d.voidRate+'%', sub:d.voidedCount+' voided / '+d.validCount+' valid', cls:voidClass(d.voidRate) },
-              { label:'Gross Profit', val:'Γé▒'+fmt(d.grossProfit), sub:'Sales - COGS', cls:profitClass(d.grossProfit) }
+              { label:'Gross Profit', val:'₱'+fmt(d.grossProfit), sub:'Sales - COGS', cls:profitClass(d.grossProfit) }
             ]" :key="i">
               <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl p-4 hover:shadow-lg transition-all">
                 <div class="text-[11px] uppercase tracking-wider text-gray-400 dark:text-[#7878aa] mb-1" x-text="card.label"></div>
@@ -202,7 +202,7 @@ tailwind.config = {
                     <div class="chart-bar-item flex-1 min-w-[6px] rounded-t-sm relative cursor-pointer transition-all bg-cyan-700 dark:bg-cyan-800 hover:bg-cyan-600 dark:hover:bg-cyan-500"
                       :style="'height:'+barHeight(x.revenue)+'%'">
                       <div class="tooltip hidden absolute bottom-full left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded mb-1.5 whitespace-nowrap z-10 shadow-lg"
-                        x-text="x.day+': Γé▒'+fmt(x.revenue)+' ('+x.salesCount+' sales)'"></div>
+                        x-text="x.day+': ₱'+fmt(x.revenue)+' ('+x.salesCount+' sales)'"></div>
                     </div>
                   </template>
                 </div>
@@ -226,7 +226,7 @@ tailwind.config = {
                       <div class="hour-bar flex-1 min-w-[4px] rounded-t-sm relative cursor-pointer transition-all bg-cyan-700 dark:bg-cyan-800 hover:bg-cyan-600 dark:hover:bg-cyan-500"
                         :style="'height:'+barHeight(x.revenue)+'%'">
                         <div class="tooltip hidden absolute bottom-full left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded mb-1.5 whitespace-nowrap z-10"
-                          x-text="x.hour.toString().padStart(2,'0')+':00: Γé▒'+fmt(x.revenue)+' ('+x.salesCount+' sales)'"></div>
+                          x-text="x.hour.toString().padStart(2,'0')+':00: ₱'+fmt(x.revenue)+' ('+x.salesCount+' sales)'"></div>
                       </div>
                     </template>
                   </div>
@@ -281,7 +281,7 @@ tailwind.config = {
                         <td class="px-3 py-2 text-right font-semibold" :class="profitClass(x.profit)">&#8369;<span x-text="fmt(x.profit)"></span></td>
                         <td class="px-3 py-2 text-right" :class="marginClass(x.marginPct)"><span x-text="x.marginPct"></span>%</td>
                         <td class="px-3 py-2"><span class="text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded" x-text="shortStore(x.storeId, $store.app.storeMap[x.storeId])"></span></td>
-                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.cashier || 'ΓÇö'"></td>
+                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.cashier || '—'"></td>
                       </tr>
                     </template>
                   </tbody>
@@ -335,7 +335,7 @@ tailwind.config = {
                           <td class="px-3 py-2 text-right font-medium">&#8369;<span x-text="fmt(x.grandTotal)"></span></td>
                           <td class="px-3 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded font-semibold" :class="badgeClass(x.paymentMethod, x.isVoided)"><span x-text="x.isVoided ? 'VOID' : x.paymentMethod"></span></span></td>
                           <td class="px-3 py-2"><span class="text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded" x-text="shortStore(x.storeId, $store.app.storeMap[x.storeId])"></span></td>
-                          <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.cashier || 'ΓÇö'"></td>
+                          <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.cashier || '—'"></td>
                         </tr>
                       </template>
                     </tbody>
@@ -385,11 +385,11 @@ tailwind.config = {
                         <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                           <td class="px-2 py-2"><a href="#" @click.prevent="$store.app._showSaleItems(x.invoiceNo, x.storeId)" class="text-cyan-700 dark:text-cyan-400 hover:underline" x-text="x.invoiceNo"></a></td>
                           <td class="px-2 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400" x-text="x.action==='VoidSale' ? 'FULL VOID' : 'ITEM VOID'"></span></td>
-                          <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.productName || 'ΓÇö'"></td>
-                          <td class="px-2 py-2 text-amber-600 dark:text-amber-400 max-w-[160px] truncate" x-text="x.reason || 'ΓÇö'"></td>
-                          <td class="px-2 py-2 text-right" x-text="x.quantity || 'ΓÇö'"></td>
+                          <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.productName || '—'"></td>
+                          <td class="px-2 py-2 text-amber-600 dark:text-amber-400 max-w-[160px] truncate" x-text="x.reason || '—'"></td>
+                          <td class="px-2 py-2 text-right" x-text="x.quantity || '—'"></td>
                           <td class="px-2 py-2 text-right text-red-500">&#8369;<span x-text="fmt(x.amount)"></span></td>
-                          <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.userName || 'ΓÇö'"></td>
+                          <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.userName || '—'"></td>
                           <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})+' '+new Date(x.createdAt).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Manila'})"></td>
                         </tr>
                       </template>
@@ -582,9 +582,9 @@ tailwind.config = {
 
       </div><!-- /dashboard section -->
 
-      <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+      <!-- ═══════════════════════════════════════════════ -->
       <!-- PRODUCTS SECTION                              -->
-      <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+      <!-- ═══════════════════════════════════════════════ -->
       <div x-show="$store.app.section === 'products'" x-transition.opacity>
         <div x-data="masterProducts" class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
           <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#222255] gap-2">
@@ -638,7 +638,7 @@ tailwind.config = {
                             </template>
                           </div>
                         </template>
-                        <span x-show="!x.units || !x.units.length" class="text-gray-400">ΓÇö</span>
+                        <span x-show="!x.units || !x.units.length" class="text-gray-400">—</span>
                       </td>
                       <td class="px-3 py-2">
                         <button @click="openEditor(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">EDIT</button>
@@ -653,9 +653,9 @@ tailwind.config = {
         </div>
       </div>
 
-      <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+      <!-- ═══════════════════════════════════════════════ -->
       <!-- STOCK SECTION (Available Stock)               -->
-      <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+      <!-- ═══════════════════════════════════════════════ -->
       <div x-show="$store.app.section === 'available'" x-transition.opacity class="space-y-4">
 
         <!-- Stock Receiving -->
@@ -766,9 +766,9 @@ tailwind.config = {
         </div>
       </div>
 
-      <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+      <!-- ═══════════════════════════════════════════════ -->
       <!-- WAREHOUSE SECTION                             -->
-      <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+      <!-- ═══════════════════════════════════════════════ -->
       <div x-show="$store.app.section === 'warehouse'" x-transition.opacity>
         <div x-data="warehousePanel" class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
           <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#222255] gap-2">
@@ -936,9 +936,9 @@ tailwind.config = {
         </div>
       </div>
 
-      <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+      <!-- ═══════════════════════════════════════════════ -->
       <!-- CUSTOMERS SECTION                             -->
-      <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+      <!-- ═══════════════════════════════════════════════ -->
       <div x-show="$store.app.section === 'customers'" x-transition.opacity>
         <div x-data="customersList" class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
           <div class="px-4 py-3 border-b border-gray-100 dark:border-[#222255]">
@@ -975,9 +975,9 @@ tailwind.config = {
         </div>
       </div>
 
-      <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+      <!-- ═══════════════════════════════════════════════ -->
       <!-- USERS SECTION                                 -->
-      <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+      <!-- ═══════════════════════════════════════════════ -->
       <div x-show="$store.app.section === 'users'" x-transition.opacity>
         <div x-data="usersList" class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
           <div class="px-4 py-3 border-b border-gray-100 dark:border-[#222255]">
@@ -1012,9 +1012,9 @@ tailwind.config = {
         </div>
       </div>
 
-      <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+      <!-- ═══════════════════════════════════════════════════ -->
       <!-- ANALYTICS SECTION                                  -->
-      <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+      <!-- ═══════════════════════════════════════════════════ -->
       <div x-show="$store.app.section === 'analytics'" x-transition.opacity>
         <div x-data="productAnalytics">
           <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
@@ -1069,8 +1069,8 @@ tailwind.config = {
                         <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                           <td class="px-2 py-2 text-gray-400" x-text="i+1"></td>
                           <td class="px-2 py-2 font-medium text-gray-700 dark:text-slate-200" x-text="p.productName"></td>
-                          <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa]" x-text="p.barcode || 'ΓÇö'"></td>
-                          <td class="px-2 py-2"><span x-show="p.category" class="text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded" x-text="p.category"></span><span x-show="!p.category" class="text-gray-400">ΓÇö</span></td>
+                          <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa]" x-text="p.barcode || '—'"></td>
+                          <td class="px-2 py-2"><span x-show="p.category" class="text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded" x-text="p.category"></span><span x-show="!p.category" class="text-gray-400">—</span></td>
                           <td class="px-2 py-2"><span class="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded" x-text="p.unitName || 'pc'"></span></td>
                           <td class="px-2 py-2 text-right font-medium" x-text="fmtInt(p.totalQty)"></td>
                           <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(p.totalRevenue)"></span></td>
@@ -1097,9 +1097,9 @@ tailwind.config = {
 
     </main>
 
-    <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+    <!-- ═══════════════════════════════════════════════════ -->
     <!-- MODALS                                            -->
-    <!-- ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ -->
+    <!-- ═══════════════════════════════════════════════════ -->
 
     <!-- Sale Items Modal -->
     <div x-show="$store.app.saleModalOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
@@ -1177,7 +1177,7 @@ tailwind.config = {
             <div class="col-span-2 sm:col-span-1"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BARCODE</label><input x-model="barcode" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
             <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">CATEGORY</label>
               <select x-model="category" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                <option value="">ΓÇö Select ΓÇö</option>
+                <option value="">— Select —</option>
                 <template x-for="c in categories" :key="c"><option :value="c" x-text="c"></option></template>
               </select>
             </div>
@@ -1221,10 +1221,10 @@ tailwind.config = {
                 <div class="col-span-2"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">NAME</label><input x-model="form.name" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
                 <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BARCODE</label><input x-model="form.barcode" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
                 <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">CATEGORY</label><input x-model="form.category" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BOX PRICE (Γé▒)</label><input type="number" step="0.01" x-model="form.boxPrice" @input="_computePiecePrice()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BOX COST (Γé▒)</label><input type="number" step="0.01" x-model="form.boxCost" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BOX PRICE (₱)</label><input type="number" step="0.01" x-model="form.boxPrice" @input="_computePiecePrice()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BOX COST (₱)</label><input type="number" step="0.01" x-model="form.boxCost" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
                 <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BOX QTY</label><input type="number" x-model="form.boxQty" @input="_computePiecePrice()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">PIECE PRICE (Γé▒)</label><input type="number" step="0.01" x-model="form.piecePrice" readonly class="w-full text-xs bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-500"></div>
+                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">PIECE PRICE (₱)</label><input type="number" step="0.01" x-model="form.piecePrice" readonly class="w-full text-xs bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-500"></div>
                 <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">INITIAL STOCK</label><input type="number" x-model="form.stockQty" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
               </div>
             </template>
