@@ -1,4 +1,4 @@
-/* ΓöÇΓöÇ Alpine Component Registrations ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
+/* ══════════════════════════════════════════════════════════════════════════════════ */
 // Loaded BEFORE Alpine CDN. Registers in alpine:init so
 // Alpine.store/Alpine.data exist when initTree processes DOM.
 
