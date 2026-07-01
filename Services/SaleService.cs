@@ -59,6 +59,7 @@ public class SaleService
 
             var saleId = Convert.ToInt32(cmd.ExecuteScalar());
 
+            var trailList = new List<StockTrail>();
             foreach (var item in sale.Items)
             {
                 // Determine unit cost: use ProductUnit cost if unit has its own, else product base cost
@@ -117,10 +118,30 @@ public class SaleService
                 trail.Parameters.AddWithValue("@inv", sale.InvoiceNo);
                 trail.Parameters.AddWithValue("@cust", sale.CustomerName ?? "Walk-in");
                 trail.ExecuteNonQuery();
+                using var trailIdCmd = new SQLiteCommand("SELECT last_insert_rowid()", conn);
+                trailList.Add(new StockTrail
+                {
+                    Id = Convert.ToInt32(trailIdCmd.ExecuteScalar()),
+                    ProductId = item.ProductId,
+                    ProductName = item.ProductName,
+                    Barcode = item.Barcode ?? "",
+                    QuantityAdded = -deductQty,
+                    StockBefore = stockBefore,
+                    StockAfter = stockAfter,
+                    Reference = sale.InvoiceNo,
+                    InvoiceNo = sale.InvoiceNo,
+                    CustomerName = sale.CustomerName ?? "Walk-in",
+                    UserId = sale.UserId ?? 0,
+                    UserName = sale.CashierName ?? "",
+                    CreatedAt = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                });
             }
 
             trans.Commit();
             sale.Id = saleId;
+
+            foreach (var st in trailList)
+                _ = SyncService.SyncStockTrail(st);
 
             foreach (var item in sale.Items)
                 _ = SyncService.SyncProduct(ProductService.GetById(item.ProductId));

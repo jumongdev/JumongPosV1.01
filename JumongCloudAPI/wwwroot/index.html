@@ -735,6 +735,7 @@ tailwind.config = {
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Product</th>
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Barcode</th>
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Category</th>
+                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Store</th>
                   <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Stock</th>
                   <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Price</th>
                   <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Cost</th>
@@ -745,6 +746,7 @@ tailwind.config = {
                       <td class="px-3 py-2" x-text="x.name"></td>
                       <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.barcode"></td>
                       <td class="px-3 py-2" x-text="x.category"></td>
+                      <td class="px-3 py-2 text-cyan-600 dark:text-cyan-400 text-xs"><span x-text="shortStore(x.storeId, $store.app.storeMap[x.storeId])"></span></td>
                       <td class="px-3 py-2 text-right font-semibold" :class="stockClass(x.stockQty)" x-text="fmtInt(x.stockQty)"></td>
                       <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.price)"></span></td>
                       <td class="px-3 py-2 text-right text-red-500">&#8369;<span x-text="fmt(x.cost)"></span></td>

@@ -44,7 +44,7 @@ window.exportCSV = (name) => {
     shifts: ['Close Date,Store,Sales,Cash,E-Wallet,Credit,Voided,Expenses,Cash on Hand,Variance,User', d => d.map(x => [x.closeDate, x.storeId, x.totalSales, x.totalCash, x.totalEwallet, x.totalCredit, x.totalVoided, x.totalExpenses, x.cashOnHand, x.difference, x.userName])],
     voids: ['Invoice,Action,Item,Reason,Qty,Amount,Cashier,Date', d => d.map(x => [x.invoiceNo, x.action, x.productName, x.reason, x.quantity, x.amount, x.userName, x.createdAt])],
     receiving: ['Product,Barcode,Qty Added,Before,After,Reference,Cashier,Store,Date', d => d.map(x => [x.productName, x.barcode, x.quantityAdded, x.stockBefore, x.stockAfter, x.reference, x.userName, x.storeId, x.createdAt])],
-    stock: ['Product,Barcode,Category,Stock,Price,Cost', d => d.map(x => [x.name, x.barcode, x.category, x.stockQty, x.price, x.cost])],
+    stock: ['Product,Barcode,Category,Store,Stock,Price,Cost', d => d.map(x => [x.name, x.barcode, x.category, window.shortStore(x.storeId, Alpine.store('app').storeMap[x.storeId]), x.stockQty, x.price, x.cost])],
     analytics: ['Product,Barcode,Category,Unit,Qty Sold,Revenue,Cost,Profit,Margin%', d => d.map(x => [x.productName, x.barcode, x.category, x.unitName || 'pc', x.totalQty, x.totalRevenue, x.totalCost, x.totalProfit, x.marginPct + '%'])]
   };
   const cache = Alpine.store('app').cache[name] || Alpine.store('app').cache[name.replace('wh-', '')];

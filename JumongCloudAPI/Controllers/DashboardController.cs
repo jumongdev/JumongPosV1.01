@@ -369,7 +369,7 @@ public class DashboardController : ControllerBase
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = $@"
-                SELECT name, barcode, category, stock_qty, price, cost
+                SELECT name, barcode, category, stock_qty, price, cost, store_id
                 FROM products p
                 WHERE is_active = true {StoreFilter(storeId, "p")}
                 ORDER BY stock_qty ASC";
@@ -377,7 +377,7 @@ public class DashboardController : ControllerBase
             var data = new List<object>();
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
-                data.Add(new { name = reader.GetString(0), barcode = reader.IsDBNull(1) ? "" : reader.GetString(1), category = reader.IsDBNull(2) ? "" : reader.GetString(2), stockQty = reader.GetInt32(3), price = reader.GetDecimal(4), cost = reader.GetDecimal(5) });
+                data.Add(new { name = reader.GetString(0), barcode = reader.IsDBNull(1) ? "" : reader.GetString(1), category = reader.IsDBNull(2) ? "" : reader.GetString(2), stockQty = reader.GetInt32(3), price = reader.GetDecimal(4), cost = reader.GetDecimal(5), storeId = reader.IsDBNull(6) ? "" : reader.GetString(6) });
             return Ok(data);
         }
 
