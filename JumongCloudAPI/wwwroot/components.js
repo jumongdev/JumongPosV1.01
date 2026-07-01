@@ -571,25 +571,44 @@ Alpine.store('app', {
     closeOrderView() { this.orderViewOpen = false; this.orderViewItems = [] },
     async importFromMaster() {
       try {
-        const mp = await fetchJSON(API + '/warehouse/products');
+        const mp = await fetchJSON(API + '/products/master');
         this.masterImportList = mp;
         this.masterImportOpen = true;
       } catch (e) { toast('Error loading master products', 'error') }
     },
-    masterImportOpen: false, masterImportList: [], masterSearch: '',
+    masterImportOpen: false, masterImportList: [], masterSearch: '', importBoxQty: 12,
     closeImport() { this.masterImportOpen = false; this.masterSearch = '' },
     async doImport(mid) {
       try {
-        const r = await fetch(API + '/warehouse/products/from-master/' + mid, { method: 'POST' });
+        const r = await fetch(API + '/warehouse/products/from-master/' + mid + '?boxQty=' + this.importBoxQty, { method: 'POST' });
         const j = await r.json();
         if (j.id) { toast('Imported (ID: ' + j.id + ')', 'success'); this.masterImportOpen = false; this.load() }
         else toast('Failed to import', 'error');
       } catch (e) { toast('Error: ' + e.message, 'error') }
     },
+    async doBulkImport(category) {
+      if (!confirm('Import all products from "' + category + '" (boxQty=' + this.importBoxQty + ')?\nAlready imported products will be skipped.')) return;
+      try {
+        const r = await fetch(API + '/warehouse/products/from-master/category/' + encodeURIComponent(category) + '?boxQty=' + this.importBoxQty, { method: 'POST' });
+        const j = await r.json();
+        toast('Imported ' + (j.imported || 0) + ' product(s)', 'success');
+        this.masterImportOpen = false;
+        this.load();
+      } catch (e) { toast('Error: ' + e.message, 'error') }
+    },
+    async syncFromMaster() {
+      if (!confirm('Sync all warehouse products from master catalog?\nPrices, names, and barcodes will be updated. Your box_qty settings will be preserved.')) return;
+      try {
+        const r = await fetch(API + '/warehouse/sync-from-master', { method: 'POST' });
+        const j = await r.json();
+        toast('Updated: ' + (j.updated || 0) + ', Deactivated: ' + (j.deactivated || 0), 'success');
+        this.load();
+      } catch (e) { toast('Error: ' + e.message, 'error') }
+    },
     get filteredMaster() {
       if (!this.masterSearch) return this.masterImportList || [];
       const q = this.masterSearch.toLowerCase();
-      return this.masterImportList.filter(x => (x.name || '').toLowerCase().includes(q) || (x.barcode || '').toLowerCase().includes(q));
+      return this.masterImportList.filter(x => (x.name || '').toLowerCase().includes(q) || (x.barcode || '').toLowerCase().includes(q) || (x.category || '').toLowerCase().includes(q));
     },
     badgeCount: 0,
     async updateBadge() {

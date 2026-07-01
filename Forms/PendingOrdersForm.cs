@@ -63,30 +63,75 @@ public class PendingOrdersForm : Form
         var transfer = dgvOrders.SelectedRows[0].Tag as PendingTransfer;
         if (transfer == null) return;
 
-        var unmatched = new List<TransferItem>();
-        foreach (var ti in transfer.Items)
-        {
-            var found = ProductService.GetByBarcode(ti.Barcode)
-                     ?? ProductService.GetAll().FirstOrDefault(p =>
-                        p.Name.Equals(ti.ProductName, StringComparison.OrdinalIgnoreCase));
-            if (found == null)
-                unmatched.Add(ti);
-        }
+        btnProcess.Enabled = false;
+        btnProcess.Text = "Processing...";
 
-        if (unmatched.Count > 0)
+        try
         {
-            var msg = "Some items could not be matched to local products:\n";
-            foreach (var u in unmatched)
-                msg += $"\n  • {u.ProductName} ({u.BaseQty} {u.BaseUnitName})";
-            msg += "\n\nDo you want to process only the matched items?";
-            if (MessageBox.Show(msg, "Unmatched Items", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+            // Match items to local products
+            var items = new List<(int ProductId, string ProductName, string Barcode, int StockBefore, int Qty)>();
+            var unmatched = new List<TransferItem>();
+
+            foreach (var ti in transfer.Items)
+            {
+                var found = ProductService.GetByBarcode(ti.Barcode)
+                         ?? ProductService.GetAll().FirstOrDefault(p =>
+                            p.Name.Equals(ti.ProductName, StringComparison.OrdinalIgnoreCase));
+                if (found == null)
+                {
+                    unmatched.Add(ti);
+                    continue;
+                }
+                items.Add((found.Id, found.Name, found.Barcode ?? "", found.StockQty, ti.BaseQty));
+            }
+
+            if (unmatched.Count > 0 && items.Count == 0)
+            {
+                MessageBox.Show("No items could be matched to local products.\nPlease add these products first.", "Cannot Process", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
-        }
+            }
 
-        using var salesForm = new SalesForm(_currentUser, _customerDisplay);
-        salesForm.LoadFromTransfer(transfer.OrderId, transfer.ClientName, transfer.Items);
-        salesForm.ShowDialog();
-        _ = LoadTransfers();
+            if (unmatched.Count > 0)
+            {
+                var msg = "Some items could not be matched to local products:\n";
+                foreach (var u in unmatched)
+                    msg += $"\n  • {u.ProductName} ({u.BaseQty} {u.BaseUnitName})";
+                msg += "\n\nDo you want to receive the matched items only?";
+                if (MessageBox.Show(msg, "Unmatched Items", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                    return;
+            }
+
+            if (items.Count == 0) return;
+
+            // Mark transfer as received on cloud
+            var received = await SyncService.MarkTransferReceivedAsync(transfer.OrderId);
+            if (received == null)
+            {
+                MessageBox.Show("Failed to confirm transfer on cloud.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            // Add stock locally
+            var userName = _currentUser?.FullName ?? _currentUser?.Username ?? "System";
+            var error = StockService.ConfirmReceiving(items, _currentUser?.Id ?? 0, userName, $"WH-Transfer #{transfer.OrderId}");
+            if (error != null)
+            {
+                MessageBox.Show($"Stock receiving error: {error}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            MessageBox.Show($"Transfer #{transfer.OrderId} received — {items.Count} item(s) added to stock.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            _ = LoadTransfers();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error processing transfer: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+        finally
+        {
+            btnProcess.Enabled = true;
+            btnProcess.Text = "\uD83D\uDCCB Process Order";
+        }
     }
 
     private void InitializeComponent()

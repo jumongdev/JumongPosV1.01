@@ -1089,6 +1089,26 @@ public class DashboardController : ControllerBase
                     }
                 }
                 tx.Commit();
+
+                // Auto-sync linked warehouse products
+                try
+                {
+                    using var sync = conn.CreateCommand();
+                    sync.CommandText = @"
+                        UPDATE wh_products SET
+                            name = mp.name,
+                            barcode = mp.barcode,
+                            category = mp.category,
+                            piece_price = mp.price,
+                            box_price = mp.price * wh.box_qty,
+                            box_cost = mp.cost * wh.box_qty
+                        FROM master_products mp
+                        WHERE wh.master_product_id = mp.id AND mp.id = @mid";
+                    sync.Parameters.AddWithValue("mid", id);
+                    sync.ExecuteNonQuery();
+                }
+                catch { }
+
                 return Ok(new { success = true });
             }
             catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
@@ -1212,18 +1232,65 @@ public class DashboardController : ControllerBase
         }
 
         [HttpPost("warehouse/products/from-master/{masterId}")]
-        public IActionResult WhAddFromMaster(int masterId)
+        public IActionResult WhAddFromMaster(int masterId, [FromQuery] int boxQty = 12)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 INSERT INTO wh_products (name, barcode, category, box_price, box_cost, box_qty, piece_price, stock_qty, master_product_id)
-                SELECT name, barcode, category, price * 12, cost * 12, 12, price, 0, id
+                SELECT name, barcode, category, price * @bq, cost * @bq, @bq, price, 0, id
                 FROM master_products WHERE id = @mid AND is_active = true RETURNING id";
             cmd.Parameters.AddWithValue("mid", masterId);
+            cmd.Parameters.AddWithValue("bq", boxQty);
             var result = cmd.ExecuteScalar();
             if (result == null) return NotFound(new { error = "Master product not found" });
             return Ok(new { id = Convert.ToInt32(result) });
+        }
+
+        [HttpPost("warehouse/products/from-master/category/{category}")]
+        public IActionResult WhBulkImportFromMaster(string category, [FromQuery] int boxQty = 12)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO wh_products (name, barcode, category, box_price, box_cost, box_qty, piece_price, stock_qty, master_product_id)
+                SELECT name, barcode, category, price * @bq, cost * @bq, @bq, price, 0, id
+                FROM master_products
+                WHERE category = @cat AND is_active = true
+                AND id NOT IN (SELECT master_product_id FROM wh_products WHERE master_product_id IS NOT NULL)
+                RETURNING id";
+            cmd.Parameters.AddWithValue("cat", category);
+            cmd.Parameters.AddWithValue("bq", boxQty);
+            var count = 0;
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) count++;
+            return Ok(new { imported = count });
+        }
+
+        [HttpPost("warehouse/sync-from-master")]
+        public IActionResult WhSyncFromMaster()
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                UPDATE wh_products SET
+                    name = mp.name,
+                    barcode = mp.barcode,
+                    category = mp.category,
+                    piece_price = mp.price,
+                    box_price = mp.price * wh.box_qty,
+                    box_cost = mp.cost * wh.box_qty
+                FROM master_products mp
+                WHERE wh.master_product_id = mp.id AND mp.is_active = true";
+            var updated = cmd.ExecuteNonQuery();
+            // Deactivate warehouse products whose master was deleted
+            using var deact = conn.CreateCommand();
+            deact.CommandText = @"
+                UPDATE wh_products SET is_active = false
+                WHERE master_product_id IS NOT NULL
+                AND master_product_id NOT IN (SELECT id FROM master_products WHERE is_active = true)";
+            var deactivated = deact.ExecuteNonQuery();
+            return Ok(new { updated, deactivated });
         }
 
         [HttpGet("warehouse/orders")]
