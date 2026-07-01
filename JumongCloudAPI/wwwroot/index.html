@@ -33,7 +33,7 @@ tailwind.config = {
   <!-- ── Sidebar ── -->
   <aside id="sidebar" class="sidebar fixed top-0 left-0 bottom-0 w-[220px] z-40 flex flex-col border-r border-gray-200 dark:border-[#222255] bg-white dark:bg-gradient-to-b dark:from-[#10102a] dark:to-[#16163a] no-print overflow-hidden"
     :class="{ 'collapsed': !$store.app._sidebarOpen }"
-    @click.outside="if(window.innerWidth<768)$store.app._sidebarOpen=false"
+    @click.outside="if(window.innerWidth<768 && $store.app._sidebarOpen)$store.app._sidebarOpen=false"
     x-effect="localStorage.setItem('sidebar', $store.app._sidebarOpen ? 'open' : 'collapsed')">
     <div class="flex items-center justify-between px-4 h-16 border-b border-gray-200 dark:border-[#222255] shrink-0">
       <span class="font-bold text-cyan-600 dark:text-cyan-400 text-sm tracking-wide truncate"
@@ -84,7 +84,7 @@ tailwind.config = {
     <header class="sticky top-0 z-30 bg-white/90 dark:bg-[#10102a]/90 backdrop-blur-md border-b border-gray-200 dark:border-[#222255] no-print">
       <div class="flex items-center justify-between px-4 h-14 gap-2">
         <div class="flex items-center gap-3">
-          <button class="md:hidden p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-[#181848] rounded-lg" @click="$store.app._sidebarOpen = !$store.app._sidebarOpen">
+          <button class="md:hidden p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-[#181848] rounded-lg" @click.stop="$store.app._sidebarOpen = !$store.app._sidebarOpen">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
           </button>
           <span class="text-sm md:text-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-400 dark:to-blue-400 bg-clip-text text-transparent"><span class="hidden sm:inline">JUMONG POS DASHBOARD</span><span class="sm:hidden">JUMONG POS</span></span>
