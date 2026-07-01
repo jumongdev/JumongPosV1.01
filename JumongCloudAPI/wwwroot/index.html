@@ -49,20 +49,33 @@ tailwind.config = {
         { id:'dashboard', icon:'📊', label:'Dashboard' },
         { id:'products', icon:'📦', label:'Products' },
         { id:'available', icon:'📉', label:'Stock' },
-        { id:'warehouse', icon:'🏢', label:'Warehouse' },
+        { id:'wh-header', label:'WAREHOUSE', isHeader:true },
+        { id:'wh-product', icon:'📦', label:'Product' },
+        { id:'wh-inventory', icon:'📊', label:'Inventory' },
+        { id:'wh-onlineorder', icon:'🛒', label:'Online Order' },
+        { id:'wh-transfer', icon:'🔄', label:'Transfer' },
         { id:'customers', icon:'👥', label:'Customers' },
         { id:'users', icon:'⚙️', label:'Users' },
         { id:'analytics', icon:'📈', label:'Analytics' }
       ]" :key="item.id">
-        <a href="#" @click.prevent="$store.app.switchSection(item.id)"
-          class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200"
-          :class="$store.app.section === item.id
+        <!-- Section header -->
+        <div x-show="item.isHeader && $store.app._sidebarOpen"
+          class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-[#4a4a7a]">
+          <span x-text="item.label"></span>
+        </div>
+        <!-- Nav item -->
+        <a x-show="!item.isHeader" href="#"
+          @click.prevent="$store.app.switchSection(item.id)"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200"
+          :class="$store.app.isActive(item.id)
             ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-400 font-semibold border-l-2 border-cyan-500'
-            : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] hover:text-gray-700 dark:hover:text-slate-200'">
-          <span class="text-lg shrink-0" x-text="item.icon"></span>
-          <span class="nav-label text-sm" x-show="$store.app._sidebarOpen" x-text="item.label"></span>
+            : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] hover:text-gray-700 dark:hover:text-slate-200'"
+          :style="item.id.startsWith('wh-') ? 'padding-left: 32px' : ''">
+          <span class="text-base shrink-0" x-show="item.id.startsWith('wh-')" style="opacity:0.5">└</span>
+          <span class="text-lg shrink-0" x-show="!item.id.startsWith('wh-')" x-text="item.icon"></span>
+          <span class="nav-label text-xs" x-show="$store.app._sidebarOpen" x-text="item.label"></span>
           <span class="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
-            x-show="item.id==='warehouse' && $store.app._sidebarOpen"
+            x-show="item.id==='wh-transfer' && $store.app._sidebarOpen"
             x-text="$store.app._whBadge || ''"></span>
         </a>
       </template>
@@ -771,30 +784,29 @@ tailwind.config = {
       <!-- ═══════════════════════════════════════════════ -->
       <div x-show="$store.app.section === 'warehouse'" x-transition.opacity>
         <div x-data="warehousePanel" class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
+          <!-- Subpage nav -->
           <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#222255] gap-2">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">WAREHOUSE</h3>
+            <div class="flex gap-1">
+              <button @click="$store.app.switchWhSubpage('product'); load()" class="text-[11px] px-3 py-1.5 rounded-lg transition-all font-medium"
+                :class="$store.app.whSubpage==='product' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">Product</button>
+              <button @click="$store.app.switchWhSubpage('inventory'); load()" class="text-[11px] px-3 py-1.5 rounded-lg transition-all font-medium"
+                :class="$store.app.whSubpage==='inventory' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">Inventory</button>
+              <button @click="$store.app.switchWhSubpage('onlineorder'); load()" class="text-[11px] px-3 py-1.5 rounded-lg transition-all font-medium"
+                :class="$store.app.whSubpage==='onlineorder' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">Online Order</button>
+              <button @click="$store.app.switchWhSubpage('transfer'); load()" class="text-[11px] px-3 py-1.5 rounded-lg transition-all font-medium"
+                :class="$store.app.whSubpage==='transfer' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">Transfer</button>
+            </div>
             <div class="flex items-center gap-2">
-              <div class="flex gap-1">
-                <button @click="switchTab('products')" class="text-[11px] px-3 py-1.5 rounded-lg transition-all font-medium"
-                  :class="tab==='products' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">Products</button>
-                <button @click="switchTab('clients')" class="text-[11px] px-3 py-1.5 rounded-lg transition-all font-medium"
-                  :class="tab==='clients' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">Clients</button>
-                <button @click="switchTab('orders')" class="text-[11px] px-3 py-1.5 rounded-lg transition-all font-medium"
-                  :class="tab==='orders' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">Orders</button>
-                <button @click="switchTab('transfers')" class="text-[11px] px-3 py-1.5 rounded-lg transition-all font-medium"
-                  :class="tab==='transfers' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">Transfers</button>
-              </div>
               <input type="text" placeholder="Search..." x-model="search" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2.5 py-1.5 w-28 text-gray-700 dark:text-slate-200 placeholder-gray-400 hidden sm:block">
-              <button @click="importFromMaster()" x-show="tab==='products'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">FROM MASTER</button>
-              <button @click="openAdd()" x-show="tab==='clients'" class="text-xs px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">+ ADD</button>
-              <button @click="openNewOrder()" x-show="tab==='orders'" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700">+ NEW ORDER</button>
-              <button @click="exportCSV('wh-'+tab)" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CSV</button>
+              <button @click="importFromMaster()" x-show="$store.app.whSubpage==='product'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">FROM MASTER</button>
+              <button @click="openNewOrder()" x-show="$store.app.whSubpage==='onlineorder'" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700">+ NEW ORDER</button>
+              <button @click="exportCSV('wh-'+$store.app.whSubpage)" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CSV</button>
               <button @click="window.print()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] hidden sm:block">PRINT</button>
             </div>
           </div>
 
-          <!-- Category pills (products tab only) -->
-          <div x-show="tab==='products' && categories.length > 0" class="px-4 py-2 border-b border-gray-100 dark:border-[#222255]/50">
+          <!-- Category pills (product & inventory) -->
+          <div x-show="($store.app.whSubpage==='product' || $store.app.whSubpage==='inventory') && categories.length > 0" class="px-4 py-2 border-b border-gray-100 dark:border-[#222255]/50">
             <div class="flex gap-1 flex-wrap">
               <button @click="setFilter('')" class="text-[10px] px-2.5 py-1 rounded-full transition-all font-medium"
                 :class="!catFilter ? 'bg-cyan-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-[#7878aa] hover:bg-gray-200 dark:hover:bg-gray-700'">All</button>
@@ -805,132 +817,193 @@ tailwind.config = {
             </div>
           </div>
 
+          <!-- Content area -->
           <div class="overflow-x-auto">
             <template x-if="loading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
-            <template x-if="!loading && filtered.length===0"><div class="text-center py-6 text-gray-400">No data</div></template>
-            <template x-if="!loading && filtered.length > 0">
-              <!-- Products table -->
-              <table x-show="tab==='products'" class="w-full text-xs">
-                <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">ID</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Name</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Barcode</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Category</th>
-                  <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Box Price</th>
-                  <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Box Qty</th>
-                  <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Piece Price</th>
-                  <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Stock</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
-                </tr></thead>
-                <tbody>
-                  <template x-for="(x,i) in filtered" :key="i">
-                    <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                      <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.id"></td>
-                      <td class="px-3 py-2 font-medium" x-text="x.name"></td>
-                      <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.barcode || ''"></td>
-                      <td class="px-3 py-2" x-text="x.category || ''"></td>
-                      <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.boxPrice)"></span></td>
-                      <td class="px-3 py-2 text-right" x-text="x.boxQty"></td>
-                      <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.piecePrice)"></span></td>
-                      <td class="px-3 py-2 text-right font-bold" :class="x.stockQty < 10 ? 'text-red-400' : 'text-emerald-400'" x-text="x.stockQty"></td>
-                      <td class="px-3 py-2">
-                        <button @click="openEdit(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">EDIT</button>
-                        <button @click="adjustStock(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">STOCK</button>
-                        <button @click="deleteItem(x.id)" class="text-[10px] px-2 py-1 rounded border border-red-200 dark:border-red-900/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">DEL</button>
-                      </td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-              <!-- Clients table -->
-              <table x-show="tab==='clients'" class="w-full text-xs">
-                <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">ID</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Name</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Contact</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Address</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Type</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
-                </tr></thead>
-                <tbody>
-                  <template x-for="(x,i) in filtered" :key="i">
-                    <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                      <td class="px-3 py-2" x-text="x.id"></td>
-                      <td class="px-3 py-2 font-medium" x-text="x.name"></td>
-                      <td class="px-3 py-2" x-text="x.contact || ''"></td>
-                      <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.address || ''"></td>
-                      <td class="px-3 py-2" x-text="x.storeType"></td>
-                      <td class="px-3 py-2">
-                        <button @click="openEdit(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">EDIT</button>
-                        <button @click="deleteItem(x.id)" class="text-[10px] px-2 py-1 rounded border border-red-200 dark:border-red-900/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">DEL</button>
-                      </td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-              <!-- Orders table -->
-              <table x-show="tab==='orders'" class="w-full text-xs">
-                <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">ID</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Client</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Status</th>
-                  <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Total</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Notes</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
-                </tr></thead>
-                <tbody>
-                  <template x-for="(x,i) in filtered" :key="i">
-                    <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                      <td class="px-3 py-2" x-text="x.id"></td>
-                      <td class="px-3 py-2" x-text="x.clientName"></td>
-                      <td class="px-3 py-2 font-semibold" :style="'color:'+(x.status==='pending'?'#f39c12':x.status==='processing'?'#2980b9':x.status==='shipped'?'#2ecc71':x.status==='received'?'#3498db':x.status==='partial'?'#e67e22':x.status==='cancelled'?'#e74c3c':'red')">
-                        <span x-text="x.status.toUpperCase()"></span>
-                        <span x-show="x.hasShortage" class="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">PARTIAL</span>
-                      </td>
-                      <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.totalAmount)"></span></td>
-                      <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.notes || ''"></td>
-                      <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})"></td>
-                      <td class="px-3 py-2">
-                        <button @click="viewOrder(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">VIEW</button>
-                        <template x-if="x.status==='pending'">
-                          <span><button @click="changeOrderStatus(x.id,'processing')" class="text-[10px] px-2 py-1 rounded border border-blue-300 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 mr-1">PROCESS</button><button @click="cancelOrder(x.id)" class="text-[10px] px-2 py-1 rounded border border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">CANCEL</button></span>
-                        </template>
-                        <template x-if="x.status==='processing'">
-                          <button @click="changeOrderStatus(x.id,'shipped')" class="text-[10px] px-2 py-1 rounded border border-emerald-300 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">SHIP</button>
-                        </template>
-                        <template x-if="x.status==='shipped'">
-                          <button @click="receiveOrder(x.id)" class="text-[10px] px-2 py-1 rounded border border-cyan-300 text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/20">RECEIVE</button>
-                        </template>
-                      </td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-              <!-- Transfers table -->
-              <table x-show="tab==='transfers'" class="w-full text-xs">
-                <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Order ID</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Client</th>
-                  <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Total</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Notes</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
-                </tr></thead>
-                <tbody>
-                  <template x-for="x in filtered" :key="x.orderId">
-                    <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                      <td class="px-3 py-2" x-text="x.orderId"></td>
-                      <td class="px-3 py-2" x-text="x.clientName"></td>
-                      <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.totalAmount)"></span></td>
-                      <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.notes || ''"></td>
-                      <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})"></td>
-                      <td class="px-3 py-2"><button @click="receiveOrder(x.orderId)" class="text-[10px] px-2 py-1 rounded border border-cyan-300 text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/20">RECEIVE</button></td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-            </template>
+
+            <!-- ═══ Product subpage ═══ -->
+            <div x-show="!loading && $store.app.whSubpage==='product'">
+              <template x-if="filtered.length===0"><div class="text-center py-6 text-gray-400">No products</div></template>
+              <template x-if="filtered.length > 0">
+                <table class="w-full text-xs">
+                  <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">ID</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Name</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Barcode</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Category</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Box Price</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Box Qty</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Piece Price</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
+                  </tr></thead>
+                  <tbody>
+                    <template x-for="(x,i) in filtered" :key="i">
+                      <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.id"></td>
+                        <td class="px-3 py-2 font-medium" x-text="x.name"></td>
+                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.barcode || ''"></td>
+                        <td class="px-3 py-2" x-text="x.category || ''"></td>
+                        <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.boxPrice)"></span></td>
+                        <td class="px-3 py-2 text-right" x-text="x.boxQty"></td>
+                        <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.piecePrice)"></span></td>
+                        <td class="px-3 py-2">
+                          <button @click="openEdit(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">EDIT</button>
+                          <button @click="deleteItem(x.id)" class="text-[10px] px-2 py-1 rounded border border-red-200 dark:border-red-900/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">DEL</button>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </template>
+            </div>
+
+            <!-- ═══ Inventory subpage ═══ -->
+            <div x-show="!loading && $store.app.whSubpage==='inventory'">
+              <template x-if="filtered.length===0"><div class="text-center py-6 text-gray-400">No products</div></template>
+              <template x-if="filtered.length > 0">
+                <table class="w-full text-xs">
+                  <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">ID</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Name</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Barcode</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Category</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Box Price</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Piece Price</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Stock</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
+                  </tr></thead>
+                  <tbody>
+                    <template x-for="(x,i) in filtered" :key="i">
+                      <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.id"></td>
+                        <td class="px-3 py-2 font-medium" x-text="x.name"></td>
+                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.barcode || ''"></td>
+                        <td class="px-3 py-2" x-text="x.category || ''"></td>
+                        <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.boxPrice)"></span></td>
+                        <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.piecePrice)"></span></td>
+                        <td class="px-3 py-2 text-right font-bold" :class="x.stockQty < 10 ? 'text-red-400' : 'text-emerald-400'" x-text="x.stockQty"></td>
+                        <td class="px-3 py-2">
+                          <button @click="adjustStock(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">ADJUST</button>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </template>
+            </div>
+
+            <!-- ═══ Online Order subpage ═══ -->
+            <div x-show="!loading && $store.app.whSubpage==='onlineorder'">
+              <!-- Clients section -->
+              <div class="px-4 py-2 border-b border-gray-100 dark:border-[#222255]/50 bg-gray-50/50 dark:bg-[#0d0d25]/50">
+                <div class="flex items-center justify-between">
+                  <h4 class="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-[#7878aa]">Clients</h4>
+                  <button @click="openAdd()" class="text-[10px] px-2 py-1 rounded bg-cyan-600 text-white font-medium hover:bg-cyan-700">+ ADD</button>
+                </div>
+              </div>
+              <template x-if="clientsData.length===0"><div class="text-center py-3 text-gray-400 text-xs">No clients</div></template>
+              <template x-if="clientsData.length > 0">
+                <table class="w-full text-xs">
+                  <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">ID</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Name</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Contact</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Address</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Type</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
+                  </tr></thead>
+                  <tbody>
+                    <template x-for="(x,i) in clientsData" :key="i">
+                      <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                        <td class="px-3 py-2" x-text="x.id"></td>
+                        <td class="px-3 py-2 font-medium" x-text="x.name"></td>
+                        <td class="px-3 py-2" x-text="x.contact || ''"></td>
+                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.address || ''"></td>
+                        <td class="px-3 py-2" x-text="x.storeType"></td>
+                        <td class="px-3 py-2">
+                          <button @click="openEdit(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">EDIT</button>
+                          <button @click="deleteItem(x.id)" class="text-[10px] px-2 py-1 rounded border border-red-200 dark:border-red-900/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">DEL</button>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </template>
+              <!-- Orders section -->
+              <div class="px-4 py-2 border-b border-gray-100 dark:border-[#222255]/50 border-t border-gray-200 dark:border-[#222255] bg-gray-50/50 dark:bg-[#0d0d25]/50">
+                <h4 class="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-[#7878aa]">Orders</h4>
+              </div>
+              <template x-if="filtered.length===0"><div class="text-center py-3 text-gray-400 text-xs">No orders</div></template>
+              <template x-if="filtered.length > 0">
+                <table class="w-full text-xs">
+                  <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">ID</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Client</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Status</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Total</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Notes</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
+                  </tr></thead>
+                  <tbody>
+                    <template x-for="(x,i) in filtered" :key="i">
+                      <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                        <td class="px-3 py-2" x-text="x.id"></td>
+                        <td class="px-3 py-2" x-text="x.clientName"></td>
+                        <td class="px-3 py-2 font-semibold" :style="'color:'+(x.status==='pending'?'#f39c12':x.status==='processing'?'#2980b9':x.status==='shipped'?'#2ecc71':x.status==='received'?'#3498db':x.status==='partial'?'#e67e22':x.status==='cancelled'?'#e74c3c':'red')">
+                          <span x-text="x.status.toUpperCase()"></span>
+                          <span x-show="x.hasShortage" class="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">PARTIAL</span>
+                        </td>
+                        <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.totalAmount)"></span></td>
+                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.notes || ''"></td>
+                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})"></td>
+                        <td class="px-3 py-2">
+                          <button @click="viewOrder(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">VIEW</button>
+                          <template x-if="x.status==='pending'">
+                            <span><button @click="changeOrderStatus(x.id,'processing')" class="text-[10px] px-2 py-1 rounded border border-blue-300 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 mr-1">PROCESS</button><button @click="cancelOrder(x.id)" class="text-[10px] px-2 py-1 rounded border border-red-200 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">CANCEL</button></span>
+                          </template>
+                          <template x-if="x.status==='processing'">
+                            <button @click="changeOrderStatus(x.id,'shipped')" class="text-[10px] px-2 py-1 rounded border border-emerald-300 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">SHIP</button>
+                          </template>
+                          <template x-if="x.status==='shipped'">
+                            <button @click="receiveOrder(x.id)" class="text-[10px] px-2 py-1 rounded border border-cyan-300 text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/20">RECEIVE</button>
+                          </template>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </template>
+            </div>
+
+            <!-- ═══ Transfer subpage ═══ -->
+            <div x-show="!loading && $store.app.whSubpage==='transfer'">
+              <template x-if="filtered.length===0"><div class="text-center py-6 text-gray-400">No pending transfers</div></template>
+              <template x-if="filtered.length > 0">
+                <table class="w-full text-xs">
+                  <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Order ID</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Client</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Total</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Notes</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
+                  </tr></thead>
+                  <tbody>
+                    <template x-for="(x,i) in filtered" :key="i">
+                      <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                        <td class="px-3 py-2" x-text="x.orderId"></td>
+                        <td class="px-3 py-2" x-text="x.clientName"></td>
+                        <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.totalAmount)"></span></td>
+                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.notes || ''"></td>
+                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})"></td>
+                        <td class="px-3 py-2"><button @click="receiveOrder(x.orderId)" class="text-[10px] px-2 py-1 rounded border border-cyan-300 text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/20">RECEIVE</button></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </template>
+            </div>
           </div>
         </div>
       </div>
@@ -1215,7 +1288,7 @@ tailwind.config = {
             <button @click="closeModal()" class="p-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">&times;</button>
           </div>
           <div class="overflow-auto p-5 flex-1">
-            <template x-if="tab==='products'">
+            <template x-if="sp==='product' || sp==='inventory'">
               <div class="grid grid-cols-2 gap-3">
                 <div class="col-span-2"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">NAME</label><input x-model="form.name" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
                 <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BARCODE</label><input x-model="form.barcode" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
@@ -1227,7 +1300,7 @@ tailwind.config = {
                 <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">INITIAL STOCK</label><input type="number" x-model="form.stockQty" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
               </div>
             </template>
-            <template x-if="tab==='clients'">
+            <template x-if="sp==='onlineorder'">
               <div class="grid grid-cols-2 gap-3">
                 <div class="col-span-2"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">NAME</label><input x-model="form.name" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
                 <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">CONTACT</label><input x-model="form.contact" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>

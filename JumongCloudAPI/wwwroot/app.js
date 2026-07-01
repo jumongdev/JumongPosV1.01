@@ -52,12 +52,10 @@ window.exportCSV = (name) => {
   if (name.startsWith('wh-')) {
     const wh = document.querySelector('[x-data="warehousePanel"]')?.__x?.$data;
     if (!wh) return;
-    const data = wh.data;
-    let headers, rows;
-    if (name === 'wh-products') { headers = 'ID,Name,Barcode,Category,Box Price,Box Qty,Piece Price,Stock'; rows = data.map(x => [x.id, x.name, x.barcode, x.category, x.boxPrice, x.boxQty, x.piecePrice, x.stockQty]) }
-    else if (name === 'wh-clients') { headers = 'ID,Name,Contact,Address,Type'; rows = data.map(x => [x.id, x.name, x.contact, x.address, x.storeType]) }
-    else if (name === 'wh-orders') { headers = 'ID,Client,Status,Total,Notes,Date'; rows = data.map(x => [x.id, x.clientName, x.status, x.totalAmount, x.notes, x.createdAt]) }
-    else if (name === 'wh-transfers') { headers = 'Order ID,Client,Total,Notes,Date'; rows = data.map(x => [x.orderId, x.clientName, x.totalAmount, x.notes, x.createdAt]) }
+    let headers, rows, data;
+    if (name === 'wh-product' || name === 'wh-inventory') { data = wh.products; headers = 'ID,Name,Barcode,Category,Box Price,Box Qty,Piece Price,Stock'; rows = data.map(x => [x.id, x.name, x.barcode, x.category, x.boxPrice, x.boxQty, x.piecePrice, x.stockQty]) }
+    else if (name === 'wh-onlineorder') { data = wh.orders; headers = 'ID,Client,Status,Total,Notes,Date'; rows = data.map(x => [x.id, x.clientName, x.status, x.totalAmount, x.notes, x.createdAt]) }
+    else if (name === 'wh-transfer') { data = wh.transfers; headers = 'Order ID,Client,Total,Notes,Date'; rows = data.map(x => [x.orderId, x.clientName, x.totalAmount, x.notes, x.createdAt]) }
     if (!headers) return;
     let csv = headers + '\n' + rows.map(r => r.map(c => '"' + (c + '').replace(/"/g, '""') + '"').join(',')).join('\n');
     downloadCSV(csv, name);

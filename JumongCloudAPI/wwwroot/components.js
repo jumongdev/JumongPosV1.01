@@ -13,6 +13,7 @@ document.addEventListener('alpine:init', () => {
 
 Alpine.store('app', {
     section: 'dashboard',
+    whSubpage: 'product',
     storeId: '',
     range: 'today',
     customFrom: '',
@@ -64,14 +65,27 @@ Alpine.store('app', {
     saleProfitClass(v) { return v > 0 ? 'text-emerald-400' : 'text-red-400' },
     saleMarginClass(v) { const m = parseFloat(v); return m > 20 ? 'text-emerald-400' : m > 0 ? 'text-amber-400' : 'text-red-400' },
     switchSection(section) {
-      this.section = section;
       document.getElementById('sidebar')?.classList.remove('open');
+      if (section.startsWith('wh-')) {
+        this.section = 'warehouse';
+        this.whSubpage = section.replace('wh-', '');
+        dispatchEvent(new CustomEvent('load-warehouse'));
+        return;
+      }
+      this.section = section;
       if (section === 'customers') dispatchEvent(new CustomEvent('load-customers'));
       if (section === 'users') dispatchEvent(new CustomEvent('load-users'));
-      if (section === 'warehouse') dispatchEvent(new CustomEvent('load-warehouse'));
+      if (section === 'warehouse') { this.whSubpage = 'product'; dispatchEvent(new CustomEvent('load-warehouse')); }
       if (section === 'products') dispatchEvent(new CustomEvent('load-products'));
       if (section === 'available') { dispatchEvent(new CustomEvent('load-stock')); dispatchEvent(new CustomEvent('load-receiving')) }
       if (section === 'analytics') dispatchEvent(new CustomEvent('load-analytics'));
+    },
+    switchWhSubpage(subpage) {
+      this.whSubpage = subpage;
+    },
+    isActive(id) {
+      if (id.startsWith('wh-')) return this.section === 'warehouse' && this.whSubpage === id.replace('wh-', '');
+      return this.section === id;
     },
     setStore(val) { this.storeId = val; this.refreshAll() },
     setRange(range) {
@@ -426,21 +440,26 @@ Alpine.store('app', {
 
   /* ΓöÇΓöÇ Warehouse ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('warehousePanel', () => ({
-    tab: 'products', data: [], loading: true, catFilter: '', search: '',
+    products: [], clientsData: [], orders: [], transfers: [], loading: true, catFilter: '', search: '',
     async init() { window.addEventListener('load-warehouse', () => this.load()); await this.load(); this.startPoll() },
     async load() {
       this.loading = true;
       try {
-        const endpoints = { products: '/warehouse/products', clients: '/warehouse/clients', orders: '/warehouse/orders', transfers: '/warehouse/transfers/pending' };
-        this.data = await fetchJSON(API + (endpoints[this.tab] || '/warehouse/products'));
-      } catch (e) { this.data = [] }
+        const sp = Alpine.store('app').whSubpage;
+        if (sp === 'product' || sp === 'inventory') this.products = await fetchJSON(API + '/warehouse/products');
+        else if (sp === 'onlineorder') { this.clientsData = await fetchJSON(API + '/warehouse/clients'); this.orders = await fetchJSON(API + '/warehouse/orders') }
+        else if (sp === 'transfer') this.transfers = await fetchJSON(API + '/warehouse/transfers/pending');
+      } catch (e) { this.products = []; this.clientsData = []; this.orders = []; this.transfers = [] }
       this.loading = false;
     },
-    switchTab(t) { this.tab = t; this.load(); this.catFilter = '' },
-    get categories() { if (this.tab !== 'products') return []; const c = []; this.data.forEach(x => { if (x.category && !c.includes(x.category)) c.push(x.category) }); return c.sort() },
+    get sp() { return Alpine.store('app').whSubpage },
+    get categories() {
+      if (this.sp !== 'product' && this.sp !== 'inventory') return [];
+      const c = []; this.products.forEach(x => { if (x.category && !c.includes(x.category)) c.push(x.category) }); return c.sort()
+    },
     get filtered() {
-      let items = this.data;
-      if (this.catFilter && this.tab === 'products') items = items.filter(x => x.category === this.catFilter);
+      let items = this.sp === 'product' || this.sp === 'inventory' ? this.products : this.sp === 'onlineorder' ? this.orders : this.transfers;
+      if (this.catFilter && (this.sp === 'product' || this.sp === 'inventory')) items = items.filter(x => x.category === this.catFilter);
       if (this.search) { const q = this.search.toLowerCase(); items = items.filter(x => JSON.stringify(x).toLowerCase().includes(q)) }
       return items;
     },
@@ -450,16 +469,17 @@ Alpine.store('app', {
 
     openAdd() {
       this.modalMode = 'add'; this.modalId = null; this.modalOpen = true;
-      if (this.tab === 'products') this.form = { name: '', barcode: '', category: '', boxPrice: 0, boxCost: 0, boxQty: 1, piecePrice: 0, stockQty: 0 };
-      else if (this.tab === 'clients') this.form = { name: '', contact: '', address: '', storeType: 'pos', storeId: '' };
-      this.modalTitle = this.tab === 'products' ? 'Add Product' : 'Add Client';
+      if (this.sp === 'product') this.form = { name: '', barcode: '', category: '', boxPrice: 0, boxCost: 0, boxQty: 1, piecePrice: 0, stockQty: 0 };
+      else this.form = { name: '', contact: '', address: '', storeType: 'pos', storeId: '' };
+      this.modalTitle = this.sp === 'product' ? 'Add Product' : 'Add Client';
     },
     openEdit(id) {
-      const p = this.data.find(x => x.id === id); if (!p) return;
+      const arr = this.sp === 'product' || this.sp === 'inventory' ? this.products : this.clientsData;
+      const p = arr.find(x => x.id === id); if (!p) return;
       this.modalMode = 'edit'; this.modalId = id; this.modalOpen = true;
-      if (this.tab === 'products') this.form = { name: p.name, barcode: p.barcode || '', category: p.category || '', boxPrice: p.boxPrice, boxCost: p.boxCost, boxQty: p.boxQty, piecePrice: p.boxQty > 0 ? (p.boxPrice / p.boxQty).toFixed(2) : p.piecePrice, stockQty: p.stockQty };
-      else if (this.tab === 'clients') this.form = { name: p.name, contact: p.contact || '', address: p.address || '', storeType: p.storeType || 'pos', storeId: p.storeId || '' };
-      this.modalTitle = this.tab === 'products' ? 'Edit: ' + p.name : 'Edit: ' + p.name;
+      if (this.sp === 'product' || this.sp === 'inventory') this.form = { name: p.name, barcode: p.barcode || '', category: p.category || '', boxPrice: p.boxPrice, boxCost: p.boxCost, boxQty: p.boxQty, piecePrice: p.boxQty > 0 ? (p.boxPrice / p.boxQty).toFixed(2) : p.piecePrice, stockQty: p.stockQty };
+      else this.form = { name: p.name, contact: p.contact || '', address: p.address || '', storeType: p.storeType || 'pos', storeId: p.storeId || '' };
+      this.modalTitle = (this.sp === 'product' || this.sp === 'inventory') ? 'Edit: ' + p.name : 'Edit: ' + p.name;
       this._computePiecePrice();
     },
     closeModal() { this.modalOpen = false },
@@ -469,15 +489,16 @@ Alpine.store('app', {
     },
     async save() {
       try {
-        const baseUrl = API + (this.tab === 'products' ? '/warehouse/products' : '/warehouse/clients');
+        const isProduct = this.sp === 'product' || this.sp === 'inventory';
+        const baseUrl = API + (isProduct ? '/warehouse/products' : '/warehouse/clients');
         const method = this.modalId ? 'PUT' : 'POST';
         const url = this.modalId ? baseUrl + '/' + this.modalId : baseUrl;
-        const body = this.tab === 'products'
+        const body = isProduct
           ? { name: this.form.name, barcode: this.form.barcode, category: this.form.category, boxPrice: parseFloat(this.form.boxPrice) || 0, boxCost: parseFloat(this.form.boxCost) || 0, boxQty: parseInt(this.form.boxQty) || 1, piecePrice: parseFloat(this.form.piecePrice) || 0 }
           : { name: this.form.name, contact: this.form.contact, address: this.form.address, storeType: this.form.storeType, storeId: this.form.storeId };
         const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         if (!r.ok) throw new Error('Failed');
-        if (this.tab === 'products' && !this.modalId) {
+        if (isProduct && !this.modalId) {
           const j = await r.json();
           if (this.form.stockQty) await fetch(API + '/warehouse/products/' + j.id + '/stock', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stockQty: parseInt(this.form.stockQty) || 0 }) });
         }
@@ -487,17 +508,18 @@ Alpine.store('app', {
       } catch (e) { toast('Save failed: ' + e.message, 'error') }
     },
     async deleteItem(id) {
-      const p = this.data.find(x => x.id === id); if (!p) return;
+      const arr = this.sp === 'transfer' ? this.transfers : (this.sp === 'onlineorder' ? this.clientsData : this.products);
+      const p = arr.find(x => x.id === id); if (!p) return;
       if (!confirm('Delete "' + p.name + '"?')) return;
       try {
-        const baseUrl = API + (this.tab === 'products' ? '/warehouse/products' : '/warehouse/clients');
-        await fetch(baseUrl + '/' + id, { method: 'DELETE' });
+        const isProduct = this.sp === 'product' || this.sp === 'inventory';
+        await fetch(API + (isProduct ? '/warehouse/products' : '/warehouse/clients') + '/' + id, { method: 'DELETE' });
         toast('Deleted', 'success');
         this.load();
       } catch (e) { toast('Delete failed: ' + e.message, 'error') }
     },
     async adjustStock(id) {
-      const p = this.data.find(x => x.id === id); if (!p) return;
+      const p = this.products.find(x => x.id === id); if (!p) return;
       const qty = prompt('Set stock quantity for "' + p.name + '":', p.stockQty);
       if (qty === null) return;
       const n = parseInt(qty); if (isNaN(n) || n < 0) { toast('Invalid quantity', 'error'); return }
@@ -614,7 +636,7 @@ Alpine.store('app', {
     },
     startPoll() {
       this.updateBadge();
-      setInterval(() => { if (this.tab === 'orders' || this.tab === 'transfers') this.load(); this.updateBadge() }, 30000);
+      setInterval(() => { if (Alpine.store('app').whSubpage === 'onlineorder' || Alpine.store('app').whSubpage === 'transfer') this.load(); this.updateBadge() }, 30000);
     }
   }));
 
