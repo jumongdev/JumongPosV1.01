@@ -732,11 +732,11 @@ public class DashboardController : ControllerBase
             });
         }
 
-        [HttpGet("version")]
-        public IActionResult GetVersion()
-        {
-            return Ok(new { version = "1.0.42", buildDate = "2026-06-14", changes = "Fix: SyncSale sends UTC DateTime (Z suffix) instead of DateTimeOffset (+08:00) — cloud Npgsql now stores correct UTC time", downloadUrl = "https://github.com/jumongdev/JumongPosV1.01/releases/download/v1.0.42/JumongPosV1.01.exe" });
-        }
+    [HttpGet("version")]
+    public IActionResult GetVersion()
+    {
+        return Ok(new { version = "1.0.5" });
+    }
 
         [HttpGet("fix-hvr-times")]
         public IActionResult FixHvrTimes()

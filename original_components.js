@@ -425,30 +425,22 @@ Alpine.store('app', {
   }));
 
   /* ΓöÇΓöÇ Warehouse ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
-
   Alpine.data('warehousePanel', () => ({
-    tab: 'product', subTab: 'orders', data: [], loading: true, catFilter: '', search: '',
+    tab: 'products', data: [], loading: true, catFilter: '', search: '',
     async init() { window.addEventListener('load-warehouse', () => this.load()); await this.load(); this.startPoll() },
-    get endpoint() {
-      if (this.tab === 'product' || this.tab === 'inventory') return '/warehouse/products';
-      if (this.subTab === 'orders') return '/warehouse/orders';
-      if (this.subTab === 'transfers') return '/warehouse/transfers/pending';
-      if (this.subTab === 'clients') return '/warehouse/clients';
-      return '/warehouse/products';
-    },
     async load() {
       this.loading = true;
-      try { this.data = await fetchJSON(API + this.endpoint) }
-      catch (e) { this.data = [] }
+      try {
+        const endpoints = { products: '/warehouse/products', clients: '/warehouse/clients', orders: '/warehouse/orders', transfers: '/warehouse/transfers/pending' };
+        this.data = await fetchJSON(API + (endpoints[this.tab] || '/warehouse/products'));
+      } catch (e) { this.data = [] }
       this.loading = false;
     },
-    switchTab(t) { this.tab = t; this.subTab = 'orders'; this.catFilter = ''; this.load() },
-    switchSubTab(t) { this.subTab = t; this.catFilter = ''; this.load() },
-    get isTransfer() { return this.tab === 'transfer' },
-    get categories() { if (this.tab !== 'product') return []; const c = []; this.data.forEach(x => { if (x.category && !c.includes(x.category)) c.push(x.category) }); return c.sort() },
+    switchTab(t) { this.tab = t; this.load(); this.catFilter = '' },
+    get categories() { if (this.tab !== 'products') return []; const c = []; this.data.forEach(x => { if (x.category && !c.includes(x.category)) c.push(x.category) }); return c.sort() },
     get filtered() {
       let items = this.data;
-      if (this.catFilter && this.tab === 'product') items = items.filter(x => x.category === this.catFilter);
+      if (this.catFilter && this.tab === 'products') items = items.filter(x => x.category === this.catFilter);
       if (this.search) { const q = this.search.toLowerCase(); items = items.filter(x => JSON.stringify(x).toLowerCase().includes(q)) }
       return items;
     },
@@ -458,19 +450,16 @@ Alpine.store('app', {
 
     openAdd() {
       this.modalMode = 'add'; this.modalId = null; this.modalOpen = true;
-      if (this.tab === 'product') this.form = { name: '', barcode: '', category: '', boxPrice: 0, boxCost: 0, boxQty: 1, piecePrice: 0, stockQty: 0 };
-      else if (this.isTransfer && this.subTab === 'clients') this.form = { name: '', contact: '', address: '', storeType: 'pos', storeId: '' };
-      this.modalTitle = this.tab === 'product' ? 'Add Product' : 'Add Client';
+      if (this.tab === 'products') this.form = { name: '', barcode: '', category: '', boxPrice: 0, boxCost: 0, boxQty: 1, piecePrice: 0, stockQty: 0 };
+      else if (this.tab === 'clients') this.form = { name: '', contact: '', address: '', storeType: 'pos', storeId: '' };
+      this.modalTitle = this.tab === 'products' ? 'Add Product' : 'Add Client';
     },
     openEdit(id) {
       const p = this.data.find(x => x.id === id); if (!p) return;
       this.modalMode = 'edit'; this.modalId = id; this.modalOpen = true;
-      if (this.tab === 'product') {
-        this.form = { name: p.name, barcode: p.barcode || '', category: p.category || '', boxPrice: p.boxPrice, boxCost: p.boxCost, boxQty: p.boxQty, piecePrice: p.boxQty > 0 ? (p.boxPrice / p.boxQty).toFixed(2) : p.piecePrice, stockQty: p.stockQty };
-      } else if (this.isTransfer && this.subTab === 'clients') {
-        this.form = { name: p.name, contact: p.contact || '', address: p.address || '', storeType: p.storeType || 'pos', storeId: p.storeId || '' };
-      }
-      this.modalTitle = this.tab === 'product' ? 'Edit: ' + p.name : 'Edit: ' + p.name;
+      if (this.tab === 'products') this.form = { name: p.name, barcode: p.barcode || '', category: p.category || '', boxPrice: p.boxPrice, boxCost: p.boxCost, boxQty: p.boxQty, piecePrice: p.boxQty > 0 ? (p.boxPrice / p.boxQty).toFixed(2) : p.piecePrice, stockQty: p.stockQty };
+      else if (this.tab === 'clients') this.form = { name: p.name, contact: p.contact || '', address: p.address || '', storeType: p.storeType || 'pos', storeId: p.storeId || '' };
+      this.modalTitle = this.tab === 'products' ? 'Edit: ' + p.name : 'Edit: ' + p.name;
       this._computePiecePrice();
     },
     closeModal() { this.modalOpen = false },
@@ -478,22 +467,17 @@ Alpine.store('app', {
       const bp = parseFloat(this.form.boxPrice) || 0, bq = parseInt(this.form.boxQty) || 1;
       if (bp && bq) this.form.piecePrice = (bp / bq).toFixed(2);
     },
-    get _entityType() {
-      if (this.tab === 'product') return 'products';
-      if (this.isTransfer && this.subTab === 'clients') return 'clients';
-      return 'products';
-    },
     async save() {
       try {
-        const baseUrl = API + '/warehouse/' + this._entityType;
+        const baseUrl = API + (this.tab === 'products' ? '/warehouse/products' : '/warehouse/clients');
         const method = this.modalId ? 'PUT' : 'POST';
         const url = this.modalId ? baseUrl + '/' + this.modalId : baseUrl;
-        const body = this._entityType === 'products'
+        const body = this.tab === 'products'
           ? { name: this.form.name, barcode: this.form.barcode, category: this.form.category, boxPrice: parseFloat(this.form.boxPrice) || 0, boxCost: parseFloat(this.form.boxCost) || 0, boxQty: parseInt(this.form.boxQty) || 1, piecePrice: parseFloat(this.form.piecePrice) || 0 }
           : { name: this.form.name, contact: this.form.contact, address: this.form.address, storeType: this.form.storeType, storeId: this.form.storeId };
         const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         if (!r.ok) throw new Error('Failed');
-        if (this._entityType === 'products' && !this.modalId) {
+        if (this.tab === 'products' && !this.modalId) {
           const j = await r.json();
           if (this.form.stockQty) await fetch(API + '/warehouse/products/' + j.id + '/stock', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stockQty: parseInt(this.form.stockQty) || 0 }) });
         }
@@ -506,7 +490,7 @@ Alpine.store('app', {
       const p = this.data.find(x => x.id === id); if (!p) return;
       if (!confirm('Delete "' + p.name + '"?')) return;
       try {
-        const baseUrl = API + '/warehouse/' + this._entityType;
+        const baseUrl = API + (this.tab === 'products' ? '/warehouse/products' : '/warehouse/clients');
         await fetch(baseUrl + '/' + id, { method: 'DELETE' });
         toast('Deleted', 'success');
         this.load();
@@ -615,6 +599,15 @@ Alpine.store('app', {
         this.load();
       } catch (e) { toast('Error: ' + e.message, 'error') }
     },
+    async syncFromMaster() {
+      if (!confirm('Sync all warehouse products from master catalog?\nPrices, names, and barcodes will be updated. Your box_qty settings will be preserved.')) return;
+      try {
+        const r = await fetch(API + '/warehouse/sync-from-master', { method: 'POST' });
+        const j = await r.json();
+        toast('Updated: ' + (j.updated || 0) + ', Deactivated: ' + (j.deactivated || 0), 'success');
+        this.load();
+      } catch (e) { toast('Error: ' + e.message, 'error') }
+    },
     get filteredMaster() {
       if (!this.masterSearch) return this.masterImportList || [];
       const q = this.masterSearch.toLowerCase();
@@ -630,10 +623,9 @@ Alpine.store('app', {
     },
     startPoll() {
       this.updateBadge();
-      setInterval(() => { if (this.tab === 'transfer' && (this.subTab === 'orders' || this.subTab === 'transfers')) this.load(); this.updateBadge() }, 30000);
+      setInterval(() => { if (this.tab === 'orders' || this.tab === 'transfers') this.load(); this.updateBadge() }, 30000);
     }
   }));
-
 
   /* ΓöÇΓöÇ Customers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('customersList', () => ({
