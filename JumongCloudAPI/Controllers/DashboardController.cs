@@ -1100,10 +1100,10 @@ public class DashboardController : ControllerBase
                             barcode = mp.barcode,
                             category = mp.category,
                             piece_price = mp.price,
-                            box_price = mp.price * wh.box_qty,
-                            box_cost = mp.cost * wh.box_qty
+                            box_price = mp.price * wh_products.box_qty,
+                            box_cost = mp.cost * wh_products.box_qty
                         FROM master_products mp
-                        WHERE wh.master_product_id = mp.id AND mp.id = @mid";
+                        WHERE wh_products.master_product_id = mp.id AND mp.id = @mid";
                     sync.Parameters.AddWithValue("mid", id);
                     sync.ExecuteNonQuery();
                 }
@@ -1127,7 +1127,7 @@ public class DashboardController : ControllerBase
 
         // ── Warehouse API ──
         [HttpGet("warehouse/products")]
-        public IActionResult WhGetProducts([FromQuery] bool activeOnly = true)
+        public IActionResult WhGetProducts([FromQuery] bool activeOnly = false)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
@@ -1323,10 +1323,10 @@ public class DashboardController : ControllerBase
                     barcode = mp.barcode,
                     category = mp.category,
                     piece_price = mp.price,
-                    box_price = mp.price * wh.box_qty,
-                    box_cost = mp.cost * wh.box_qty
+                    box_price = mp.price * wh_products.box_qty,
+                    box_cost = mp.cost * wh_products.box_qty
                 FROM master_products mp
-                WHERE wh.master_product_id = mp.id AND mp.is_active = true";
+                WHERE wh_products.master_product_id = mp.id AND mp.is_active = true";
             var updated = cmd.ExecuteNonQuery();
             // Deactivate warehouse products whose master was deleted
             using var deact = conn.CreateCommand();
