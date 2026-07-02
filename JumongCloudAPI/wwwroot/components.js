@@ -469,7 +469,7 @@ Alpine.store('app', {
 
     openAdd() {
       this.modalMode = 'add'; this.modalId = null; this.modalOpen = true;
-      if (this.sp === 'product') this.form = { name: '', barcode: '', category: '', boxPrice: 0, boxCost: 0, boxQty: 1, piecePrice: 0, stockQty: 0 };
+      if (this.sp === 'product') this.form = { name: '', barcode: '', category: '', price: 0, cost: 0, stockQty: 0, units: [] };
       else this.form = { name: '', contact: '', address: '', storeType: 'pos', storeId: '' };
       this.modalTitle = this.sp === 'product' ? 'Add Product' : 'Add Client';
     },
@@ -477,25 +477,44 @@ Alpine.store('app', {
       const arr = this.sp === 'product' || this.sp === 'inventory' ? this.products : this.clientsData;
       const p = arr.find(x => x.id === id); if (!p) return;
       this.modalMode = 'edit'; this.modalId = id; this.modalOpen = true;
-      if (this.sp === 'product' || this.sp === 'inventory') this.form = { name: p.name, barcode: p.barcode || '', category: p.category || '', boxPrice: p.boxPrice, boxCost: p.boxCost, boxQty: p.boxQty, piecePrice: p.boxQty > 0 ? (p.boxPrice / p.boxQty).toFixed(2) : p.piecePrice, stockQty: p.stockQty };
-      else this.form = { name: p.name, contact: p.contact || '', address: p.address || '', storeType: p.storeType || 'pos', storeId: p.storeId || '' };
+      if (this.sp === 'product' || this.sp === 'inventory') {
+        const units = p.units && p.units.length ? JSON.parse(JSON.stringify(p.units)) : [];
+        if (!units.length) units.push({ unitName: 'pc', price: parseFloat(p.piecePrice) || 0, qtyPerUnit: 1, isDefault: true });
+        this.form = {
+          name: p.name, barcode: p.barcode || '', category: p.category || '',
+          price: parseFloat(p.piecePrice) || 0,
+          cost: p.boxCost && p.boxQty ? (parseFloat(p.boxCost) / parseInt(p.boxQty)).toFixed(2) : (p.piecePrice || 0),
+          stockQty: p.stockQty, units
+        };
+      } else {
+        this.form = { name: p.name, contact: p.contact || '', address: p.address || '', storeType: p.storeType || 'pos', storeId: p.storeId || '' };
+      }
       this.modalTitle = (this.sp === 'product' || this.sp === 'inventory') ? 'Edit: ' + p.name : 'Edit: ' + p.name;
-      this._computePiecePrice();
+    },
+    editAddUnit() {
+      if (!this.form.units) this.form.units = [];
+      this.form.units.push({ unitName: '', price: 0, qtyPerUnit: 1, isDefault: !this.form.units.length });
+    },
+    editRemoveUnit(i) { this.form.units.splice(i, 1) },
+    _computeBody() {
+      const pp = parseFloat(this.form.price) || 0;
+      const du = (this.form.units || []).find(u => u.isDefault) || (this.form.units || [])[0];
+      const bq = du ? parseInt(du.qtyPerUnit) || 1 : 1;
+      const bp = du ? parseFloat(du.price) || 0 : pp;
+      return {
+        name: this.form.name, barcode: this.form.barcode, category: this.form.category,
+        boxPrice: bp, boxCost: (parseFloat(this.form.cost) || 0) * bq,
+        boxQty: bq, piecePrice: pp
+      };
     },
     closeModal() { this.modalOpen = false },
-    _computePiecePrice() {
-      const bp = parseFloat(this.form.boxPrice) || 0, bq = parseInt(this.form.boxQty) || 1;
-      if (bp && bq) this.form.piecePrice = (bp / bq).toFixed(2);
-    },
     async save() {
       try {
         const isProduct = this.sp === 'product' || this.sp === 'inventory';
         const baseUrl = API + (isProduct ? '/warehouse/products' : '/warehouse/clients');
         const method = this.modalId ? 'PUT' : 'POST';
         const url = this.modalId ? baseUrl + '/' + this.modalId : baseUrl;
-        const body = isProduct
-          ? { name: this.form.name, barcode: this.form.barcode, category: this.form.category, boxPrice: parseFloat(this.form.boxPrice) || 0, boxCost: parseFloat(this.form.boxCost) || 0, boxQty: parseInt(this.form.boxQty) || 1, piecePrice: parseFloat(this.form.piecePrice) || 0 }
-          : { name: this.form.name, contact: this.form.contact, address: this.form.address, storeType: this.form.storeType, storeId: this.form.storeId };
+        const body = isProduct ? this._computeBody() : { name: this.form.name, contact: this.form.contact, address: this.form.address, storeType: this.form.storeType, storeId: this.form.storeId };
         const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         if (!r.ok) throw new Error('Failed');
         if (isProduct && !this.modalId) {

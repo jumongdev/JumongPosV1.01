@@ -1034,15 +1034,28 @@ tailwind.config = {
         </div>
         <div class="overflow-auto p-5 flex-1">
           <template x-if="sp==='product' || sp==='inventory'">
-            <div class="grid grid-cols-2 gap-3">
-              <div class="col-span-2"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">NAME</label><input x-model="form.name" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
-              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BARCODE</label><input x-model="form.barcode" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">CATEGORY</label><input x-model="form.category" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BOX PRICE (₱)</label><input type="number" step="0.01" x-model="form.boxPrice" @input="_computePiecePrice()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BOX COST (₱)</label><input type="number" step="0.01" x-model="form.boxCost" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BOX QTY</label><input type="number" x-model="form.boxQty" @input="_computePiecePrice()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">PIECE PRICE (₱)</label><input type="number" step="0.01" x-model="form.piecePrice" readonly class="w-full text-xs bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-500"></div>
-              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">INITIAL STOCK</label><input type="number" x-model="form.stockQty" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+            <div>
+              <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="col-span-2 sm:col-span-1"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">NAME</label><input x-model="form.name" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
+                <div class="col-span-2 sm:col-span-1"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BARCODE</label><input x-model="form.barcode" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">CATEGORY</label><input x-model="form.category" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">PRICE (₱)</label><input type="number" step="0.01" x-model="form.price" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">COST (₱)</label><input type="number" step="0.01" x-model="form.cost" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">INITIAL STOCK</label><input type="number" x-model="form.stockQty" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+              </div>
+              <div class="border-t border-gray-200 dark:border-[#222255] pt-3 mb-3">
+                <h4 class="text-xs font-bold text-cyan-700 dark:text-cyan-400 mb-2">UNITS <button type="button" @click="editAddUnit()" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] ml-2">+ ADD UNIT</button></h4>
+                <template x-if="!form.units || !form.units.length"><div class="text-xs text-gray-400 py-2">No units.</div></template>
+                <template x-for="(u,i) in form.units" :key="i">
+                  <div class="flex items-center gap-2 mb-1.5">
+                    <input placeholder="Name" x-model="u.unitName" class="w-24 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5 text-gray-700 dark:text-slate-200">
+                    <input placeholder="Price" type="number" step="0.01" x-model="u.price" class="w-20 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5 text-gray-700 dark:text-slate-200">
+                    <input placeholder="Qty" type="number" x-model="u.qtyPerUnit" class="w-16 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5 text-gray-700 dark:text-slate-200">
+                    <label class="text-[11px] text-gray-500 dark:text-[#7878aa] flex items-center gap-1"><input type="checkbox" x-model="u.isDefault"> Default</label>
+                    <button type="button" @click="editRemoveUnit(i)" class="p-1 text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded">X</button>
+                  </div>
+                </template>
+              </div>
             </div>
           </template>
           <template x-if="sp==='onlineorder'">
