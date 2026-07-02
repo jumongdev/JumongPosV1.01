@@ -1007,6 +1007,218 @@ tailwind.config = {
               </template>
             </div>
           </div>
+
+    <!-- Warehouse Add/Edit Modal -->
+    <div x-show="modalOpen" x-cloak
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div class="modal-box bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-[92%] max-w-xl max-h-[85vh] flex flex-col shadow-2xl" @click.outside="closeModal()">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-t-xl">
+          <h3 class="text-sm font-bold text-cyan-700 dark:text-cyan-400" x-text="modalTitle"></h3>
+          <button @click="closeModal()" class="p-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">&times;</button>
+        </div>
+        <div class="overflow-auto p-5 flex-1">
+          <template x-if="sp==='product' || sp==='inventory'">
+            <div class="grid grid-cols-2 gap-3">
+              <div class="col-span-2"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">NAME</label><input x-model="form.name" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
+              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BARCODE</label><input x-model="form.barcode" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">CATEGORY</label><input x-model="form.category" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BOX PRICE (₱)</label><input type="number" step="0.01" x-model="form.boxPrice" @input="_computePiecePrice()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BOX COST (₱)</label><input type="number" step="0.01" x-model="form.boxCost" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BOX QTY</label><input type="number" x-model="form.boxQty" @input="_computePiecePrice()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">PIECE PRICE (₱)</label><input type="number" step="0.01" x-model="form.piecePrice" readonly class="w-full text-xs bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-500"></div>
+              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">INITIAL STOCK</label><input type="number" x-model="form.stockQty" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+            </div>
+          </template>
+          <template x-if="sp==='onlineorder'">
+            <div class="grid grid-cols-2 gap-3">
+              <div class="col-span-2"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">NAME</label><input x-model="form.name" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">CONTACT</label><input x-model="form.contact" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+              <div class="col-span-2"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">ADDRESS</label><input x-model="form.address" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">STORE TYPE</label>
+                <select x-model="form.storeType" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"><option value="pos">POS Store</option><option value="external">External Client</option></select>
+              </div>
+              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">STORE ID</label><input x-model="form.storeId" placeholder="STORE-..." class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+            </div>
+          </template>
+          <div class="flex justify-end gap-2 pt-3 mt-3 border-t border-gray-200 dark:border-[#222255]">
+            <button @click="closeModal()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa]">CANCEL</button>
+            <button @click="save()" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium">SAVE</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Warehouse Order Modal -->
+    <div x-show="orderModal" x-cloak
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div class="modal-box bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-[92%] max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-t-xl">
+          <h3 class="text-sm font-bold text-cyan-700 dark:text-cyan-400">Create Order</h3>
+          <button @click="closeOrder()" class="p-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">&times;</button>
+        </div>
+        <div class="overflow-auto p-5 flex-1">
+          <div class="mb-3">
+            <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Client</label>
+            <select x-model="orderForm.clientId" @change="orderForm.clientName = $event.target.options[$event.target.selectedIndex].text"
+              class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2" x-init="
+                $nextTick(async ()=>{
+                  const clients = await fetchClients();
+                  const sel = $el;
+                  sel.innerHTML = '<option value=\'\'>Select client...</option>';
+                  clients.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; sel.appendChild(o) });
+                })">
+            </select>
+          </div>
+          <div class="mb-3"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Notes</label><input x-model="orderForm.notes" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+          <div class="mb-3">
+            <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Add Item</label>
+            <div class="flex gap-2 items-center">
+              <select id="whOrdProd" class="flex-1 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2" x-init="
+                $nextTick(async ()=>{
+                  const prods = await fetchProducts();
+                  const sel = $el;
+                  sel.innerHTML = '<option value=\'\'>Select product...</option>';
+                  prods.forEach(p => {
+                    const o = document.createElement('option');
+                    o.value = p.id; o.setAttribute('data-name', p.name);
+                    o.setAttribute('data-boxqty', p.boxQty); o.setAttribute('data-boxprice', p.boxPrice);
+                    o.setAttribute('data-pieceprice', p.piecePrice); o.setAttribute('data-stock', p.stockQty);
+                    o.textContent = p.name + ' (Stock:' + p.stockQty + ')';
+                    sel.appendChild(o);
+                  });
+                })">
+              </select>
+              <select id="whOrdUnit" class="w-20 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-2"><option value="box">Box</option><option value="piece">Piece</option></select>
+              <input id="whOrdQty" type="number" value="1" min="1" class="w-16 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-2">
+              <button @click="
+                const sel = document.getElementById('whOrdProd');
+                const opt = sel.options[sel.selectedIndex];
+                if (!opt || !opt.value) { toast('Select a product','error'); return }
+                addOrderItem(parseInt(opt.value), opt.getAttribute('data-name'),
+                  document.getElementById('whOrdUnit').value, parseInt(document.getElementById('whOrdQty').value)||1,
+                  opt.getAttribute('data-boxqty'), opt.getAttribute('data-boxprice'), opt.getAttribute('data-pieceprice'));
+                document.getElementById('whOrdQty').value = 1;
+              " class="text-xs px-3 py-2 rounded-lg bg-cyan-600 text-white font-medium">+ ADD</button>
+            </div>
+          </div>
+          <div class="mb-3">
+            <table class="w-full text-xs">
+              <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Product</th>
+                <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Unit</th>
+                <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Qty</th>
+                <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Price</th>
+                <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Total</th>
+                <th class="text-center px-2 py-2 border-b border-gray-200 dark:border-[#222255]"></th>
+              </tr></thead>
+              <tbody>
+                <template x-if="orderForm.items.length===0">
+                  <tr><td colspan="6" class="text-center py-4 text-gray-400">No items added</td></tr>
+                </template>
+                <template x-for="(x,i) in orderForm.items" :key="i">
+                  <tr class="border-b border-gray-50 dark:border-[#222255]/40">
+                    <td class="px-2 py-2" x-text="x.productName"></td>
+                    <td class="px-2 py-2" x-text="x.unitType+' ('+x.baseQty+' pcs)'"></td>
+                    <td class="px-2 py-2 text-right" x-text="x.qty"></td>
+                    <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.price)"></span></td>
+                    <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalPrice)"></span></td>
+                    <td class="px-2 py-2 text-center"><button @click="removeOrderItem(i)" class="text-red-400 hover:text-red-300">X</button></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div class="flex justify-end gap-2 pt-3 border-t border-gray-200 dark:border-[#222255]">
+            <span class="text-sm font-bold mr-auto pt-1">Total: &#8369;<span x-text="fmt(orderTotal)"></span></span>
+            <button @click="closeOrder()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500">CANCEL</button>
+            <button @click="saveOrder()" class="text-xs px-4 py-2 rounded-lg bg-emerald-600 text-white font-medium">CREATE ORDER</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Warehouse Order View Modal -->
+    <div x-show="orderViewOpen" x-cloak
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div class="modal-box bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-[92%] max-w-xl max-h-[85vh] flex flex-col shadow-2xl">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-t-xl">
+          <h3 class="text-sm font-bold text-cyan-700 dark:text-cyan-400" x-text="'Order #'+orderViewId"></h3>
+          <button @click="closeOrderView()" class="p-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">&times;</button>
+        </div>
+        <div class="overflow-auto p-5 flex-1">
+          <table class="w-full text-xs">
+            <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+              <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Product</th>
+              <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Unit</th>
+              <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Qty</th>
+              <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Price</th>
+              <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Total</th>
+            </tr></thead>
+            <tbody>
+              <template x-for="(x,i) in orderViewItems" :key="i">
+                <tr class="border-b border-gray-50 dark:border-[#222255]/40">
+                  <td class="px-2 py-2" x-text="x.productName"></td>
+                  <td class="px-2 py-2" x-text="x.unitType"></td>
+                  <td class="px-2 py-2 text-right" x-text="x.qty"></td>
+                  <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.price)"></span></td>
+                  <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalPrice)"></span></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <div class="mt-3 flex justify-end"><button @click="closeOrderView()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500">CLOSE</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Warehouse Import from Master Modal -->
+    <div x-show="masterImportOpen" x-cloak
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div class="modal-box bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-[92%] max-w-xl max-h-[85vh] flex flex-col shadow-2xl">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-t-xl">
+          <h3 class="text-sm font-bold text-cyan-700 dark:text-cyan-400">Import from Master Catalog</h3>
+          <button @click="closeImport()" class="p-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">&times;</button>
+        </div>
+        <div class="overflow-auto p-5 flex-1">
+          <div class="flex gap-2 mb-3">
+            <input type="text" placeholder="Search master products..." x-model="masterSearch" class="flex-1 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2">
+            <div class="flex items-center gap-1">
+              <label class="text-[10px] text-gray-500 dark:text-[#7878aa]">Box Qty:</label>
+              <input type="number" x-model="importBoxQty" min="1" class="w-16 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-2">
+            </div>
+          </div>
+          <table class="w-full text-xs">
+            <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+              <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">ID</th>
+              <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Name</th>
+              <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Barcode</th>
+              <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Category</th>
+              <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Price</th>
+              <th class="text-center px-2 py-2 border-b border-gray-200 dark:border-[#222255]"></th>
+            </tr></thead>
+            <tbody>
+               <template x-for="(x,i) in filteredMaster" :key="i">
+                <tr class="border-b border-gray-50 dark:border-[#222255]/40">
+                  <td class="px-2 py-2" x-text="x.id"></td>
+                  <td class="px-2 py-2" x-text="x.name"></td>
+                  <td class="px-2 py-2" x-text="x.barcode || ''"></td>
+                  <td class="px-2 py-2" x-text="x.category || ''"></td>
+                  <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.price)"></span></td>
+                  <td class="px-2 py-2 text-center">
+                    <button @click="doImport(x.id)" class="text-[10px] px-2 py-1 rounded border border-cyan-300 text-cyan-600 hover:bg-cyan-50">IMPORT</button>
+                    <button x-show="x.category" @click="doBulkImport(x.category)" class="text-[10px] px-2 py-1 rounded border border-emerald-300 text-emerald-600 hover:bg-emerald-50 ml-1">ALL IN CAT</button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <div class="mt-3 flex justify-end gap-2">
+            <button @click="closeImport()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500">CLOSE</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
         </div>
       </div>
 
@@ -1280,224 +1492,7 @@ tailwind.config = {
       </div>
     </div>
 
-    <!-- Warehouse Add/Edit Modal -->
-    <div x-data x-show="$store.app.section==='warehouse' && document.querySelector('[x-data=warehousePanel]')?.__x?.$data.modalOpen" x-cloak
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div class="modal-box bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-[92%] max-w-xl max-h-[85vh] flex flex-col shadow-2xl" @click.outside="document.querySelector('[x-data=warehousePanel]')?.__x?.$data.closeModal()">
-        <div x-data="warehousePanel">
-          <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-t-xl">
-            <h3 class="text-sm font-bold text-cyan-700 dark:text-cyan-400" x-text="modalTitle"></h3>
-            <button @click="closeModal()" class="p-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">&times;</button>
-          </div>
-          <div class="overflow-auto p-5 flex-1">
-            <template x-if="sp==='product' || sp==='inventory'">
-              <div class="grid grid-cols-2 gap-3">
-                <div class="col-span-2"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">NAME</label><input x-model="form.name" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
-                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BARCODE</label><input x-model="form.barcode" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">CATEGORY</label><input x-model="form.category" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BOX PRICE (₱)</label><input type="number" step="0.01" x-model="form.boxPrice" @input="_computePiecePrice()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BOX COST (₱)</label><input type="number" step="0.01" x-model="form.boxCost" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BOX QTY</label><input type="number" x-model="form.boxQty" @input="_computePiecePrice()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">PIECE PRICE (₱)</label><input type="number" step="0.01" x-model="form.piecePrice" readonly class="w-full text-xs bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-500"></div>
-                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">INITIAL STOCK</label><input type="number" x-model="form.stockQty" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-              </div>
-            </template>
-            <template x-if="sp==='onlineorder'">
-              <div class="grid grid-cols-2 gap-3">
-                <div class="col-span-2"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">NAME</label><input x-model="form.name" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">CONTACT</label><input x-model="form.contact" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-                <div class="col-span-2"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">ADDRESS</label><input x-model="form.address" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">STORE TYPE</label>
-                  <select x-model="form.storeType" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"><option value="pos">POS Store</option><option value="external">External Client</option></select>
-                </div>
-                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">STORE ID</label><input x-model="form.storeId" placeholder="STORE-..." class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-              </div>
-            </template>
-            <div class="flex justify-end gap-2 pt-3 mt-3 border-t border-gray-200 dark:border-[#222255]">
-              <button @click="closeModal()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa]">CANCEL</button>
-              <button @click="save()" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium">SAVE</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Warehouse Order Modal -->
-    <div x-data x-show="$store.app.section==='warehouse' && document.querySelector('[x-data=warehousePanel]')?.__x?.$data.orderModal" x-cloak
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div class="modal-box bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-[92%] max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
-        <div x-data="warehousePanel">
-          <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-t-xl">
-            <h3 class="text-sm font-bold text-cyan-700 dark:text-cyan-400">Create Order</h3>
-            <button @click="closeOrder()" class="p-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">&times;</button>
-          </div>
-          <div class="overflow-auto p-5 flex-1">
-            <div class="mb-3">
-              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Client</label>
-              <select x-model="orderForm.clientId" @change="orderForm.clientName = $event.target.options[$event.target.selectedIndex].text"
-                class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2" x-init="
-                  $nextTick(async ()=>{
-                    const clients = await fetchClients();
-                    const sel = $el;
-                    sel.innerHTML = '<option value=\'\'>Select client...</option>';
-                    clients.forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; sel.appendChild(o) });
-                  })">
-              </select>
-            </div>
-            <div class="mb-3"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Notes</label><input x-model="orderForm.notes" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
-            <div class="mb-3">
-              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Add Item</label>
-              <div class="flex gap-2 items-center">
-                <select id="whOrdProd" class="flex-1 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2" x-init="
-                  $nextTick(async ()=>{
-                    const prods = await fetchProducts();
-                    const sel = $el;
-                    sel.innerHTML = '<option value=\'\'>Select product...</option>';
-                    prods.forEach(p => {
-                      const o = document.createElement('option');
-                      o.value = p.id; o.setAttribute('data-name', p.name);
-                      o.setAttribute('data-boxqty', p.boxQty); o.setAttribute('data-boxprice', p.boxPrice);
-                      o.setAttribute('data-pieceprice', p.piecePrice); o.setAttribute('data-stock', p.stockQty);
-                      o.textContent = p.name + ' (Stock:' + p.stockQty + ')';
-                      sel.appendChild(o);
-                    });
-                  })">
-                </select>
-                <select id="whOrdUnit" class="w-20 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-2"><option value="box">Box</option><option value="piece">Piece</option></select>
-                <input id="whOrdQty" type="number" value="1" min="1" class="w-16 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-2">
-                <button @click="
-                  const sel = document.getElementById('whOrdProd');
-                  const opt = sel.options[sel.selectedIndex];
-                  if (!opt || !opt.value) { toast('Select a product','error'); return }
-                  addOrderItem(parseInt(opt.value), opt.getAttribute('data-name'),
-                    document.getElementById('whOrdUnit').value, parseInt(document.getElementById('whOrdQty').value)||1,
-                    opt.getAttribute('data-boxqty'), opt.getAttribute('data-boxprice'), opt.getAttribute('data-pieceprice'));
-                  document.getElementById('whOrdQty').value = 1;
-                " class="text-xs px-3 py-2 rounded-lg bg-cyan-600 text-white font-medium">+ ADD</button>
-              </div>
-            </div>
-            <div class="mb-3">
-              <table class="w-full text-xs">
-                <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
-                  <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Product</th>
-                  <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Unit</th>
-                  <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Qty</th>
-                  <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Price</th>
-                  <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Total</th>
-                  <th class="text-center px-2 py-2 border-b border-gray-200 dark:border-[#222255]"></th>
-                </tr></thead>
-                <tbody>
-                  <template x-if="orderForm.items.length===0">
-                    <tr><td colspan="6" class="text-center py-4 text-gray-400">No items added</td></tr>
-                  </template>
-                  <template x-for="(x,i) in orderForm.items" :key="i">
-                    <tr class="border-b border-gray-50 dark:border-[#222255]/40">
-                      <td class="px-2 py-2" x-text="x.productName"></td>
-                      <td class="px-2 py-2" x-text="x.unitType+' ('+x.baseQty+' pcs)'"></td>
-                      <td class="px-2 py-2 text-right" x-text="x.qty"></td>
-                      <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.price)"></span></td>
-                      <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalPrice)"></span></td>
-                      <td class="px-2 py-2 text-center"><button @click="removeOrderItem(i)" class="text-red-400 hover:text-red-300">X</button></td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-            </div>
-            <div class="flex justify-end gap-2 pt-3 border-t border-gray-200 dark:border-[#222255]">
-              <span class="text-sm font-bold mr-auto pt-1">Total: &#8369;<span x-text="fmt(orderTotal)"></span></span>
-              <button @click="closeOrder()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500">CANCEL</button>
-              <button @click="saveOrder()" class="text-xs px-4 py-2 rounded-lg bg-emerald-600 text-white font-medium">CREATE ORDER</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Warehouse Order View Modal -->
-    <div x-data x-show="$store.app.section==='warehouse' && document.querySelector('[x-data=warehousePanel]')?.__x?.$data.orderViewOpen" x-cloak
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div class="modal-box bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-[92%] max-w-xl max-h-[85vh] flex flex-col shadow-2xl">
-        <div x-data="warehousePanel">
-          <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-t-xl">
-            <h3 class="text-sm font-bold text-cyan-700 dark:text-cyan-400" x-text="'Order #'+orderViewId"></h3>
-            <button @click="closeOrderView()" class="p-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">&times;</button>
-          </div>
-          <div class="overflow-auto p-5 flex-1">
-            <table class="w-full text-xs">
-              <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
-                <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Product</th>
-                <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Unit</th>
-                <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Qty</th>
-                <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Price</th>
-                <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Total</th>
-              </tr></thead>
-              <tbody>
-                <template x-for="(x,i) in orderViewItems" :key="i">
-                  <tr class="border-b border-gray-50 dark:border-[#222255]/40">
-                    <td class="px-2 py-2" x-text="x.productName"></td>
-                    <td class="px-2 py-2" x-text="x.unitType"></td>
-                    <td class="px-2 py-2 text-right" x-text="x.qty"></td>
-                    <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.price)"></span></td>
-                    <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalPrice)"></span></td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-            <div class="mt-3 flex justify-end"><button @click="closeOrderView()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500">CLOSE</button></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Warehouse Import from Master Modal -->
-    <div x-data x-show="$store.app.section==='warehouse' && document.querySelector('[x-data=warehousePanel]')?.__x?.$data.masterImportOpen" x-cloak
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div class="modal-box bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-[92%] max-w-xl max-h-[85vh] flex flex-col shadow-2xl">
-        <div x-data="warehousePanel">
-          <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-t-xl">
-            <h3 class="text-sm font-bold text-cyan-700 dark:text-cyan-400">Import from Master Catalog</h3>
-            <button @click="closeImport()" class="p-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">&times;</button>
-          </div>
-          <div class="overflow-auto p-5 flex-1">
-            <div class="flex gap-2 mb-3">
-              <input type="text" placeholder="Search master products..." x-model="masterSearch" class="flex-1 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2">
-              <div class="flex items-center gap-1">
-                <label class="text-[10px] text-gray-500 dark:text-[#7878aa]">Box Qty:</label>
-                <input type="number" x-model="importBoxQty" min="1" class="w-16 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-2">
-              </div>
-            </div>
-            <table class="w-full text-xs">
-              <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
-                <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">ID</th>
-                <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Name</th>
-                <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Barcode</th>
-                <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Category</th>
-                <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Price</th>
-                <th class="text-center px-2 py-2 border-b border-gray-200 dark:border-[#222255]"></th>
-              </tr></thead>
-              <tbody>
-                 <template x-for="(x,i) in filteredMaster" :key="i">
-                  <tr class="border-b border-gray-50 dark:border-[#222255]/40">
-                    <td class="px-2 py-2" x-text="x.id"></td>
-                    <td class="px-2 py-2" x-text="x.name"></td>
-                    <td class="px-2 py-2" x-text="x.barcode || ''"></td>
-                    <td class="px-2 py-2" x-text="x.category || ''"></td>
-                    <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.price)"></span></td>
-                    <td class="px-2 py-2 text-center">
-                      <button @click="doImport(x.id)" class="text-[10px] px-2 py-1 rounded border border-cyan-300 text-cyan-600 hover:bg-cyan-50">IMPORT</button>
-                      <button x-show="x.category" @click="doBulkImport(x.category)" class="text-[10px] px-2 py-1 rounded border border-emerald-300 text-emerald-600 hover:bg-emerald-50 ml-1">ALL IN CAT</button>
-                    </td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-            <div class="mt-3 flex justify-end gap-2">
-              <button @click="closeImport()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500">CLOSE</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
   </div><!-- /main content -->
 
