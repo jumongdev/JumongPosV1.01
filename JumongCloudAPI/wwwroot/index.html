@@ -58,26 +58,28 @@ tailwind.config = {
         { id:'users', icon:'⚙️', label:'Users' },
         { id:'analytics', icon:'📈', label:'Analytics' }
       ]" :key="item.id">
-        <!-- Section header -->
-        <div x-show="item.isHeader && $store.app._sidebarOpen"
-          class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-[#4a4a7a]">
-          <span x-text="item.label"></span>
+        <div>
+          <!-- Section header -->
+          <div x-show="item.isHeader && $store.app._sidebarOpen"
+            class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-[#4a4a7a]">
+            <span x-text="item.label"></span>
+          </div>
+          <!-- Nav item -->
+          <a x-show="!item.isHeader" href="#"
+            @click.prevent="$store.app.switchSection(item.id)"
+            class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200"
+            :class="$store.app.isActive(item.id)
+              ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-400 font-semibold border-l-2 border-cyan-500'
+              : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] hover:text-gray-700 dark:hover:text-slate-200'"
+            :style="item.id.startsWith('wh-') ? 'padding-left: 32px' : ''">
+            <span class="text-base shrink-0" x-show="item.id.startsWith('wh-')" style="opacity:0.5">└</span>
+            <span class="text-lg shrink-0" x-show="!item.id.startsWith('wh-')" x-text="item.icon"></span>
+            <span class="nav-label text-xs" x-show="$store.app._sidebarOpen" x-text="item.label"></span>
+            <span class="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
+              x-show="item.id==='wh-transfer' && $store.app._sidebarOpen"
+              x-text="$store.app._whBadge || ''"></span>
+          </a>
         </div>
-        <!-- Nav item -->
-        <a x-show="!item.isHeader" href="#"
-          @click.prevent="$store.app.switchSection(item.id)"
-          class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200"
-          :class="$store.app.isActive(item.id)
-            ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-400 font-semibold border-l-2 border-cyan-500'
-            : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] hover:text-gray-700 dark:hover:text-slate-200'"
-          :style="item.id.startsWith('wh-') ? 'padding-left: 32px' : ''">
-          <span class="text-base shrink-0" x-show="item.id.startsWith('wh-')" style="opacity:0.5">└</span>
-          <span class="text-lg shrink-0" x-show="!item.id.startsWith('wh-')" x-text="item.icon"></span>
-          <span class="nav-label text-xs" x-show="$store.app._sidebarOpen" x-text="item.label"></span>
-          <span class="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
-            x-show="item.id==='wh-transfer' && $store.app._sidebarOpen"
-            x-text="$store.app._whBadge || ''"></span>
-        </a>
       </template>
     </nav>
     <div class="p-3 border-t border-gray-200 dark:border-[#222255]" x-show="$store.app._sidebarOpen">
