@@ -833,9 +833,8 @@ tailwind.config = {
                     <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Name</th>
                     <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Barcode</th>
                     <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Category</th>
-                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Box Price</th>
-                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Box Qty</th>
-                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Piece Price</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Price</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Units</th>
                     <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
                   </tr></thead>
                   <tbody>
@@ -845,9 +844,17 @@ tailwind.config = {
                         <td class="px-3 py-2 font-medium" x-text="x.name"></td>
                         <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.barcode || ''"></td>
                         <td class="px-3 py-2" x-text="x.category || ''"></td>
-                        <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.boxPrice)"></span></td>
-                        <td class="px-3 py-2 text-right" x-text="x.boxQty"></td>
                         <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.piecePrice)"></span></td>
+                        <td class="px-3 py-2">
+                          <template x-if="x.units && x.units.length">
+                            <div>
+                              <template x-for="(u,i) in x.units" :key="i">
+                                <div class="text-[11px] leading-snug whitespace-nowrap"><span x-text="u.unitName"></span>: &#8369;<span x-text="fmt(u.price)"></span><span x-show="u.isDefault" class="text-cyan-400 font-bold ml-0.5" title="Default">*</span></div>
+                              </template>
+                            </div>
+                          </template>
+                          <span x-show="!x.units || !x.units.length" class="text-gray-400">—</span>
+                        </td>
                         <td class="px-3 py-2">
                           <button @click="openEdit(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">EDIT</button>
                           <button @click="deleteItem(x.id)" class="text-[10px] px-2 py-1 rounded border border-red-200 dark:border-red-900/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">DEL</button>
@@ -869,8 +876,8 @@ tailwind.config = {
                     <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Name</th>
                     <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Barcode</th>
                     <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Category</th>
-                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Box Price</th>
-                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Piece Price</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Price</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Units</th>
                     <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Stock</th>
                     <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
                   </tr></thead>
@@ -881,8 +888,17 @@ tailwind.config = {
                         <td class="px-3 py-2 font-medium" x-text="x.name"></td>
                         <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.barcode || ''"></td>
                         <td class="px-3 py-2" x-text="x.category || ''"></td>
-                        <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.boxPrice)"></span></td>
                         <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.piecePrice)"></span></td>
+                        <td class="px-3 py-2">
+                          <template x-if="x.units && x.units.length">
+                            <div>
+                              <template x-for="(u,i) in x.units" :key="i">
+                                <div class="text-[11px] leading-snug whitespace-nowrap"><span x-text="u.unitName"></span>: &#8369;<span x-text="fmt(u.price)"></span><span x-show="u.isDefault" class="text-cyan-400 font-bold ml-0.5" title="Default">*</span></div>
+                              </template>
+                            </div>
+                          </template>
+                          <span x-show="!x.units || !x.units.length" class="text-gray-400">—</span>
+                        </td>
                         <td class="px-3 py-2 text-right font-bold" :class="x.stockQty < 10 ? 'text-red-400' : 'text-emerald-400'" x-text="x.stockQty"></td>
                         <td class="px-3 py-2">
                           <button @click="adjustStock(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">ADJUST</button>

@@ -1131,10 +1131,31 @@ public class DashboardController : ControllerBase
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"SELECT id, name, barcode, category, box_price, box_cost, box_qty, piece_price, stock_qty FROM wh_products {(activeOnly ? "WHERE is_active = true" : "")} ORDER BY name";
+            cmd.CommandText = $@"
+                SELECT wp.id, wp.name, wp.barcode, wp.category, wp.box_price, wp.box_cost, wp.box_qty, wp.piece_price, wp.stock_qty,
+                       CASE WHEN wp.master_product_id IS NOT NULL THEN
+                           (SELECT COALESCE(json_agg(json_build_object('unitName', mpu.unit_name, 'price', mpu.price, 'cost', mpu.cost, 'qtyPerUnit', mpu.qty_per_unit, 'isDefault', mpu.is_default) ORDER BY mpu.is_default DESC, mpu.unit_name), '[]'::json)
+                            FROM master_product_units mpu WHERE mpu.product_id = wp.master_product_id)
+                       ELSE '[]'::json END AS units
+                FROM wh_products wp {(activeOnly ? "WHERE wp.is_active = true" : "")} ORDER BY wp.name";
             var data = new List<object>();
             using var r = cmd.ExecuteReader();
-            while (r.Read()) data.Add(new { id = r.GetInt32(0), name = r.GetString(1), barcode = r.IsDBNull(2) ? "" : r.GetString(2), category = r.IsDBNull(3) ? "" : r.GetString(3), boxPrice = r.GetDecimal(4), boxCost = r.GetDecimal(5), boxQty = r.GetInt32(6), piecePrice = r.GetDecimal(7), stockQty = r.GetInt32(8) });
+            while (r.Read())
+            {
+                var unitsJson = r.GetString(9);
+                data.Add(new {
+                    id = r.GetInt32(0),
+                    name = r.GetString(1),
+                    barcode = r.IsDBNull(2) ? "" : r.GetString(2),
+                    category = r.IsDBNull(3) ? "" : r.GetString(3),
+                    boxPrice = r.GetDecimal(4),
+                    boxCost = r.GetDecimal(5),
+                    boxQty = r.GetInt32(6),
+                    piecePrice = r.GetDecimal(7),
+                    stockQty = r.GetInt32(8),
+                    units = unitsJson != "[]" ? System.Text.Json.JsonSerializer.Deserialize<object>(unitsJson) : null
+                });
+            }
             return Ok(data);
         }
 

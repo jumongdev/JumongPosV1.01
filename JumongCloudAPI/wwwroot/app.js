@@ -53,7 +53,7 @@ window.exportCSV = (name) => {
     const wh = document.querySelector('[x-data="warehousePanel"]')?.__x?.$data;
     if (!wh) return;
     let headers, rows, data;
-    if (name === 'wh-product' || name === 'wh-inventory') { data = wh.products; headers = 'ID,Name,Barcode,Category,Box Price,Box Qty,Piece Price,Stock'; rows = data.map(x => [x.id, x.name, x.barcode, x.category, x.boxPrice, x.boxQty, x.piecePrice, x.stockQty]) }
+    if (name === 'wh-product' || name === 'wh-inventory') { data = wh.products; headers = 'ID,Name,Barcode,Category,Price,Units,Stock'; rows = data.map(x => [x.id, x.name, x.barcode, x.category, x.piecePrice, x.units ? x.units.map(u => u.unitName + ': ' + u.price + (u.isDefault ? '*' : '')).join(' | ') : '', x.stockQty]) }
     else if (name === 'wh-onlineorder') { data = wh.orders; headers = 'ID,Client,Status,Total,Notes,Date'; rows = data.map(x => [x.id, x.clientName, x.status, x.totalAmount, x.notes, x.createdAt]) }
     else if (name === 'wh-transfer') { data = wh.transfers; headers = 'Order ID,Client,Total,Notes,Date'; rows = data.map(x => [x.orderId, x.clientName, x.totalAmount, x.notes, x.createdAt]) }
     if (!headers) return;
