@@ -1257,6 +1257,47 @@ public class DashboardController : ControllerBase
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
+
+            // Check if already imported — if so, update instead of duplicate
+            cmd.CommandText = "SELECT id FROM wh_products WHERE master_product_id = @mid ORDER BY id LIMIT 1";
+            cmd.Parameters.AddWithValue("mid", masterId);
+            var existingId = cmd.ExecuteScalar();
+
+            if (existingId != null)
+            {
+                // Reactivate and refresh from master
+                var wid = Convert.ToInt32(existingId);
+                // Clean up any extra duplicates pointing to same master
+                using var cleanup = conn.CreateCommand();
+                cleanup.CommandText = "UPDATE wh_products SET master_product_id = NULL WHERE master_product_id = @mid AND id != @wid";
+                cleanup.Parameters.AddWithValue("mid", masterId);
+                cleanup.Parameters.AddWithValue("wid", wid);
+                cleanup.ExecuteNonQuery();
+
+                cmd.CommandText = @"
+                    WITH default_unit AS (
+                        SELECT qty_per_unit, price
+                        FROM master_product_units
+                        WHERE product_id = @mid AND is_default = true
+                        LIMIT 1
+                    )
+                    UPDATE wh_products SET
+                        name = mp.name,
+                        barcode = mp.barcode,
+                        category = mp.category,
+                        box_price = COALESCE((SELECT price FROM default_unit), mp.price * @bq),
+                        box_cost = mp.cost * COALESCE((SELECT qty_per_unit FROM default_unit), @bq),
+                        box_qty = COALESCE((SELECT qty_per_unit FROM default_unit), @bq),
+                        piece_price = mp.price,
+                        is_active = true
+                    FROM master_products mp
+                    WHERE wh_products.id = @wid AND mp.id = @mid AND mp.is_active = true";
+                cmd.Parameters.AddWithValue("wid", wid);
+                cmd.Parameters.AddWithValue("bq", boxQty);
+                cmd.ExecuteNonQuery();
+                return Ok(new { id = wid, updated = true });
+            }
+
             cmd.CommandText = @"
                 WITH default_unit AS (
                     SELECT qty_per_unit, price
@@ -1274,7 +1315,6 @@ public class DashboardController : ControllerBase
                 FROM master_products mp
                 WHERE mp.id = @mid AND mp.is_active = true
                 RETURNING id";
-            cmd.Parameters.AddWithValue("mid", masterId);
             cmd.Parameters.AddWithValue("bq", boxQty);
             var result = cmd.ExecuteScalar();
             if (result == null) return NotFound(new { error = "Master product not found" });
