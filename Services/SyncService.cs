@@ -215,7 +215,7 @@ public static class SyncService
         await PostAsync("/voidlogs", data);
     }
 
-    public static async Task SyncStockTrail(StockTrail trail)
+    public static async Task<bool> SyncStockTrail(StockTrail trail)
     {
         var data = new[]
         {
@@ -233,7 +233,7 @@ public static class SyncService
                 CreatedAt = ToUtcString(trail.CreatedAt)
             }
         };
-        await PostAsync("/stocktrails", data);
+        return await PostAsync("/stocktrails", data);
     }
 
     public static async Task SyncCreditTransaction(CreditTransaction ct)
@@ -302,7 +302,7 @@ public static class SyncService
         await PostAsync("/expenses", data);
     }
 
-    private static async Task PostAsync(string endpoint, object data, int? saleId = null)
+    private static async Task<bool> PostAsync(string endpoint, object data, int? saleId = null)
     {
         try
         {
@@ -316,12 +316,14 @@ public static class SyncService
             {
                 LogSync(endpoint, "OK", "");
                 if (saleId.HasValue) MarkSynced(saleId.Value);
+                return true;
             }
             else
             {
                 var err = await response.Content.ReadAsStringAsync();
                 LogSync(endpoint, "FAIL", err);
                 EnqueueFailed(endpoint, json);
+                return false;
             }
         }
         catch (Exception ex)
@@ -333,6 +335,7 @@ public static class SyncService
                 EnqueueFailed(endpoint, json);
             }
             catch (Exception ex2) { ErrorLogger.Log("SyncService.PostAsync(enqueue)", ex2); }
+            return false;
         }
     }
 

@@ -94,7 +94,12 @@ public class StockService
                 ins.ExecuteNonQuery();
                 using var idCmd = new SQLiteCommand("SELECT last_insert_rowid()", conn);
                 var trailId = Convert.ToInt32(idCmd.ExecuteScalar());
-                _ = SyncService.SyncStockTrail(new StockTrail { Id = trailId, ProductId = productId, ProductName = productName, Barcode = barcode, QuantityAdded = qty, StockBefore = stockBefore, StockAfter = stockAfter, Reference = reference, UserId = userId, UserName = userName, CreatedAt = now });
+                var trail = new StockTrail { Id = trailId, ProductId = productId, ProductName = productName, Barcode = barcode, QuantityAdded = qty, StockBefore = stockBefore, StockAfter = stockAfter, Reference = reference, UserId = userId, UserName = userName, CreatedAt = now };
+                var syncedOk = SyncService.SyncStockTrail(trail).GetAwaiter().GetResult();
+                using var syncUpd = new SQLiteCommand("UPDATE StockTrail SET Synced = @synced WHERE Id = @id", conn, tx);
+                syncUpd.Parameters.AddWithValue("@synced", syncedOk ? 1 : 0);
+                syncUpd.Parameters.AddWithValue("@id", trailId);
+                syncUpd.ExecuteNonQuery();
                 _ = SyncService.SyncProduct(ProductService.GetById(productId));
 
                 // Also update PostgreSQL stock

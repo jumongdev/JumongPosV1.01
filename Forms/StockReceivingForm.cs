@@ -1,3 +1,4 @@
+using JumongPosV1._01.Data;
 using JumongPosV1._01.Helpers;
 using JumongPosV1._01.Models;
 using JumongPosV1._01.Services;
@@ -15,6 +16,16 @@ public partial class StockReceivingForm : Form
         _currentUser = user;
         InitializeComponent();
         DebugHelper.AddFormLabel(this);
+        GenerateReference();
+    }
+
+    private void GenerateReference()
+    {
+        var today = TimeHelper.Now.ToString("yyyyMMdd");
+        var counter = DatabaseHelper.GetSetting("ReceivingCounter", "0");
+        var next = int.TryParse(counter, out var c) ? c + 1 : 1;
+        DatabaseHelper.SaveSetting("ReceivingCounter", next.ToString());
+        txtReference.Text = $"RR-{today}-{next:D3}";
     }
 
     private void SearchProduct(string keyword)
@@ -197,7 +208,7 @@ public partial class StockReceivingForm : Form
         txtReference.Clear();
         txtBarcode.Focus();
 
-        MessageBox.Show($"{itemsCopy.Count} item(s) received successfully.", "Stock Receiving", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        MessageBox.Show($"{itemsCopy.Count} item(s) received successfully.\nRef#: {reference}", "Stock Receiving", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
         var print = MessageBox.Show("Print receiving receipt?", "Print", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
         if (print == DialogResult.Yes)
@@ -228,6 +239,15 @@ public partial class StockReceivingForm : Form
         dgv.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "AFTER", DataPropertyName = "StockAfter", Width = 70, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter } });
         dgv.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "REFERENCE", DataPropertyName = "Reference", Width = 150 });
         dgv.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "CASHIER", DataPropertyName = "UserName", Width = 100 });
+        dgv.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "SYNC", DataPropertyName = "Synced", Width = 60 });
+        dgv.CellFormatting += (s, e) =>
+        {
+            if (dgv.Columns[e.ColumnIndex].DataPropertyName == "Synced" && e.Value != null)
+            {
+                e.Value = Convert.ToInt32(e.Value) == 1 ? "✅" : "❌";
+                e.FormattingApplied = true;
+            }
+        };
 
         List<StockTrail>? _trailData = null;
 

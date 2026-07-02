@@ -139,6 +139,12 @@ public class DatabaseHelper
             "CreatedAt TEXT NOT NULL DEFAULT (datetime('now','localtime')))";
         using var stCmd = new SQLiteCommand(stockTrailTable, conn);
         stCmd.ExecuteNonQuery();
+        using var checkTrailSynced = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('StockTrail') WHERE name = 'Synced'", conn);
+        if (Convert.ToInt32(checkTrailSynced.ExecuteScalar()) == 0)
+        {
+            using var alterTrail = new SQLiteCommand("ALTER TABLE StockTrail ADD COLUMN Synced INTEGER NOT NULL DEFAULT 0", conn);
+            alterTrail.ExecuteNonQuery();
+        }
 
         using var checkCol = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('SaleItems') WHERE name = 'UnitName'", conn);
         if (Convert.ToInt32(checkCol.ExecuteScalar()) == 0)
@@ -581,5 +587,25 @@ public class DatabaseHelper
     public static SQLiteConnection GetConnection()
     {
         return new SQLiteConnection(_connectionString);
+    }
+
+    public static string GetSetting(string key, string defaultValue = "")
+    {
+        using var conn = GetConnection();
+        conn.Open();
+        using var cmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = @key", conn);
+        cmd.Parameters.AddWithValue("@key", key);
+        var val = cmd.ExecuteScalar();
+        return val?.ToString() ?? defaultValue;
+    }
+
+    public static void SaveSetting(string key, string value)
+    {
+        using var conn = GetConnection();
+        conn.Open();
+        using var cmd = new SQLiteCommand("INSERT OR REPLACE INTO Settings (Key, Value) VALUES (@key, @val)", conn);
+        cmd.Parameters.AddWithValue("@key", key);
+        cmd.Parameters.AddWithValue("@val", value);
+        cmd.ExecuteNonQuery();
     }
 }
