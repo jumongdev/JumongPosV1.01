@@ -1232,14 +1232,27 @@ public class DashboardController : ControllerBase
         }
 
         [HttpPost("warehouse/products/from-master/{masterId}")]
-        public IActionResult WhAddFromMaster(int masterId, [FromQuery] int boxQty = 12)
+        public IActionResult WhAddFromMaster(int masterId, [FromQuery] int boxQty = 1)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
+                WITH default_unit AS (
+                    SELECT qty_per_unit, price
+                    FROM master_product_units
+                    WHERE product_id = @mid AND is_default = true
+                    LIMIT 1
+                )
                 INSERT INTO wh_products (name, barcode, category, box_price, box_cost, box_qty, piece_price, stock_qty, master_product_id)
-                SELECT name, barcode, category, price * @bq, cost * @bq, @bq, price, 0, id
-                FROM master_products WHERE id = @mid AND is_active = true RETURNING id";
+                SELECT
+                    mp.name, mp.barcode, mp.category,
+                    COALESCE((SELECT price FROM default_unit), mp.price * @bq),
+                    mp.cost * COALESCE((SELECT qty_per_unit FROM default_unit), @bq),
+                    COALESCE((SELECT qty_per_unit FROM default_unit), @bq),
+                    mp.price, 0, mp.id
+                FROM master_products mp
+                WHERE mp.id = @mid AND mp.is_active = true
+                RETURNING id";
             cmd.Parameters.AddWithValue("mid", masterId);
             cmd.Parameters.AddWithValue("bq", boxQty);
             var result = cmd.ExecuteScalar();
@@ -1248,16 +1261,27 @@ public class DashboardController : ControllerBase
         }
 
         [HttpPost("warehouse/products/from-master/category/{category}")]
-        public IActionResult WhBulkImportFromMaster(string category, [FromQuery] int boxQty = 12)
+        public IActionResult WhBulkImportFromMaster(string category, [FromQuery] int boxQty = 1)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
+                WITH default_units AS (
+                    SELECT DISTINCT ON (product_id) product_id, qty_per_unit, price
+                    FROM master_product_units
+                    WHERE is_default = true
+                )
                 INSERT INTO wh_products (name, barcode, category, box_price, box_cost, box_qty, piece_price, stock_qty, master_product_id)
-                SELECT name, barcode, category, price * @bq, cost * @bq, @bq, price, 0, id
-                FROM master_products
-                WHERE category = @cat AND is_active = true
-                AND id NOT IN (SELECT master_product_id FROM wh_products WHERE master_product_id IS NOT NULL)
+                SELECT
+                    mp.name, mp.barcode, mp.category,
+                    COALESCE(du.price, mp.price * @bq),
+                    mp.cost * COALESCE(du.qty_per_unit, @bq),
+                    COALESCE(du.qty_per_unit, @bq),
+                    mp.price, 0, mp.id
+                FROM master_products mp
+                LEFT JOIN default_units du ON du.product_id = mp.id
+                WHERE mp.category = @cat AND mp.is_active = true
+                AND mp.id NOT IN (SELECT master_product_id FROM wh_products WHERE master_product_id IS NOT NULL)
                 RETURNING id";
             cmd.Parameters.AddWithValue("cat", category);
             cmd.Parameters.AddWithValue("bq", boxQty);

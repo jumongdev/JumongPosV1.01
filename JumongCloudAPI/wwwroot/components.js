@@ -601,7 +601,7 @@ Alpine.store('app', {
         this.masterImportOpen = true;
       } catch (e) { toast('Error loading master products', 'error') }
     },
-    masterImportOpen: false, masterImportList: [], masterSearch: '', importBoxQty: 12,
+    masterImportOpen: false, masterImportList: [], masterSearch: '', importBoxQty: 1,
     closeImport() { this.masterImportOpen = false; this.masterSearch = '' },
     async doImport(mid) {
       try {
