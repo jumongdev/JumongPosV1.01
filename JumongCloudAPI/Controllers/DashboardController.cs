@@ -735,7 +735,7 @@ public class DashboardController : ControllerBase
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-        return Ok(new { version = "1.0.5" });
+        return Ok(new { version = "1.0.6" });
     }
 
         [HttpGet("fix-hvr-times")]
