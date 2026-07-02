@@ -1127,7 +1127,7 @@ public class DashboardController : ControllerBase
 
         // ── Warehouse API ──
         [HttpGet("warehouse/products")]
-        public IActionResult WhGetProducts([FromQuery] bool activeOnly = false)
+        public IActionResult WhGetProducts([FromQuery] bool activeOnly = true)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
