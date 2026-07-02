@@ -9,7 +9,12 @@ namespace JumongPosV1._01.Services;
 
 public static class SyncService
 {
-    private static readonly HttpClient _client = new() { Timeout = TimeSpan.FromSeconds(60) };
+    private static readonly HttpClient _client = new HttpClient(new SocketsHttpHandler
+    {
+        UseProxy = false,
+        ConnectTimeout = TimeSpan.FromSeconds(10)
+    })
+    { Timeout = TimeSpan.FromSeconds(15) };
     private static string? _storeId;
     private static string? _storeName;
     private static bool _storeNameSynced;
@@ -307,8 +312,6 @@ public static class SyncService
         try
         {
             var url = ApiUrl.TrimEnd('/') + endpoint + "?store_id=" + StoreId + "&store_name=" + Uri.EscapeDataString(StoreName);
-            File.AppendAllText(Path.Combine(AppContext.BaseDirectory, "sync_log.txt"),
-                $"{TimeHelper.Now:HH:mm:ss} POST {url}{Environment.NewLine}");
             var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var response = await _client.PostAsync(url, content);

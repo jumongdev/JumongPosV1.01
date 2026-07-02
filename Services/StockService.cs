@@ -95,11 +95,21 @@ public class StockService
                 using var idCmd = new SQLiteCommand("SELECT last_insert_rowid()", conn);
                 var trailId = Convert.ToInt32(idCmd.ExecuteScalar());
                 var trail = new StockTrail { Id = trailId, ProductId = productId, ProductName = productName, Barcode = barcode, QuantityAdded = qty, StockBefore = stockBefore, StockAfter = stockAfter, Reference = reference, UserId = userId, UserName = userName, CreatedAt = now };
-                var syncedOk = SyncService.SyncStockTrail(trail).GetAwaiter().GetResult();
-                using var syncUpd = new SQLiteCommand("UPDATE StockTrail SET Synced = @synced WHERE Id = @id", conn, tx);
-                syncUpd.Parameters.AddWithValue("@synced", syncedOk ? 1 : 0);
-                syncUpd.Parameters.AddWithValue("@id", trailId);
-                syncUpd.ExecuteNonQuery();
+                var capturedTrailId = trailId;
+                Task.Run(async () =>
+                {
+                    try
+                    {
+                        var ok = await SyncService.SyncStockTrail(trail);
+                        using var updConn = DatabaseHelper.GetConnection();
+                        updConn.Open();
+                        using var upd = new SQLiteCommand("UPDATE StockTrail SET Synced = @synced WHERE Id = @id", updConn);
+                        upd.Parameters.AddWithValue("@synced", ok ? 1 : 0);
+                        upd.Parameters.AddWithValue("@id", capturedTrailId);
+                        upd.ExecuteNonQuery();
+                    }
+                    catch (Exception ex) { ErrorLogger.Log("StockService.ConfirmReceiving(syncUpdate)", ex); }
+                });
                 _ = SyncService.SyncProduct(ProductService.GetById(productId));
 
                 // Also update PostgreSQL stock

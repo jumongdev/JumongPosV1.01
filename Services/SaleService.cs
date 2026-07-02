@@ -143,8 +143,10 @@ public class SaleService
             foreach (var st in trailList)
                 _ = SyncService.SyncStockTrail(st);
 
+            var syncedPids = new HashSet<int>();
             foreach (var item in sale.Items)
-                _ = SyncService.SyncProduct(ProductService.GetById(item.ProductId));
+                if (syncedPids.Add(item.ProductId))
+                    _ = SyncService.SyncProduct(ProductService.GetById(item.ProductId));
 
             _ = SyncService.SyncSale(sale, sale.Items);
             return saleId;
