@@ -611,16 +611,6 @@ Alpine.store('app', {
         else toast('Failed to import', 'error');
       } catch (e) { toast('Error: ' + e.message, 'error') }
     },
-    async doBulkImport(category) {
-      if (!confirm('Import all products from "' + category + '" (boxQty=' + this.importBoxQty + ')?\nAlready imported products will be skipped.')) return;
-      try {
-        const r = await fetch(API + '/warehouse/products/from-master/category/' + encodeURIComponent(category) + '?boxQty=' + this.importBoxQty, { method: 'POST' });
-        const j = await r.json();
-        toast('Imported ' + (j.imported || 0) + ' product(s)', 'success');
-        this.masterImportOpen = false;
-        this.load();
-      } catch (e) { toast('Error: ' + e.message, 'error') }
-    },
     get filteredMaster() {
       if (!this.masterSearch) return this.masterImportList || [];
       const q = this.masterSearch.toLowerCase();

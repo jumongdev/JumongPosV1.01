@@ -1206,7 +1206,6 @@ tailwind.config = {
                   <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.price)"></span></td>
                   <td class="px-2 py-2 text-center">
                     <button @click="doImport(x.id)" class="text-[10px] px-2 py-1 rounded border border-cyan-300 text-cyan-600 hover:bg-cyan-50">IMPORT</button>
-                    <button x-show="x.category" @click="doBulkImport(x.category)" class="text-[10px] px-2 py-1 rounded border border-emerald-300 text-emerald-600 hover:bg-emerald-50 ml-1">ALL IN CAT</button>
                   </td>
                 </tr>
               </template>
