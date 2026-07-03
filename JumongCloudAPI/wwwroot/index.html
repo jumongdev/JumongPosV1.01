@@ -129,7 +129,7 @@ tailwind.config = {
     <main class="p-4 md:p-5 space-y-4">
 
       <!-- Date Filters (visible on all sections) -->
-      <div class="flex flex-wrap items-center gap-1.5 mb-1 no-print">
+      <div x-show="$store.app.section !== 'products' &amp;&amp; $store.app.section !== 'customers' &amp;&amp; $store.app.section !== 'users'" class="flex flex-wrap items-center gap-1.5 mb-1 no-print">
         <div class="flex items-center gap-1.5 flex-wrap">
           <input type="date" x-model="$store.app.singleDate"
             @change="$store.app.setSingleDate($store.app.singleDate)"
