@@ -554,11 +554,11 @@ Alpine.store('app', {
     closeOrder() { this.orderModal = false },
     async fetchClients() { try { return await fetchJSON(API + '/warehouse/clients') } catch (e) { return [] } },
     async fetchProducts() { try { return await fetchJSON(API + '/warehouse/products') } catch (e) { return [] } },
-    addOrderItem(pid, pname, unit, qty, boxqty, boxprice, pieceprice) {
-      const price = unit === 'piece' ? (parseFloat(pieceprice) || 0) : (parseFloat(boxprice) || 0);
+    addOrderItem(pid, pname, unitName, qty, unitPrice, unitQty) {
+      const price = unitPrice;
       const total = price * qty;
-      const baseQty = unit === 'box' ? qty * (parseInt(boxqty) || 1) : qty;
-      this.orderForm.items.push({ productId: pid, productName: pname, unitType: unit, qty, price, totalPrice: total, baseQty, baseUnitName: 'Piece', boxQtyPerUnit: parseInt(boxqty) || 1 });
+      const baseQty = qty * (unitQty || 1);
+      this.orderForm.items.push({ productId: pid, productName: pname, unitType: unitName, qty, price, totalPrice: total, baseQty, baseUnitName: unitName, boxQtyPerUnit: unitQty || 1 });
     },
     removeOrderItem(i) { this.orderForm.items.splice(i, 1) },
     get orderTotal() { return this.orderForm.items.reduce((s, x) => s + x.totalPrice, 0) },

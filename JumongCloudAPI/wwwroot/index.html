@@ -1112,20 +1112,39 @@ tailwind.config = {
                     o.value = p.id; o.setAttribute('data-name', p.name);
                     o.setAttribute('data-boxqty', p.boxQty); o.setAttribute('data-boxprice', p.boxPrice);
                     o.setAttribute('data-pieceprice', p.piecePrice); o.setAttribute('data-stock', p.stockQty);
+                    o.setAttribute('data-units', JSON.stringify(p.units || []));
                     o.textContent = p.name + ' (Stock:' + p.stockQty + ')';
                     sel.appendChild(o);
                   });
+                  sel.addEventListener('change', function() {
+                    const opt = this.options[this.selectedIndex];
+                    const units = opt && opt.value ? JSON.parse(opt.getAttribute('data-units') || '[]') : [];
+                    const unitSel = document.getElementById('whOrdUnit');
+                    if (units.length) {
+                      unitSel.innerHTML = units.map((u, i) =>
+                        '<option value=&quot;' + u.unitName + '&quot; data-price=&quot;' + u.price + '&quot; data-qty=&quot;' + u.qtyPerUnit + '&quot;' + (u.isDefault ? ' selected' : '') + '>' + u.unitName + ': ₱' + u.price + ' (x' + u.qtyPerUnit + ')' + (u.isDefault ? ' *' : '') + '</option>'
+                      ).join('');
+                    } else {
+                      unitSel.innerHTML = '<option value=&quot;piece&quot; data-price=&quot;0&quot; data-qty=&quot;1&quot;>Piece: ₱0</option>';
+                    }
+                  });
                 })">
               </select>
-              <select id="whOrdUnit" class="w-20 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-2"><option value="box">Box</option><option value="piece">Piece</option></select>
+              <select id="whOrdUnit" class="w-32 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-2"></select>
               <input id="whOrdQty" type="number" value="1" min="1" class="w-16 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-2">
               <button @click="
                 const sel = document.getElementById('whOrdProd');
                 const opt = sel.options[sel.selectedIndex];
                 if (!opt || !opt.value) { toast('Select a product','error'); return }
+                const unitSel = document.getElementById('whOrdUnit');
+                const unitOpt = unitSel.options[unitSel.selectedIndex];
+                if (!unitOpt) { toast('No unit available','error'); return }
+                const unitName = unitOpt.value;
+                const unitPrice = parseFloat(unitOpt.getAttribute('data-price')) || 0;
+                const unitQty = parseInt(unitOpt.getAttribute('data-qty')) || 1;
+                const ordQty = parseInt(document.getElementById('whOrdQty').value) || 1;
                 addOrderItem(parseInt(opt.value), opt.getAttribute('data-name'),
-                  document.getElementById('whOrdUnit').value, parseInt(document.getElementById('whOrdQty').value)||1,
-                  opt.getAttribute('data-boxqty'), opt.getAttribute('data-boxprice'), opt.getAttribute('data-pieceprice'));
+                  unitName, ordQty, unitPrice, unitQty);
                 document.getElementById('whOrdQty').value = 1;
               " class="text-xs px-3 py-2 rounded-lg bg-cyan-600 text-white font-medium">+ ADD</button>
             </div>
