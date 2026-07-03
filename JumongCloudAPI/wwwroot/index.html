@@ -125,32 +125,32 @@ tailwind.config = {
       </div>
     </header>
 
-    <!-- ΓöÇΓöÇ Main Body ΓöÇΓöÇ -->
+    <!-- ── Main Body ── -->
     <main class="p-4 md:p-5 space-y-4">
+
+      <!-- Date Filters (visible on all sections) -->
+      <div class="flex flex-wrap items-center gap-1.5 mb-1 no-print">
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <input type="date" x-model="$store.app.singleDate"
+            @change="$store.app.setSingleDate($store.app.singleDate)"
+            class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1 text-gray-700 dark:text-slate-200 max-w-[140px]"
+            title="Select a single date">
+          <span class="text-xs text-gray-400 hidden sm:inline">|</span>
+          <input type="date" x-model="$store.app.rangeFrom"
+            class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1 text-gray-700 dark:text-slate-200 max-w-[140px]"
+            placeholder="From">
+          <span class="text-xs text-gray-400">→</span>
+          <input type="date" x-model="$store.app.rangeTo"
+            class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1 text-gray-700 dark:text-slate-200 max-w-[140px]"
+            placeholder="To">
+          <button @click="$store.app.setDateRange()" class="text-xs px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium">GO</button>
+        </div>
+      </div>
 
       <!-- ═══════════════════════════════════════════════ -->
       <!-- DASHBOARD SECTION                              -->
       <!-- ═══════════════════════════════════════════════ -->
       <div x-show="$store.app.section === 'dashboard'" x-transition.opacity>
-
-        <!-- Date Filters -->
-        <div class="flex flex-wrap items-center gap-1.5 mb-4 no-print">
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <input type="date" x-model="$store.app.singleDate"
-              @change="$store.app.setSingleDate($store.app.singleDate)"
-              class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1 text-gray-700 dark:text-slate-200 max-w-[140px]"
-              title="Select a single date">
-            <span class="text-xs text-gray-400 hidden sm:inline">|</span>
-            <input type="date" x-model="$store.app.rangeFrom"
-              class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1 text-gray-700 dark:text-slate-200 max-w-[140px]"
-              placeholder="From">
-            <span class="text-xs text-gray-400">→</span>
-            <input type="date" x-model="$store.app.rangeTo"
-              class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1 text-gray-700 dark:text-slate-200 max-w-[140px]"
-              placeholder="To">
-            <button @click="$store.app.setDateRange()" class="text-xs px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium">GO</button>
-          </div>
-        </div>
 
         <!-- Summary Cards -->
         <div x-data="summaryCards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 mb-4">
