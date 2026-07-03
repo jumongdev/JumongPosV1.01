@@ -411,5 +411,16 @@ public static class PgDatabaseHelper
             ALTER TABLE wh_order_items ADD COLUMN IF NOT EXISTS received_qty INTEGER NOT NULL DEFAULT 0;
         ";
         whMig.ExecuteNonQuery();
+
+        // Seed wh_clients from existing stores (for warehouse-to-POS transfers)
+        using var seedClients = conn.CreateCommand();
+        seedClients.CommandText = @"
+            INSERT INTO wh_clients (name, contact, address, store_type, store_id)
+            SELECT s.store_name, '', '', 'pos', s.store_id
+            FROM stores s
+            WHERE NOT EXISTS (
+                SELECT 1 FROM wh_clients wc WHERE wc.store_id = s.store_id
+            )";
+        seedClients.ExecuteNonQuery();
     }
 }

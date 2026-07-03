@@ -319,7 +319,15 @@ public partial class ProductsForm : Form
         var sb = new System.Text.StringBuilder();
         sb.AppendLine(sep);
         sb.AppendLine("INVENTORY STOCK CHECKLIST".PadLeft((lineChars + 28) / 2).PadRight(lineChars));
-        sb.AppendLine($"Printed: {TimeHelper.Now:yyyy-MM-dd hh:mm tt}".PadLeft((lineChars + 37) / 2).PadRight(lineChars));
+        var cashierName = _currentUser != null && !string.IsNullOrEmpty(_currentUser.FullName) ? _currentUser.FullName : _currentUser?.Username ?? "";
+        var storeName = SyncService.StoreName;
+        var storeId = SyncService.StoreId;
+        var storeLine = $"Store: {storeName} ({storeId})";
+        var cashierLine = $"Cashier: {cashierName}";
+        var printedLine = $"Printed: {TimeHelper.Now:yyyy-MM-dd hh:mm tt}";
+        sb.AppendLine(storeLine.PadLeft((lineChars + storeLine.Length) / 2).PadRight(lineChars));
+        sb.AppendLine(cashierLine.PadLeft((lineChars + cashierLine.Length) / 2).PadRight(lineChars));
+        sb.AppendLine(printedLine.PadLeft((lineChars + printedLine.Length) / 2).PadRight(lineChars));
         sb.AppendLine(sep);
         sb.AppendLine();
 
