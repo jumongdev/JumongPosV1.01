@@ -448,7 +448,7 @@ Alpine.store('app', {
         const sp = Alpine.store('app').whSubpage;
         if (sp === 'product' || sp === 'inventory') this.products = await fetchJSON(API + '/warehouse/products');
         else if (sp === 'onlineorder') { this.clientsData = await fetchJSON(API + '/warehouse/clients'); this.orders = await fetchJSON(API + '/warehouse/orders') }
-        else if (sp === 'transfer') this.transfers = await fetchJSON(API + '/warehouse/transfers/pending');
+        else if (sp === 'transfer') this.transfers = await fetchJSON(API + '/warehouse/transfers');
       } catch (e) { this.products = []; this.clientsData = []; this.orders = []; this.transfers = [] }
       this.loading = false;
     },
@@ -527,7 +527,7 @@ Alpine.store('app', {
       } catch (e) { toast('Save failed: ' + e.message, 'error') }
     },
     async deleteItem(id) {
-      const arr = this.sp === 'transfer' ? this.transfers : (this.sp === 'onlineorder' ? this.clientsData : this.products);
+      const arr = this.sp === 'onlineorder' ? this.clientsData : this.products;
       const p = arr.find(x => x.id === id); if (!p) return;
       if (!confirm('Delete "' + p.name + '"?')) return;
       try {
@@ -630,6 +630,67 @@ Alpine.store('app', {
         else toast('Failed to import', 'error');
       } catch (e) { toast('Error: ' + e.message, 'error') }
     },
+    // ════════════════════════════════════════════════════
+    // TRANSFER methods (warehouse → POS stock transfers)
+    // ════════════════════════════════════════════════════
+    transferModal: false, transferForm: { clientId: '', clientName: '', notes: '', storeId: '' }, transferFormItems: [],
+    openNewTransfer() { this.transferModal = true; this.transferForm = { clientId: '', clientName: '', notes: '', storeId: '' }; this.transferFormItems = [] },
+    closeTransfer() { this.transferModal = false; this.transferFormItems = [] },
+    addTransferItem(pid, pname, barcode, qty) { this.transferFormItems.push({ productId: pid, productName: pname, barcode: barcode || '', qty: parseInt(qty) || 1 }) },
+    removeTransferItem(i) { this.transferFormItems.splice(i, 1) },
+    get transferTotalQty() { return this.transferFormItems.reduce((s, x) => s + x.qty, 0) },
+    async saveTransfer() {
+      if (!this.transferForm.clientId) { toast('Select a POS client', 'error'); return }
+      if (!this.transferFormItems.length) { toast('Add at least one product', 'error'); return }
+      try {
+        const r = await fetch(API + '/warehouse/transfers', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientId: parseInt(this.transferForm.clientId),
+            clientName: this.transferForm.clientName,
+            notes: this.transferForm.notes,
+            storeId: this.transferForm.storeId,
+            items: this.transferFormItems.map(x => ({ productId: x.productId, productName: x.productName, barcode: x.barcode, qty: x.qty }))
+          })
+        });
+        const j = await r.json();
+        if (j.id) { toast('Transfer #' + j.id + ' created', 'success'); this.transferModal = false; this.load(); this.updateBadge() }
+        else throw new Error('Failed');
+      } catch (e) { toast('Error: ' + e.message, 'error') }
+    },
+    async receiveTransfer(id) {
+      if (!confirm('Receive transfer #' + id + '? This will add stock to the POS client.')) return;
+      try {
+        const r = await fetch(API + '/warehouse/transfers/' + id + '/receive', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || 'Failed');
+        if (j.shortages && j.shortages.length > 0)
+          toast('Transfer #' + id + ' received with ' + j.shortages.length + ' shortage(s)', 'warning');
+        else
+          toast('Transfer #' + id + ' completed', 'success');
+        this.load(); this.updateBadge();
+      } catch (e) { toast('Error: ' + e.message, 'error') }
+    },
+    transferViewOpen: false, transferViewId: null, transferViewItems: [],
+    async viewTransfer(id) {
+      try {
+        const items = await fetchJSON(API + '/warehouse/transfers/' + id + '/items');
+        if (!items || !items.length) { toast('No items', 'info'); return }
+        this.transferViewItems = items;
+        this.transferViewId = id;
+        this.transferViewOpen = true;
+      } catch (e) { toast('Error: ' + e.message, 'error') }
+    },
+    closeTransferView() { this.transferViewOpen = false; this.transferViewItems = [] },
+    async cancelTransfer(id) {
+      if (!confirm('Cancel transfer #' + id + '?')) return;
+      try {
+        await fetch(API + '/warehouse/transfers/' + id + '/receive', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        toast('Transfer cancelled', 'success');
+        this.load(); this.updateBadge();
+      } catch (e) { toast('Error: ' + e.message, 'error') }
+    },
+
     get filteredMaster() {
       if (!this.masterSearch) return this.masterImportList || [];
       const q = this.masterSearch.toLowerCase();
@@ -638,14 +699,14 @@ Alpine.store('app', {
     badgeCount: 0,
     async updateBadge() {
       try {
-        const d = await fetchJSON(API + '/warehouse/transfers/pending');
-        this.badgeCount = d ? d.length : 0;
+        const d = await fetchJSON(API + '/warehouse/transfers/pending-count');
+        this.badgeCount = d ? d.pending || 0 : 0;
       } catch (e) { this.badgeCount = 0 }
       Alpine.store('app')._whBadge = this.badgeCount;
     },
     startPoll() {
       this.updateBadge();
-      setInterval(() => { if (Alpine.store('app').whSubpage === 'onlineorder' || Alpine.store('app').whSubpage === 'transfer') this.load(); this.updateBadge() }, 30000);
+      setInterval(() => { if (Alpine.store('app').whSubpage === 'transfer') this.load(); this.updateBadge() }, 30000);
     }
   }));
 

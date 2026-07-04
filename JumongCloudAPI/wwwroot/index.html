@@ -786,6 +786,12 @@ tailwind.config = {
       <!-- ═══════════════════════════════════════════════ -->
       <div x-show="$store.app.section === 'warehouse'" x-transition.opacity>
         <div x-data="warehousePanel" class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
+          <!-- Section header -->
+          <div class="px-4 py-3 border-b border-gray-100 dark:border-[#222255]">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">
+              WAREHOUSE — <span x-text="$store.app.whSubpage==='product' ? 'Products' : $store.app.whSubpage==='inventory' ? 'Inventory' : $store.app.whSubpage==='onlineorder' ? 'Online Orders' : 'Transfers'"></span>
+            </h3>
+          </div>
           <!-- Subpage nav -->
           <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#222255] gap-2">
             <div class="flex gap-1">
@@ -802,6 +808,7 @@ tailwind.config = {
               <input type="text" placeholder="Search..." x-model="search" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2.5 py-1.5 w-28 text-gray-700 dark:text-slate-200 placeholder-gray-400 hidden sm:block">
               <button @click="importFromMaster()" x-show="$store.app.whSubpage==='product'" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">FROM MASTER</button>
               <button @click="openNewOrder()" x-show="$store.app.whSubpage==='onlineorder'" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700">+ NEW ORDER</button>
+              <button @click="openNewTransfer()" x-show="$store.app.whSubpage==='transfer'" class="text-xs px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">+ NEW TRANSFER</button>
               <button @click="exportCSV('wh-'+$store.app.whSubpage)" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CSV</button>
               <button @click="window.print()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] hidden sm:block">PRINT</button>
             </div>
@@ -996,13 +1003,13 @@ tailwind.config = {
 
             <!-- ═══ Transfer subpage ═══ -->
             <div x-show="!loading && $store.app.whSubpage==='transfer'">
-              <template x-if="filtered.length===0"><div class="text-center py-6 text-gray-400">No pending transfers</div></template>
+              <template x-if="filtered.length===0"><div class="text-center py-6 text-gray-400">No transfers</div></template>
               <template x-if="filtered.length > 0">
                 <table class="w-full text-xs">
                   <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Order ID</th>
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Client</th>
-                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Total</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">ID</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">POS Client</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Status</th>
                     <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Notes</th>
                     <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
                     <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
@@ -1010,12 +1017,20 @@ tailwind.config = {
                   <tbody>
                     <template x-for="(x,i) in filtered" :key="i">
                       <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                        <td class="px-3 py-2" x-text="x.orderId"></td>
+                        <td class="px-3 py-2" x-text="x.id"></td>
                         <td class="px-3 py-2" x-text="x.clientName"></td>
-                        <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.totalAmount)"></span></td>
+                        <td class="px-3 py-2 font-semibold" :style="'color:'+(x.status==='pending'?'#f39c12':x.status==='completed'?'#2ecc71':x.status==='partial'?'#e67e22':'red')">
+                          <span x-text="x.status.toUpperCase()"></span>
+                          <span x-show="x.hasShortage" class="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">PARTIAL</span>
+                        </td>
                         <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.notes || ''"></td>
                         <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})"></td>
-                        <td class="px-3 py-2"><button @click="receiveOrder(x.orderId)" class="text-[10px] px-2 py-1 rounded border border-cyan-300 text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/20">RECEIVE</button></td>
+                        <td class="px-3 py-2">
+                          <button @click="viewTransfer(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">VIEW</button>
+                          <template x-if="x.status==='pending'">
+                            <button @click="receiveTransfer(x.id)" class="text-[10px] px-2 py-1 rounded border border-cyan-300 text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/20">RECEIVE</button>
+                          </template>
+                        </td>
                       </tr>
                     </template>
                   </tbody>
@@ -1262,6 +1277,122 @@ tailwind.config = {
           <div class="mt-3 flex justify-end gap-2">
             <button @click="closeImport()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500">CLOSE</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Warehouse Transfer Modal -->
+    <div x-show="transferModal" x-cloak
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div class="modal-box bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-[92%] max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-t-xl">
+          <h3 class="text-sm font-bold text-cyan-700 dark:text-cyan-400">New Transfer — Warehouse to POS</h3>
+          <button @click="closeTransfer()" class="p-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">&times;</button>
+        </div>
+        <div class="overflow-auto p-5 flex-1">
+          <div class="mb-3">
+            <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">POS Client</label>
+            <select x-model="transferForm.clientId" @change="transferForm.clientName = $event.target.options[$event.target.selectedIndex].text; transferForm.storeId = $event.target.options[$event.target.selectedIndex].getAttribute('data-sid')||''"
+              class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2" x-init="
+                $nextTick(async ()=>{
+                  const clients = await fetchJSON(API+'/warehouse/clients');
+                  const sel = $el;
+                  sel.innerHTML = '<option value=\'\'>Select POS client...</option>';
+                  clients.filter(c=>c.storeType==='pos').forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; o.setAttribute('data-sid',c.storeId||''); sel.appendChild(o) });
+                })">
+            </select>
+          </div>
+          <div class="mb-3"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Notes</label><input x-model="transferForm.notes" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2"></div>
+          <div class="mb-3">
+            <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Add Product</label>
+            <div class="flex gap-2 items-center">
+              <select id="trfProd" class="flex-1 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2" x-init="
+                $nextTick(async ()=>{
+                  const prods = await fetchJSON(API+'/warehouse/products');
+                  const sel = $el;
+                  sel.innerHTML = '<option value=\'\'>Select product...</option>';
+                  prods.forEach(p => {
+                    const o = document.createElement('option');
+                    o.value = p.id; o.setAttribute('data-name', p.name);
+                    o.setAttribute('data-barcode', p.barcode||'');
+                    o.setAttribute('data-stock', p.stockQty);
+                    o.textContent = p.name + ' (Stock:' + p.stockQty + ')';
+                    sel.appendChild(o);
+                  });
+                })">
+              </select>
+              <input id="trfQty" type="number" value="1" min="1" class="w-20 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-2">
+              <button @click="
+                const sel = document.getElementById('trfProd');
+                const opt = sel.options[sel.selectedIndex];
+                if (!opt || !opt.value) { toast('Select a product','error'); return }
+                const qty = parseInt(document.getElementById('trfQty').value) || 1;
+                addTransferItem(parseInt(opt.value), opt.getAttribute('data-name'),
+                  opt.getAttribute('data-barcode'), qty);
+                document.getElementById('trfQty').value = 1;
+              " class="text-xs px-3 py-2 rounded-lg bg-cyan-600 text-white font-medium">+ ADD</button>
+            </div>
+          </div>
+          <div class="mb-3">
+            <table class="w-full text-xs">
+              <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Product</th>
+                <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Qty</th>
+                <th class="text-center px-2 py-2 border-b border-gray-200 dark:border-[#222255]"></th>
+              </tr></thead>
+              <tbody>
+                <template x-if="transferFormItems.length===0">
+                  <tr><td colspan="3" class="text-center py-4 text-gray-400">No products added</td></tr>
+                </template>
+                <template x-for="(x,i) in transferFormItems" :key="i">
+                  <tr class="border-b border-gray-50 dark:border-[#222255]/40">
+                    <td class="px-2 py-2" x-text="x.productName"></td>
+                    <td class="px-2 py-2 text-right" x-text="x.qty"></td>
+                    <td class="px-2 py-2 text-center"><button @click="removeTransferItem(i)" class="text-red-400 hover:text-red-300">X</button></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div class="flex justify-end gap-2 pt-3 border-t border-gray-200 dark:border-[#222255]">
+            <span class="text-sm font-bold mr-auto pt-1">Total Items: <span x-text="transferTotalQty"></span></span>
+            <button @click="closeTransfer()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500">CANCEL</button>
+            <button @click="saveTransfer()" class="text-xs px-4 py-2 rounded-lg bg-emerald-600 text-white font-medium">CREATE TRANSFER</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Warehouse Transfer View Modal -->
+    <div x-show="transferViewOpen" x-cloak
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div class="modal-box bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-[92%] max-w-xl max-h-[85vh] flex flex-col shadow-2xl">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-t-xl">
+          <h3 class="text-sm font-bold text-cyan-700 dark:text-cyan-400" x-text="'Transfer #'+transferViewId"></h3>
+          <button @click="closeTransferView()" class="p-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">&times;</button>
+        </div>
+        <div class="overflow-auto p-5 flex-1">
+          <table class="w-full text-xs">
+            <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+              <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Product</th>
+              <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Barcode</th>
+              <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Qty</th>
+              <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Received</th>
+              <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Stock</th>
+            </tr></thead>
+            <tbody>
+              <template x-for="(x,i) in transferViewItems" :key="i">
+                <tr class="border-b border-gray-50 dark:border-[#222255]/40">
+                  <td class="px-2 py-2" x-text="x.productName"></td>
+                  <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.barcode || ''"></td>
+                  <td class="px-2 py-2 text-right" x-text="x.qty"></td>
+                  <td class="px-2 py-2 text-right" :class="x.receivedQty < x.qty ? 'text-amber-400' : 'text-emerald-400'" x-text="x.receivedQty"></td>
+                  <td class="px-2 py-2 text-right" x-text="x.currentStock"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <div class="mt-3 flex justify-end"><button @click="closeTransferView()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500">CLOSE</button></div>
         </div>
       </div>
     </div>

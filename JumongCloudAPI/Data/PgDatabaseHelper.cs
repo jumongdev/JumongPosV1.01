@@ -409,6 +409,30 @@ public static class PgDatabaseHelper
             ALTER TABLE wh_order_items ADD COLUMN IF NOT EXISTS base_qty INTEGER NOT NULL DEFAULT 0;
             ALTER TABLE wh_order_items ADD COLUMN IF NOT EXISTS base_unit_name TEXT NOT NULL DEFAULT 'Piece';
             ALTER TABLE wh_order_items ADD COLUMN IF NOT EXISTS received_qty INTEGER NOT NULL DEFAULT 0;
+
+            -- Transfer tables for warehouse-to-POS stock transfers
+            CREATE TABLE IF NOT EXISTS wh_transfers (
+                id SERIAL PRIMARY KEY,
+                client_id INTEGER NOT NULL REFERENCES wh_clients(id),
+                client_name TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                notes TEXT DEFAULT '',
+                store_id TEXT DEFAULT '',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE TABLE IF NOT EXISTS wh_transfer_items (
+                id SERIAL PRIMARY KEY,
+                transfer_id INTEGER NOT NULL REFERENCES wh_transfers(id) ON DELETE CASCADE,
+                product_id INTEGER NOT NULL REFERENCES wh_products(id),
+                product_name TEXT NOT NULL,
+                barcode TEXT DEFAULT '',
+                qty INTEGER NOT NULL DEFAULT 0,
+                received_qty INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_wh_transfers_client ON wh_transfers(client_id);
+            CREATE INDEX IF NOT EXISTS idx_wh_transfers_status ON wh_transfers(status);
+            CREATE INDEX IF NOT EXISTS idx_wh_transfer_items_transfer ON wh_transfer_items(transfer_id);
         ";
         whMig.ExecuteNonQuery();
 

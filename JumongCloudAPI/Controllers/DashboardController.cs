@@ -1624,6 +1624,172 @@ public class DashboardController : ControllerBase
             }
             catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
         }
+
+        // ══════════════════════════════════════════════════════════════
+        // WAREHOUSE TRANSFERS (warehouse → POS store stock transfers)
+        // ══════════════════════════════════════════════════════════════
+
+        [HttpGet("warehouse/transfers")]
+        public IActionResult WhGetTransfers()
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT t.id, t.client_id, t.client_name, t.status, t.notes, t.store_id,
+                       t.created_at, t.updated_at,
+                       COALESCE(SUM(CASE WHEN ti.received_qty < ti.qty THEN 1 ELSE 0 END), 0) > 0 AS has_shortage
+                FROM wh_transfers t
+                LEFT JOIN wh_transfer_items ti ON ti.transfer_id = t.id
+                GROUP BY t.id
+                ORDER BY t.created_at DESC LIMIT 200";
+            var data = new List<object>();
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+                data.Add(new {
+                    id = r.GetInt32(0), clientId = r.GetInt32(1), clientName = r.GetString(2),
+                    status = r.GetString(3), notes = r.IsDBNull(4) ? "" : r.GetString(4),
+                    storeId = r.IsDBNull(5) ? "" : r.GetString(5),
+                    createdAt = r.GetDateTime(6), updatedAt = r.GetDateTime(7),
+                    hasShortage = r.GetBoolean(8)
+                });
+            return Ok(data);
+        }
+
+        [HttpPost("warehouse/transfers")]
+        public IActionResult WhCreateTransfer([FromBody] WhTransferDto t)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var tx = conn.BeginTransaction();
+            try
+            {
+                using var cmd = conn.CreateCommand(); cmd.Transaction = tx;
+                cmd.CommandText = "INSERT INTO wh_transfers (client_id, client_name, status, notes, store_id) VALUES (@ci, @cn, 'pending', @n, @sid) RETURNING id";
+                cmd.Parameters.AddWithValue("ci", t.ClientId);
+                cmd.Parameters.AddWithValue("cn", t.ClientName ?? "");
+                cmd.Parameters.AddWithValue("n", t.Notes ?? "");
+                cmd.Parameters.AddWithValue("sid", t.StoreId ?? "");
+                var transferId = Convert.ToInt32(cmd.ExecuteScalar());
+
+                if (t.Items != null)
+                {
+                    foreach (var item in t.Items)
+                    {
+                        using var icmd = new NpgsqlCommand(
+                            "INSERT INTO wh_transfer_items (transfer_id, product_id, product_name, barcode, qty) VALUES (@ti, @pi, @pn, @bc, @q)", conn, tx);
+                        icmd.Parameters.AddWithValue("ti", transferId);
+                        icmd.Parameters.AddWithValue("pi", item.ProductId);
+                        icmd.Parameters.AddWithValue("pn", item.ProductName);
+                        icmd.Parameters.AddWithValue("bc", item.Barcode ?? "");
+                        icmd.Parameters.AddWithValue("q", item.Qty);
+                        icmd.ExecuteNonQuery();
+                    }
+                }
+
+                tx.Commit();
+                return Ok(new { id = transferId });
+            }
+            catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
+        }
+
+        [HttpGet("warehouse/transfers/{id}/items")]
+        public IActionResult WhGetTransferItems(int id)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT ti.product_id, ti.product_name, ti.barcode, ti.qty, ti.received_qty,
+                       COALESCE(wp.stock_qty, 0) AS current_stock
+                FROM wh_transfer_items ti
+                LEFT JOIN wh_products wp ON ti.product_id = wp.id
+                WHERE ti.transfer_id = @tid ORDER BY ti.product_name";
+            cmd.Parameters.AddWithValue("tid", id);
+            var items = new List<object>();
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+                items.Add(new {
+                    productId = r.GetInt32(0), productName = r.GetString(1),
+                    barcode = r.GetString(2), qty = r.GetInt32(3),
+                    receivedQty = r.GetInt32(4), currentStock = r.GetInt32(5)
+                });
+            return Ok(items);
+        }
+
+        [HttpPut("warehouse/transfers/{id}/receive")]
+        public IActionResult WhReceiveTransfer(int id, [FromBody] WhTransferReceiveRequest? body = null)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var tx = conn.BeginTransaction();
+            try
+            {
+                using var checkCmd = conn.CreateCommand(); checkCmd.Transaction = tx;
+                checkCmd.CommandText = "SELECT status FROM wh_transfers WHERE id = @id";
+                checkCmd.Parameters.AddWithValue("id", id);
+                var status = checkCmd.ExecuteScalar() as string;
+                if (status != "pending") return BadRequest(new { error = "Transfer not found or not pending" });
+
+                var receivedIds = new HashSet<int>();
+                if (body?.Items != null)
+                    foreach (var ri in body.Items)
+                        if (ri.ProductId > 0) receivedIds.Add(ri.ProductId);
+
+                using var allItems = conn.CreateCommand(); allItems.Transaction = tx;
+                allItems.CommandText = @"
+                    SELECT ti.product_id, ti.product_name, ti.qty, ti.barcode
+                    FROM wh_transfer_items ti
+                    WHERE ti.transfer_id = @tid ORDER BY ti.product_name";
+                allItems.Parameters.AddWithValue("tid", id);
+                var shortages = new List<object>();
+                using var r = allItems.ExecuteReader();
+                while (r.Read())
+                {
+                    var productId = r.GetInt32(0);
+                    var productName = r.GetString(1);
+                    var baseQty = r.GetInt32(2);
+                    var barcode = r.GetString(3);
+                    var accepted = body?.Items == null || receivedIds.Contains(productId);
+                    var receivedQty = accepted ? baseQty : 0;
+
+                    using var upd = conn.CreateCommand(); upd.Transaction = tx;
+                    upd.CommandText = "UPDATE wh_transfer_items SET received_qty = @rq WHERE transfer_id = @tid AND product_id = @pid";
+                    upd.Parameters.AddWithValue("rq", receivedQty);
+                    upd.Parameters.AddWithValue("tid", id);
+                    upd.Parameters.AddWithValue("pid", productId);
+                    upd.ExecuteNonQuery();
+
+                    if (!accepted)
+                    {
+                        using var restock = conn.CreateCommand(); restock.Transaction = tx;
+                        restock.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @bq WHERE id = @pid";
+                        restock.Parameters.AddWithValue("bq", baseQty);
+                        restock.Parameters.AddWithValue("pid", productId);
+                        restock.ExecuteNonQuery();
+                        shortages.Add(new { productId, productName, baseQty });
+                    }
+                }
+                r.Close();
+
+                var finalStatus = shortages.Count > 0 ? "partial" : "completed";
+                using var updateCmd = conn.CreateCommand(); updateCmd.Transaction = tx;
+                updateCmd.CommandText = "UPDATE wh_transfers SET status = @st, updated_at = NOW() WHERE id = @id";
+                updateCmd.Parameters.AddWithValue("st", finalStatus);
+                updateCmd.Parameters.AddWithValue("id", id);
+                updateCmd.ExecuteNonQuery();
+
+                tx.Commit();
+                return Ok(new { success = true, transferId = id, status = finalStatus, shortages });
+            }
+            catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
+        }
+
+        [HttpGet("warehouse/transfers/pending-count")]
+        public IActionResult WhGetPendingTransferCount()
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM wh_transfers WHERE status = 'pending'";
+            var count = Convert.ToInt32(cmd.ExecuteScalar());
+            return Ok(new { pending = count });
+        }
     }
 
     public class WhProductDto { public string Name { get; set; } = ""; public string? Barcode { get; set; } public string? Category { get; set; } public decimal BoxPrice { get; set; } public decimal BoxCost { get; set; } public int BoxQty { get; set; } = 1; public decimal PiecePrice { get; set; } }
@@ -1643,6 +1809,11 @@ public class DashboardController : ControllerBase
         public string ProductName { get; set; } = "";
         public string? Barcode { get; set; }
     }
+
+    public class WhTransferDto { public int ClientId { get; set; } public string? ClientName { get; set; } public string? Notes { get; set; } public string? StoreId { get; set; } public List<WhTransferItemDto>? Items { get; set; } }
+    public class WhTransferItemDto { public int ProductId { get; set; } public string ProductName { get; set; } = ""; public string? Barcode { get; set; } public int Qty { get; set; } }
+    public class WhTransferReceiveRequest { public List<WhTransferReceivedItemDto>? Items { get; set; } }
+    public class WhTransferReceivedItemDto { public int ProductId { get; set; } public string ProductName { get; set; } = ""; }
 
     public class SeedProductDto
     {
