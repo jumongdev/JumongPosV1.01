@@ -435,12 +435,14 @@ public class DashboardController : ControllerBase
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = $@"
-                SELECT u.pos_id, u.username, u.role, u.full_name, u.is_active, u.password_hash
+            cmd.CommandText = @"
+                SELECT DISTINCT u.pos_id, u.username, u.role, u.full_name, u.is_active, u.password_hash
                 FROM users u
                 WHERE u.is_active = true
-                AND (u.store_id = @sid OR EXISTS (SELECT 1 FROM user_stores us WHERE us.user_pos_id = u.pos_id AND us.store_id = @sid))
-                GROUP BY u.pos_id, u.username, u.role, u.full_name, u.is_active, u.password_hash
+                AND (
+                  EXISTS (SELECT 1 FROM user_stores us WHERE us.user_pos_id = u.pos_id AND us.store_id = @sid)
+                  OR (u.store_id = @sid AND NOT EXISTS (SELECT 1 FROM user_stores us WHERE us.user_pos_id = u.pos_id))
+                )
                 ORDER BY u.username";
             cmd.Parameters.AddWithValue("sid", storeId ?? "");
             var data = new List<object>();
@@ -448,6 +450,17 @@ public class DashboardController : ControllerBase
             while (r.Read())
                 data.Add(new { posId = r.GetInt32(0), username = r.GetString(1), role = r.GetString(2), fullName = r.IsDBNull(3) ? "" : r.GetString(3), isActive = r.GetBoolean(4), passwordHash = r.IsDBNull(5) ? "12345" : r.GetString(5) });
             return Ok(data);
+        }
+
+        [HttpPost("users/clean")]
+        public IActionResult CleanUsers()
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            var deletedStores = 0;
+            var deactivatedUsers = 0;
+            using (var c1 = conn.CreateCommand()) { c1.CommandText = "DELETE FROM user_stores"; deletedStores = c1.ExecuteNonQuery(); }
+            using (var c2 = conn.CreateCommand()) { c2.CommandText = "UPDATE users SET is_active = false WHERE LOWER(username) != 'admin'"; deactivatedUsers = c2.ExecuteNonQuery(); }
+            return Ok(new { deletedStores, deactivatedUsers });
         }
 
         [HttpGet("expenses-summary")]

@@ -793,6 +793,17 @@ Alpine.store('app', {
         toast('User deactivated', 'success');
         this.load();
       } catch (e) { toast('Delete failed: ' + e.message, 'error') }
+    },
+
+    async cleanAll() {
+      if (!confirm('Remove ALL users except admin? This will clear all store access and deactivate all non-admin users. Continue?')) return;
+      if (!confirm('FINAL WARNING: This action cannot be undone. All users except admin will be removed. Proceed?')) return;
+      try {
+        const r = await fetch(API + '/users/clean', { method: 'POST' });
+        const j = await r.json();
+        toast('Cleaned: ' + j.deactivatedUsers + ' users deactivated, ' + j.deletedStores + ' store links removed', 'success');
+        this.load();
+      } catch (e) { toast('Clean failed: ' + e.message, 'error') }
     }
   }));
 
