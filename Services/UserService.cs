@@ -150,4 +150,47 @@ public static class UserService
             IsActive = Convert.ToInt32(rdr["is_active"]) == 1
         };
     }
+
+    public static void SyncFromCloud(List<System.Text.Json.JsonElement> cloudUsers)
+    {
+        using var conn = DatabaseHelper.GetConnection();
+        conn.Open();
+        foreach (var cu in cloudUsers)
+        {
+            var posId = cu.GetProperty("posId").GetInt32();
+            var username = cu.GetProperty("username").GetString() ?? "";
+            var fullName = cu.TryGetProperty("fullName", out var fn) ? fn.GetString() ?? "" : "";
+            var role = cu.TryGetProperty("role", out var rl) ? rl.GetString() ?? "Cashier" : "Cashier";
+            var isActive = cu.TryGetProperty("isActive", out var ia) ? ia.GetBoolean() : true;
+            var passwordHash = cu.TryGetProperty("passwordHash", out var ph) ? ph.GetString() ?? "12345" : "12345";
+
+            // Check if user exists locally
+            using var chk = new SQLiteCommand("SELECT Id, PasswordHash FROM Users WHERE Username = @u", conn);
+            chk.Parameters.AddWithValue("@u", username);
+            var existing = chk.ExecuteScalar();
+            if (existing != null && existing != DBNull.Value)
+            {
+                // User exists — update fields but keep local password
+                using var upd = new SQLiteCommand(
+                    "UPDATE Users SET FullName=@f, Role=@r, IsActive=@a WHERE Username=@u", conn);
+                upd.Parameters.AddWithValue("@u", username);
+                upd.Parameters.AddWithValue("@f", fullName);
+                upd.Parameters.AddWithValue("@r", role);
+                upd.Parameters.AddWithValue("@a", isActive ? 1 : 0);
+                upd.ExecuteNonQuery();
+            }
+            else
+            {
+                // New user — create with cloud password
+                using var ins = new SQLiteCommand(
+                    "INSERT INTO Users (Username, FullName, PasswordHash, Role, IsActive) VALUES (@u, @f, @p, @r, @a)", conn);
+                ins.Parameters.AddWithValue("@u", username);
+                ins.Parameters.AddWithValue("@f", fullName);
+                ins.Parameters.AddWithValue("@p", passwordHash);
+                ins.Parameters.AddWithValue("@r", role);
+                ins.Parameters.AddWithValue("@a", isActive ? 1 : 0);
+                ins.ExecuteNonQuery();
+            }
+        }
+    }
 }

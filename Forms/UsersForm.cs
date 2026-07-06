@@ -126,6 +126,61 @@ public partial class UsersForm : Form
         var lblPageTitle = new Label { Text = "\uD83D\uDC64 USER MANAGEMENT", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = t.AccentCyan, Location = new Point(20, 12), Size = new Size(300, 28) };
         pnlToolbar.Controls.Add(lblPageTitle);
 
+        var btnProfile = new Button { Text = "\uD83D\uDC64 MY PROFILE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentGreen, ForeColor = Color.White, Cursor = Cursors.Hand, Location = new Point(0, 8), Size = new Size(120, 34), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+        btnProfile.Click += (_, _) =>
+        {
+            if (_currentUser == null) return;
+            var panelBg = t.PanelBg;
+            var inputBg = t.InputBg;
+            var inputFg = t.InputFg;
+            var neonTitle = t.AccentCyan;
+            var dimText = t.TextMuted;
+            using var pf = new Form { Text = "My Profile", Size = new Size(380, 320), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, BackColor = t.CanvasBg };
+            var lblUser = new Label { Text = $"User: {_currentUser.Username}", Font = new Font("Segoe UI", 12F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(20, 15), Size = new Size(340, 25) };
+            var lblName = new Label { Text = $"Full Name: {_currentUser.FullName}", Font = new Font("Segoe UI", 10F), ForeColor = dimText, Location = new Point(20, 45), Size = new Size(340, 20) };
+            var lblRole = new Label { Text = $"Role: {_currentUser.Role}", Font = new Font("Segoe UI", 10F), ForeColor = dimText, Location = new Point(20, 68), Size = new Size(340, 20) };
+            var sep = new Panel { Location = new Point(20, 95), Size = new Size(340, 1), BackColor = t.BorderColor };
+            var lblChangePin = new Label { Text = "CHANGE PIN", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(20, 108), Size = new Size(200, 20) };
+            var lblOld = new Label { Text = "Current PIN:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(20, 135), Size = new Size(100, 22) };
+            var txtOld = new TextBox { Location = new Point(130, 133), Size = new Size(120, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, UseSystemPasswordChar = true, Font = new Font("Segoe UI", 9F) };
+            var lblNew = new Label { Text = "New PIN:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(20, 165), Size = new Size(100, 22) };
+            var txtNew = new TextBox { Location = new Point(130, 163), Size = new Size(120, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, UseSystemPasswordChar = true, Font = new Font("Segoe UI", 9F) };
+            var lblConfirm = new Label { Text = "Confirm:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(20, 195), Size = new Size(100, 22) };
+            var txtConfirm = new TextBox { Location = new Point(130, 193), Size = new Size(120, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg, UseSystemPasswordChar = true, Font = new Font("Segoe UI", 9F) };
+            var lblStatus = new Label { Text = "", Font = new Font("Segoe UI", 9F), ForeColor = t.AccentRed, Location = new Point(20, 225), Size = new Size(340, 20) };
+            var btnSavePin = new Button { Text = "CHANGE PIN", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentBlue, ForeColor = Color.White, Cursor = Cursors.Hand, Location = new Point(130, 245), Size = new Size(120, 30) };
+            btnSavePin.Click += (_, __) =>
+            {
+                if (txtOld.Text != _currentUser.PasswordHash)
+                {
+                    lblStatus.Text = "Current PIN is incorrect!";
+                    return;
+                }
+                if (string.IsNullOrWhiteSpace(txtNew.Text) || txtNew.Text.Length < 4)
+                {
+                    lblStatus.Text = "New PIN must be at least 4 characters";
+                    return;
+                }
+                if (txtNew.Text != txtConfirm.Text)
+                {
+                    lblStatus.Text = "PINs do not match!";
+                    return;
+                }
+                _currentUser.PasswordHash = txtNew.Text;
+                var error = UserService.Save(_currentUser, _currentUser.FullName);
+                if (error != null)
+                {
+                    lblStatus.Text = error;
+                    return;
+                }
+                MessageBox.Show("PIN changed successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                pf.Close();
+            };
+            pf.Controls.AddRange(new Control[] { lblUser, lblName, lblRole, sep, lblChangePin, lblOld, txtOld, lblNew, txtNew, lblConfirm, txtConfirm, lblStatus, btnSavePin });
+            pf.ShowDialog();
+        };
+        pnlToolbar.Controls.Add(btnProfile);
+
         // ── MAIN SPLIT ──
         var pnlMain = new Panel { Dock = DockStyle.Fill, BackColor = t.CanvasBg };
 

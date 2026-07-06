@@ -419,6 +419,15 @@ public partial class MainForm : Form
         _connTimer = new System.Windows.Forms.Timer { Interval = 10000 };
         _connTimer.Tick += async (_, _) => await CheckApiConnectionAsync();
         _connTimer.Start();
+
+        _ = SyncUsersFromCloudAsync();
+    }
+
+    private async Task SyncUsersFromCloudAsync()
+    {
+        var storeId = SyncService.StoreId;
+        if (string.IsNullOrEmpty(storeId) || storeId == "STORE-DEV-0001") return;
+        await SyncService.DownloadUsersAsync(storeId);
     }
 
     private static readonly Color _connGreen = Color.FromArgb(0, 200, 83);

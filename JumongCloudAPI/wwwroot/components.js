@@ -726,12 +726,61 @@ Alpine.store('app', {
 
   /* ΓöÇΓöÇ Users ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('usersList', () => ({
-    d: [], loading: true,
+    d: [], loading: true, modalOpen: false, modalTitle: '', editingId: null, form: {},
+
     async init() { window.addEventListener('load-users', () => this.load()); await this.load() },
     async load() {
       this.loading = true;
       try { this.d = await fetchJSON(API + '/users?' + Alpine.store('app').storeParam.replace('&', '')) } catch (e) { this.d = [] }
       this.loading = false;
+    },
+
+    openAdd() {
+      this.editingId = null;
+      this.form = { username: '', fullName: '', role: 'Cashier', passwordHash: '12345', storeId: '', isActive: true };
+      this.modalTitle = 'NEW USER';
+      this.modalOpen = true;
+    },
+
+    openEdit(x) {
+      this.editingId = x.posId;
+      this.form = {
+        username: x.username || '',
+        fullName: x.fullName || '',
+        role: x.role || 'Cashier',
+        passwordHash: '',
+        storeId: x.storeId || '',
+        isActive: x.isActive !== false
+      };
+      this.modalTitle = 'EDIT: ' + x.username;
+      this.modalOpen = true;
+    },
+
+    closeModal() { this.modalOpen = false; this.editingId = null },
+
+    async save() {
+      if (!this.form.username) { toast('Username is required', 'error'); return }
+      if (!this.form.storeId && !this.editingId) { toast('Select a store', 'error'); return }
+      try {
+        const method = this.editingId ? 'PUT' : 'POST';
+        const url = this.editingId ? API + '/dashboard/users/' + this.editingId : API + '/dashboard/users';
+        const body = { username: this.form.username, fullName: this.form.fullName, role: this.form.role, storeId: this.form.storeId, isActive: this.form.isActive };
+        if (this.form.passwordHash) body.passwordHash = this.form.passwordHash;
+        const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (!r.ok) { const j = await r.json(); throw new Error(j.error || 'Failed') }
+        toast((this.editingId ? 'Updated' : 'Created') + ' successfully', 'success');
+        this.modalOpen = false;
+        this.load();
+      } catch (e) { toast('Save failed: ' + e.message, 'error') }
+    },
+
+    async deleteUser(x) {
+      if (!confirm('Deactivate user "' + x.username + '"?')) return;
+      try {
+        await fetch(API + '/dashboard/users/' + x.posId, { method: 'DELETE' });
+        toast('User deactivated', 'success');
+        this.load();
+      } catch (e) { toast('Delete failed: ' + e.message, 'error') }
     }
   }));
 

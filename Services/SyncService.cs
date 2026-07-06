@@ -149,10 +149,27 @@ public static class SyncService
                 Username = user.Username,
                 Role = user.Role,
                 FullName = user.FullName,
-                IsActive = user.IsActive
+                IsActive = user.IsActive,
+                PasswordHash = user.PasswordHash
             }
         };
         await PostAsync("/users", data);
+    }
+
+    public static async Task DownloadUsersAsync(string storeId)
+    {
+        try
+        {
+            var url = ApiUrl.TrimEnd('/') + "/dashboard/users/download?storeId=" + Uri.EscapeDataString(storeId);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var response = await _client.GetAsync(url, cts.Token);
+            if (!response.IsSuccessStatusCode) return;
+            var json = await response.Content.ReadAsStringAsync();
+            var cloudUsers = JsonSerializer.Deserialize<List<JsonElement>>(json);
+            if (cloudUsers == null) return;
+            UserService.SyncFromCloud(cloudUsers);
+        }
+        catch { }
     }
 
     public static async Task SyncSale(Sale sale, List<SaleItem> items)

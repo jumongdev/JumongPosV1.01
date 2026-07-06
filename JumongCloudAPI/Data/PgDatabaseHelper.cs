@@ -263,6 +263,11 @@ public static class PgDatabaseHelper
         upMig.CommandText = "ALTER TABLE master_products ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()";
         try { upMig.ExecuteNonQuery(); } catch { }
 
+        // Migration: add password_hash to users for centralized PIN auth
+        using var pwMig = conn.CreateCommand();
+        pwMig.CommandText = "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT '12345'";
+        try { pwMig.ExecuteNonQuery(); } catch { }
+
         // Recreate unique constraints with store_id
         using var dropCmd = conn.CreateCommand();
         dropCmd.CommandText = @"

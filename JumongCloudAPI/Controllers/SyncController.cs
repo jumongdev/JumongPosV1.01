@@ -56,10 +56,10 @@ public class SyncController : ControllerBase
     public IActionResult SyncUsers([FromBody] List<JsonElement> items)
     {
         var sid = StoreId();
-        return SyncTable("users", items, new[] { "pos_id", "username", "role", "full_name", "is_active" },
-            "INSERT INTO users (pos_id, store_id, username, role, full_name, is_active, synced_at) " +
-            "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,NOW()) " +
-            "ON CONFLICT (store_id, pos_id) DO UPDATE SET username=@p1, role=@p2, full_name=@p3, is_active=@p4, synced_at=NOW()", sid);
+        return SyncTable("users", items, new[] { "pos_id", "username", "role", "full_name", "is_active", "password_hash" },
+            "INSERT INTO users (pos_id, store_id, username, role, full_name, is_active, password_hash, synced_at) " +
+            "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,NOW()) " +
+            "ON CONFLICT (store_id, pos_id) DO UPDATE SET username=@p1, role=@p2, full_name=@p3, is_active=@p4, password_hash=COALESCE(@p5, password_hash), synced_at=NOW()", sid);
     }
 
     [HttpPost("sales")]
