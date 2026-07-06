@@ -543,6 +543,22 @@ public class DatabaseHelper
             logUrl.ExecuteNonQuery();
         }
 
+        // Fix stale DigitalOcean cloud API URL → local server
+        using var fixUrl2 = new SQLiteCommand(
+            "UPDATE Settings SET Value = 'https://admin.jumongdev.com/api' WHERE Key = 'CloudApiUrl' AND Value LIKE '%digitalocean%'",
+            conn);
+        if (fixUrl2.ExecuteNonQuery() > 0)
+        {
+            using var logUrl2 = new SQLiteCommand(
+                "INSERT OR IGNORE INTO SyncLog (Endpoint, Status, Error, CreatedAt) VALUES ('/migration', 'OK', 'Fixed stale CloudApiUrl (DO→local)', datetime('now','localtime'))",
+                conn);
+            logUrl2.ExecuteNonQuery();
+        }
+
+        // Clear stale SyncQueue entries that failed against old DO URL
+        using var clearQueue = new SQLiteCommand("DELETE FROM SyncQueue", conn);
+        clearQueue.ExecuteNonQuery();
+
         SeedDefaults(conn);
     }
 
