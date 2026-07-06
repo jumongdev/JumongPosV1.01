@@ -125,6 +125,14 @@ public static class UserService
         }
     }
 
+    public static void DeleteAllNonAdmin()
+    {
+        using var conn = DatabaseHelper.GetConnection();
+        conn.Open();
+        using var cmd = new SQLiteCommand("DELETE FROM Users WHERE LOWER(Username) != 'admin'", conn);
+        cmd.ExecuteNonQuery();
+    }
+
     private static User Map(SQLiteDataReader rdr)
     {
         return new User

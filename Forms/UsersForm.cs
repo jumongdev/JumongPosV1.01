@@ -170,6 +170,17 @@ public partial class UsersForm : Form
             btnRefreshCloud = new Button { Text = "\u2B06 REFRESH FROM CLOUD", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentBlue, ForeColor = Color.White, Cursor = Cursors.Hand, Location = new Point(12, 350), Size = new Size(200, 34) };
             btnRefreshCloud.Click += btnRefreshCloud_Click;
             pnlGrid.Controls.Add(btnRefreshCloud);
+
+            var btnCleanLocal = new Button { Text = "\uD83E\uDDF9 CLEAN LOCAL", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentRed, ForeColor = Color.White, Cursor = Cursors.Hand, Location = new Point(220, 350), Size = new Size(150, 34) };
+            btnCleanLocal.Click += (_, _) =>
+            {
+                if (MessageBox.Show("Remove ALL non-admin users from this POS client?\n\nThis only affects this machine. Cloud users are not affected.", "Clean Local Users", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+                if (MessageBox.Show("FINAL WARNING: This cannot be undone. All local non-admin users will be deleted permanently.", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) != DialogResult.Yes) return;
+                UserService.DeleteAllNonAdmin();
+                LoadUsers();
+                MessageBox.Show("All non-admin users have been removed from this POS.", "Cleaned", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            };
+            pnlGrid.Controls.Add(btnCleanLocal);
         }
 
         pnlMain.Controls.Add(pnlGrid);
