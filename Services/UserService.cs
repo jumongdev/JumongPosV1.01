@@ -207,18 +207,19 @@ public static class UserService
         }
 
         // Deactivate local users not in cloud response (keep admin active)
+        // Append '_1' to freed usernames so they can be reused from cloud
         var keep = cloudUsernames.Where(u => !string.IsNullOrEmpty(u) && !u.Equals("admin", StringComparison.OrdinalIgnoreCase)).ToList();
         if (keep.Count > 0)
         {
             using var deactCmd = new SQLiteCommand(conn);
             var phs = keep.Select((_, i) => $"@u{i}").ToList();
             for (var i = 0; i < keep.Count; i++) deactCmd.Parameters.AddWithValue($"@u{i}", keep[i]);
-            deactCmd.CommandText = $"UPDATE Users SET IsActive = 0 WHERE LOWER(Username) != 'admin' AND IsActive = 1 AND LOWER(Username) NOT IN ({string.Join(",", phs)})";
+            deactCmd.CommandText = $"UPDATE Users SET IsActive = 0, Username = Username || '_1' WHERE LOWER(Username) != 'admin' AND IsActive = 1 AND LOWER(Username) NOT IN ({string.Join(",", phs)})";
             deactCmd.ExecuteNonQuery();
         }
         else
         {
-            using var deactCmd = new SQLiteCommand("UPDATE Users SET IsActive = 0 WHERE LOWER(Username) != 'admin' AND IsActive = 1", conn);
+            using var deactCmd = new SQLiteCommand("UPDATE Users SET IsActive = 0, Username = Username || '_1' WHERE LOWER(Username) != 'admin' AND IsActive = 1", conn);
             deactCmd.ExecuteNonQuery();
         }
     }
