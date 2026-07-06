@@ -395,7 +395,7 @@ public class DashboardController : ControllerBase
             delUs.ExecuteNonQuery();
 
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "UPDATE users SET is_active = false, synced_at = NOW() WHERE pos_id = @pid";
+            cmd.CommandText = "UPDATE users SET is_active = false, username = username || '_1', synced_at = NOW() WHERE pos_id = @pid";
             cmd.Parameters.AddWithValue("pid", posId);
             cmd.ExecuteNonQuery();
 
