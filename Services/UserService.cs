@@ -206,19 +206,20 @@ public static class UserService
             }
         }
 
-        // Deactivate local users not in cloud response (except built-in admin)
-        if (cloudUsernames.Count > 1 || (cloudUsernames.Count == 1 && !cloudUsernames.Contains("admin")))
+        // Deactivate local users not in cloud response (keep admin active)
+        var keep = cloudUsernames.Where(u => !string.IsNullOrEmpty(u) && !u.Equals("admin", StringComparison.OrdinalIgnoreCase)).ToList();
+        if (keep.Count > 0)
         {
-            var usernames = cloudUsernames.Where(u => !string.IsNullOrEmpty(u) && !u.Equals("admin", StringComparison.OrdinalIgnoreCase)).ToList();
-            if (usernames.Count > 0)
-            {
-                using var deactCmd = new SQLiteCommand(conn);
-                var placeholders = usernames.Select((_, i) => $"@u{i}").ToList();
-                for (var i = 0; i < usernames.Count; i++)
-                    deactCmd.Parameters.AddWithValue($"@u{i}", usernames[i]);
-                deactCmd.CommandText = $"UPDATE Users SET IsActive = 0 WHERE LOWER(Username) != 'admin' AND IsActive = 1 AND LOWER(Username) NOT IN ({string.Join(",", placeholders)})";
-                deactCmd.ExecuteNonQuery();
-            }
+            using var deactCmd = new SQLiteCommand(conn);
+            var phs = keep.Select((_, i) => $"@u{i}").ToList();
+            for (var i = 0; i < keep.Count; i++) deactCmd.Parameters.AddWithValue($"@u{i}", keep[i]);
+            deactCmd.CommandText = $"UPDATE Users SET IsActive = 0 WHERE LOWER(Username) != 'admin' AND IsActive = 1 AND LOWER(Username) NOT IN ({string.Join(",", phs)})";
+            deactCmd.ExecuteNonQuery();
+        }
+        else
+        {
+            using var deactCmd = new SQLiteCommand("UPDATE Users SET IsActive = 0 WHERE LOWER(Username) != 'admin' AND IsActive = 1", conn);
+            deactCmd.ExecuteNonQuery();
         }
     }
 }
