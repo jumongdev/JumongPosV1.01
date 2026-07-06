@@ -1507,7 +1507,7 @@ tailwind.config = {
                   <div class="flex flex-wrap gap-2 mt-1">
                     <template x-for="[sid, sname] in Object.entries($store.app.storeMap)" :key="sid">
                       <label class="flex items-center gap-1 text-xs text-gray-600 dark:text-[#7878aa] cursor-pointer px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-[#181848]">
-                        <input type="checkbox" :checked="form.storeIds.includes(sid)" @click="toggleStore(sid)" class="rounded">
+                        <input type="checkbox" :checked="(form.storeIds||[]).includes(sid)" @click="toggleStore(sid)" class="rounded">
                         <span x-text="sname"></span>
                       </label>
                     </template>

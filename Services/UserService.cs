@@ -155,22 +155,26 @@ public static class UserService
     {
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
+
+        var cloudUsernames = new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+
         foreach (var cu in cloudUsers)
         {
-            var posId = cu.GetProperty("posId").GetInt32();
             var username = cu.GetProperty("username").GetString() ?? "";
+            cloudUsernames.Add(username);
+
             var fullName = cu.TryGetProperty("fullName", out var fn) ? fn.GetString() ?? "" : "";
             var role = cu.TryGetProperty("role", out var rl) ? rl.GetString() ?? "Cashier" : "Cashier";
             var isActive = cu.TryGetProperty("isActive", out var ia) ? ia.GetBoolean() : true;
-            var passwordHash = cu.TryGetProperty("passwordHash", out var ph) ? ph.GetString() ?? "12345" : "12345";
 
             // Check if user exists locally
-            using var chk = new SQLiteCommand("SELECT Id, PasswordHash FROM Users WHERE Username = @u", conn);
+            using var chk = new SQLiteCommand("SELECT COUNT(*) FROM Users WHERE Username = @u", conn);
             chk.Parameters.AddWithValue("@u", username);
-            var existing = chk.ExecuteScalar();
-            if (existing != null && existing != DBNull.Value)
+            var exists = Convert.ToInt32(chk.ExecuteScalar()) > 0;
+
+            if (exists)
             {
-                // User exists — update fields but keep local password
+                // Update fields but keep local password
                 using var upd = new SQLiteCommand(
                     "UPDATE Users SET FullName=@f, Role=@r, IsActive=@a WHERE Username=@u", conn);
                 upd.Parameters.AddWithValue("@u", username);
@@ -182,6 +186,7 @@ public static class UserService
             else
             {
                 // New user — create with cloud password
+                var passwordHash = cu.TryGetProperty("passwordHash", out var ph) ? ph.GetString() ?? "12345" : "12345";
                 using var ins = new SQLiteCommand(
                     "INSERT INTO Users (Username, FullName, PasswordHash, Role, IsActive) VALUES (@u, @f, @p, @r, @a)", conn);
                 ins.Parameters.AddWithValue("@u", username);
@@ -191,6 +196,25 @@ public static class UserService
                 ins.Parameters.AddWithValue("@a", isActive ? 1 : 0);
                 ins.ExecuteNonQuery();
             }
+        }
+
+        // Deactivate local users not in cloud response (except built-in admin)
+        var usernames = cloudUsernames.Where(u => !string.IsNullOrEmpty(u) && !u.Equals("admin", StringComparison.OrdinalIgnoreCase)).ToList();
+        if (usernames.Count > 0)
+        {
+            using var deactCmd = new SQLiteCommand(conn);
+            var placeholders = usernames.Select((_, i) => $"@u{i}").ToList();
+            for (var i = 0; i < usernames.Count; i++)
+                deactCmd.Parameters.AddWithValue($"@u{i}", usernames[i]);
+            deactCmd.CommandText = $"UPDATE Users SET IsActive = 0 WHERE LOWER(Username) != 'admin' AND IsActive = 1 AND LOWER(Username) NOT IN ({string.Join(",", placeholders)})";
+            deactCmd.ExecuteNonQuery();
+        }
+        else
+        {
+            // No cloud users — deactivate all except admin
+            using var deactCmd = new SQLiteCommand(
+                "UPDATE Users SET IsActive = 0 WHERE LOWER(Username) != 'admin' AND IsActive = 1", conn);
+            deactCmd.ExecuteNonQuery();
         }
     }
 }
