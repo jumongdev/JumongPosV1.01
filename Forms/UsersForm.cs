@@ -171,7 +171,7 @@ public partial class UsersForm : Form
             btnRefreshCloud.Click += btnRefreshCloud_Click;
             pnlGrid.Controls.Add(btnRefreshCloud);
 
-            var btnCleanLocal = new Button { Text = "\uD83E\uDDF9 CLEAN LOCAL", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentRed, ForeColor = Color.White, Cursor = Cursors.Hand, Location = new Point(220, 350), Size = new Size(150, 34) };
+            btnCleanLocal = new Button { Text = "\uD83E\uDDF9 CLEAN LOCAL", Font = new Font("Segoe UI", 9F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentRed, ForeColor = Color.White, Cursor = Cursors.Hand, Location = new Point(220, 350), Size = new Size(150, 34) };
             btnCleanLocal.Click += (_, _) =>
             {
                 if (MessageBox.Show("Remove ALL non-admin users from this POS client?\n\nThis only affects this machine. Cloud users are not affected.", "Clean Local Users", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
@@ -203,7 +203,11 @@ public partial class UsersForm : Form
         dgv.Location = new Point(8, 32);
         dgv.Size = new Size(availW - 16, availH - 90);
         if (btnRefreshCloud != null)
+        {
             btnRefreshCloud.Location = new Point(12, availH - 50);
+            if (btnCleanLocal != null)
+                btnCleanLocal.Location = new Point(220, availH - 50);
+        }
     }
 
     public void ApplyTheme()
@@ -215,4 +219,5 @@ public partial class UsersForm : Form
 
     private DataGridView dgvUsers = null!;
     private Button? btnRefreshCloud;
+    private Button? btnCleanLocal;
 }
