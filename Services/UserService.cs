@@ -214,12 +214,12 @@ public static class UserService
             using var deactCmd = new SQLiteCommand(conn);
             var phs = keep.Select((_, i) => $"@u{i}").ToList();
             for (var i = 0; i < keep.Count; i++) deactCmd.Parameters.AddWithValue($"@u{i}", keep[i]);
-            deactCmd.CommandText = $"UPDATE Users SET IsActive = 0, Username = Username || '_1' WHERE LOWER(Username) != 'admin' AND IsActive = 1 AND LOWER(Username) NOT IN ({string.Join(",", phs)})";
+            deactCmd.CommandText = $"UPDATE Users SET IsActive = 0, Username = Username || '_' || Id WHERE LOWER(Username) != 'admin' AND IsActive = 1 AND LOWER(Username) NOT IN ({string.Join(",", phs)})";
             deactCmd.ExecuteNonQuery();
         }
         else
         {
-            using var deactCmd = new SQLiteCommand("UPDATE Users SET IsActive = 0, Username = Username || '_1' WHERE LOWER(Username) != 'admin' AND IsActive = 1", conn);
+            using var deactCmd = new SQLiteCommand("UPDATE Users SET IsActive = 0, Username = Username || '_' || Id WHERE LOWER(Username) != 'admin' AND IsActive = 1", conn);
             deactCmd.ExecuteNonQuery();
         }
     }
