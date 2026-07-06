@@ -66,7 +66,7 @@ public class DailyCloseService
 
         // Add split payment portions
         var splitSql = $@"SELECT 
-            COALESCE(SUM(CASE WHEN s.IsVoided = 0 THEN s.CashPaid ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN s.IsVoided = 0 THEN s.GrandTotal - s.EwPaid ELSE 0 END), 0),
             COALESCE(SUM(CASE WHEN s.IsVoided = 0 THEN s.EwPaid ELSE 0 END), 0)
             FROM Sales s WHERE s.PaymentMethod = 'Split' AND {cond}";
         using var splitCmd = new SQLiteCommand(splitSql, conn);
@@ -400,6 +400,42 @@ public class DailyCloseService
     {
         try { return Convert.ToDecimal(rdr[column]); }
         catch { return 0m; }
+    }
+
+    public static List<DailyVariance> GetDailyVariance()
+    {
+        var list = new List<DailyVariance>();
+        using var conn = DatabaseHelper.GetConnection();
+        conn.Open();
+        var sql = @"SELECT date(CloseDate) AS Day,
+                           COUNT(*) AS Shifts,
+                           GROUP_CONCAT(DISTINCT UserName) AS Cashiers,
+                           SUM(TotalSales) AS Sales,
+                           SUM(TotalCash) AS Cash,
+                           SUM(TotalEWallet) AS EWallet,
+                           SUM(CashOnHand) AS CashCounted,
+                           SUM(Difference) AS TotalVariance
+                    FROM DailyClose
+                    GROUP BY date(CloseDate)
+                    ORDER BY Day DESC
+                    LIMIT 90";
+        using var cmd = new SQLiteCommand(sql, conn);
+        using var rdr = cmd.ExecuteReader();
+        while (rdr.Read())
+        {
+            list.Add(new DailyVariance
+            {
+                Date = rdr["Day"].ToString() ?? "",
+                Shifts = Convert.ToInt32(rdr["Shifts"]),
+                Cashiers = rdr["Cashiers"]?.ToString() ?? "",
+                TotalSales = Convert.ToDecimal(rdr["Sales"]),
+                TotalCash = Convert.ToDecimal(rdr["Cash"]),
+                TotalEWallet = Convert.ToDecimal(rdr["EWallet"]),
+                CashCounted = Convert.ToDecimal(rdr["CashCounted"]),
+                TotalVariance = Convert.ToDecimal(rdr["TotalVariance"])
+            });
+        }
+        return list;
     }
 
     public static List<(string Date, int ShiftCount, decimal TotalSales, decimal TotalExpenses, decimal AvgVariance)> GetShiftComparison()

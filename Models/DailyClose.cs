@@ -25,3 +25,15 @@ public class DailyClose
     public int UserId { get; set; }
     public string UserName { get; set; } = "";
 }
+
+public class DailyVariance
+{
+    public string Date { get; set; } = "";
+    public int Shifts { get; set; }
+    public string Cashiers { get; set; } = "";
+    public decimal TotalSales { get; set; }
+    public decimal TotalCash { get; set; }
+    public decimal TotalEWallet { get; set; }
+    public decimal CashCounted { get; set; }
+    public decimal TotalVariance { get; set; }
+}

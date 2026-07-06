@@ -12,3 +12,14 @@ JumongCloudAPI/bin/
 JumongCloudAPI/obj/
 JumongCloudAPI/out/
 AGENTS.md
+
+# Database dumps and logs
+*.sql
+*_schema.txt
+*_err.txt
+*_log.txt
+server_err.txt
+server_log.txt
+do_dump.sql
+do_schema.txt
+local_schema.txt

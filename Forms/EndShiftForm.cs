@@ -76,7 +76,7 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
     var creditCustomers = DailyCloseService.GetCreditCustomersSinceLastClose();
     var creditPayments = DailyCloseService.GetCreditPaymentsSinceLastClose();
 
-    var diff = cashOnHand + _totalExpenses - _totalCash - _creditPayCash;
+    var diff = cashOnHand + _totalExpenses - _totalCash - _creditPayCash - _openingBalance;
     var now = TimeHelper.Now;
 
     var dc = new DailyClose 
@@ -154,7 +154,7 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
     
     LoadTotals();
     
-    var diff = cashOnHand + _totalExpenses - _totalCash - _creditPayCash;
+    var diff = cashOnHand + _totalExpenses - _totalCash - _creditPayCash - _openingBalance;
     
     var expenses = ExpenseService.GetExpensesForCurrentShift();
     var gcashTxns = DailyCloseService.GetGcashTransactionsSinceLastClose();
@@ -170,7 +170,7 @@ private void btnEmail_Click(object? sender, EventArgs e)
     
     LoadTotals();
     
-    var diff = cashOnHand + _totalExpenses - _totalCash - _creditPayCash;
+    var diff = cashOnHand + _totalExpenses - _totalCash - _creditPayCash - _openingBalance;
     
     var expenses = ExpenseService.GetExpensesForCurrentShift();
     var gcashTxns = DailyCloseService.GetGcashTransactionsSinceLastClose();
@@ -259,10 +259,59 @@ private void btnEmail_Click(object? sender, EventArgs e)
             tf.Controls.AddRange(new Control[] { td, tp, tt });
             tf.ShowDialog();
         };
+        var btnVariance = new Button { Text = "\uD83D\uDCCB DAILY O/S", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(280, 10), Size = new Size(110, 30), BackColor = t2.AccentOrange, ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+        btnVariance.Click += (_, __) =>
+        {
+            var data = DailyCloseService.GetDailyVariance();
+            using var vf = new Form { Text = "Daily Over/Short Tracker", WindowState = FormWindowState.Maximized, StartPosition = FormStartPosition.CenterScreen, FormBorderStyle = FormBorderStyle.Sizable, BackColor = canvasBg };
+            var vt = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = panelBg };
+            vt.Paint += (s, ev) => { using var pen = new Pen(borderColor, 1); ev.Graphics.DrawLine(pen, 0, vt.Height - 1, vt.Width, vt.Height - 1); };
+            var vl = new Label { Text = "\uD83D\uDCCB DAILY OVER/SHORT TRACKER (90 days)", Font = new Font("Segoe UI", 13F, FontStyle.Bold), ForeColor = neonTitle, Location = new Point(20, 12), Size = new Size(500, 28) };
+            vt.Controls.Add(vl);
+            var vd = new DataGridView { Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = panelBg, BorderStyle = BorderStyle.None, GridColor = t2.DgvGrid, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = t2.DgvHeaderBg, ForeColor = neonTitle, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = t2.DgvRowNormal, ForeColor = t2.TextPrimary, SelectionBackColor = t2.DgvSelection, SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = t2.DgvRowAlt } };
+            vd.AutoGenerateColumns = false;
+            vd.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Date", HeaderText = "DATE", Width = 100 });
+            vd.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Shifts", HeaderText = "SFT", Width = 50 });
+            vd.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Cashiers", HeaderText = "CASHIER(S)", Width = 140 });
+            vd.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "TotalSales", HeaderText = "SALES", Width = 110, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", ForeColor = t2.TextPrimary } });
+            vd.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "TotalCash", HeaderText = "CASH", Width = 100, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2" } });
+            vd.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "TotalEWallet", HeaderText = "E-WALLET", Width = 100, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2" } });
+            vd.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "CashCounted", HeaderText = "IN HAND", Width = 100, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", ForeColor = t2.AccentCyan, Font = new Font("Segoe UI", 9F, FontStyle.Bold) } });
+            vd.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "TotalVariance", HeaderText = "O/S", Width = 110, DefaultCellStyle = new DataGridViewCellStyle { Format = "+0.00;-0.00;0", Font = new Font("Segoe UI", 10F, FontStyle.Bold) } });
+            vd.CellFormatting += (s, ev) =>
+            {
+                if (ev.ColumnIndex == 7 && ev.Value is decimal d && ev.CellStyle != null)
+                {
+                    if (d > 10) { ev.CellStyle.ForeColor = t2.AccentGreen; ev.Value = "+" + d.ToString("N2"); }
+                    else if (d < -10) { ev.CellStyle.ForeColor = t2.AccentRed; ev.Value = d.ToString("N2"); }
+                    else { ev.CellStyle.ForeColor = t2.TextMuted; ev.Value = d >= 0 ? "+" + d.ToString("N2") : d.ToString("N2"); }
+                }
+            };
+            var totalVariance = data.Sum(x => x.TotalVariance);
+            var displayData = data.Select(x => new
+            {
+                x.Date, x.Shifts, x.Cashiers, x.TotalSales, x.TotalCash, x.TotalEWallet, CashCounted = x.CashCounted,
+                TotalVariance = x.TotalVariance
+            }).ToList();
+            displayData.Add(new
+            {
+                Date = "CUMULATIVE", Shifts = data.Sum(x => x.Shifts), Cashiers = "",
+                TotalSales = data.Sum(x => x.TotalSales), TotalCash = data.Sum(x => x.TotalCash),
+                TotalEWallet = data.Sum(x => x.TotalEWallet), CashCounted = data.Sum(x => x.CashCounted),
+                TotalVariance = totalVariance
+            });
+            vd.DataSource = displayData;
+            var vc = new Button { Text = "CLOSE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(20, 10), Size = new Size(100, 30), BackColor = accentBlue, ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+            vc.Click += (_, __) => vf.Close();
+            var vp = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = canvasBg };
+            vp.Controls.Add(vc);
+            vf.Controls.AddRange(new Control[] { vd, vp, vt });
+            vf.ShowDialog();
+        };
         var btnClose = new Button { Text = "CLOSE", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(170, 10), Size = new Size(100, 30), BackColor = t2.AccentGrey, ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
         btnClose.Click += (_, __) => form.Close();
         var pnlBtn = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = canvasBg };
-        pnlBtn.Controls.AddRange(new Control[] { btnReprint, btnTrends, btnClose });
+        pnlBtn.Controls.AddRange(new Control[] { btnReprint, btnTrends, btnVariance, btnClose });
         form.Controls.AddRange(new Control[] { dgv, pnlBtn, pnlToolbar });
         form.ShowDialog();
     }

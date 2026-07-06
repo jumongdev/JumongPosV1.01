@@ -976,7 +976,7 @@ tailwind.config = {
                         <td class="px-3 py-2" x-text="x.id"></td>
                         <td class="px-3 py-2" x-text="x.clientName"></td>
                         <td class="px-3 py-2 font-semibold" :style="'color:'+(x.status==='pending'?'#f39c12':x.status==='processing'?'#2980b9':x.status==='shipped'?'#2ecc71':x.status==='received'?'#3498db':x.status==='partial'?'#e67e22':x.status==='cancelled'?'#e74c3c':'red')">
-                          <span x-text="x.status.toUpperCase()"></span>
+                          <span x-text="(x.status || '').toUpperCase()"></span>
                           <span x-show="x.hasShortage" class="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">PARTIAL</span>
                         </td>
                         <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.totalAmount)"></span></td>
@@ -1020,7 +1020,7 @@ tailwind.config = {
                         <td class="px-3 py-2" x-text="x.id"></td>
                         <td class="px-3 py-2" x-text="x.clientName"></td>
                         <td class="px-3 py-2 font-semibold" :style="'color:'+(x.status==='pending'?'#f39c12':x.status==='completed'?'#2ecc71':x.status==='partial'?'#e67e22':'red')">
-                          <span x-text="x.status.toUpperCase()"></span>
+                          <span x-text="(x.status || '').toUpperCase()"></span>
                           <span x-show="x.hasShortage" class="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">PARTIAL</span>
                         </td>
                         <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.notes || ''"></td>

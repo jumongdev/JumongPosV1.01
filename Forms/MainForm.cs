@@ -13,7 +13,9 @@ public partial class MainForm : Form
     private readonly CustomerDisplayForm _customerDisplay;
     private System.Windows.Forms.Timer? _schedulerTimer;
     private System.Windows.Forms.Timer? _transferTimer;
+    private System.Windows.Forms.Timer? _connTimer;
     private static int _lastTransferCount;
+    private Label _lblConnStatus = null!;
 
     private string? _lastDailyReportSent;
 
@@ -398,10 +400,34 @@ public partial class MainForm : Form
         btnSettings = CreateMenuButton("Settings", 0, 670, btnSettings_Click, cardBg, textColor, hoverBg);
         btnLogout = CreateMenuButton("Logout", 0, 725, btnLogout_Click, t.SidebarLogoutBg, t.SidebarLogoutFg, t.SidebarLogoutHover);
 
-        Controls.AddRange(new Control[] { title, userInfo, divider, btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnOnlineOrders, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout });
+        _lblConnStatus = new Label
+        {
+            Text = "Checking API...",
+            Font = new Font("Segoe UI", 8F),
+            ForeColor = t.SidebarUserInfo,
+            Location = new Point(60, 780),
+            Size = new Size(400, 20),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+
+        Controls.AddRange(new Control[] { title, userInfo, divider, btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnOnlineOrders, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout, _lblConnStatus });
 
         _menuButtons = new Button[] { btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnOnlineOrders, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout };
         LayoutMenuButtons();
+
+        _ = CheckApiConnectionAsync();
+        _connTimer = new System.Windows.Forms.Timer { Interval = 10000 };
+        _connTimer.Tick += async (_, _) => await CheckApiConnectionAsync();
+        _connTimer.Start();
+    }
+
+    private static readonly Color _connGreen = Color.FromArgb(0, 200, 83);
+    private static readonly Color _connRed = Color.FromArgb(255, 82, 82);
+    private async Task CheckApiConnectionAsync()
+    {
+        var connected = await SyncService.CheckConnectionAsync();
+        _lblConnStatus.Text = connected ? "● Connected" : "● Disconnected";
+        _lblConnStatus.ForeColor = connected ? _connGreen : _connRed;
     }
 
     private void LayoutMenuButtons()

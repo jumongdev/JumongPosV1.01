@@ -779,6 +779,18 @@ public static class SyncService
         catch { }
         return null;
     }
+
+    public static async Task<bool> CheckConnectionAsync()
+    {
+        try
+        {
+            var url = ApiUrl.TrimEnd('/') + "/dashboard/version";
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            var response = await _client.GetAsync(url, cts.Token);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
 }
 
 public class ReceiveResult
