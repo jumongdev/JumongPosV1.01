@@ -159,7 +159,7 @@ public static class SyncService
     public static async Task<int> DownloadUsersAsync(string storeId)
     {
         var url = ApiUrl.TrimEnd('/') + "/dashboard/users/download?storeId=" + Uri.EscapeDataString(storeId);
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         var response = await _client.GetAsync(url, cts.Token);
         if (!response.IsSuccessStatusCode)
             throw new Exception($"API returned {response.StatusCode}");

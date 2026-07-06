@@ -420,14 +420,16 @@ public partial class MainForm : Form
         _connTimer.Tick += async (_, _) => await CheckApiConnectionAsync();
         _connTimer.Start();
 
-        _ = SyncUsersFromCloudAsync();
-    }
-
-    private async Task SyncUsersFromCloudAsync()
-    {
-        var storeId = SyncService.StoreId;
-        if (string.IsNullOrEmpty(storeId)) return;
-        try { await SyncService.DownloadUsersAsync(storeId); } catch { }
+        // Delay user sync to avoid slowing down app startup
+        var syncTimer = new System.Windows.Forms.Timer { Interval = 8000 };
+        syncTimer.Tick += async (_, _) =>
+        {
+            syncTimer.Stop();
+            var storeId = SyncService.StoreId;
+            if (string.IsNullOrEmpty(storeId) || storeId == "STORE-DEV-0001") return;
+            try { await SyncService.DownloadUsersAsync(storeId); } catch { }
+        };
+        syncTimer.Start();
     }
 
     private static readonly Color _connGreen = Color.FromArgb(0, 200, 83);
