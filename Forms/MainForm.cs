@@ -426,8 +426,8 @@ public partial class MainForm : Form
     private async Task SyncUsersFromCloudAsync()
     {
         var storeId = SyncService.StoreId;
-        if (string.IsNullOrEmpty(storeId) || storeId == "STORE-DEV-0001") return;
-        await SyncService.DownloadUsersAsync(storeId);
+        if (string.IsNullOrEmpty(storeId)) return;
+        try { await SyncService.DownloadUsersAsync(storeId); } catch { }
     }
 
     private static readonly Color _connGreen = Color.FromArgb(0, 200, 83);

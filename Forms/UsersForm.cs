@@ -51,9 +51,9 @@ public partial class UsersForm : Form
     private async void btnRefreshCloud_Click(object? sender, EventArgs e)
     {
         var storeId = SyncService.StoreId;
-        if (string.IsNullOrEmpty(storeId) || storeId == "STORE-DEV-0001")
+        if (string.IsNullOrEmpty(storeId))
         {
-            MessageBox.Show("Cloud sync not configured for this store.", "Sync", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            MessageBox.Show("Store ID not configured. Go to Settings to set up cloud sync.", "Sync", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
         btnRefreshCloud.Enabled = false;
