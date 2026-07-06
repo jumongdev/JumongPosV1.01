@@ -1458,7 +1458,7 @@ tailwind.config = {
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Full Name</th>
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Role</th>
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Active</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Store ID</th>
+                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Stores</th>
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
                 </tr></thead>
                 <tbody>
@@ -1468,7 +1468,12 @@ tailwind.config = {
                       <td class="px-3 py-2" x-text="x.fullName || ''"></td>
                       <td class="px-3 py-2"><span :class="x.role==='Admin'?'text-purple-500':'text-cyan-500'" x-text="x.role"></span></td>
                       <td class="px-3 py-2"><span :class="x.isActive ? 'text-emerald-500' : 'text-red-500'" x-text="x.isActive ? 'Active' : 'Inactive'"></span></td>
-                      <td class="px-3 py-2"><span class="text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded" x-text="shortStore(x.storeId, $store.app.storeMap[x.storeId])"></span></td>
+                      <td class="px-3 py-2">
+                        <template x-for="sid in (x.storeIds || [])" :key="sid">
+                          <span class="inline-block text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded mr-1 mb-0.5" x-text="shortStore(sid, $store.app.storeMap[sid])"></span>
+                        </template>
+                        <span x-show="!x.storeIds || !x.storeIds.length" class="text-gray-400">—</span>
+                      </td>
                       <td class="px-3 py-2">
                         <button @click="openEdit(x)" class="text-[11px] px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/40 mr-1">EDIT</button>
                         <button @click="deleteUser(x)" class="text-[11px] px-2 py-1 rounded bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/40">DEL</button>
@@ -1499,13 +1504,15 @@ tailwind.config = {
                   </select>
                 </div>
                 <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">PIN (default: 12345)</label><input type="password" x-model="form.passwordHash" placeholder="12345" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
-                <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">STORE</label>
-                  <select x-model="form.storeId" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                    <option value="">— Select Store —</option>
-                    <template x-for="s in Object.keys($store.app.storeMap)" :key="s">
-                      <option :value="s" x-text="$store.app.storeMap[s]"></option>
+                <div class="col-span-2"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">ACCESS TO STORES</label>
+                  <div class="flex flex-wrap gap-2 mt-1">
+                    <template x-for="[sid, sname] in Object.entries($store.app.storeMap)" :key="sid">
+                      <label class="flex items-center gap-1 text-xs text-gray-600 dark:text-[#7878aa] cursor-pointer px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-[#181848]">
+                        <input type="checkbox" :value="sid" x-model="form.storeIds" class="rounded">
+                        <span x-text="sname"></span>
+                      </label>
                     </template>
-                  </select>
+                  </div>
                 </div>
                 <div class="flex items-center"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] flex items-center gap-2"><input type="checkbox" x-model="form.isActive" class="rounded"> Active</label></div>
               </div>

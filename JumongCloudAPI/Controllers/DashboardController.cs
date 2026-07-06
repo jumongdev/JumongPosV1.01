@@ -263,12 +263,21 @@ public class DashboardController : ControllerBase
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = $@"SELECT u.pos_id, u.username, u.role, u.full_name, u.is_active, u.store_id, u.password_hash
-                FROM users u WHERE 1=1 {StoreFilter(storeId, "u")} ORDER BY u.username LIMIT 500";
+            cmd.CommandText = $@"
+                SELECT u.pos_id, u.username, u.role, u.full_name, u.is_active, u.password_hash,
+                       COALESCE((SELECT json_agg(us.store_id) FROM user_stores us WHERE us.user_pos_id = u.pos_id), '[]'::json) AS store_ids
+                FROM users u
+                WHERE 1=1 {StoreFilter(storeId, "u")}
+                GROUP BY u.pos_id, u.username, u.role, u.full_name, u.is_active, u.password_hash
+                ORDER BY u.username LIMIT 500";
             if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
             var data = new List<object>();
             using var r = cmd.ExecuteReader();
-            while (r.Read()) data.Add(new { posId = r.GetInt32(0), username = r.GetString(1), role = r.GetString(2), fullName = r.IsDBNull(3) ? "" : r.GetString(3), isActive = r.GetBoolean(4), storeId = r.GetString(5), passwordHash = r.IsDBNull(6) ? "12345" : r.GetString(6) });
+            while (r.Read())
+            {
+                var storeIds = r.IsDBNull(6) ? new List<string>() : System.Text.Json.JsonSerializer.Deserialize<List<string>>(r.GetString(6)) ?? new();
+                data.Add(new { posId = r.GetInt32(0), username = r.GetString(1), role = r.GetString(2), fullName = r.IsDBNull(3) ? "" : r.GetString(3), isActive = r.GetBoolean(4), passwordHash = r.IsDBNull(5) ? "12345" : r.GetString(5), storeIds });
+            }
             return Ok(data);
         }
 
@@ -278,61 +287,75 @@ public class DashboardController : ControllerBase
             var username = body.GetProperty("username").GetString() ?? "";
             var fullName = body.TryGetProperty("fullName", out var fn) ? fn.GetString() ?? "" : "";
             var role = body.TryGetProperty("role", out var rl) ? rl.GetString() ?? "Cashier" : "Cashier";
-            var storeId = body.TryGetProperty("storeId", out var sid) ? sid.GetString() ?? "" : "";
             var passwordHash = body.TryGetProperty("passwordHash", out var ph) ? ph.GetString() ?? "12345" : "12345";
+            var storeIds = body.TryGetProperty("storeIds", out var si) && si.ValueKind == JsonValueKind.Array
+                ? si.EnumerateArray().Select(x => x.GetString()).Where(s => !string.IsNullOrEmpty(s)).ToList()
+                : new List<string?>();
 
             if (string.IsNullOrEmpty(username)) return BadRequest(new { error = "Username is required" });
-            if (string.IsNullOrEmpty(storeId)) return BadRequest(new { error = "Store ID is required" });
+            if (storeIds.Count == 0) return BadRequest(new { error = "Select at least one store" });
 
             using var conn = Data.PgDatabaseHelper.GetConnection();
 
-            // Check duplicate username within store
+            // Check duplicate username globally
             using var dupCmd = conn.CreateCommand();
-            dupCmd.CommandText = "SELECT COUNT(*) FROM users WHERE username = @u AND store_id = @sid AND is_active = true";
+            dupCmd.CommandText = "SELECT COUNT(*) FROM users WHERE LOWER(username) = LOWER(@u)";
             dupCmd.Parameters.AddWithValue("u", username);
-            dupCmd.Parameters.AddWithValue("sid", storeId);
             var exists = Convert.ToInt32(dupCmd.ExecuteScalar());
-            if (exists > 0) return Conflict(new { error = "Username already exists in this store" });
+            if (exists > 0) return Conflict(new { error = "Username already exists" });
 
-            // Find max pos_id for this store to generate next
+            // Generate new pos_id (global sequential)
             using var maxCmd = conn.CreateCommand();
-            maxCmd.CommandText = "SELECT COALESCE(MAX(pos_id), 0) + 1 FROM users WHERE store_id = @sid";
-            maxCmd.Parameters.AddWithValue("sid", storeId);
+            maxCmd.CommandText = "SELECT COALESCE(MAX(pos_id), 0) + 1 FROM users";
             var newPosId = Convert.ToInt32(maxCmd.ExecuteScalar());
 
+            // Insert user (store_id = '' for cloud-managed users)
             using var insCmd = conn.CreateCommand();
             insCmd.CommandText = @"INSERT INTO users (pos_id, store_id, username, role, full_name, is_active, password_hash, synced_at)
-                VALUES (@p, @sid, @u, @r, @fn, true, @ph, NOW()) RETURNING id";
+                VALUES (@p, '', @u, @r, @fn, true, @ph, NOW()) RETURNING id";
             insCmd.Parameters.AddWithValue("p", newPosId);
-            insCmd.Parameters.AddWithValue("sid", storeId);
             insCmd.Parameters.AddWithValue("u", username);
             insCmd.Parameters.AddWithValue("r", role);
             insCmd.Parameters.AddWithValue("fn", fullName);
             insCmd.Parameters.AddWithValue("ph", passwordHash);
-            var id = Convert.ToInt32(insCmd.ExecuteScalar());
+            insCmd.ExecuteNonQuery();
 
-            return Ok(new { id, posId = newPosId, username, role, fullName, storeId, isActive = true });
+            // Insert user_stores entries
+            foreach (var sid in storeIds)
+            {
+                if (string.IsNullOrEmpty(sid)) continue;
+                using var usCmd = conn.CreateCommand();
+                usCmd.CommandText = "INSERT INTO user_stores (user_pos_id, store_id) VALUES (@p, @sid) ON CONFLICT DO NOTHING";
+                usCmd.Parameters.AddWithValue("p", newPosId);
+                usCmd.Parameters.AddWithValue("sid", sid);
+                usCmd.ExecuteNonQuery();
+            }
+
+            return Ok(new { posId = newPosId, username, role, fullName, isActive = true, storeIds });
         }
 
-        [HttpPut("users/{id}")]
-        public IActionResult UpdateUser(int id, [FromBody] JsonElement body)
+        [HttpPut("users/{posId}")]
+        public IActionResult UpdateUser(int posId, [FromBody] JsonElement body)
         {
-            using var conn = Data.PgDatabaseHelper.GetConnection();
-
             var username = body.TryGetProperty("username", out var u) ? u.GetString() ?? "" : "";
             var fullName = body.TryGetProperty("fullName", out var fn) ? fn.GetString() ?? "" : "";
             var role = body.TryGetProperty("role", out var rl) ? rl.GetString() ?? "Cashier" : "Cashier";
             var isActive = body.TryGetProperty("isActive", out var ia) ? ia.GetBoolean() : true;
             var passwordHash = body.TryGetProperty("passwordHash", out var ph) ? ph.GetString() : null;
+            var storeIds = body.TryGetProperty("storeIds", out var si) && si.ValueKind == JsonValueKind.Array
+                ? si.EnumerateArray().Select(x => x.GetString()).Where(s => !string.IsNullOrEmpty(s)).ToList()
+                : new List<string?>();
 
             if (string.IsNullOrEmpty(username)) return BadRequest(new { error = "Username is required" });
+
+            using var conn = Data.PgDatabaseHelper.GetConnection();
 
             using var cmd = conn.CreateCommand();
             var setClause = "username = @u, role = @r, full_name = @fn, is_active = @ia, synced_at = NOW()";
             if (passwordHash != null) setClause += ", password_hash = @ph";
 
-            cmd.CommandText = $"UPDATE users SET {setClause} WHERE id = @id";
-            cmd.Parameters.AddWithValue("id", id);
+            cmd.CommandText = $"UPDATE users SET {setClause} WHERE pos_id = @pid";
+            cmd.Parameters.AddWithValue("pid", posId);
             cmd.Parameters.AddWithValue("u", username);
             cmd.Parameters.AddWithValue("r", role);
             cmd.Parameters.AddWithValue("fn", fullName);
@@ -341,22 +364,46 @@ public class DashboardController : ControllerBase
 
             var rows = cmd.ExecuteNonQuery();
             if (rows == 0) return NotFound(new { error = "User not found" });
+
+            // Replace store tags
+            using var delUs = conn.CreateCommand();
+            delUs.CommandText = "DELETE FROM user_stores WHERE user_pos_id = @pid";
+            delUs.Parameters.AddWithValue("pid", posId);
+            delUs.ExecuteNonQuery();
+
+            foreach (var sid in storeIds)
+            {
+                if (string.IsNullOrEmpty(sid)) continue;
+                using var usCmd = conn.CreateCommand();
+                usCmd.CommandText = "INSERT INTO user_stores (user_pos_id, store_id) VALUES (@p, @sid) ON CONFLICT DO NOTHING";
+                usCmd.Parameters.AddWithValue("p", posId);
+                usCmd.Parameters.AddWithValue("sid", sid);
+                usCmd.ExecuteNonQuery();
+            }
+
             return Ok(new { success = true });
         }
 
-        [HttpDelete("users/{id}")]
-        public IActionResult DeleteUser(int id)
+        [HttpDelete("users/{posId}")]
+        public IActionResult DeleteUser(int posId)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
+
+            using var delUs = conn.CreateCommand();
+            delUs.CommandText = "DELETE FROM user_stores WHERE user_pos_id = @pid";
+            delUs.Parameters.AddWithValue("pid", posId);
+            delUs.ExecuteNonQuery();
+
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "UPDATE users SET is_active = false, synced_at = NOW() WHERE id = @id";
-            cmd.Parameters.AddWithValue("id", id);
+            cmd.CommandText = "UPDATE users SET is_active = false, synced_at = NOW() WHERE pos_id = @pid";
+            cmd.Parameters.AddWithValue("pid", posId);
             cmd.ExecuteNonQuery();
+
             return Ok(new { success = true });
         }
 
-        [HttpPost("users/{id}/change-pin")]
-        public IActionResult ChangeUserPin(int id, [FromBody] JsonElement body)
+        [HttpPost("users/{posId}/change-pin")]
+        public IActionResult ChangeUserPin(int posId, [FromBody] JsonElement body)
         {
             var oldPin = body.GetProperty("oldPin").GetString() ?? "";
             var newPin = body.GetProperty("newPin").GetString() ?? "";
@@ -367,17 +414,17 @@ public class DashboardController : ControllerBase
             using var conn = Data.PgDatabaseHelper.GetConnection();
 
             using var checkCmd = conn.CreateCommand();
-            checkCmd.CommandText = "SELECT password_hash FROM users WHERE id = @id AND is_active = true";
-            checkCmd.Parameters.AddWithValue("id", id);
+            checkCmd.CommandText = "SELECT password_hash FROM users WHERE pos_id = @pid AND is_active = true";
+            checkCmd.Parameters.AddWithValue("pid", posId);
             var currentHash = checkCmd.ExecuteScalar()?.ToString() ?? "";
 
             if (currentHash != oldPin)
                 return Unauthorized(new { error = "Current PIN is incorrect" });
 
             using var updCmd = conn.CreateCommand();
-            updCmd.CommandText = "UPDATE users SET password_hash = @ph, synced_at = NOW() WHERE id = @id";
+            updCmd.CommandText = "UPDATE users SET password_hash = @ph, synced_at = NOW() WHERE pos_id = @pid";
             updCmd.Parameters.AddWithValue("ph", newPin);
-            updCmd.Parameters.AddWithValue("id", id);
+            updCmd.Parameters.AddWithValue("pid", posId);
             updCmd.ExecuteNonQuery();
 
             return Ok(new { success = true });
@@ -388,12 +435,18 @@ public class DashboardController : ControllerBase
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = $@"SELECT u.pos_id, u.username, u.role, u.full_name, u.is_active, u.store_id, u.password_hash
-                FROM users u WHERE u.is_active = true {StoreFilter(storeId, "u")} ORDER BY u.username";
-            if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
+            cmd.CommandText = $@"
+                SELECT u.pos_id, u.username, u.role, u.full_name, u.is_active, u.password_hash
+                FROM users u
+                WHERE u.is_active = true
+                AND (u.store_id = @sid OR EXISTS (SELECT 1 FROM user_stores us WHERE us.user_pos_id = u.pos_id AND us.store_id = @sid))
+                GROUP BY u.pos_id, u.username, u.role, u.full_name, u.is_active, u.password_hash
+                ORDER BY u.username";
+            cmd.Parameters.AddWithValue("sid", storeId ?? "");
             var data = new List<object>();
             using var r = cmd.ExecuteReader();
-            while (r.Read()) data.Add(new { posId = r.GetInt32(0), username = r.GetString(1), role = r.GetString(2), fullName = r.IsDBNull(3) ? "" : r.GetString(3), isActive = r.GetBoolean(4), storeId = r.GetString(5), passwordHash = r.IsDBNull(6) ? "12345" : r.GetString(6) });
+            while (r.Read())
+                data.Add(new { posId = r.GetInt32(0), username = r.GetString(1), role = r.GetString(2), fullName = r.IsDBNull(3) ? "" : r.GetString(3), isActive = r.GetBoolean(4), passwordHash = r.IsDBNull(5) ? "12345" : r.GetString(5) });
             return Ok(data);
         }
 

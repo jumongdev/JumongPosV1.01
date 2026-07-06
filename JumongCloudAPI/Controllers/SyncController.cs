@@ -56,10 +56,34 @@ public class SyncController : ControllerBase
     public IActionResult SyncUsers([FromBody] List<JsonElement> items)
     {
         var sid = StoreId();
-        return SyncTable("users", items, new[] { "pos_id", "username", "role", "full_name", "is_active", "password_hash" },
+        var result = SyncTable("users", items, new[] { "pos_id", "username", "role", "full_name", "is_active", "password_hash" },
             "INSERT INTO users (pos_id, store_id, username, role, full_name, is_active, password_hash, synced_at) " +
             "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,NOW()) " +
             "ON CONFLICT (store_id, pos_id) DO UPDATE SET username=@p1, role=@p2, full_name=@p3, is_active=@p4, password_hash=COALESCE(@p5, password_hash), synced_at=NOW()", sid);
+
+        // Also populate user_stores for backward compat
+        if (!string.IsNullOrEmpty(sid))
+        {
+            try
+            {
+                using var conn = Data.PgDatabaseHelper.GetConnection();
+                foreach (var item in items)
+                {
+                    if (item.TryGetProperty("pos_id", out var pidEl) && pidEl.ValueKind == JsonValueKind.Number)
+                    {
+                        var posId = pidEl.GetInt32();
+                        using var usCmd = conn.CreateCommand();
+                        usCmd.CommandText = "INSERT INTO user_stores (user_pos_id, store_id) VALUES (@p, @sid) ON CONFLICT DO NOTHING";
+                        usCmd.Parameters.AddWithValue("p", posId);
+                        usCmd.Parameters.AddWithValue("sid", sid);
+                        usCmd.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch { }
+        }
+
+        return result;
     }
 
     [HttpPost("sales")]

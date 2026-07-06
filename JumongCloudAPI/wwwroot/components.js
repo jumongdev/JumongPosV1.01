@@ -737,7 +737,7 @@ Alpine.store('app', {
 
     openAdd() {
       this.editingId = null;
-      this.form = { username: '', fullName: '', role: 'Cashier', passwordHash: '12345', storeId: '', isActive: true };
+      this.form = { username: '', fullName: '', role: 'Cashier', passwordHash: '12345', storeIds: [], isActive: true };
       this.modalTitle = 'NEW USER';
       this.modalOpen = true;
     },
@@ -749,7 +749,7 @@ Alpine.store('app', {
         fullName: x.fullName || '',
         role: x.role || 'Cashier',
         passwordHash: '',
-        storeId: x.storeId || '',
+        storeIds: (x.storeIds || []).slice(),
         isActive: x.isActive !== false
       };
       this.modalTitle = 'EDIT: ' + x.username;
@@ -760,11 +760,17 @@ Alpine.store('app', {
 
     async save() {
       if (!this.form.username) { toast('Username is required', 'error'); return }
-      if (!this.form.storeId && !this.editingId) { toast('Select a store', 'error'); return }
+      if (!this.form.storeIds || !this.form.storeIds.length) { toast('Select at least one store', 'error'); return }
       try {
         const method = this.editingId ? 'PUT' : 'POST';
         const url = this.editingId ? API + '/dashboard/users/' + this.editingId : API + '/dashboard/users';
-        const body = { username: this.form.username, fullName: this.form.fullName, role: this.form.role, storeId: this.form.storeId, isActive: this.form.isActive };
+        const body = {
+          username: this.form.username,
+          fullName: this.form.fullName,
+          role: this.form.role,
+          storeIds: this.form.storeIds,
+          isActive: this.form.isActive
+        };
         if (this.form.passwordHash) body.passwordHash = this.form.passwordHash;
         const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         if (!r.ok) { const j = await r.json(); throw new Error(j.error || 'Failed') }

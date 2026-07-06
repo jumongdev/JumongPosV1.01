@@ -268,6 +268,32 @@ public static class PgDatabaseHelper
         pwMig.CommandText = "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT '12345'";
         try { pwMig.ExecuteNonQuery(); } catch { }
 
+        // Migration: create user_stores junction table for multi-store user access
+        using var usMig = conn.CreateCommand();
+        usMig.CommandText = @"
+            CREATE TABLE IF NOT EXISTS user_stores (
+                id SERIAL PRIMARY KEY,
+                user_pos_id INTEGER NOT NULL,
+                store_id TEXT NOT NULL,
+                UNIQUE(user_pos_id, store_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_user_stores_store ON user_stores(store_id);
+            CREATE INDEX IF NOT EXISTS idx_user_stores_user ON user_stores(user_pos_id);
+        ";
+        try { usMig.ExecuteNonQuery(); } catch { }
+
+        // Migration: backfill user_stores from existing users table
+        using var backfillUs = conn.CreateCommand();
+        backfillUs.CommandText = @"
+            INSERT INTO user_stores (user_pos_id, store_id)
+            SELECT DISTINCT u.pos_id, u.store_id FROM users u
+            WHERE u.pos_id > 0 AND u.store_id != ''
+            AND NOT EXISTS (
+                SELECT 1 FROM user_stores us WHERE us.user_pos_id = u.pos_id AND us.store_id = u.store_id
+            )
+        ";
+        try { backfillUs.ExecuteNonQuery(); } catch { }
+
         // Recreate unique constraints with store_id
         using var dropCmd = conn.CreateCommand();
         dropCmd.CommandText = @"
