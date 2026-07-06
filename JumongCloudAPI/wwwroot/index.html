@@ -1446,10 +1446,7 @@ tailwind.config = {
         <div x-data="usersList" class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
           <div class="px-4 py-3 border-b border-gray-100 dark:border-[#222255] flex items-center justify-between">
             <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">USERS &amp; STORES</h3>
-            <div class="flex gap-2">
-              <button @click="cleanAll()" class="text-[11px] px-3 py-1.5 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700">CLEAN ALL</button>
-              <button @click="openAdd()" class="text-[11px] px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">+ NEW USER</button>
-            </div>
+            <button @click="openAdd()" class="text-[11px] px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">+ NEW USER</button>
           </div>
           <div class="overflow-x-auto">
             <template x-if="loading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
