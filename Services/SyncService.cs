@@ -156,20 +156,19 @@ public static class SyncService
         await PostAsync("/users", data);
     }
 
-    public static async Task DownloadUsersAsync(string storeId)
+    public static async Task<int> DownloadUsersAsync(string storeId)
     {
-        try
-        {
-            var url = ApiUrl.TrimEnd('/') + "/dashboard/users/download?storeId=" + Uri.EscapeDataString(storeId);
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var response = await _client.GetAsync(url, cts.Token);
-            if (!response.IsSuccessStatusCode) return;
-            var json = await response.Content.ReadAsStringAsync();
-            var cloudUsers = JsonSerializer.Deserialize<List<JsonElement>>(json);
-            if (cloudUsers == null) return;
-            UserService.SyncFromCloud(cloudUsers);
-        }
-        catch { }
+        var url = ApiUrl.TrimEnd('/') + "/dashboard/users/download?storeId=" + Uri.EscapeDataString(storeId);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var response = await _client.GetAsync(url, cts.Token);
+        if (!response.IsSuccessStatusCode)
+            throw new Exception($"API returned {response.StatusCode}");
+        var json = await response.Content.ReadAsStringAsync();
+        var cloudUsers = JsonSerializer.Deserialize<List<JsonElement>>(json);
+        if (cloudUsers == null)
+            throw new Exception("Invalid response from server");
+        UserService.SyncFromCloud(cloudUsers);
+        return cloudUsers.Count;
     }
 
     public static async Task SyncSale(Sale sale, List<SaleItem> items)

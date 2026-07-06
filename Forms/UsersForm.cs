@@ -60,9 +60,9 @@ public partial class UsersForm : Form
         btnRefreshCloud.Text = "SYNCING...";
         try
         {
-            await SyncService.DownloadUsersAsync(storeId);
+            var count = await SyncService.DownloadUsersAsync(storeId);
             LoadUsers();
-            MessageBox.Show("Users synced from cloud successfully.", "Sync Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show($"Synced {count} user(s) from cloud.", "Sync Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {
