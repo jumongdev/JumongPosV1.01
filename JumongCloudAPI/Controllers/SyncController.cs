@@ -56,34 +56,73 @@ public class SyncController : ControllerBase
     public IActionResult SyncUsers([FromBody] List<JsonElement> items)
     {
         var sid = StoreId();
-        var result = SyncTable("users", items, new[] { "pos_id", "username", "role", "full_name", "is_active", "password_hash" },
-            "INSERT INTO users (pos_id, store_id, username, role, full_name, is_active, password_hash, synced_at) " +
-            "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,NOW()) " +
-            "ON CONFLICT (store_id, pos_id) DO UPDATE SET username=@p1, role=@p2, full_name=@p3, is_active=@p4, password_hash=COALESCE(@p5, password_hash), synced_at=NOW()", sid);
-
-        // Also populate user_stores for backward compat
-        if (!string.IsNullOrEmpty(sid))
+        try
         {
-            try
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            foreach (var item in items)
             {
-                using var conn = Data.PgDatabaseHelper.GetConnection();
-                foreach (var item in items)
+                var posId = item.TryGetProperty("pos_id", out var pidEl) && pidEl.ValueKind == JsonValueKind.Number ? pidEl.GetInt32() : 0;
+                var username = item.TryGetProperty("username", out var uEl) ? uEl.GetString() ?? "" : "";
+                var role = item.TryGetProperty("role", out var rEl) ? rEl.GetString() ?? "Cashier" : "Cashier";
+                var fullName = item.TryGetProperty("full_name", out var fnEl) ? fnEl.GetString() ?? "" : "";
+                var isActive = item.TryGetProperty("is_active", out var iaEl) ? iaEl.GetBoolean() : true;
+                var passwordHash = item.TryGetProperty("password_hash", out var phEl) ? phEl.GetString() : null;
+
+                if (string.IsNullOrEmpty(username)) continue;
+
+                // Try to find existing user by username (consolidated)
+                using var findCmd = conn.CreateCommand();
+                findCmd.CommandText = "SELECT id, pos_id FROM users WHERE LOWER(username) = LOWER(@u) LIMIT 1";
+                findCmd.Parameters.AddWithValue("u", username);
+                var existingId = findCmd.ExecuteScalar();
+
+                if (existingId != null && existingId != DBNull.Value)
                 {
-                    if (item.TryGetProperty("pos_id", out var pidEl) && pidEl.ValueKind == JsonValueKind.Number)
-                    {
-                        var posId = pidEl.GetInt32();
-                        using var usCmd = conn.CreateCommand();
-                        usCmd.CommandText = "INSERT INTO user_stores (user_pos_id, store_id) VALUES (@p, @sid) ON CONFLICT DO NOTHING";
-                        usCmd.Parameters.AddWithValue("p", posId);
-                        usCmd.Parameters.AddWithValue("sid", sid);
-                        usCmd.ExecuteNonQuery();
-                    }
+                    // User exists — update
+                    using var updCmd = conn.CreateCommand();
+                    var sql = "UPDATE users SET role=@r, full_name=@fn, is_active=@ia, synced_at=NOW()";
+                    if (passwordHash != null) sql += ", password_hash=@ph";
+                    sql += " WHERE id=@id";
+                    updCmd.CommandText = sql;
+                    updCmd.Parameters.AddWithValue("id", existingId);
+                    updCmd.Parameters.AddWithValue("r", role);
+                    updCmd.Parameters.AddWithValue("fn", fullName);
+                    updCmd.Parameters.AddWithValue("ia", isActive);
+                    if (passwordHash != null) updCmd.Parameters.AddWithValue("ph", passwordHash);
+                    updCmd.ExecuteNonQuery();
+                }
+                else
+                {
+                    // New user — insert
+                    using var insCmd = conn.CreateCommand();
+                    insCmd.CommandText = "INSERT INTO users (pos_id, store_id, username, role, full_name, is_active, password_hash, synced_at) " +
+                        "VALUES (@p, @sid, @u, @r, @fn, @ia, @ph, NOW())";
+                    insCmd.Parameters.AddWithValue("p", posId);
+                    insCmd.Parameters.AddWithValue("sid", sid);
+                    insCmd.Parameters.AddWithValue("u", username);
+                    insCmd.Parameters.AddWithValue("r", role);
+                    insCmd.Parameters.AddWithValue("fn", fullName);
+                    insCmd.Parameters.AddWithValue("ia", isActive);
+                    insCmd.Parameters.AddWithValue("ph", passwordHash ?? "12345");
+                    insCmd.ExecuteNonQuery();
+                }
+
+                // Populate user_stores for this user in this store
+                if (!string.IsNullOrEmpty(sid) && posId > 0)
+                {
+                    using var usCmd = conn.CreateCommand();
+                    usCmd.CommandText = "INSERT INTO user_stores (user_pos_id, store_id) VALUES (@p, @sid) ON CONFLICT DO NOTHING";
+                    usCmd.Parameters.AddWithValue("p", posId);
+                    usCmd.Parameters.AddWithValue("sid", sid);
+                    usCmd.ExecuteNonQuery();
                 }
             }
-            catch { }
+            return Ok(new { success = true, count = items.Count });
         }
-
-        return result;
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, error = ex.Message });
+        }
     }
 
     [HttpPost("sales")]

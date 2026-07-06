@@ -758,12 +758,18 @@ Alpine.store('app', {
 
     closeModal() { this.modalOpen = false; this.editingId = null },
 
+    toggleStore(sid) {
+      const idx = this.form.storeIds.indexOf(sid);
+      if (idx > -1) this.form.storeIds.splice(idx, 1);
+      else this.form.storeIds.push(sid);
+    },
+
     async save() {
       if (!this.form.username) { toast('Username is required', 'error'); return }
       if (!this.form.storeIds || !this.form.storeIds.length) { toast('Select at least one store', 'error'); return }
       try {
         const method = this.editingId ? 'PUT' : 'POST';
-        const url = this.editingId ? API + '/dashboard/users/' + this.editingId : API + '/dashboard/users';
+        const url = this.editingId ? API + '/users/' + this.editingId : API + '/users';
         const body = {
           username: this.form.username,
           fullName: this.form.fullName,
@@ -783,7 +789,7 @@ Alpine.store('app', {
     async deleteUser(x) {
       if (!confirm('Deactivate user "' + x.username + '"?')) return;
       try {
-        await fetch(API + '/dashboard/users/' + x.posId, { method: 'DELETE' });
+        await fetch(API + '/users/' + x.posId, { method: 'DELETE' });
         toast('User deactivated', 'success');
         this.load();
       } catch (e) { toast('Delete failed: ' + e.message, 'error') }
