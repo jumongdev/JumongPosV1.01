@@ -578,28 +578,26 @@ public partial class SettingsForm : Form
 
     private void btnSyncAll_Click(object? sender, EventArgs e)
     {
-        ShowSyncProgress("Syncing All To Cloud...", async p =>
+        ShowSyncProgress("Syncing All Today...", async p =>
         {
-            var products = ProductService.GetAll();
-            var customers = CustomerService.GetAll();
-            var users = UserService.GetAll();
-            var expenses = ExpenseService.GetExpensesBetween(null, DateTime.MaxValue);
-            var voids = SaleService.GetVoidLogs();
-            var dailyCloses = DailyCloseService.GetHistory();
-            var stockTrails = StockService.GetTrail(limit: 10000);
-            var creditTxns = CreditService.GetAll();
-            var sales = SaleService.GetSales();
-            var total = products.Count + customers.Count + users.Count + expenses.Count + voids.Count + dailyCloses.Count + stockTrails.Count + creditTxns.Count + sales.Count;
+            var today = TimeHelper.Now.ToString("yyyy-MM-dd");
+            var todayStart = today + " 00:00:00";
+            var todayEnd = today + " 23:59:59";
+            var todayDate = DateTime.Parse(todayStart);
+            var allSales = SaleService.GetSales(from: todayDate, to: DateTime.Parse(todayEnd));
+            foreach (var s in allSales) { s.Items = SaleService.GetSaleItems(s.Id); }
+            var expenses = ExpenseService.GetExpensesBetween(todayStart, DateTime.Parse(todayEnd));
+            var voids = SaleService.GetVoidLogs().Where(v => v.CreatedAt?.StartsWith(today) == true).ToList();
+            var stockTrails = StockService.GetTrail(limit: 10000).Where(t => t.CreatedAt?.StartsWith(today) == true).ToList();
+            var creditTxns = CreditService.GetAll().Where(ct => ct.CreatedAt?.StartsWith(today) == true).ToList();
+            var total = allSales.Count + expenses.Count + voids.Count + stockTrails.Count + creditTxns.Count;
             var done = 0;
-            foreach (var x in products) { p.Report($"Products: {++done}/{total}"); await SyncService.SyncProduct(x); await Task.Delay(20); }
-            foreach (var x in customers) { p.Report($"Customers: {++done}/{total}"); await SyncService.SyncCustomer(x); await Task.Delay(20); }
-            foreach (var x in users) { p.Report($"Users: {++done}/{total}"); await SyncService.SyncUser(x); await Task.Delay(20); }
-            foreach (var x in expenses) { p.Report($"Expenses: {++done}/{total}"); await SyncService.SyncExpense(x); await Task.Delay(20); }
-            foreach (var x in voids) { p.Report($"Voids: {++done}/{total}"); await SyncService.SyncVoidLog(x); await Task.Delay(20); }
-            foreach (var x in dailyCloses) { p.Report($"Shifts: {++done}/{total}"); await SyncService.SyncDailyClose(x); await Task.Delay(20); }
-            foreach (var x in stockTrails) { p.Report($"Stock: {++done}/{total}"); await SyncService.SyncStockTrail(x); await Task.Delay(20); }
-            foreach (var x in creditTxns) { p.Report($"Credit: {++done}/{total}"); await SyncService.SyncCreditTransaction(x); await Task.Delay(20); }
-            foreach (var s in sales) { p.Report($"Sales: {++done}/{total} (+ items)"); var items = SaleService.GetSaleItems(s.Id); await SyncService.SyncSale(s, items); await Task.Delay(50); done += items.Count; }
+            if (total == 0) { p.Report("Nothing to sync today."); await Task.Delay(1500); return 0; }
+            foreach (var x in allSales) { p.Report($"Sales: {++done}/{total}"); await SyncService.SyncSale(x, x.Items); }
+            foreach (var x in expenses) { p.Report($"Expenses: {++done}/{total}"); await SyncService.SyncExpense(x); }
+            foreach (var x in voids) { p.Report($"Voids: {++done}/{total}"); await SyncService.SyncVoidLog(x); }
+            foreach (var x in stockTrails) { p.Report($"Stock: {++done}/{total}"); await SyncService.SyncStockTrail(x); }
+            foreach (var x in creditTxns) { p.Report($"Credit: {++done}/{total}"); await SyncService.SyncCreditTransaction(x); }
             return total;
         });
     }
