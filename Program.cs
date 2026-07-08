@@ -43,11 +43,25 @@ static class Program
 
         ApplicationConfiguration.Initialize();
 
+        var perfLog = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "perf.log");
+        var perfSw = Stopwatch.StartNew();
+
         try
         {
+            perfSw.Restart();
             DatabaseHelper.Initialize();
+            var dbInit = perfSw.ElapsedMilliseconds;
+
+            perfSw.Restart();
             ThemeManager.LoadTheme();
+            var themeLoad = perfSw.ElapsedMilliseconds;
+
+            perfSw.Restart();
             AutoBackup();
+            var backupTime = perfSw.ElapsedMilliseconds;
+
+            File.AppendAllText(perfLog,
+                $"[{TimeHelper.Now:yyyy-MM-dd HH:mm:ss}] DB={dbInit}ms Theme={themeLoad}ms Backup={backupTime}ms{Environment.NewLine}");
         }
         catch (Exception ex)
         {
@@ -65,9 +79,13 @@ static class Program
 
         EmailService.FlushQueue();
 
+        perfSw.Restart();
         using var login = new LoginForm();
         if (login.ShowDialog() != DialogResult.OK)
             return;
+        var loginTime = perfSw.ElapsedMilliseconds;
+        File.AppendAllText(perfLog,
+            $"Login={loginTime}ms  Total={perfSw.ElapsedMilliseconds}ms{Environment.NewLine}");
 
         ErrorLogger.Log("Startup", $"App v{AppVersion.Current} started by {login.CurrentUser?.Username ?? "unknown"}");
 

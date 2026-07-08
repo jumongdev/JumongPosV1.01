@@ -7,7 +7,7 @@ namespace JumongPosV1._01.Forms;
 public class PendingOrdersForm : Form
 {
     private readonly User _currentUser;
-    private readonly CustomerDisplayForm? _customerDisplay;
+
     private List<PendingTransfer> _transfers = new();
     public void ApplyTheme()
     {
@@ -29,10 +29,9 @@ public class PendingOrdersForm : Form
     private static Color CGreen => ThemeManager.Current.AccentGreen;
     private static Color CBorder => ThemeManager.Current.BorderColor;
 
-    public PendingOrdersForm(User user, CustomerDisplayForm? customerDisplay = null)
+    public PendingOrdersForm(User user)
     {
         _currentUser = user;
-        _customerDisplay = customerDisplay;
         InitializeComponent();
         _ = LoadTransfers();
     }
@@ -46,11 +45,9 @@ public class PendingOrdersForm : Form
         foreach (var t in _transfers)
         {
             var idx = dgvOrders.Rows.Add();
-            dgvOrders.Rows[idx].Cells[0].Value = t.OrderId;
-            dgvOrders.Rows[idx].Cells[1].Value = t.ClientName;
-            dgvOrders.Rows[idx].Cells[2].Value = $"\u20b1{t.TotalAmount:N2}";
-            dgvOrders.Rows[idx].Cells[3].Value = t.Items.Count;
-            dgvOrders.Rows[idx].Cells[4].Value = t.CreatedAt.ToString("MMM dd, hh:mm tt");
+            dgvOrders.Rows[idx].Cells[0].Value = $"#{t.OrderId}";
+            dgvOrders.Rows[idx].Cells[1].Value = t.WarehouseName;
+            dgvOrders.Rows[idx].Cells[2].Value = t.CreatedAt.ToString("MMM dd, hh:mm tt");
             dgvOrders.Rows[idx].Tag = t;
         }
         lblStatus.Text = _transfers.Count == 0 ? "No pending orders" : $"{_transfers.Count} order(s) pending";
@@ -246,7 +243,7 @@ public class PendingOrdersForm : Form
 
     private void InitializeComponent()
     {
-        Text = "Online Orders";
+        Text = "Incoming Stock";
         ClientSize = new Size(900, 600);
         StartPosition = FormStartPosition.CenterScreen;
         BackColor = CSurface;
@@ -255,7 +252,7 @@ public class PendingOrdersForm : Form
 
         var lblTitle = new Label
         {
-            Text = "\uD83D\uDCE6 Pending Online Orders",
+            Text = "\uD83D\uDCE6 Incoming Stock",
             Font = new Font("Segoe UI", 18F, FontStyle.Bold),
             ForeColor = CAccent,
             Location = new Point(20, 15),
@@ -317,15 +314,11 @@ public class PendingOrdersForm : Form
             RowTemplate = { Height = 36 }
         };
         dgvOrders.Columns.Add("OrderId", "ORDER #");
-        dgvOrders.Columns.Add("Client", "CLIENT");
-        dgvOrders.Columns.Add("Total", "TOTAL");
-        dgvOrders.Columns.Add("Items", "ITEMS");
+        dgvOrders.Columns.Add("From", "FROM");
         dgvOrders.Columns.Add("Date", "DATE");
-        dgvOrders.Columns[0].FillWeight = 10;
-        dgvOrders.Columns[1].FillWeight = 30;
-        dgvOrders.Columns[2].FillWeight = 20;
-        dgvOrders.Columns[3].FillWeight = 10;
-        dgvOrders.Columns[4].FillWeight = 30;
+        dgvOrders.Columns[0].FillWeight = 20;
+        dgvOrders.Columns[1].FillWeight = 50;
+        dgvOrders.Columns[2].FillWeight = 30;
         dgvOrders.DoubleClick += btnProcess_Click;
 
         btnProcess = new Button

@@ -14,8 +14,7 @@ public partial class SalesForm : Form
     private readonly User? _currentUser;
     private Customer? _selectedCustomer;
     private string _orderType = "Walk-in";
-    private readonly CustomerDisplayForm _customerDisplay;
-    private bool _displayVisible = true;
+    private bool _displayVisible;
     private System.Windows.Forms.Timer _barcodeTimer = null!;
     private decimal _discountPercent;
     private decimal _taxRate;
@@ -47,12 +46,9 @@ public partial class SalesForm : Form
     private static Color CAmberDark    => ThemeManager.Current.StatusAmberDark;
     private static Color CAmberMid     => ThemeManager.Current.StatusAmberMid;
 
-    public SalesForm(User? user, CustomerDisplayForm customerDisplay)
+    public SalesForm(User? user)
     {
         _currentUser = user;
-        _customerDisplay = customerDisplay;
-        _customerDisplay.SetIdleMode(false);
-        _displayVisible = customerDisplay.Visible;
         InitializeComponent();
         UpdateTotals();
         txtBarcode.Focus();
@@ -166,7 +162,6 @@ public partial class SalesForm : Form
             lblOrderChip.Text = "Walk-in";
             lblOrderChip.Visible = false;
         }
-        PushToCustomerDisplay();
     }
 
     private void SetupCartGrid()
@@ -534,7 +529,6 @@ public partial class SalesForm : Form
     {
         _cartSource.ResetBindings(false);
         UpdateTotals();
-        PushToCustomerDisplay();
 
         BeginInvoke(new Action(() =>
         {
@@ -544,29 +538,6 @@ public partial class SalesForm : Form
                 dgvCart.ClearSelection();
             }
         }));
-    }
-
-    private void PushToCustomerDisplay()
-    {
-        if (!_displayVisible) return;
-        var grandTotal = _cart.Sum(x => x.TotalPrice);
-        _customerDisplay.UpdateOrder(_selectedCustomer?.Name ?? "", _orderType, _cart.ToList(), grandTotal);
-    }
-
-    private void ToggleCustomerDisplay()
-    {
-        if (_customerDisplay.Visible)
-        {
-            _customerDisplay.Hide();
-            _displayVisible = false;
-        }
-        else
-        {
-            _customerDisplay.Show();
-            _customerDisplay.BringToFront();
-            _displayVisible = true;
-            PushToCustomerDisplay();
-        }
     }
 
     private void UpdateTotals()
@@ -825,18 +796,6 @@ public partial class SalesForm : Form
             TextAlign = ContentAlignment.MiddleRight
         };
 
-        var btnDisplay = new Button
-        {
-            Text = "Display",
-            Font = new Font("Segoe UI", 8F, FontStyle.Bold),
-            FlatStyle = FlatStyle.Flat,
-            FlatAppearance = { BorderSize = 1, BorderColor = CTopbarBorder },
-            BackColor = CTopbarChip,
-            ForeColor = CTopbarText,
-            Cursor = Cursors.Hand
-        };
-        btnDisplay.Click += (_, _) => ToggleCustomerDisplay();
-
         _lblUpdateBanner = new Label
         {
             Font = new Font("Segoe UI", 8F, FontStyle.Bold),
@@ -879,7 +838,7 @@ public partial class SalesForm : Form
             }
         };
 
-        _pnlTopbar.Controls.AddRange(new Control[] { lblBrand, lblCashierName, _lblUpdateBanner, _lblMasterBanner, _lblTime, btnDisplay });
+        _pnlTopbar.Controls.AddRange(new Control[] { lblBrand, lblCashierName, _lblUpdateBanner, _lblMasterBanner, _lblTime });
 
         _pnlCustomerBar = new Panel { BackColor = CCard };
         _pnlCustomerBar.Paint += (s, e) =>
@@ -1230,9 +1189,6 @@ public partial class SalesForm : Form
         _lblTime.Text     = TimeHelper.Now.ToString("MMM dd, yyyy  h:mm tt");
         _lblTime.Location = new Point(w - 310, 0);
         _lblTime.Size     = new Size(190, topH);
-        tbControls[5].Location = new Point(w - 110, 10);
-        tbControls[5].Size     = new Size(90, 24);
-
         ResizeTopbar();
 
         _pnlCustomerBar.Location = new Point(0, topH);

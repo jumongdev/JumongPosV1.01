@@ -10,7 +10,7 @@ namespace JumongPosV1._01.Forms;
 public partial class MainForm : Form
 {
     private readonly User _currentUser;
-    private readonly CustomerDisplayForm _customerDisplay;
+    private readonly CustomerDisplayForm? _customerDisplay;
     private System.Windows.Forms.Timer? _schedulerTimer;
     private System.Windows.Forms.Timer? _transferTimer;
     private System.Windows.Forms.Timer? _connTimer;
@@ -43,25 +43,13 @@ public partial class MainForm : Form
             WindowState = FormWindowState.Maximized;
         }
 
-        _customerDisplay = new CustomerDisplayForm();
-        var showDisplay = true;
-        try
-        {
-            using var conn2 = DatabaseHelper.GetConnection();
-            conn2.Open();
-            using var cmd2 = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'EnableCustomerDisplay'", conn2);
-            var dispVal = cmd2.ExecuteScalar()?.ToString();
-            showDisplay = dispVal != "false";
-        }
-        catch { }
-        if (showDisplay) _customerDisplay.Show();
-
         try
         {
             using var conn3 = DatabaseHelper.GetConnection();
             conn3.Open();
             using var cmd3 = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'EnableOnlineOrders'", conn3);
             btnOnlineOrders.Visible = cmd3.ExecuteScalar()?.ToString() != "false";
+            if (btnOnlineOrders.Visible) btnOnlineOrders.Text = "    Incoming Stock";
         }
         catch { }
         LayoutMenuButtons();
@@ -96,8 +84,8 @@ public partial class MainForm : Form
                     {
                         Icon = SystemIcons.Information,
                         Visible = true,
-                        BalloonTipTitle = "New Online Orders",
-                        BalloonTipText = $"{newCount} new order(s) ready. Open Online Orders to process."
+                        BalloonTipTitle = "Incoming Stock",
+                        BalloonTipText = $"{newCount} new transfer(s) ready. Open to receive."
                     };
                     icon.BalloonTipClicked += (_, _) =>
                     {
@@ -110,8 +98,8 @@ public partial class MainForm : Form
                 _lastTransferCount = count;
                 if (btnOnlineOrders != null)
                     btnOnlineOrders.Text = count > 0
-                        ? $"    Online Orders ({count})"
-                        : "    Online Orders";
+                        ? $"    Incoming Stock ({count})"
+                        : "    Incoming Stock";
             }
             catch (Exception ex) { ErrorLogger.Log("MainForm.StartTransferPoll", ex); }
         };
@@ -253,7 +241,6 @@ public partial class MainForm : Form
             else if (f is VoidLogForm vlf) vlf.ApplyTheme();
             else if (f is ProductUnitsForm puf) puf.ApplyTheme();
             else if (f is LoginForm lf) lf.ApplyTheme();
-            else if (f is CustomerDisplayForm cdf) cdf.ApplyTheme();
             else if (f is PaymentForm pmf) pmf.ApplyTheme();
         }
     }
@@ -264,17 +251,13 @@ public partial class MainForm : Form
         _schedulerTimer?.Dispose();
         _transferTimer?.Stop();
         _transferTimer?.Dispose();
-        if (_customerDisplay != null && !_customerDisplay.IsDisposed)
-            _customerDisplay.Close();
         base.OnFormClosed(e);
     }
 
     private void btnPOS_Click(object? sender, EventArgs e)
     {
-        using var form = new SalesForm(_currentUser, _customerDisplay);
+        using var form = new SalesForm(_currentUser);
         form.ShowDialog();
-        _customerDisplay.SetIdleMode(true);
-        _customerDisplay.ClearOrder();
     }
 
     private void btnProducts_Click(object? sender, EventArgs e)
@@ -309,7 +292,7 @@ public partial class MainForm : Form
 
     private void btnOnlineOrders_Click(object? sender, EventArgs e)
     {
-        using var form = new PendingOrdersForm(_currentUser, _customerDisplay);
+        using var form = new PendingOrdersForm(_currentUser);
         form.ShowDialog();
     }
 
@@ -392,7 +375,7 @@ public partial class MainForm : Form
         btnReports = CreateMenuButton("Reports", 0, 285, btnReports_Click, cardBg, textColor, hoverBg);
         btnCredit = CreateMenuButton("Credit Management", 0, 340, btnCredit_Click, cardBg, textColor, hoverBg);
         btnInventory = CreateMenuButton("Inventory", 0, 395, btnInventory_Click, cardBg, textColor, hoverBg);
-        btnOnlineOrders = CreateMenuButton("Online Orders", 0, 450, btnOnlineOrders_Click, cardBg, textColor, hoverBg);
+        btnOnlineOrders = CreateMenuButton("Incoming Stock", 0, 450, btnOnlineOrders_Click, cardBg, textColor, hoverBg);
         btnExpenses = CreateMenuButton("Expenses", 0, 505, btnExpenses_Click, cardBg, textColor, hoverBg);
         btnUsers = CreateMenuButton("User Management", 0, 560, btnUsers_Click, cardBg, textColor, hoverBg);
         btnUsers.Visible = _currentUser.Role == "Admin";

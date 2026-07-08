@@ -1748,14 +1748,17 @@ public class DashboardController : ControllerBase
             if (!string.IsNullOrEmpty(storeId)) { filters += " AND t.store_id = @sid"; cmd.Parameters.AddWithValue("sid", storeId); }
             if (clientId.HasValue) { filters += " AND t.client_id = @ci"; cmd.Parameters.AddWithValue("ci", clientId.Value); }
             cmd.CommandText = $@"
-                SELECT t.id, t.client_id, t.client_name, t.notes, t.created_at
+                SELECT t.id, t.client_name, t.created_at,
+                       COALESCE((SELECT STRING_AGG(ti.product_name, ', ') FROM wh_transfer_items ti WHERE ti.transfer_id = t.id), '') AS items_summary,
+                       COALESCE((SELECT c.name FROM wh_clients c WHERE c.store_type = 'warehouse' LIMIT 1), 'Head Office') AS warehouse_name
                 FROM wh_transfers t
                 WHERE {filters} ORDER BY t.created_at DESC LIMIT 50";
             var data = new List<object>();
             using var r = cmd.ExecuteReader();
             while (r.Read()) data.Add(new {
-                orderId = r.GetInt32(0), clientId = r.GetInt32(1), clientName = r.GetString(2),
-                notes = r.IsDBNull(3) ? "" : r.GetString(3), totalAmount = 0, createdAt = r.GetDateTime(4)
+                orderId = r.GetInt32(0), clientName = r.GetString(1),
+                createdAt = r.GetDateTime(2), itemsSummary = r.GetString(3),
+                warehouseName = r.IsDBNull(4) ? "Head Office" : r.GetString(4)
             });
             return Ok(data);
         }
@@ -1954,20 +1957,19 @@ public class DashboardController : ControllerBase
                     foreach (var ri in body.Items)
                         if (ri.ProductId > 0) receivedIds.Add(ri.ProductId);
 
-                using var allItems = conn.CreateCommand(); allItems.Transaction = tx;
-                allItems.CommandText = @"
-                    SELECT ti.product_id, ti.product_name, ti.qty, ti.barcode
-                    FROM wh_transfer_items ti
-                    WHERE ti.transfer_id = @tid ORDER BY ti.product_name";
-                allItems.Parameters.AddWithValue("tid", id);
+                // Read all items first (Npgsql does not support concurrent readers)
+                var itemsList = new List<(int ProductId, string ProductName, int Qty, string Barcode)>();
+                using (var allItems = conn.CreateCommand()) { allItems.Transaction = tx;
+                    allItems.CommandText = "SELECT ti.product_id, ti.product_name, ti.qty, ti.barcode FROM wh_transfer_items ti WHERE ti.transfer_id = @tid ORDER BY ti.product_name";
+                    allItems.Parameters.AddWithValue("tid", id);
+                    using var r = allItems.ExecuteReader();
+                    while (r.Read())
+                        itemsList.Add((r.GetInt32(0), r.GetString(1), r.GetInt32(2), r.GetString(3)));
+                }
+
                 var shortages = new List<object>();
-                using var r = allItems.ExecuteReader();
-                while (r.Read())
+                foreach (var (productId, productName, baseQty, barcode) in itemsList)
                 {
-                    var productId = r.GetInt32(0);
-                    var productName = r.GetString(1);
-                    var baseQty = r.GetInt32(2);
-                    var barcode = r.GetString(3);
                     var accepted = body?.Items == null || receivedIds.Contains(productId);
                     var receivedQty = accepted ? baseQty : 0;
 
@@ -1988,7 +1990,6 @@ public class DashboardController : ControllerBase
                         shortages.Add(new { productId, productName, baseQty });
                     }
                 }
-                r.Close();
 
                 var finalStatus = shortages.Count > 0 ? "partial" : "completed";
                 using var updateCmd = conn.CreateCommand(); updateCmd.Transaction = tx;

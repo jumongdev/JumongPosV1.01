@@ -99,34 +99,54 @@ public partial class StockReceivingForm : Form
                 return;
             }
 
-            using var picker = new Form { Text = "Pending Warehouse Transfers", Size = new Size(750, 500), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = ThemeManager.Current.CanvasBg };
+            using var picker = new Form { Text = "Incoming Stock", Size = new Size(750, 500), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = ThemeManager.Current.CanvasBg };
             var pnl = new Panel { Dock = DockStyle.Fill, BackColor = ThemeManager.Current.CanvasBg };
-            var lbl = new Label { Text = "Select a transfer to receive:", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = ThemeManager.Current.AccentCyan, Location = new Point(12, 10), Size = new Size(700, 25) };
+            var lbl = new Label { Text = "Select incoming stock to receive:", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = ThemeManager.Current.AccentCyan, Location = new Point(12, 10), Size = new Size(700, 25) };
 
             var dgv = new DataGridView { Location = new Point(12, 42), Size = new Size(710, 370), ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, BackgroundColor = ThemeManager.Current.PanelBg, BorderStyle = BorderStyle.None, GridColor = ThemeManager.Current.DgvGrid, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, Font = new Font("Segoe UI", 9F), ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = ThemeManager.Current.DgvHeaderBg, ForeColor = ThemeManager.Current.AccentCyan, Font = new Font("Segoe UI", 9F, FontStyle.Bold) }, ColumnHeadersHeight = 30, EnableHeadersVisualStyles = false, DefaultCellStyle = new DataGridViewCellStyle { BackColor = ThemeManager.Current.DgvRowNormal, ForeColor = ThemeManager.Current.TextPrimary, SelectionBackColor = ThemeManager.Current.DgvSelection, SelectionForeColor = Color.White }, RowTemplate = { Height = 28 }, AlternatingRowsDefaultCellStyle = { BackColor = ThemeManager.Current.DgvRowAlt } };
-            dgv.DataSource = transfers.Select(t => new { t.OrderId, t.ClientName, Total = t.TotalAmount.ToString("N2"), Notes = t.Notes ?? "", Date = t.CreatedAt.ToString("yyyy-MM-dd HH:mm") }).ToList();
-            if (dgv.Columns["OrderId"] != null) { dgv.Columns["OrderId"].Width = 60; }
-            if (dgv.Columns["ClientName"] != null) { dgv.Columns["ClientName"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; }
+            dgv.DataSource = transfers.Select(t => new { Order = $"#{t.OrderId}", From = t.WarehouseName, Date = t.CreatedAt.ToString("MMM dd, hh:mm tt"), _Id = t.OrderId }).ToList();
+            if (dgv.Columns["Order"] != null) { dgv.Columns["Order"].Width = 60; }
+            if (dgv.Columns["From"] != null) { dgv.Columns["From"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; }
+            if (dgv.Columns["_Id"] != null) { dgv.Columns["_Id"].Visible = false; }
 
             var btnReceive = new Button { Text = "RECEIVE SELECTED", Font = new Font("Segoe UI", 10F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = ThemeManager.Current.AccentGreen, ForeColor = Color.White, Location = new Point(280, 422), Size = new Size(180, 35), Cursor = Cursors.Hand };
             btnReceive.Click += async (s, ev) =>
             {
                 if (dgv.SelectedRows.Count == 0) return;
-                var orderId = (int)dgv.SelectedRows[0].Cells[0].Value;
+                var orderId = (int)dgv.SelectedRows[0].Cells["_Id"].Value;
                 btnReceive.Enabled = false;
-                btnReceive.Text = "Processing...";
+                btnReceive.Text = "Loading items...";
 
-                var result = await SyncService.MarkTransferReceivedAsync(orderId);
-                if (result == null || !result.Success || result.Items == null || result.Items.Count == 0)
+                var allItems = await SyncService.GetTransferItemsAsync(orderId);
+                if (allItems == null || allItems.Count == 0)
                 {
-                    MessageBox.Show("Failed to receive transfer or no items found.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("Could not load items for this transfer.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    btnReceive.Enabled = true;
+                    btnReceive.Text = "RECEIVE SELECTED";
+                    return;
+                }
+
+                // Show checkbox picker
+                var (checkedItems, hasUnmatched) = ShowTransferItemPicker(allItems);
+                if (checkedItems == null) { btnReceive.Enabled = true; btnReceive.Text = "RECEIVE SELECTED"; return; }
+                if (checkedItems.Count == 0)
+                {
+                    MessageBox.Show("No items selected. Receive cancelled.", "No Items", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    btnReceive.Enabled = true; btnReceive.Text = "RECEIVE SELECTED"; return;
+                }
+
+                btnReceive.Text = "Receiving...";
+                var result = await SyncService.MarkTransferReceivedAsync(orderId, checkedItems);
+                if (result == null || !result.Success)
+                {
+                    MessageBox.Show("Failed to confirm transfer on cloud.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     btnReceive.Enabled = true;
                     btnReceive.Text = "RECEIVE SELECTED";
                     return;
                 }
 
                 var matched = 0;
-                foreach (var item in result.Items)
+                foreach (var item in checkedItems)
                 {
                     var product = StockService.Search(item.ProductName).FirstOrDefault() ??
                                   (!string.IsNullOrEmpty(item.Barcode) ? StockService.GetByBarcode(item.Barcode) : null);
@@ -144,7 +164,7 @@ public partial class StockReceivingForm : Form
                 var shortageMsg = (result.Shortages != null && result.Shortages.Count > 0)
                     ? $"\n{result.Shortages.Count} item(s) reported as shortage."
                     : "";
-                MessageBox.Show($"{matched} of {result.Items.Count} item(s) received from transfer #{orderId}.{shortageMsg}", "Transfer Received", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"{matched} of {checkedItems.Count} item(s) received from transfer #{orderId}.{shortageMsg}", "Transfer Received", MessageBoxButtons.OK, MessageBoxIcon.Information);
             };
 
             pnl.Controls.AddRange(new Control[] { lbl, dgv, btnReceive });
@@ -160,6 +180,41 @@ public partial class StockReceivingForm : Form
             btnCheckTransfers.Text = "\uD83D\uDCE5 CHECK PENDING TRANSFERS";
             btnCheckTransfers.Enabled = true;
         }
+    }
+
+    private (List<TransferItem>? Checked, bool HasUnmatched) ShowTransferItemPicker(List<TransferItem> items)
+    {
+        var checkedItems = new List<TransferItem>();
+        var hasUnmatched = false;
+        using var picker = new Form { Text = "Receive Incoming Stock", Size = new Size(650, 500), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.Sizable, BackColor = ThemeManager.Current.CanvasBg };
+        var lbl = new Label { Text = "Uncheck items that did not arrive:", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = ThemeManager.Current.AccentCyan, Location = new Point(12, 12), Size = new Size(600, 22) };
+        var panel = new Panel { Location = new Point(12, 42), Size = new Size(600, 370), AutoScroll = true, BackColor = ThemeManager.Current.PanelBg, BorderStyle = BorderStyle.FixedSingle };
+        var checkboxes = new Dictionary<int, CheckBox>();
+        var y = 5;
+        foreach (var item in items)
+        {
+            var found = ProductService.GetByBarcode(item.Barcode) ?? ProductService.GetAll().FirstOrDefault(p => p.Name.Equals(item.ProductName, StringComparison.OrdinalIgnoreCase));
+            if (found == null)
+            {
+                hasUnmatched = true;
+                panel.Controls.Add(new Label { Text = $"\u26A0 {item.ProductName} (not found in POS)", Location = new Point(8, y), Size = new Size(570, 24), Font = new Font("Segoe UI", 9F), ForeColor = ThemeManager.Current.AccentRed });
+                y += 28; continue;
+            }
+            var cb = new CheckBox { Text = $"{item.ProductName} \u2014 {item.BaseQty} pcs", Location = new Point(5, y), Size = new Size(580, 24), Font = new Font("Segoe UI", 9F), ForeColor = ThemeManager.Current.TextPrimary, Checked = true, Tag = item };
+            panel.Controls.Add(cb);
+            checkboxes[item.ProductId] = cb;
+            y += 28;
+        }
+        if (y < panel.Height) panel.Height = y + 10;
+        var btnOk = new Button { Text = "RECEIVE CHECKED", Font = new Font("Segoe UI", 10F, FontStyle.Bold), FlatStyle = FlatStyle.Flat, BackColor = ThemeManager.Current.AccentGreen, ForeColor = Color.White, Location = new Point(12, panel.Bottom + 12), Size = new Size(200, 40), Cursor = Cursors.Hand, DialogResult = DialogResult.OK };
+        var btnCancel = new Button { Text = "CANCEL", Font = new Font("Segoe UI", 10F), FlatStyle = FlatStyle.Flat, BackColor = ThemeManager.Current.PanelBg, ForeColor = ThemeManager.Current.TextPrimary, Location = new Point(220, panel.Bottom + 12), Size = new Size(120, 40), Cursor = Cursors.Hand, DialogResult = DialogResult.Cancel };
+        picker.Controls.AddRange(new Control[] { lbl, panel, btnOk, btnCancel });
+        picker.AcceptButton = btnOk;
+        picker.CancelButton = btnCancel;
+        if (picker.ShowDialog() == DialogResult.OK)
+            foreach (var cb in checkboxes.Values)
+                if (cb.Checked && cb.Tag is TransferItem ti) checkedItems.Add(ti);
+        return (checkedItems.Count > 0 ? checkedItems : null, hasUnmatched);
     }
 
     private void AddCurrentToList()
