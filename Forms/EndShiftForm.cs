@@ -10,6 +10,7 @@ public class EndShiftForm : Form
     private decimal _totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, _creditPayCash, _creditPayEWallet, _totalExpenses;
     private decimal _openingBalance;
     private bool _denominationsEntered = false;
+    private Label lblTotal1000 = null!, lblTotal500 = null!, lblTotal200 = null!, lblTotal100 = null!, lblTotal50 = null!, lblTotal20 = null!, lblTotalCoins = null!;
 
     public EndShiftForm(User user)
     {
@@ -37,7 +38,21 @@ public class EndShiftForm : Form
 
     private void Recalc()
     {
-        var cashOnHand = (int)num1000.Value * 1000m + (int)num500.Value * 500m + (int)num200.Value * 200m + (int)num100.Value * 100m + (int)num50.Value * 50m + (int)num20.Value * 20m + txtCoins.Value;
+        var t1000 = (int)num1000.Value * 1000m;
+        var t500 = (int)num500.Value * 500m;
+        var t200 = (int)num200.Value * 200m;
+        var t100 = (int)num100.Value * 100m;
+        var t50 = (int)num50.Value * 50m;
+        var t20 = (int)num20.Value * 20m;
+        var coins = txtCoins.Value;
+        lblTotal1000.Text = "= ₱" + t1000.ToString("N2");
+        lblTotal500.Text = "= ₱" + t500.ToString("N2");
+        lblTotal200.Text = "= ₱" + t200.ToString("N2");
+        lblTotal100.Text = "= ₱" + t100.ToString("N2");
+        lblTotal50.Text = "= ₱" + t50.ToString("N2");
+        lblTotal20.Text = "= ₱" + t20.ToString("N2");
+        lblTotalCoins.Text = "= ₱" + coins.ToString("N2");
+        var cashOnHand = t1000 + t500 + t200 + t100 + t50 + t20 + coins;
         lblCashOnHand.Text = cashOnHand.ToString("N2");
     }
 
@@ -375,16 +390,19 @@ private void btnEmail_Click(object? sender, EventArgs e)
         pnlDenom.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlDenom.Width - 1, pnlDenom.Height - 1); };
         var lblDenomTitle = new Label { Text = "CASH DENOMINATION", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, 10), Size = new Size(200, 18) };
         var dy = 32;
-        AddDenomRow(pnlDenom, 15, ref dy, "\u20b11,000", num1000 = MakeNum());
-        AddDenomRow(pnlDenom, 15, ref dy, "\u20b1500", num500 = MakeNum());
-        AddDenomRow(pnlDenom, 15, ref dy, "\u20b1200", num200 = MakeNum());
-        AddDenomRow(pnlDenom, 15, ref dy, "\u20b1100", num100 = MakeNum());
-        AddDenomRow(pnlDenom, 15, ref dy, "\u20b150", num50 = MakeNum());
-        AddDenomRow(pnlDenom, 15, ref dy, "\u20b120", num20 = MakeNum());
-        var lblCoins = new Label { Text = "Coins (\u20b1):", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, dy), Size = new Size(100, 25) };
-        txtCoins = new NumericUpDown { DecimalPlaces = 2, Location = new Point(120, dy), Size = new Size(100, 25), Maximum = 99999, BackColor = inputBg, ForeColor = inputFg };
+        AddDenomRow(pnlDenom, ref dy, "\u20b11,000", num1000 = MakeNum(), lblTotal1000 = MakeTotalLabel());
+        AddDenomRow(pnlDenom, ref dy, "\u20b1500", num500 = MakeNum(), lblTotal500 = MakeTotalLabel());
+        AddDenomRow(pnlDenom, ref dy, "\u20b1200", num200 = MakeNum(), lblTotal200 = MakeTotalLabel());
+        AddDenomRow(pnlDenom, ref dy, "\u20b1100", num100 = MakeNum(), lblTotal100 = MakeTotalLabel());
+        AddDenomRow(pnlDenom, ref dy, "\u20b150", num50 = MakeNum(), lblTotal50 = MakeTotalLabel());
+        AddDenomRow(pnlDenom, ref dy, "\u20b120", num20 = MakeNum(), lblTotal20 = MakeTotalLabel());
+        var lblCoins = new Label { Text = "Coins:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, dy), Size = new Size(60, 25) };
+        var lblXcoins = new Label { Text = "x", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = dimText, Location = new Point(78, dy), Size = new Size(20, 25), TextAlign = ContentAlignment.MiddleCenter };
+        txtCoins = new NumericUpDown { DecimalPlaces = 2, Location = new Point(100, dy), Size = new Size(80, 25), Maximum = 99999, BackColor = inputBg, ForeColor = inputFg };
         txtCoins.ValueChanged += Denom_ValueChanged;
-        pnlDenom.Controls.AddRange(new Control[] { lblCoins, txtCoins });
+        lblTotalCoins = MakeTotalLabel();
+        lblTotalCoins.Location = new Point(190, dy);
+        pnlDenom.Controls.AddRange(new Control[] { lblCoins, lblXcoins, txtCoins, lblTotalCoins });
         dy += 28;
         var line = new Panel { Location = new Point(15, dy), Size = new Size(460, 1), BackColor = borderColor };
         pnlDenom.Controls.Add(line);
@@ -457,11 +475,16 @@ private void btnEmail_Click(object? sender, EventArgs e)
         return n;
     }
 
-    private void AddDenomRow(Panel parent, int x, ref int y, string label, NumericUpDown num)
+    private Label MakeTotalLabel() => new Label { Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = ThemeManager.Current.AccentCyan, Size = new Size(100, 25), TextAlign = ContentAlignment.MiddleLeft };
+
+    private void AddDenomRow(Panel parent, ref int y, string label, NumericUpDown num, Label lblTotal)
     {
-        var lbl = new Label { Text = label, Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = ThemeManager.Current.TextMuted, Location = new Point(x, y), Size = new Size(100, 25) };
-        num.Location = new Point(120, y);
-        parent.Controls.AddRange(new Control[] { lbl, num });
+        var lblName = new Label { Text = label, Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = ThemeManager.Current.TextMuted, Location = new Point(15, y), Size = new Size(60, 25), TextAlign = ContentAlignment.MiddleLeft };
+        var lblX = new Label { Text = "x", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = ThemeManager.Current.TextMuted, Location = new Point(78, y), Size = new Size(20, 25), TextAlign = ContentAlignment.MiddleCenter };
+        num.Location = new Point(100, y);
+        num.Size = new Size(80, 25);
+        lblTotal.Location = new Point(190, y);
+        parent.Controls.AddRange(new Control[] { lblName, lblX, num, lblTotal });
         y += 28;
     }
 
