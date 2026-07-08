@@ -1744,19 +1744,18 @@ public class DashboardController : ControllerBase
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            var filters = "o.status = 'shipped'";
-            if (!string.IsNullOrEmpty(storeId)) { filters += " AND c.store_id = @sid"; cmd.Parameters.AddWithValue("sid", storeId); }
-            if (clientId.HasValue) { filters += " AND o.client_id = @ci"; cmd.Parameters.AddWithValue("ci", clientId.Value); }
+            var filters = "t.status = 'pending'";
+            if (!string.IsNullOrEmpty(storeId)) { filters += " AND t.store_id = @sid"; cmd.Parameters.AddWithValue("sid", storeId); }
+            if (clientId.HasValue) { filters += " AND t.client_id = @ci"; cmd.Parameters.AddWithValue("ci", clientId.Value); }
             cmd.CommandText = $@"
-                SELECT o.id, o.client_id, o.client_name, o.notes, o.total_amount, o.created_at
-                FROM wh_orders o
-                JOIN wh_clients c ON o.client_id = c.id
-                WHERE {filters} ORDER BY o.created_at DESC LIMIT 50";
+                SELECT t.id, t.client_id, t.client_name, t.notes, t.created_at
+                FROM wh_transfers t
+                WHERE {filters} ORDER BY t.created_at DESC LIMIT 50";
             var data = new List<object>();
             using var r = cmd.ExecuteReader();
             while (r.Read()) data.Add(new {
                 orderId = r.GetInt32(0), clientId = r.GetInt32(1), clientName = r.GetString(2),
-                notes = r.IsDBNull(3) ? "" : r.GetString(3), totalAmount = r.GetDecimal(4), createdAt = r.GetDateTime(5)
+                notes = r.IsDBNull(3) ? "" : r.GetString(3), totalAmount = 0, createdAt = r.GetDateTime(4)
             });
             return Ok(data);
         }
@@ -1931,7 +1930,7 @@ public class DashboardController : ControllerBase
             while (r.Read())
                 items.Add(new {
                     productId = r.GetInt32(0), productName = r.GetString(1),
-                    barcode = r.GetString(2), qty = r.GetInt32(3),
+                    barcode = r.GetString(2), baseQty = r.GetInt32(3),
                     receivedQty = r.GetInt32(4), currentStock = r.GetInt32(5)
                 });
             return Ok(items);
@@ -1999,7 +1998,7 @@ public class DashboardController : ControllerBase
                 updateCmd.ExecuteNonQuery();
 
                 tx.Commit();
-                return Ok(new { success = true, transferId = id, status = finalStatus, shortages });
+                return Ok(new { success = true, orderId = id, status = finalStatus, shortages });
             }
             catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
         }

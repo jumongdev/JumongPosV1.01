@@ -789,7 +789,7 @@ public static class SyncService
     {
         try
         {
-            var url = ApiUrl.TrimEnd('/') + $"/dashboard/warehouse/orders/{orderId}/items";
+            var url = ApiUrl.TrimEnd('/') + $"/dashboard/warehouse/transfers/{orderId}/items";
             var json = await _client.GetStringAsync(url);
             return JsonSerializer.Deserialize<List<TransferItem>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
@@ -800,7 +800,7 @@ public static class SyncService
     {
         try
         {
-            var url = ApiUrl.TrimEnd('/') + $"/dashboard/warehouse/orders/{orderId}/receive";
+            var url = ApiUrl.TrimEnd('/') + $"/dashboard/warehouse/transfers/{orderId}/receive";
             var body = receivedItems != null
                 ? JsonSerializer.Serialize(new { items = receivedItems.Select(i => new { i.ProductId, i.BaseQty, i.ProductName, i.Barcode }) })
                 : "{}";
