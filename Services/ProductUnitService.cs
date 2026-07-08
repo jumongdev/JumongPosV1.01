@@ -184,7 +184,8 @@ public class ProductUnitService
             Price = Convert.ToDecimal(rdr["Price"]),
             Cost = Convert.ToDecimal(rdr["Cost"]),
             QtyPerUnit = Convert.ToInt32(rdr["QtyPerUnit"]),
-            IsDefault = Convert.ToBoolean(rdr["IsDefault"])
+            IsDefault = Convert.ToBoolean(rdr["IsDefault"]),
+            PointsPerUnit = rdr["PointsPerUnit"] != DBNull.Value ? Convert.ToInt32(rdr["PointsPerUnit"]) : 0
         };
     }
 

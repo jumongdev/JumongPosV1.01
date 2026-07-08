@@ -416,6 +416,24 @@ public class DatabaseHelper
             alter.ExecuteNonQuery();
         }
 
+        // Migrate: add PointsExempt, PointsPerUnit to Products
+        using var checkPEx = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('Products') WHERE name = 'PointsExempt'", conn);
+        if (Convert.ToInt32(checkPEx.ExecuteScalar()) == 0)
+        {
+            using var alter = new SQLiteCommand("ALTER TABLE Products ADD COLUMN PointsExempt INTEGER NOT NULL DEFAULT 0", conn);
+            alter.ExecuteNonQuery();
+            alter.CommandText = "ALTER TABLE Products ADD COLUMN PointsPerUnit INTEGER NOT NULL DEFAULT 0";
+            alter.ExecuteNonQuery();
+        }
+
+        // Migrate: add PointsPerUnit to ProductUnits
+        using var checkPuP = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('ProductUnits') WHERE name = 'PointsPerUnit'", conn);
+        if (Convert.ToInt32(checkPuP.ExecuteScalar()) == 0)
+        {
+            using var alter = new SQLiteCommand("ALTER TABLE ProductUnits ADD COLUMN PointsPerUnit INTEGER NOT NULL DEFAULT 0", conn);
+            alter.ExecuteNonQuery();
+        }
+
         // Migrate: add ModifiedBy to Customers
         using var checkCMod = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('Customers') WHERE name = 'ModifiedBy'", conn);
         if (Convert.ToInt32(checkCMod.ExecuteScalar()) == 0)
@@ -527,7 +545,7 @@ public class DatabaseHelper
         using var seedMissing = new SQLiteCommand(
             "INSERT OR IGNORE INTO Settings (Key, Value) VALUES " +
             "('SmtpHost', ''), ('SmtpPort', '587'), ('SmtpUser', ''), ('SmtpPass', ''), ('SmtpTo', ''), " +
-            "('AppTimezone', '480'), ('LastMasterSync', ''), ('AppTheme', 'Dark')",
+            "('AppTimezone', '480'), ('LastMasterSync', ''), ('AppTheme', 'Dark'), ('PointsRate', '200')",
             conn);
         seedMissing.ExecuteNonQuery();
 

@@ -9,4 +9,5 @@ public class ProductUnit
     public decimal Cost { get; set; }
     public int QtyPerUnit { get; set; } = 1;
     public bool IsDefault { get; set; }
+    public int PointsPerUnit { get; set; }
 }

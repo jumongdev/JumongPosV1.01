@@ -14,4 +14,6 @@ public class SaleItem
     public int QtyPerUnit { get; set; } = 1;
     public decimal UnitCost { get; set; }
     public bool IsVoided { get; set; }
+    public bool PointsExempt { get; set; }
+    public int PointsPerUnit { get; set; }
 }

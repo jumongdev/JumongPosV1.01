@@ -470,6 +470,8 @@ public partial class SalesForm : Form
         var price = unit?.Price ?? product.Price;
         var unitName = unit?.UnitName ?? "";
         var qtyPerUnit = unit?.QtyPerUnit ?? 1;
+        var ptsExempt = product.PointsExempt;
+        var ptsPerUnit = unit?.PointsPerUnit ?? product.PointsPerUnit;
 
         var cartPieces = _cart
             .Where(x => x.ProductId == product.Id)
@@ -504,7 +506,9 @@ public partial class SalesForm : Form
                 QtyPerUnit = qtyPerUnit,
                 Quantity = quantity,
                 TotalPrice = price * quantity,
-                UnitCost = product.Cost * qtyPerUnit
+                UnitCost = product.Cost * qtyPerUnit,
+                PointsExempt = ptsExempt,
+                PointsPerUnit = ptsPerUnit
             });
         }
         RefreshCart();
@@ -723,7 +727,16 @@ public partial class SalesForm : Form
 
         if (_selectedCustomer != null)
         {
-            var ptsEarned = (int)(grandTotal / 100);
+            var pointsRate = int.Parse(DatabaseHelper.GetSetting("PointsRate", "200"));
+            var ptsEarned = 0;
+            foreach (var item in _cart)
+            {
+                if (item.PointsExempt) continue;
+                if (item.PointsPerUnit > 0)
+                    ptsEarned += item.PointsPerUnit * item.Quantity;
+                else
+                    ptsEarned += (int)(item.TotalPrice / pointsRate);
+            }
             var ptsUsed = payForm.PointsUsed;
             var newPts = _selectedCustomer.LoyaltyPoints + ptsEarned - ptsUsed;
             if (newPts < 0) newPts = 0;

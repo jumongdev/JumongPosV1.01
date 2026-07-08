@@ -56,6 +56,7 @@ tailwind.config = {
         { id:'wh-transfer', icon:'🔄', label:'Transfer' },
         { id:'customers', icon:'👥', label:'Customers' },
         { id:'users', icon:'⚙️', label:'Users' },
+        { id:'settings', icon:'🔧', label:'Settings' },
         { id:'analytics', icon:'📈', label:'Analytics' }
       ]" :key="item.id">
         <div>
@@ -1527,6 +1528,30 @@ tailwind.config = {
       </div>
 
       <!-- ═══════════════════════════════════════════════════ -->
+      <!-- SETTINGS SECTION                                  -->
+      <!-- ═══════════════════════════════════════════════════ -->
+      <div x-show="$store.app.section === 'settings'" x-transition.opacity>
+        <div x-data="storeSettings" class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
+          <div class="px-4 py-3 border-b border-gray-100 dark:border-[#222255]">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">STORE SETTINGS</h3>
+          </div>
+          <div class="p-4 space-y-4 max-w-lg">
+            <template x-if="loading"><div class="flex justify-center py-4"><span class="spinner"></span></div></template>
+            <template x-if="!loading">
+              <div class="space-y-4">
+                <div>
+                  <label class="text-xs text-gray-500 dark:text-[#7878aa] block mb-1">Points Rate</label>
+                  <p class="text-[10px] text-gray-400 dark:text-[#5a5a8a] mb-2">How much (₱) spend = 1 loyalty point. Default: 200. E.g., 200 means ₱200 = 1 point.</p>
+                  <input type="number" x-model="pointsRate" min="1" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                </div>
+                <button @click="save()" :disabled="saving" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 disabled:opacity-50" x-text="saving ? 'Saving...' : 'Save'"></button>
+                <div x-show="saved" x-transition.opacity class="text-xs text-emerald-500">Saved!</div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+
       <!-- ANALYTICS SECTION                                  -->
       <!-- ═══════════════════════════════════════════════════ -->
       <div x-show="$store.app.section === 'analytics'" x-transition.opacity>
@@ -1698,6 +1723,8 @@ tailwind.config = {
             <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">PRICE</label><input type="number" step="0.01" x-model="price" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
             <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">COST</label><input type="number" step="0.01" x-model="cost" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
             <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">IMAGE</label><input type="file" accept="image/*" @change="previewImage" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1.5 text-gray-500"><div x-show="imageData" class="mt-1"><img :src="imageData" class="max-h-16 rounded"></div></div>
+            <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1 flex items-center gap-1"><input type="checkbox" x-model="pointsExempt"> POINTS EXEMPT</label></div>
+            <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">POINTS PER UNIT</label><input type="number" min="0" x-model="pointsPerUnit" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
           </div>
           <div class="border-t border-gray-200 dark:border-[#222255] pt-3 mb-3">
             <h4 class="text-xs font-bold text-cyan-700 dark:text-cyan-400 mb-2">UNITS <button @click="addUnit()" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] ml-2">+ ADD UNIT</button></h4>
@@ -1707,6 +1734,7 @@ tailwind.config = {
                 <input placeholder="Name" x-model="u.unitName" class="w-24 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5 text-gray-700 dark:text-slate-200">
                 <input placeholder="Price" type="number" step="0.01" x-model="u.price" class="w-20 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5 text-gray-700 dark:text-slate-200">
                 <input placeholder="Qty" type="number" x-model="u.qtyPerUnit" class="w-16 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5 text-gray-700 dark:text-slate-200">
+                <input placeholder="Pts" type="number" min="0" x-model="u.pointsPerUnit" class="w-14 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5 text-gray-700 dark:text-slate-200">
                 <label class="text-[11px] text-gray-500 dark:text-[#7878aa] flex items-center gap-1"><input type="checkbox" x-model="u.isDefault"> Default</label>
                 <button @click="removeUnit(i)" class="p-1 text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded">X</button>
               </div>

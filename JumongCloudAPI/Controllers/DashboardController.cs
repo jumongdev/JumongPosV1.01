@@ -915,13 +915,39 @@ public class DashboardController : ControllerBase
             });
         }
 
+    [HttpGet("settings/{storeId}/{key}")]
+    public IActionResult GetStoreSetting(string storeId, string key)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT value FROM store_settings WHERE store_id = @sid AND key = @k";
+        cmd.Parameters.AddWithValue("sid", storeId);
+        cmd.Parameters.AddWithValue("k", key);
+        var val = cmd.ExecuteScalar();
+        return Ok(new { key, value = val?.ToString() ?? "" });
+    }
+
+    [HttpPut("settings/{storeId}/{key}")]
+    public IActionResult SetStoreSetting(string storeId, string key, [FromBody] JsonElement body)
+    {
+        var value = body.TryGetProperty("value", out var v) ? v.GetString() : "";
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            INSERT INTO store_settings (store_id, key, value) VALUES (@sid, @k, @v)
+            ON CONFLICT (store_id, key) DO UPDATE SET value = @v";
+        cmd.Parameters.AddWithValue("sid", storeId);
+        cmd.Parameters.AddWithValue("k", key);
+        cmd.Parameters.AddWithValue("v", value ?? "");
+        cmd.ExecuteNonQuery();
+        return Ok(new { success = true });
+    }
+
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.0.7" });
+            return Ok(new { version = "1.0.8" });
     }
-
-
 
         [HttpGet("fix-hvr-times")]
         public IActionResult FixHvrTimes()
@@ -1054,7 +1080,7 @@ public class DashboardController : ControllerBase
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                SELECT id, name, barcode, category, price, cost, stock_qty, image_data, is_active
+                SELECT id, name, barcode, category, price, cost, stock_qty, image_data, is_active, points_exempt, points_per_unit
                 FROM master_products WHERE is_active = true ORDER BY name";
             using var reader = cmd.ExecuteReader();
             var products = new List<object>();
@@ -1067,7 +1093,9 @@ public class DashboardController : ControllerBase
                     price = reader.GetDecimal(4),
                     cost = reader.GetDecimal(5),
                     stockQty = reader.GetInt32(6),
-                    imageData = reader.IsDBNull(7) ? "" : reader.GetString(7)
+                    imageData = reader.IsDBNull(7) ? "" : reader.GetString(7),
+                    pointsExempt = reader.GetBoolean(9),
+                    pointsPerUnit = reader.GetInt32(10)
                 });
             return Ok(products);
         }
@@ -1078,7 +1106,7 @@ public class DashboardController : ControllerBase
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                SELECT id, product_id, unit_name, price, cost, qty_per_unit, is_default
+                SELECT id, product_id, unit_name, price, cost, qty_per_unit, is_default, points_per_unit
                 FROM master_product_units WHERE product_id = @pid ORDER BY is_default DESC, unit_name";
             cmd.Parameters.AddWithValue("pid", id);
             using var reader = cmd.ExecuteReader();
@@ -1091,7 +1119,8 @@ public class DashboardController : ControllerBase
                     price = reader.GetDecimal(3),
                     cost = reader.GetDecimal(4),
                     qtyPerUnit = reader.GetInt32(5),
-                    isDefault = reader.GetBoolean(6)
+                    isDefault = reader.GetBoolean(6),
+                    pointsPerUnit = reader.IsDBNull(7) ? 0 : reader.GetInt32(7)
                 });
             return Ok(units);
         }
@@ -1121,8 +1150,9 @@ public class DashboardController : ControllerBase
             }
             cmd.CommandText = $@"
                 SELECT mp.id, mp.name, mp.barcode, mp.category, mp.price, mp.cost, mp.stock_qty, mp.image_data,
+                       mp.points_exempt, mp.points_per_unit,
                        COALESCE(json_agg(
-                           json_build_object('unitName', mpu.unit_name, 'price', mpu.price, 'cost', mpu.cost, 'qtyPerUnit', mpu.qty_per_unit, 'isDefault', mpu.is_default)
+                           json_build_object('unitName', mpu.unit_name, 'price', mpu.price, 'cost', mpu.cost, 'qtyPerUnit', mpu.qty_per_unit, 'isDefault', mpu.is_default, 'pointsPerUnit', mpu.points_per_unit)
                            ORDER BY mpu.is_default DESC, mpu.unit_name
                        ) FILTER (WHERE mpu.id IS NOT NULL), '[]') AS units
                 FROM master_products mp
@@ -1141,7 +1171,9 @@ public class DashboardController : ControllerBase
                     cost = reader.GetDecimal(5),
                     stockQty = reader.GetInt32(6),
                     imageData = reader.IsDBNull(7) ? "" : reader.GetString(7),
-                    units = reader.IsDBNull(8) ? null : System.Text.Json.JsonSerializer.Deserialize<object>(reader.GetString(8))
+                    pointsExempt = reader.GetBoolean(8),
+                    pointsPerUnit = reader.GetInt32(9),
+                    units = reader.IsDBNull(10) ? null : System.Text.Json.JsonSerializer.Deserialize<object>(reader.GetString(10))
                 });
             return Ok(products);
         }
@@ -1202,14 +1234,16 @@ public class DashboardController : ControllerBase
             try
             {
                 using var cmd = new NpgsqlCommand(@"
-                    INSERT INTO master_products (name, barcode, category, price, cost, stock_qty, image_data, updated_at)
-                    VALUES (@n, @b, @c, @p, @co, 0, @img, NOW()) RETURNING id", conn, tx);
+                    INSERT INTO master_products (name, barcode, category, price, cost, stock_qty, image_data, points_exempt, points_per_unit, updated_at)
+                    VALUES (@n, @b, @c, @p, @co, 0, @img, @pe, @ppu, NOW()) RETURNING id", conn, tx);
                 cmd.Parameters.AddWithValue("n", p.Name);
                 cmd.Parameters.AddWithValue("b", (object?)p.Barcode ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("c", p.Category ?? "");
                 cmd.Parameters.AddWithValue("p", p.Price);
                 cmd.Parameters.AddWithValue("co", p.Cost);
                 cmd.Parameters.AddWithValue("img", p.ImageData ?? "");
+                cmd.Parameters.AddWithValue("pe", p.PointsExempt);
+                cmd.Parameters.AddWithValue("ppu", p.PointsPerUnit);
                 var id = Convert.ToInt32(cmd.ExecuteScalar());
 
                 if (p.Units != null)
@@ -1217,14 +1251,15 @@ public class DashboardController : ControllerBase
                     foreach (var u in p.Units)
                     {
                         using var ucmd = new NpgsqlCommand(@"
-                            INSERT INTO master_product_units (product_id, unit_name, price, cost, qty_per_unit, is_default)
-                            VALUES (@pid, @un, @pr, @co, @qpu, @def)", conn, tx);
+                            INSERT INTO master_product_units (product_id, unit_name, price, cost, qty_per_unit, is_default, points_per_unit)
+                            VALUES (@pid, @un, @pr, @co, @qpu, @def, @ppu)", conn, tx);
                         ucmd.Parameters.AddWithValue("pid", id);
                         ucmd.Parameters.AddWithValue("un", u.UnitName);
                         ucmd.Parameters.AddWithValue("pr", u.Price);
                         ucmd.Parameters.AddWithValue("co", u.Cost);
                         ucmd.Parameters.AddWithValue("qpu", u.QtyPerUnit);
                         ucmd.Parameters.AddWithValue("def", u.IsDefault);
+                        ucmd.Parameters.AddWithValue("ppu", u.PointsPerUnit);
                         ucmd.ExecuteNonQuery();
                     }
                 }
@@ -1242,7 +1277,7 @@ public class DashboardController : ControllerBase
             try
             {
                 using var cmd = new NpgsqlCommand(@"
-                    UPDATE master_products SET name=@n, barcode=@b, category=@c, price=@p, cost=@co, image_data=@img, updated_at=NOW()
+                    UPDATE master_products SET name=@n, barcode=@b, category=@c, price=@p, cost=@co, image_data=@img, points_exempt=@pe, points_per_unit=@ppu, updated_at=NOW()
                     WHERE id=@id", conn, tx);
                 cmd.Parameters.AddWithValue("n", p.Name);
                 cmd.Parameters.AddWithValue("b", (object?)p.Barcode ?? DBNull.Value);
@@ -1250,6 +1285,8 @@ public class DashboardController : ControllerBase
                 cmd.Parameters.AddWithValue("p", p.Price);
                 cmd.Parameters.AddWithValue("co", p.Cost);
                 cmd.Parameters.AddWithValue("img", p.ImageData ?? "");
+                cmd.Parameters.AddWithValue("pe", p.PointsExempt);
+                cmd.Parameters.AddWithValue("ppu", p.PointsPerUnit);
                 cmd.Parameters.AddWithValue("id", id);
                 cmd.ExecuteNonQuery();
 
@@ -1262,14 +1299,15 @@ public class DashboardController : ControllerBase
                     foreach (var u in p.Units)
                     {
                         using var ucmd = new NpgsqlCommand(@"
-                            INSERT INTO master_product_units (product_id, unit_name, price, cost, qty_per_unit, is_default)
-                            VALUES (@pid, @un, @pr, @co, @qpu, @def)", conn, tx);
+                            INSERT INTO master_product_units (product_id, unit_name, price, cost, qty_per_unit, is_default, points_per_unit)
+                            VALUES (@pid, @un, @pr, @co, @qpu, @def, @ppu)", conn, tx);
                         ucmd.Parameters.AddWithValue("pid", id);
                         ucmd.Parameters.AddWithValue("un", u.UnitName);
                         ucmd.Parameters.AddWithValue("pr", u.Price);
                         ucmd.Parameters.AddWithValue("co", u.Cost);
                         ucmd.Parameters.AddWithValue("qpu", u.QtyPerUnit);
                         ucmd.Parameters.AddWithValue("def", u.IsDefault);
+                        ucmd.Parameters.AddWithValue("ppu", u.PointsPerUnit);
                         ucmd.ExecuteNonQuery();
                     }
                 }
@@ -2009,6 +2047,8 @@ public class DashboardController : ControllerBase
         public decimal Cost { get; set; }
         public int StockQty { get; set; }
         public string? ImageData { get; set; }
+        public bool PointsExempt { get; set; }
+        public int PointsPerUnit { get; set; }
         public List<SeedProductUnitDto>? Units { get; set; }
     }
 
@@ -2019,6 +2059,7 @@ public class DashboardController : ControllerBase
         public decimal Cost { get; set; }
         public int QtyPerUnit { get; set; } = 1;
         public bool IsDefault { get; set; }
+        public int PointsPerUnit { get; set; }
     }
 
     public class RenameStoreRequest

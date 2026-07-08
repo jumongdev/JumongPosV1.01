@@ -15,6 +15,8 @@ public class Product
     public DateTime CreatedAt { get; set; } = TimeHelper.Now;
     public string ModifiedBy { get; set; } = string.Empty;
     public string ImageData { get; set; } = "";
+    public bool PointsExempt { get; set; }
+    public int PointsPerUnit { get; set; }
 
     public string DisplayWithStock => $"{Name}  —  Stock: {StockQty} pcs";
     public string DisplayWithPrice => $"{Name}  [{Barcode}]  \u20b1{Price:N2}  |  Stock: {StockQty}";

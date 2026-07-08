@@ -477,5 +477,36 @@ public static class PgDatabaseHelper
                 SELECT 1 FROM wh_clients wc WHERE wc.store_id = s.store_id
             )";
         seedClients.ExecuteNonQuery();
+
+        // Migration: add points fields to master products
+        using var ptMig = conn.CreateCommand();
+        ptMig.CommandText = @"
+            ALTER TABLE master_products ADD COLUMN IF NOT EXISTS points_exempt BOOLEAN NOT NULL DEFAULT FALSE;
+            ALTER TABLE master_products ADD COLUMN IF NOT EXISTS points_per_unit INTEGER NOT NULL DEFAULT 0;
+        ";
+        try { ptMig.ExecuteNonQuery(); } catch { }
+
+        // Migration: add points_per_unit to master product units
+        using var puMig = conn.CreateCommand();
+        puMig.CommandText = "ALTER TABLE master_product_units ADD COLUMN IF NOT EXISTS points_per_unit INTEGER NOT NULL DEFAULT 0";
+        try { puMig.ExecuteNonQuery(); } catch { }
+
+        // Migration: store_settings for configurable values like PointsRate
+        using var ssMig = conn.CreateCommand();
+        ssMig.CommandText = @"
+            CREATE TABLE IF NOT EXISTS store_settings (
+                id SERIAL PRIMARY KEY,
+                store_id TEXT NOT NULL DEFAULT '',
+                key TEXT NOT NULL,
+                value TEXT NOT NULL DEFAULT '',
+                UNIQUE(store_id, key)
+            );
+            INSERT INTO store_settings (store_id, key, value)
+            SELECT DISTINCT store_id, 'PointsRate', '200' FROM stores
+            WHERE NOT EXISTS (
+                SELECT 1 FROM store_settings ss WHERE ss.store_id = stores.store_id AND ss.key = 'PointsRate'
+            );
+        ";
+        try { ssMig.ExecuteNonQuery(); } catch { }
     }
 }

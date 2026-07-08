@@ -486,11 +486,13 @@ public static class SyncService
         catch (Exception ex) { ErrorLogger.Log("SyncService.EnsureSyncQueueTable", ex); }
     }
 
-    public static async Task<int> DownloadMasterCatalog(IProgress<string>? progress = null)
+        public static async Task<int> DownloadMasterCatalog(IProgress<string>? progress = null)
     {
         var added = 0; var updated = 0; var deactivated = 0;
         try
         {
+            _ = SyncStoreSettingsAsync();
+
             var url = ApiUrl.TrimEnd('/') + "/dashboard/products/master/download";
             progress?.Report("Downloading master catalog...");
             var json = await _client.GetStringAsync(url);
@@ -527,17 +529,22 @@ public static class SyncService
                     if (val != null) existingId = Convert.ToInt32(val);
                 }
 
+                var ptsExempt = p.TryGetProperty("pointsExempt", out var pe) && pe.ValueKind == JsonValueKind.True;
+                var ptsPerUnit = p.TryGetProperty("pointsPerUnit", out var ppu) ? ppu.GetInt32() : 0;
+
                 if (existingId > 0)
                 {
                     var imageData = p.TryGetProperty("imageData", out var img) ? img.GetString() : null;
                     // Update existing product
-                    using var upd = new SQLiteCommand("UPDATE Products SET Name=@n, Barcode=@b, Category=@c, Price=@p, Cost=@co, image_data=@img, ModifiedBy='cloud' WHERE Id=@id", conn);
+                    using var upd = new SQLiteCommand("UPDATE Products SET Name=@n, Barcode=@b, Category=@c, Price=@p, Cost=@co, image_data=@img, PointsExempt=@pe, PointsPerUnit=@ppu, ModifiedBy='cloud' WHERE Id=@id", conn);
                     upd.Parameters.AddWithValue("@n", name);
                     upd.Parameters.AddWithValue("@b", (object?)barcode ?? DBNull.Value);
                     upd.Parameters.AddWithValue("@c", category ?? "");
                     upd.Parameters.AddWithValue("@p", price);
                     upd.Parameters.AddWithValue("@co", cost);
                     upd.Parameters.AddWithValue("@img", (object?)imageData ?? DBNull.Value);
+                    upd.Parameters.AddWithValue("@pe", ptsExempt ? 1 : 0);
+                    upd.Parameters.AddWithValue("@ppu", ptsPerUnit);
                     upd.Parameters.AddWithValue("@id", existingId);
                     upd.ExecuteNonQuery();
 
@@ -557,14 +564,16 @@ public static class SyncService
                     var imageData = p.TryGetProperty("imageData", out var img) ? img.GetString() : null;
                     // Insert new product
                     using var ins = new SQLiteCommand(@"
-                        INSERT INTO Products (Name, Barcode, Category, Price, Cost, StockQty, IsActive, CreatedAt, ModifiedBy, SourceId, image_data)
-                        VALUES (@n, @b, @c, @p, @co, 0, 1, datetime('now','localtime'), 'cloud', 'master', @img)", conn);
+                        INSERT INTO Products (Name, Barcode, Category, Price, Cost, StockQty, IsActive, CreatedAt, ModifiedBy, SourceId, image_data, PointsExempt, PointsPerUnit)
+                        VALUES (@n, @b, @c, @p, @co, 0, 1, datetime('now','localtime'), 'cloud', 'master', @img, @pe, @ppu)", conn);
                     ins.Parameters.AddWithValue("@n", name);
                     ins.Parameters.AddWithValue("@b", (object?)barcode ?? DBNull.Value);
                     ins.Parameters.AddWithValue("@c", category ?? "");
                     ins.Parameters.AddWithValue("@p", price);
                     ins.Parameters.AddWithValue("@co", cost);
                     ins.Parameters.AddWithValue("@img", (object?)imageData ?? DBNull.Value);
+                    ins.Parameters.AddWithValue("@pe", ptsExempt ? 1 : 0);
+                    ins.Parameters.AddWithValue("@ppu", ptsPerUnit);
                     ins.ExecuteNonQuery();
 
                     using var getId = new SQLiteCommand("SELECT last_insert_rowid()", conn);
@@ -598,6 +607,8 @@ public static class SyncService
     {
         try
         {
+            _ = SyncStoreSettingsAsync();
+
             var lastSync = "";
             using (var conn = DatabaseHelper.GetConnection())
             {
@@ -681,16 +692,21 @@ public static class SyncService
                 if (val != null) existingId = Convert.ToInt32(val);
             }
 
+            var ptsExempt = p.TryGetProperty("pointsExempt", out var pe) && pe.ValueKind == JsonValueKind.True;
+            var ptsPerUnit = p.TryGetProperty("pointsPerUnit", out var ppu) ? ppu.GetInt32() : 0;
+
             if (existingId > 0)
             {
                 var imageData = p.TryGetProperty("imageData", out var img) ? img.GetString() : null;
-                using var upd = new SQLiteCommand("UPDATE Products SET Name=@n, Barcode=@b, Category=@c, Price=@p, Cost=@co, image_data=@img, ModifiedBy='cloud' WHERE Id=@id", conn);
+                using var upd = new SQLiteCommand("UPDATE Products SET Name=@n, Barcode=@b, Category=@c, Price=@p, Cost=@co, image_data=@img, PointsExempt=@pe, PointsPerUnit=@ppu, ModifiedBy='cloud' WHERE Id=@id", conn);
                 upd.Parameters.AddWithValue("@n", name);
                 upd.Parameters.AddWithValue("@b", (object?)barcode ?? DBNull.Value);
                 upd.Parameters.AddWithValue("@c", category ?? "");
                 upd.Parameters.AddWithValue("@p", price);
                 upd.Parameters.AddWithValue("@co", cost);
                 upd.Parameters.AddWithValue("@img", (object?)imageData ?? DBNull.Value);
+                upd.Parameters.AddWithValue("@pe", ptsExempt ? 1 : 0);
+                upd.Parameters.AddWithValue("@ppu", ptsPerUnit);
                 upd.Parameters.AddWithValue("@id", existingId);
                 upd.ExecuteNonQuery();
 
@@ -707,14 +723,16 @@ public static class SyncService
             {
                 var imageData = p.TryGetProperty("imageData", out var img) ? img.GetString() : null;
                 using var ins = new SQLiteCommand(@"
-                    INSERT INTO Products (Name, Barcode, Category, Price, Cost, StockQty, IsActive, CreatedAt, ModifiedBy, SourceId, image_data)
-                    VALUES (@n, @b, @c, @p, @co, 0, 1, datetime('now','localtime'), 'cloud', 'master', @img)", conn);
+                    INSERT INTO Products (Name, Barcode, Category, Price, Cost, StockQty, IsActive, CreatedAt, ModifiedBy, SourceId, image_data, PointsExempt, PointsPerUnit)
+                    VALUES (@n, @b, @c, @p, @co, 0, 1, datetime('now','localtime'), 'cloud', 'master', @img, @pe, @ppu)", conn);
                 ins.Parameters.AddWithValue("@n", name);
                 ins.Parameters.AddWithValue("@b", (object?)barcode ?? DBNull.Value);
                 ins.Parameters.AddWithValue("@c", category ?? "");
                 ins.Parameters.AddWithValue("@p", price);
                 ins.Parameters.AddWithValue("@co", cost);
                 ins.Parameters.AddWithValue("@img", (object?)imageData ?? DBNull.Value);
+                ins.Parameters.AddWithValue("@pe", ptsExempt ? 1 : 0);
+                ins.Parameters.AddWithValue("@ppu", ptsPerUnit);
                 ins.ExecuteNonQuery();
 
                 using var getId = new SQLiteCommand("SELECT last_insert_rowid()", conn);
@@ -740,16 +758,18 @@ public static class SyncService
             var uCost = u.GetProperty("cost").GetDecimal();
             var qtyPerUnit = u.GetProperty("qtyPerUnit").GetInt32();
             var isDefault = u.GetProperty("isDefault").GetBoolean();
+            var ptsPerUnit = u.TryGetProperty("pointsPerUnit", out var ppu) ? ppu.GetInt32() : 0;
 
             using var ucmd = new SQLiteCommand(@"
-                INSERT INTO ProductUnits (ProductId, UnitName, Price, Cost, QtyPerUnit, IsDefault)
-                VALUES (@pid, @un, @pr, @co, @qpu, @def)", conn);
+                INSERT INTO ProductUnits (ProductId, UnitName, Price, Cost, QtyPerUnit, IsDefault, PointsPerUnit)
+                VALUES (@pid, @un, @pr, @co, @qpu, @def, @ppu)", conn);
             ucmd.Parameters.AddWithValue("@pid", productId);
             ucmd.Parameters.AddWithValue("@un", unitName);
             ucmd.Parameters.AddWithValue("@pr", uPrice);
             ucmd.Parameters.AddWithValue("@co", uCost);
             ucmd.Parameters.AddWithValue("@qpu", qtyPerUnit);
             ucmd.Parameters.AddWithValue("@def", isDefault ? 1 : 0);
+            ucmd.Parameters.AddWithValue("@ppu", ptsPerUnit);
             ucmd.ExecuteNonQuery();
         }
     }
@@ -806,6 +826,22 @@ public static class SyncService
             return response.IsSuccessStatusCode;
         }
         catch { return false; }
+    }
+
+    public static async Task SyncStoreSettingsAsync()
+    {
+        try
+        {
+            var sid = StoreId;
+            if (string.IsNullOrEmpty(sid)) return;
+            var url = ApiUrl.TrimEnd('/') + $"/dashboard/settings/{sid}/PointsRate";
+            var json = await _client.GetStringAsync(url);
+            var doc = JsonDocument.Parse(json);
+            var val = doc.RootElement.GetProperty("value").GetString();
+            if (!string.IsNullOrEmpty(val))
+                DatabaseHelper.SaveSetting("PointsRate", val);
+        }
+        catch { }
     }
 }
 

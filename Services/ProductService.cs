@@ -347,7 +347,9 @@ public class ProductService
             StockQty = Convert.ToInt32(rdr["StockQty"]),
             IsActive = Convert.ToBoolean(rdr["IsActive"]),
             CreatedAt = DateTime.SpecifyKind(DateTime.Parse(rdr["CreatedAt"].ToString()!), DateTimeKind.Local),
-            ImageData = rdr["image_data"]?.ToString() ?? ""
+            ImageData = rdr["image_data"]?.ToString() ?? "",
+            PointsExempt = rdr["PointsExempt"] != DBNull.Value && Convert.ToBoolean(rdr["PointsExempt"]),
+            PointsPerUnit = rdr["PointsPerUnit"] != DBNull.Value ? Convert.ToInt32(rdr["PointsPerUnit"]) : 0
         };
     }
 

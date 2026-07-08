@@ -394,6 +394,7 @@ Alpine.store('app', {
   /* ΓöÇΓöÇ Product Editor ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('productEditor', () => ({
     name: '', barcode: '', category: '', price: 0, cost: 0, imageData: '',
+    pointsExempt: false, pointsPerUnit: 0,
     units: [], productId: null, categories: [],
     async init() {
       this.$watch('$store.app.section', () => { if (this.$store.app.section !== 'products') this.reset() });
@@ -403,11 +404,11 @@ Alpine.store('app', {
     open(id) {
       this.productId = id || null;
       const p = Alpine.store('app').editingProductData;
-      if (id && p) { this.name = p.name; this.barcode = p.barcode || ''; this.category = p.category || ''; this.price = p.price; this.cost = p.cost; this.imageData = p.imageData || ''; this.units = (p.units || []).map(u => ({ ...u })) }
-      else { this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.units = [] }
+      if (id && p) { this.name = p.name; this.barcode = p.barcode || ''; this.category = p.category || ''; this.price = p.price; this.cost = p.cost; this.imageData = p.imageData || ''; this.pointsExempt = p.pointsExempt || false; this.pointsPerUnit = p.pointsPerUnit || 0; this.units = (p.units || []).map(u => ({ ...u })) }
+      else { this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.units = [] }
     },
-    reset() { this.productId = null; this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.units = []; Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null; Alpine.store('app').editingProductData = null },
-    addUnit() { this.units.push({ unitName: '', price: 0, qtyPerUnit: 1, isDefault: false }) },
+    reset() { this.productId = null; this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.units = []; Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null; Alpine.store('app').editingProductData = null },
+    addUnit() { this.units.push({ unitName: '', price: 0, qtyPerUnit: 1, isDefault: false, pointsPerUnit: 0 }) },
     removeUnit(i) { this.units.splice(i, 1) },
     async save() {
       if (!this.name) { toast('Name required', 'error'); return }
@@ -415,7 +416,8 @@ Alpine.store('app', {
         name: this.name, barcode: this.barcode, category: this.category,
         price: parseFloat(this.price) || 0, cost: parseFloat(this.cost) || 0,
         imageData: this.imageData,
-        units: this.units.filter(u => u.unitName).map(u => ({ ...u, cost: (u.qtyPerUnit || 1) * (parseFloat(this.cost) || 0) }))
+        pointsExempt: this.pointsExempt, pointsPerUnit: parseInt(this.pointsPerUnit) || 0,
+        units: this.units.filter(u => u.unitName).map(u => ({ ...u, cost: (u.qtyPerUnit || 1) * (parseFloat(this.cost) || 0), pointsPerUnit: parseInt(u.pointsPerUnit) || 0 }))
       };
       try {
         const api = API + '/products/master';
@@ -829,6 +831,26 @@ Alpine.store('app', {
     prev() { if (this.page > 0) this.page-- },
     next() { if (this.page < this.pages - 1) this.page++ },
     marginClass(m) { const v = parseFloat(m); return v > 20 ? 'text-emerald-400' : v > 0 ? 'text-amber-400' : 'text-red-400' }
+  }));
+
+  Alpine.data('storeSettings', () => ({
+    pointsRate: 200, loading: true, saving: false, saved: false,
+    async init() {
+      try {
+        const r = await fetchJSON(API + '/settings/' + (Alpine.store('app').storeId || 'STORE-DEV-0001') + '/PointsRate');
+        this.pointsRate = parseInt(r.value) || 200;
+      } catch (e) { this.pointsRate = 200 }
+      this.loading = false;
+    },
+    async save() {
+      this.saving = true; this.saved = false;
+      try {
+        await fetchJSON(API + '/settings/' + (Alpine.store('app').storeId || 'STORE-DEV-0001') + '/PointsRate', { method: 'PUT', body: JSON.stringify({ value: String(this.pointsRate) }), headers: { 'Content-Type': 'application/json' } });
+        this.saved = true;
+        setTimeout(() => this.saved = false, 2000);
+      } catch (e) { toast('Failed to save: ' + e.message, 'error') }
+      this.saving = false;
+    }
   }));
 
 });
