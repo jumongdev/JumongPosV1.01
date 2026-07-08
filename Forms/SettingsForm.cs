@@ -84,10 +84,6 @@ public partial class SettingsForm : Form
             var schedHour = GetSetting(conn, "EmailScheduleHour") ?? "20";
             numEmailScheduleHour.Value = int.TryParse(schedHour, out var sh) && sh >= 0 && sh <= 23 ? sh : 20;
             _originalSettings["EmailScheduleHour"] = numEmailScheduleHour.Value.ToString();
-            var enableOnline = GetSetting(conn, "EnableOnlineOrders") ?? "true";
-            chkEnableOnlineOrders.Checked = enableOnline == "true";
-            _originalSettings["EnableOnlineOrders"] = enableOnline;
-
             var cloudUrl = GetSetting(conn, "CloudApiUrl") ?? "https://jumong-pos-api-p285q.ondigitalocean.app/api";
             txtCloudApiUrl.Text = cloudUrl;
             _originalSettings["CloudApiUrl"] = cloudUrl;
@@ -135,7 +131,6 @@ public partial class SettingsForm : Form
             newValues["PosScreenIndex"] = cmbPosScreen.SelectedIndex.ToString();
             newValues["CustomerScreenIndex"] = cmbCustomerScreen.SelectedIndex.ToString();
             newValues["EmailScheduleHour"] = numEmailScheduleHour.Value.ToString();
-            newValues["EnableOnlineOrders"] = chkEnableOnlineOrders.Checked ? "true" : "false";
 
             newValues["CloudApiUrl"] = txtCloudApiUrl.Text;
         }
@@ -158,8 +153,6 @@ public partial class SettingsForm : Form
                 UpsertSetting(conn, "PosScreenIndex", cmbPosScreen.SelectedIndex.ToString());
                 UpsertSetting(conn, "CustomerScreenIndex", cmbCustomerScreen.SelectedIndex.ToString());
                 UpsertSetting(conn, "EmailScheduleHour", numEmailScheduleHour.Value.ToString());
-                UpsertSetting(conn, "EnableOnlineOrders", chkEnableOnlineOrders.Checked ? "true" : "false");
-
                 UpsertSetting(conn, "CloudApiUrl", txtCloudApiUrl.Text);
             }
 
@@ -375,8 +368,6 @@ public partial class SettingsForm : Form
             var lblEmailSched = new Label { Text = "Email Report Hour:", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, dy), Size = new Size(140, 25) };
             var lblEmailSchedHint = new Label { Text = "(24hr, e.g. 20 = 8PM - daily auto-email)", Font = new Font("Segoe UI", 8F), ForeColor = dimText, Location = new Point(250, dy + 3), Size = new Size(250, 20) };
             dy += 32;
-            chkEnableOnlineOrders = new CheckBox { Text = "Show Incoming Stock", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, dy), Size = new Size(200, 25), FlatStyle = FlatStyle.Flat };
-
             dy += 32;
             var lblRestart = new Label { Text = "Screen changes take effect after restart.", Font = new Font("Segoe UI", 8F), ForeColor = dimText, Location = new Point(15, dy), Size = new Size(380, 20) };
             var lblLowStock = new Label { Text = "Low Stock\nThreshold:", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, dy + 24), Size = new Size(120, 32), TextAlign = ContentAlignment.MiddleLeft };
@@ -422,7 +413,7 @@ public partial class SettingsForm : Form
             MakeSection("DISPLAY SETUP", 310, new Control[] {
                 lblPos, cmbPosScreen, lblCust, cmbCustomerScreen,
                 lblEmailSched, numEmailScheduleHour, lblEmailSchedHint,
-                chkEnableOnlineOrders, lblRestart,
+                lblRestart,
                 lblLowStock, numLowStock, lblLowStockHint,
                 lblTz, cmbTimezone, lblTzHint
             });
@@ -791,7 +782,7 @@ public partial class SettingsForm : Form
     }
 
     private NumericUpDown numEmailScheduleHour = new();
-    private CheckBox chkEnableOnlineOrders = new();
+
 
     private TextBox txtCloudApiUrl = new();
     private Label lblStoreId = new();

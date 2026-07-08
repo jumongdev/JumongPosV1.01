@@ -43,20 +43,12 @@ public partial class MainForm : Form
             WindowState = FormWindowState.Maximized;
         }
 
-        try
-        {
-            using var conn3 = DatabaseHelper.GetConnection();
-            conn3.Open();
-            using var cmd3 = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'EnableOnlineOrders'", conn3);
-            btnOnlineOrders.Visible = cmd3.ExecuteScalar()?.ToString() != "false";
-            if (btnOnlineOrders.Visible) btnOnlineOrders.Text = "    Incoming Stock";
-        }
-        catch { }
+        btnOnlineOrders.Text = "    Incoming Stock";
         LayoutMenuButtons();
 
         StartEmailScheduler();
         StartSyncRetry();
-        if (btnOnlineOrders.Visible) StartTransferPoll();
+        StartTransferPoll();
         DebugHelper.AddFormLabel(this);
         Load += (_, _) => LayoutMenuButtons();
     }
