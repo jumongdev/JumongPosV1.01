@@ -172,7 +172,11 @@ public partial class ProductsForm : Form
         if (string.IsNullOrWhiteSpace(data)) return null;
         try
         {
-            var bytes = Convert.FromBase64String(data);
+            var clean = data;
+            var idx = data.IndexOf("base64,", StringComparison.OrdinalIgnoreCase);
+            if (idx >= 0) clean = data[(idx + 7)..];
+            clean = clean.Trim();
+            var bytes = Convert.FromBase64String(clean);
             var ms = new MemoryStream(bytes);
             return Image.FromStream(ms);
         }
