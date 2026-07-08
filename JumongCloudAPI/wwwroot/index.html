@@ -153,7 +153,7 @@ tailwind.config = {
       <div x-show="$store.app.section === 'dashboard'" x-transition.opacity>
 
         <!-- Summary Cards -->
-        <div x-data="summaryCards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 mb-4">
+        <div x-data="summaryCards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3 mb-4">
           <template x-if="loading">
             <div class="col-span-full flex items-center justify-center py-8 text-gray-400"><span class="spinner mr-2"></span>Loading...</div>
           </template>
@@ -165,7 +165,8 @@ tailwind.config = {
               { label:'E-Wallet Sales', val:'₱'+fmt(d.totalEwalletSales), sub:'', icon:'📱' },
               { label:'Credit Sales', val:'₱'+fmt(d.totalCreditSales), sub:'', icon:'📋', cls:'text-amber-600 dark:text-amber-400' },
               { label:'Products / Customers', val:fmtInt(d.totalProducts)+' / '+fmtInt(d.totalCustomers), sub:'', icon:'📦' },
-              { label:'Voided Amount', val:'₱'+fmt(d.totalVoided), sub:'', icon:'⚠️', cls:'text-red-600 dark:text-red-400' }
+              { label:'Voided Amount', val:'₱'+fmt(d.totalVoided), sub:'', icon:'⚠️', cls:'text-red-600 dark:text-red-400' },
+              { label:'Short / Over', val:'₱'+fmt(Math.abs(d.todayVariance)), sub:d.todayVariance>=0?'OVER':'SHORT', icon:d.todayVariance>=0?'✅':'❌', cls:d.todayVariance>=0?'text-emerald-500':'text-red-500' }
             ]" :key="i">
               <div class="relative bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl p-4 hover:shadow-lg dark:hover:shadow-cyan-900/10 transition-all">
                 <span class="absolute top-3 right-3 text-2xl opacity-10" x-text="card.icon"></span>

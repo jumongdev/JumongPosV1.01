@@ -98,7 +98,8 @@ public class DashboardController : ControllerBase
                     (SELECT COALESCE(SUM(si.total_price),0) {slj} WHERE s.is_voided = false AND si.is_voided = false AND s.payment_method = 'Cash' {StoreFilter(storeId, "s")}{tfSales.Replace("sale_date","s.sale_date")}) AS total_cash_sales,
                     (SELECT COALESCE(SUM(si.total_price),0) {slj} WHERE s.is_voided = false AND si.is_voided = false AND s.payment_method = 'E-Wallet' {StoreFilter(storeId, "s")}{tfSales.Replace("sale_date","s.sale_date")}) AS total_ewallet_sales,
                     (SELECT COALESCE(SUM(si.total_price),0) {slj} WHERE s.is_voided = false AND si.is_voided = false AND s.payment_method = 'Credit' {StoreFilter(storeId, "s")}{tfSales.Replace("sale_date","s.sale_date")}) AS total_credit_sales,
-                    (SELECT COALESCE(SUM(si.total_price),0) {slj} WHERE s.is_voided = false AND si.is_voided = true {StoreFilter(storeId, "s")}{tfSales.Replace("sale_date","s.sale_date")}) AS total_voided
+                    (SELECT COALESCE(SUM(si.total_price),0) {slj} WHERE s.is_voided = false AND si.is_voided = true {StoreFilter(storeId, "s")}{tfSales.Replace("sale_date","s.sale_date")}) AS total_voided,
+                    (SELECT COALESCE(SUM(difference),0) FROM daily_closes WHERE close_date::date = CURRENT_DATE {StoreFilter(storeId, "daily_closes")}) AS today_variance
             ";
             var row = cmd.ExecuteReader();
             row.Read();
@@ -114,7 +115,8 @@ public class DashboardController : ControllerBase
                 totalCashSales = row.GetDecimal(7),
                 totalEwalletSales = row.GetDecimal(8),
                 totalCreditSales = row.GetDecimal(9),
-                totalVoided = row.GetDecimal(10)
+                totalVoided = row.GetDecimal(10),
+                todayVariance = row.GetDecimal(11)
             };
             return Ok(result);
         }
@@ -916,7 +918,7 @@ public class DashboardController : ControllerBase
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-        return Ok(new { version = "1.0.6" });
+            return Ok(new { version = "1.0.7" });
     }
 
         [HttpGet("fix-hvr-times")]
