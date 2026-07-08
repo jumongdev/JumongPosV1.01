@@ -82,6 +82,7 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
     var dc = new DailyClose 
     { 
         CloseDate = now.ToString("yyyy-MM-dd HH:mm:ss"), 
+        CreatedAt = now.ToString("yyyy-MM-dd HH:mm:ss"),
         TotalSales = _totalSales, 
         TotalCash = _totalCash, 
         TotalEWallet = _totalEWallet, 

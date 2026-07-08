@@ -119,13 +119,14 @@ public class DailyCloseService
         conn.Open();
         try
         {
-            var sql = @"INSERT INTO DailyClose (CloseDate, TotalSales, TotalCash, TotalEWallet, TotalCredit,
+            var sql = @"INSERT INTO DailyClose (CloseDate, CreatedAt, TotalSales, TotalCash, TotalEWallet, TotalCredit,
                         TotalVoided, TotalExpenses, OpeningCash, Denom1000, Denom500, Denom200, Denom100, Denom50, Denom20, DenomCoins,
                         CashOnHand, Difference, Notes, UserId, UserName)
-                        VALUES (@d, @ts, @tc, @te, @tcr, @tv, @texp, @opn, @d1k, @d5h, @d2h, @d1h, @d50, @d20, @coins,
+                        VALUES (@d, @ca, @ts, @tc, @te, @tcr, @tv, @texp, @opn, @d1k, @d5h, @d2h, @d1h, @d50, @d20, @coins,
                         @coh, @diff, @notes, @uid, @uname)";
             using var cmd = new SQLiteCommand(sql, conn);
             cmd.Parameters.AddWithValue("@d", dc.CloseDate);
+            cmd.Parameters.AddWithValue("@ca", dc.CreatedAt);
             cmd.Parameters.AddWithValue("@ts", dc.TotalSales);
             cmd.Parameters.AddWithValue("@tc", dc.TotalCash);
             cmd.Parameters.AddWithValue("@te", dc.TotalEWallet);

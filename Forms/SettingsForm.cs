@@ -590,7 +590,8 @@ public partial class SettingsForm : Form
             var voids = SaleService.GetVoidLogs().Where(v => v.CreatedAt?.StartsWith(today) == true).ToList();
             var stockTrails = StockService.GetTrail(limit: 10000).Where(t => t.CreatedAt?.StartsWith(today) == true).ToList();
             var creditTxns = CreditService.GetAll().Where(ct => ct.CreatedAt?.StartsWith(today) == true).ToList();
-            var total = allSales.Count + expenses.Count + voids.Count + stockTrails.Count + creditTxns.Count;
+            var dailyCloses = DailyCloseService.GetHistory().Where(dc => dc.CloseDate.StartsWith(today)).ToList();
+            var total = allSales.Count + expenses.Count + voids.Count + stockTrails.Count + creditTxns.Count + dailyCloses.Count;
             var done = 0;
             if (total == 0) { p.Report("Nothing to sync today."); await Task.Delay(1500); return 0; }
             foreach (var x in allSales) { p.Report($"Sales: {++done}/{total}"); await SyncService.SyncSale(x, x.Items); }
@@ -598,6 +599,7 @@ public partial class SettingsForm : Form
             foreach (var x in voids) { p.Report($"Voids: {++done}/{total}"); await SyncService.SyncVoidLog(x); }
             foreach (var x in stockTrails) { p.Report($"Stock: {++done}/{total}"); await SyncService.SyncStockTrail(x); }
             foreach (var x in creditTxns) { p.Report($"Credit: {++done}/{total}"); await SyncService.SyncCreditTransaction(x); }
+            foreach (var x in dailyCloses) { p.Report($"Shifts: {++done}/{total}"); await SyncService.SyncDailyClose(x); }
             return total;
         });
     }
