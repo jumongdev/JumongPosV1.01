@@ -464,6 +464,17 @@ public static class PgDatabaseHelper
             CREATE INDEX IF NOT EXISTS idx_wh_transfers_client ON wh_transfers(client_id);
             CREATE INDEX IF NOT EXISTS idx_wh_transfers_status ON wh_transfers(status);
             CREATE INDEX IF NOT EXISTS idx_wh_transfer_items_transfer ON wh_transfer_items(transfer_id);
+            CREATE TABLE IF NOT EXISTS wh_stock_trails (
+                id SERIAL PRIMARY KEY,
+                product_id INTEGER NOT NULL REFERENCES wh_products(id),
+                product_name TEXT NOT NULL DEFAULT '',
+                barcode TEXT DEFAULT '',
+                qty_change INTEGER NOT NULL DEFAULT 0,
+                reference TEXT NOT NULL DEFAULT '',
+                reference_type TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS idx_wh_stock_trails_product ON wh_stock_trails(product_id);
         ";
         whMig.ExecuteNonQuery();
 

@@ -1970,6 +1970,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 }
 
                 var shortages = new List<object>();
+                var transferOut = new List<object>();
                 foreach (var (productId, productName, baseQty, barcode) in itemsList)
                 {
                     var accepted = body?.Items == null || receivedIds.Contains(productId);
@@ -1982,13 +1983,46 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     upd.Parameters.AddWithValue("pid", productId);
                     upd.ExecuteNonQuery();
 
-                    if (!accepted)
+                    if (accepted)
                     {
+                        // Deduct from warehouse stock
+                        using var deduct = conn.CreateCommand(); deduct.Transaction = tx;
+                        deduct.CommandText = "UPDATE wh_products SET stock_qty = stock_qty - @bq WHERE id = @pid";
+                        deduct.Parameters.AddWithValue("bq", baseQty);
+                        deduct.Parameters.AddWithValue("pid", productId);
+                        deduct.ExecuteNonQuery();
+
+                        // Log trail
+                        using var trail = conn.CreateCommand(); trail.Transaction = tx;
+                        trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) VALUES (@pid, @pn, @bc, @qty, @ref, 'transfer_out')";
+                        trail.Parameters.AddWithValue("pid", productId);
+                        trail.Parameters.AddWithValue("pn", productName);
+                        trail.Parameters.AddWithValue("bc", barcode);
+                        trail.Parameters.AddWithValue("qty", -baseQty);
+                        trail.Parameters.AddWithValue("ref", $"Transfer #{id}");
+                        trail.ExecuteNonQuery();
+
+                        transferOut.Add(new { productId, productName, baseQty });
+                    }
+                    else
+                    {
+                        // Restock shortages back to warehouse
                         using var restock = conn.CreateCommand(); restock.Transaction = tx;
                         restock.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @bq WHERE id = @pid";
                         restock.Parameters.AddWithValue("bq", baseQty);
                         restock.Parameters.AddWithValue("pid", productId);
                         restock.ExecuteNonQuery();
+
+                        // Log trail
+                        using var trail = conn.CreateCommand(); trail.Transaction = tx;
+                        trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) VALUES (@pid, @pn, @bc, @qty, @ref, 'shortage_return')";
+                        trail.Parameters.AddWithValue("pid", productId);
+                        trail.Parameters.AddWithValue("pn", productName);
+                        trail.Parameters.AddWithValue("bc", barcode);
+                        trail.Parameters.AddWithValue("qty", baseQty);
+                        trail.Parameters.AddWithValue("ref", $"Transfer #{id}");
+                        trail.ExecuteNonQuery();
+
                         shortages.Add(new { productId, productName, baseQty });
                     }
                 }
