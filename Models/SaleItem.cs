@@ -16,4 +16,5 @@ public class SaleItem
     public bool IsVoided { get; set; }
     public bool PointsExempt { get; set; }
     public int PointsPerUnit { get; set; }
+    public int PointsEarned { get; set; }
 }

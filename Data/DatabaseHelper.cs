@@ -577,6 +577,14 @@ public class DatabaseHelper
         using var clearQueue = new SQLiteCommand("DELETE FROM SyncQueue", conn);
         clearQueue.ExecuteNonQuery();
 
+        // Migrate: add PointsEarned to SaleItems
+        using var checkPe = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('SaleItems') WHERE name = 'PointsEarned'", conn);
+        if (Convert.ToInt32(checkPe.ExecuteScalar()) == 0)
+        {
+            using var alter = new SQLiteCommand("ALTER TABLE SaleItems ADD COLUMN PointsEarned INTEGER NOT NULL DEFAULT 0", conn);
+            alter.ExecuteNonQuery();
+        }
+
         SeedDefaults(conn);
     }
 

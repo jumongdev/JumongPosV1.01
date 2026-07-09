@@ -1670,6 +1670,7 @@ tailwind.config = {
                   <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Total</th>
                   <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Unit Cost</th>
                   <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Total Cost</th>
+                  <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Pts</th>
                   <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Profit</th>
                   <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Margin</th>
                 </tr></thead>
@@ -1683,6 +1684,7 @@ tailwind.config = {
                       <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalPrice)"></span></td>
                       <td class="px-2 py-2 text-right text-red-500">&#8369;<span x-text="fmt(x.unitCost)"></span></td>
                       <td class="px-2 py-2 text-right text-red-500">&#8369;<span x-text="fmt(x.totalCost)"></span></td>
+                      <td class="px-2 py-2 text-right font-semibold" :class="x.pointsEarned>0?'text-yellow-400':'text-gray-500'" x-text="x.pointsEarned || 0"></td>
                       <td class="px-2 py-2 text-right font-semibold" :class="x.profit>0?'text-emerald-400':'text-red-400'">&#8369;<span x-text="fmt(x.profit)"></span></td>
                       <td class="px-2 py-2 text-right" :class="(x.totalPrice>0 ? (x.profit/x.totalPrice*100).toFixed(1) : '0.0') > 20 ? 'text-emerald-400' : 'text-amber-400'"><span x-text="x.totalPrice>0 ? (x.profit/x.totalPrice*100).toFixed(1) : '0.0'"></span>%</td>
                     </tr>

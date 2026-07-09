@@ -806,8 +806,9 @@ public class DashboardController : ControllerBase
                        si.product_name, si.barcode, si.quantity, si.price, si.total_price,
                        COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0) AS unit_cost, si.qty_per_unit,
                        si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0) AS total_cost,
-                       si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS profit,
-                       p.pos_id AS product_pos_id
+si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS profit,
+                       si.points_earned AS points_earned,
+                        p.pos_id AS product_pos_id
                 FROM sales s
                 LEFT JOIN sale_items si ON si.sale_id = s.pos_id AND si.store_id = s.store_id AND si.is_voided = false
                 LEFT JOIN products p ON si.product_id = p.pos_id AND si.store_id = p.store_id
@@ -835,7 +836,8 @@ public class DashboardController : ControllerBase
                     qtyPerUnit = reader.GetInt32(10),
                     totalCost = reader.GetDecimal(11),
                     profit = reader.GetDecimal(12),
-                    productPosId = reader.IsDBNull(13) ? 0 : reader.GetInt32(13)
+                    pointsEarned = reader.GetInt32(13),
+                    productPosId = reader.IsDBNull(14) ? 0 : reader.GetInt32(14)
                 });
             }
             return Ok(new { items, paymentMethod, referenceNo, ewPaid, grandTotal });

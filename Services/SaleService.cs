@@ -74,8 +74,20 @@ public class SaleService
                     unitCost = result != null ? Convert.ToDecimal(result) : 0;
                 }
 
-                var itemSql = @"INSERT INTO SaleItems (SaleId, ProductId, ProductName, Barcode, Price, Quantity, TotalPrice, UnitName, QtyPerUnit, UnitCost)
-                                VALUES (@sid, @pid, @pn, @bc, @pr, @qty, @tot, @un, @qpu, @uc)";
+                var ptsEarned = 0;
+                if (!item.PointsExempt)
+                {
+                    if (item.PointsPerUnit > 0)
+                        ptsEarned = item.PointsPerUnit * item.Quantity;
+                    else
+                    {
+                        var rate = int.Parse(DatabaseHelper.GetSetting("PointsRate", "200"));
+                        ptsEarned = (int)(item.TotalPrice / rate);
+                    }
+                }
+
+                var itemSql = @"INSERT INTO SaleItems (SaleId, ProductId, ProductName, Barcode, Price, Quantity, TotalPrice, UnitName, QtyPerUnit, UnitCost, PointsEarned)
+                                VALUES (@sid, @pid, @pn, @bc, @pr, @qty, @tot, @un, @qpu, @uc, @pe)";
                 using var itemCmd = new SQLiteCommand(itemSql, conn);
                 itemCmd.Parameters.AddWithValue("@sid", saleId);
                 itemCmd.Parameters.AddWithValue("@pid", item.ProductId);
@@ -87,6 +99,7 @@ public class SaleService
                 itemCmd.Parameters.AddWithValue("@un", item.UnitName);
                 itemCmd.Parameters.AddWithValue("@qpu", item.QtyPerUnit);
                 itemCmd.Parameters.AddWithValue("@uc", unitCost);
+                itemCmd.Parameters.AddWithValue("@pe", ptsEarned);
                 itemCmd.ExecuteNonQuery();
                 using var itemIdCmd = new SQLiteCommand("SELECT last_insert_rowid()", conn);
                 item.Id = Convert.ToInt32(itemIdCmd.ExecuteScalar());

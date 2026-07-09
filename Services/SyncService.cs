@@ -208,7 +208,8 @@ public static class SyncService
                 IsVoided = i.IsVoided,
                 UnitName = i.UnitName,
                 QtyPerUnit = i.QtyPerUnit,
-                UnitCost = i.UnitCost
+                UnitCost = i.UnitCost,
+                PointsEarned = i.PointsEarned
             }).ToList()
         };
         await PostAsync("/sales", payload, sale.Id);

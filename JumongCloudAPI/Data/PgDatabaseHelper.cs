@@ -491,6 +491,11 @@ public static class PgDatabaseHelper
         puMig.CommandText = "ALTER TABLE master_product_units ADD COLUMN IF NOT EXISTS points_per_unit INTEGER NOT NULL DEFAULT 0";
         try { puMig.ExecuteNonQuery(); } catch { }
 
+        // Migration: add points_earned to sale_items
+        using var peMig = conn.CreateCommand();
+        peMig.CommandText = "ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS points_earned INTEGER NOT NULL DEFAULT 0";
+        try { peMig.ExecuteNonQuery(); } catch { }
+
         // Migration: store_settings for configurable values like PointsRate
         using var ssMig = conn.CreateCommand();
         ssMig.CommandText = @"
