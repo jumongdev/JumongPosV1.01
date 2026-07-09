@@ -630,6 +630,8 @@ tailwind.config = {
                   <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Name</th>
                   <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Barcode</th>
                   <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Category</th>
+                  <th class="text-center px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]" title="Points Exempt">Exempt</th>
+                  <th class="text-center px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]" title="Points Per Unit">Pts/U</th>
                   <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Price</th>
                   <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Cost</th>
                   <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Margin</th>
@@ -644,6 +646,8 @@ tailwind.config = {
                       <td class="px-3 py-2 font-medium" x-text="x.name"></td>
                       <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.barcode || ''"></td>
                       <td class="px-3 py-2" x-text="x.category || ''"></td>
+                      <td class="px-3 py-2 text-center"><span x-show="x.pointsExempt" class="text-red-400 font-bold" title="Exempted from points">✕</span><span x-show="!x.pointsExempt" class="text-emerald-400" title="Earns points">✓</span></td>
+                      <td class="px-3 py-2 text-center text-gray-500 dark:text-[#7878aa]" x-text="x.pointsPerUnit || 0"></td>
                       <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.price)"></span></td>
                       <td class="px-3 py-2 text-right text-red-500">&#8369;<span x-text="fmt(x.cost)"></span></td>
                       <td class="px-3 py-2 text-right font-medium" :class="marginClass(margin(x))"><span x-text="margin(x)"></span>%</td>
