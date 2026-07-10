@@ -857,10 +857,10 @@ public static class SyncService
             {
                 var name = c.GetProperty("name").GetString() ?? "";
                 var phone = c.GetProperty("phone").GetString() ?? "";
-                var email = c.GetProperty("email").GetString() ?? "";
-                var points = c.GetProperty("points").GetInt32();
-                var address = c.GetProperty("address").GetString() ?? "";
-                var creditBalance = c.GetProperty("creditBalance").GetDecimal();
+                var email = c.TryGetProperty("email", out var e) ? e.GetString() ?? "" : "";
+                var points = c.TryGetProperty("points", out var pt) ? pt.GetInt32() : 0;
+                var address = c.TryGetProperty("address", out var a) ? a.GetString() ?? "" : "";
+                var creditBalance = c.TryGetProperty("creditBalance", out var cb) ? cb.GetDecimal() : 0;
 
                 using var conn = DatabaseHelper.GetConnection();
                 conn.Open();

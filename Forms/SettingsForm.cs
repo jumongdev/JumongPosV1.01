@@ -470,23 +470,16 @@ public partial class SettingsForm : Form
             btnUpdateMaster = MakeBtn("\uD83D\uDD04 UPDATE MASTER CATALOG", btnX, cy, Color.FromArgb(0, 150, 136), btnUpdateMaster_Click);
             var descUpdate = MakeDesc("Download only new/changed products from cloud (faster than full sync)", descX, cy);
             cy += 42;
-            btnUploadCustomers = MakeBtn("\uD83D\uDCE1 UPLOAD CUSTOMERS TO CLOUD", btnX, cy, Color.FromArgb(46, 204, 113), btnUploadCustomers_Click);
-            var descUpload = MakeDesc("Step 1: Send all local customers to cloud server", descX, cy);
-            cy += 42;
-            btnDeleteCustomers = MakeBtn("\uD83D\uDDD1 DELETE ALL LOCAL CUSTOMERS", btnX, cy, Color.FromArgb(231, 76, 60), btnDeleteCustomers_Click);
-            var descDel = MakeDesc("Step 2: Remove all customers from local database", descX, cy);
-            cy += 42;
             btnSyncCustomers = MakeBtn("\uD83D\uDC65 SYNC CUSTOMERS FROM CLOUD", btnX, cy, Color.FromArgb(155, 89, 182), btnSyncCustomers_Click);
-            var descCust = MakeDesc("Step 3: Download all customers from cloud (includes points)", descX, cy);
+            var descCust = MakeDesc("Download all customers from cloud server to local database", descX, cy);
             cy += 42;
             btnSyncLog = MakeBtn("\uD83D\uDCCB VIEW SYNC LOG", btnX, cy, accentBlue, btnSyncLog_Click);
             var desc4 = MakeDesc("View history of all sync operations and any errors", descX, cy);
-            MakeSection("CLOUD SYNC", 470, new Control[] {
+            MakeSection("CLOUD SYNC", 390, new Control[] {
                 lblCloudApi, txtCloudApiUrl, lblStoreIdLabel, lblStoreId,
                 lblStoreNameLabel, txtStoreName,
                 btnSyncAll, desc1, btnSyncToday, desc2, btnSyncFromCloud, desc3,
-                btnUpdateMaster, descUpdate, btnSyncCustomers, descCust,
-                btnUploadCustomers, descUpload, btnDeleteCustomers, descDel, btnSyncLog, desc4
+                btnUpdateMaster, descUpdate, btnSyncCustomers, descCust, btnSyncLog, desc4
             });
         }
 
@@ -701,25 +694,6 @@ public partial class SettingsForm : Form
         });
     }
 
-    private void btnUploadCustomers_Click(object? sender, EventArgs e)
-    {
-        ShowSyncProgress("Uploading Customers...", async p =>
-        {
-            p.Report("Uploading all local customers to cloud...");
-            var count = await SyncService.UploadAllCustomersAsync();
-            return count;
-        });
-    }
-
-    private void btnDeleteCustomers_Click(object? sender, EventArgs e)
-    {
-        if (MessageBox.Show("Delete ALL local customers? This cannot be undone.\n\nRe-download from cloud after deleting.", "Confirm Delete",
-            MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
-            return;
-        SyncService.DeleteAllLocalCustomers();
-        MessageBox.Show("All local customers deleted.", "Done", MessageBoxButtons.OK, MessageBoxIcon.Information);
-    }
-
     private async void btnUpdate_Click(object? sender, EventArgs e)
     {
         btnUpdate.Enabled = false;
@@ -831,8 +805,6 @@ public partial class SettingsForm : Form
     private Button btnSyncFromCloud = null!;
     private Button btnUpdateMaster = null!;
     private Button btnSyncCustomers = null!;
-    private Button btnUploadCustomers = null!;
-    private Button btnDeleteCustomers = null!;
     private Button btnUpdate = null!;
     private Button btnExportProducts = null!;
     private Button btnImportAndSync = null!;
