@@ -795,7 +795,7 @@ tailwind.config = {
           <!-- Section header -->
           <div class="px-4 py-3 border-b border-gray-100 dark:border-[#222255]">
             <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">
-              WAREHOUSE — <span x-text="$store.app.whSubpage==='product' ? 'Products' : $store.app.whSubpage==='inventory' ? 'Inventory' : $store.app.whSubpage==='onlineorder' ? 'Online Orders' : 'Transfers'"></span>
+              WAREHOUSE — <span x-text="$store.app.whSubpage==='product' ? 'Products' : $store.app.whSubpage==='inventory' ? 'Inventory' : $store.app.whSubpage==='onlineorder' ? 'Online Orders' : $store.app.whSubpage==='sales' ? 'Sales' : 'Transfers'"></span>
             </h3>
           </div>
           <!-- Subpage nav -->
@@ -809,6 +809,8 @@ tailwind.config = {
                 :class="$store.app.whSubpage==='onlineorder' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">Online Order</button>
               <button @click="$store.app.switchWhSubpage('transfer'); load()" class="text-[11px] px-3 py-1.5 rounded-lg transition-all font-medium"
                 :class="$store.app.whSubpage==='transfer' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">Transfer</button>
+              <button @click="$store.app.switchWhSubpage('sales'); loadSales()" class="text-[11px] px-3 py-1.5 rounded-lg transition-all font-medium"
+                :class="$store.app.whSubpage==='sales' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">Sales</button>
             </div>
             <div class="flex items-center gap-2">
               <input type="text" placeholder="Search..." x-model="search" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2.5 py-1.5 w-28 text-gray-700 dark:text-slate-200 placeholder-gray-400 hidden sm:block">
@@ -914,7 +916,9 @@ tailwind.config = {
                         </td>
                         <td class="px-3 py-2 text-right font-bold" :class="x.stockQty < 10 ? 'text-red-400' : 'text-emerald-400'" x-text="x.stockQty"></td>
                         <td class="px-3 py-2">
-                          <button @click="adjustStock(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">ADJUST</button>
+                          <button @click="stockMove(x.id,'receive')" class="text-[10px] px-2 py-1 rounded bg-emerald-600 text-white font-medium hover:bg-emerald-700">+ RECEIVE</button>
+                          <button @click="stockMove(x.id,'return')" class="text-[10px] px-2 py-1 rounded bg-red-600 text-white font-medium hover:bg-red-700">- RETURN</button>
+                          <button @click="showTrail(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">TRAIL</button>
                         </td>
                       </tr>
                     </template>
@@ -1044,6 +1048,41 @@ tailwind.config = {
               </template>
             </div>
           </div>
+
+            <!-- ═══ Sales subpage ═══ -->
+            <div x-show="!loading && $store.app.whSubpage==='sales'">
+              <div class="flex items-center gap-2 px-4 py-2 border-b border-gray-100 dark:border-[#222255]/50">
+                <input type="date" x-model="saleFrom" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5">
+                <span class="text-gray-400">→</span>
+                <input type="date" x-model="saleTo" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5">
+                <button @click="loadSales()" class="text-xs px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">FILTER</button>
+              </div>
+              <template x-if="salesData.length===0"><div class="text-center py-6 text-gray-400">No walk-in sales</div></template>
+              <template x-if="salesData.length > 0">
+                <table class="w-full text-xs">
+                  <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Customer</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Items</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Total</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
+                  </tr></thead>
+                  <tbody>
+                    <template x-for="(x,i) in salesData" :key="i">
+                      <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                        <td class="px-3 py-2 font-medium" x-text="x.customerName"></td>
+                        <td class="px-3 py-2 text-right" x-text="x.itemCount"></td>
+                        <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.total)"></span></td>
+                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Manila'})"></td>
+                        <td class="px-3 py-2">
+                          <button @click="viewSaleItems(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">VIEW</button>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </template>
+            </div>
 
     <!-- Warehouse Add/Edit Modal -->
     <div x-show="modalOpen" x-cloak
@@ -1399,6 +1438,80 @@ tailwind.config = {
             </tbody>
           </table>
           <div class="mt-3 flex justify-end"><button @click="closeTransferView()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500">CLOSE</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Warehouse Stock Trail Modal -->
+    <div x-show="trailModal" x-cloak
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div class="modal-box bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-[92%] max-w-xl max-h-[85vh] flex flex-col shadow-2xl">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-t-xl">
+          <h3 class="text-sm font-bold text-cyan-700 dark:text-cyan-400"><span x-text="trailProduct?.name"></span> — Stock Trail</h3>
+          <button @click="closeTrail()" class="p-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">&times;</button>
+        </div>
+        <div class="overflow-auto p-5 flex-1">
+          <template x-if="trailItems.length===0"><div class="text-center py-6 text-gray-400">No trail records</div></template>
+          <template x-if="trailItems.length > 0">
+            <table class="w-full text-xs">
+              <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Type</th>
+                <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Qty Change</th>
+                <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Reference</th>
+                <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Date</th>
+              </tr></thead>
+              <tbody>
+                <template x-for="(x,i) in trailItems" :key="i">
+                  <tr class="border-b border-gray-50 dark:border-[#222255]/40">
+                    <td class="px-2 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded" :class="x.type==='transfer_out' ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300' : x.type==='manual_receive' ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' : x.type==='manual_return' ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300' : 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300'" x-text="x.type==='transfer_out' ? 'TRANSFER OUT' : x.type==='manual_receive' ? 'RECEIVE' : x.type==='manual_return' ? 'RETURN' : 'SHORTAGE RETURN'"></span></td>
+                    <td class="px-2 py-2 text-right font-bold" :class="x.qtyChange < 0 ? 'text-red-400' : 'text-emerald-400'" x-text="(x.qtyChange > 0 ? '+' : '') + x.qtyChange"></td>
+                    <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.reference || ''"></td>
+                    <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Manila'})"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </template>
+          <div class="mt-3 flex justify-end"><button @click="closeTrail()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500">CLOSE</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Warehouse Sale Items View Modal -->
+    <div x-show="saleViewOpen" x-cloak
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div class="modal-box bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-[92%] max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-t-xl">
+          <h3 class="text-sm font-bold text-cyan-700 dark:text-cyan-400">Sale Items</h3>
+          <button @click="closeSaleView()" class="p-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">&times;</button>
+        </div>
+        <div class="overflow-auto p-5 flex-1">
+          <template x-if="saleViewItems.length===0"><div class="text-center py-6 text-gray-400">No items</div></template>
+          <template x-if="saleViewItems.length > 0">
+            <table class="w-full text-xs">
+              <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Product</th>
+                <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Unit</th>
+                <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Qty</th>
+                <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Price</th>
+                <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Total</th>
+                <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Pts</th>
+              </tr></thead>
+              <tbody>
+                <template x-for="(x,i) in saleViewItems" :key="i">
+                  <tr class="border-b border-gray-50 dark:border-[#222255]/40">
+                    <td class="px-2 py-2" x-text="x.productName"></td>
+                    <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.unitName"></td>
+                    <td class="px-2 py-2 text-right" x-text="x.qty"></td>
+                    <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.price)"></span></td>
+                    <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.subtotal)"></span></td>
+                    <td class="px-2 py-2 text-right text-cyan-400" x-text="x.points"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </template>
+          <div class="mt-3 flex justify-end"><button @click="closeSaleView()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500">CLOSE</button></div>
         </div>
       </div>
     </div>

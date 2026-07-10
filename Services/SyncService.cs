@@ -844,6 +844,60 @@ public static class SyncService
         }
         catch { }
     }
+
+    public static async Task<int> DownloadCustomersAsync()
+    {
+        var count = 0;
+        try
+        {
+            var url = ApiUrl.TrimEnd('/') + "/dashboard/warehouse/customers?all=true";
+            var json = await _client.GetStringAsync(url);
+            using var doc = JsonDocument.Parse(json);
+            foreach (var c in doc.RootElement.EnumerateArray())
+            {
+                var name = c.GetProperty("name").GetString() ?? "";
+                var phone = c.GetProperty("phone").GetString() ?? "";
+                var email = c.GetProperty("email").GetString() ?? "";
+                var points = c.GetProperty("points").GetInt32();
+                var address = c.GetProperty("address").GetString() ?? "";
+                var creditBalance = c.GetProperty("creditBalance").GetDecimal();
+
+                using var conn = DatabaseHelper.GetConnection();
+                conn.Open();
+                using var cmd = new SQLiteCommand(@"
+                    INSERT INTO Customers (Name, Phone, Email, LoyaltyPoints, IsActive, CreditBalance, Address, CreatedAt)
+                    VALUES (@n, @p, @e, @pts, 1, @cb, @a, datetime('now','localtime'))
+                    ON CONFLICT(Name) DO UPDATE SET
+                        Phone=@p, Email=@e, LoyaltyPoints=@pts, IsActive=1, CreditBalance=@cb, Address=@a", conn);
+                cmd.Parameters.AddWithValue("n", name);
+                cmd.Parameters.AddWithValue("p", phone);
+                cmd.Parameters.AddWithValue("e", email);
+                cmd.Parameters.AddWithValue("pts", points);
+                cmd.Parameters.AddWithValue("cb", creditBalance);
+                cmd.Parameters.AddWithValue("a", address);
+                cmd.ExecuteNonQuery();
+                count++;
+            }
+        }
+        catch (Exception ex) { ErrorLogger.Log("SyncService.DownloadCustomers", ex); throw; }
+        return count;
+    }
+
+    public static async Task<int> UploadAllCustomersAsync()
+    {
+        var customers = CustomerService.GetAll();
+        foreach (var c in customers)
+            await SyncCustomer(c);
+        return customers.Count;
+    }
+
+    public static void DeleteAllLocalCustomers()
+    {
+        using var conn = DatabaseHelper.GetConnection();
+        conn.Open();
+        using var cmd = new SQLiteCommand("DELETE FROM Customers", conn);
+        cmd.ExecuteNonQuery();
+    }
 }
 
 public class ReceiveResult

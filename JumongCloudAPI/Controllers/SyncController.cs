@@ -45,11 +45,10 @@ public class SyncController : ControllerBase
     [HttpPost("customers")]
     public IActionResult SyncCustomers([FromBody] List<JsonElement> items)
     {
-        var sid = StoreId();
         return SyncTable("customers", items, new[] { "pos_id", "name", "phone", "email", "loyalty_points", "is_active", "credit_balance", "credit_limit", "address", "created_at", "modified_by" },
-            "INSERT INTO customers (pos_id, store_id, name, phone, email, loyalty_points, is_active, credit_balance, credit_limit, address, created_at, modified_by, synced_at) " +
-            "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,NOW()) " +
-            "ON CONFLICT (store_id, pos_id) DO UPDATE SET name=@p1, phone=@p2, email=@p3, loyalty_points=@p4, is_active=@p5, credit_balance=@p6, credit_limit=@p7, address=@p8, modified_by=@p10, synced_at=NOW()", sid);
+            "INSERT INTO customers (pos_id, name, phone, email, loyalty_points, is_active, credit_balance, credit_limit, address, created_at, modified_by, synced_at) " +
+            "VALUES (@p0,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,NOW()) " +
+            "ON CONFLICT (name) DO UPDATE SET pos_id=@p0, phone=@p2, email=@p3, loyalty_points=@p4, is_active=@p5, credit_balance=@p6, credit_limit=@p7, address=@p8, modified_by=@p10, synced_at=NOW()", "");
     }
 
     [HttpPost("users")]

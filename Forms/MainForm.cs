@@ -46,6 +46,10 @@ public partial class MainForm : Form
         btnOnlineOrders.Text = "    Incoming Stock";
         LayoutMenuButtons();
 
+        var storeId = SyncService.StoreId;
+        btnWhSell.Visible = storeId == "STORE-20260602-7159" || storeId == "STORE-DEV-0001";
+        LayoutMenuButtons();
+
         StartEmailScheduler();
         StartSyncRetry();
         StartTransferPoll();
@@ -282,6 +286,22 @@ public partial class MainForm : Form
         form.ShowDialog();
     }
 
+    private void btnWhSell_Click(object? sender, EventArgs e)
+    {
+        try
+        {
+            ErrorLogger.Log("btnWhSell", "Opening WarehouseSellForm...");
+            using var form = new WarehouseSellForm(_currentUser);
+            form.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            ErrorLogger.Log("btnWhSell", ex);
+            MessageBox.Show($"Error: {ex.Message}", "Wholesale Error",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
     private void btnOnlineOrders_Click(object? sender, EventArgs e)
     {
         using var form = new PendingOrdersForm(_currentUser);
@@ -367,6 +387,8 @@ public partial class MainForm : Form
         btnReports = CreateMenuButton("Reports", 0, 285, btnReports_Click, cardBg, textColor, hoverBg);
         btnCredit = CreateMenuButton("Credit Management", 0, 340, btnCredit_Click, cardBg, textColor, hoverBg);
         btnInventory = CreateMenuButton("Inventory", 0, 395, btnInventory_Click, cardBg, textColor, hoverBg);
+        btnWhSell = CreateMenuButton("Wholesale", 0, 430, btnWhSell_Click, cardBg, textColor, hoverBg);
+        btnWhSell.Visible = false;
         btnOnlineOrders = CreateMenuButton("Incoming Stock", 0, 450, btnOnlineOrders_Click, cardBg, textColor, hoverBg);
         btnExpenses = CreateMenuButton("Expenses", 0, 505, btnExpenses_Click, cardBg, textColor, hoverBg);
         btnUsers = CreateMenuButton("User Management", 0, 560, btnUsers_Click, cardBg, textColor, hoverBg);
@@ -385,9 +407,9 @@ public partial class MainForm : Form
             TextAlign = ContentAlignment.MiddleLeft
         };
 
-        Controls.AddRange(new Control[] { title, userInfo, divider, btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnOnlineOrders, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout, _lblConnStatus });
+        Controls.AddRange(new Control[] { title, userInfo, divider, btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnWhSell, btnOnlineOrders, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout, _lblConnStatus });
 
-        _menuButtons = new Button[] { btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnOnlineOrders, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout };
+        _menuButtons = new Button[] { btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnWhSell, btnOnlineOrders, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout };
         LayoutMenuButtons();
 
         _ = CheckApiConnectionAsync();
@@ -460,6 +482,7 @@ public partial class MainForm : Form
     private Button btnUsers = null!;
     private Button btnCredit = null!;
     private Button btnInventory = null!;
+    private Button btnWhSell = null!;
     private Button btnOnlineOrders = null!;
     private Button btnExpenses = null!;
     private Button btnEndShift = null!;

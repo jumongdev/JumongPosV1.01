@@ -60,7 +60,7 @@ public static class PgDatabaseHelper
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 modified_by TEXT DEFAULT '',
                 synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                UNIQUE(store_id, pos_id)
+                UNIQUE(name)
             );
 
             CREATE TABLE IF NOT EXISTS users (
@@ -304,7 +304,10 @@ public static class PgDatabaseHelper
                 
                 ALTER TABLE customers DROP CONSTRAINT IF EXISTS customers_pos_id_key;
                 ALTER TABLE customers DROP CONSTRAINT IF EXISTS customers_store_id_pos_id_key;
-                ALTER TABLE customers ADD CONSTRAINT customers_store_id_pos_id_key UNIQUE (store_id, pos_id);
+                ALTER TABLE customers DROP CONSTRAINT IF EXISTS customers_name_key;
+                ALTER TABLE customers ADD CONSTRAINT customers_name_key UNIQUE (name);
+                ALTER TABLE customers ALTER COLUMN store_id SET DEFAULT '';
+                UPDATE customers SET store_id = '' WHERE store_id IS NOT NULL AND store_id != '';
                 
                 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_pos_id_key;
                 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_store_id_pos_id_key;
@@ -524,5 +527,35 @@ public static class PgDatabaseHelper
             );
         ";
         try { ssMig.ExecuteNonQuery(); } catch { }
+
+        // Migration: walk-in sales tables for Warehouse Sell
+        using var wsMig = conn.CreateCommand();
+        wsMig.CommandText = @"
+            CREATE TABLE IF NOT EXISTS wh_walkin_sales (
+                id SERIAL PRIMARY KEY,
+                customer_id INTEGER,
+                customer_name TEXT NOT NULL DEFAULT '',
+                total_amount NUMERIC NOT NULL DEFAULT 0,
+                item_count INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE TABLE IF NOT EXISTS wh_walkin_sale_items (
+                id SERIAL PRIMARY KEY,
+                sale_id INTEGER NOT NULL REFERENCES wh_walkin_sales(id) ON DELETE CASCADE,
+                product_id INTEGER NOT NULL,
+                product_name TEXT NOT NULL DEFAULT '',
+                barcode TEXT DEFAULT '',
+                unit_name TEXT NOT NULL DEFAULT 'Piece',
+                qty INTEGER NOT NULL DEFAULT 1,
+                price NUMERIC NOT NULL DEFAULT 0,
+                subtotal NUMERIC NOT NULL DEFAULT 0,
+                stock_deduction INTEGER NOT NULL DEFAULT 0,
+                points_earned INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS idx_wh_walkin_sale_items_sale ON wh_walkin_sale_items(sale_id);
+            CREATE INDEX IF NOT EXISTS idx_wh_walkin_sales_customer ON wh_walkin_sales(customer_id);
+        ";
+        try { wsMig.ExecuteNonQuery(); } catch { }
     }
 }

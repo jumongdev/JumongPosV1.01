@@ -525,6 +525,9 @@ public class DatabaseHelper
         var uniqueIdx = conn.CreateCommand();
         uniqueIdx.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_phone ON Customers(Phone) WHERE Phone != ''";
         uniqueIdx.ExecuteNonQuery();
+        var nameIdx = conn.CreateCommand();
+        nameIdx.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_name ON Customers(Name)";
+        nameIdx.ExecuteNonQuery();
 
         // Fix any negative stock values
         using var fixStock = new SQLiteCommand("UPDATE Products SET StockQty = 0 WHERE StockQty < 0", conn);

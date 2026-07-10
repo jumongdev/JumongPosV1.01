@@ -872,6 +872,96 @@ public class PrinterService
         var val = cmd.ExecuteScalar();
         return val?.ToString() ?? "";
     }
+
+    public static void PrintWhReceipt(int saleId, string customerName, List<(string ProductName, string UnitName, int Qty, decimal Price, decimal Subtotal)> items, decimal grandTotal, string cashierName)
+    {
+        var printer = GetSetting("PrinterName");
+        if (string.IsNullOrEmpty(printer)) { MessageBox.Show("No printer configured. Go to Settings to set a printer.", "Printer Not Set", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+
+        var paperWidth = int.TryParse(GetSetting("PaperWidth"), out var pw) ? pw : 280;
+        var marginLeft = int.TryParse(GetSetting("MarginLeft"), out var ml) ? ml : 0;
+        var marginRight = int.TryParse(GetSetting("MarginRight"), out var mr) ? mr : 0;
+        var chars = (paperWidth - marginLeft - marginRight) / 9;
+
+        var doc = new PrintDocument();
+        doc.PrinterSettings.PrinterName = printer;
+        doc.DefaultPageSettings.PaperSize = new PaperSize("Custom", paperWidth, 3000);
+        doc.DefaultPageSettings.Margins = new Margins(marginLeft, marginRight, 0, 0);
+
+        if (chars < 24) chars = 24;
+
+        var lines = new List<string[]>();
+        void AddLine(string text, bool bold = false, string right = "")
+        {
+            lines.Add(new[] { text, right, bold ? "1" : "0" });
+        }
+
+        var companyName = GetSetting("CompanyName");
+        var address = GetSetting("CompanyAddress");
+        var mobile = GetSetting("CompanyMobile");
+        var footer = GetSetting("ReceiptFooter");
+        if (string.IsNullOrEmpty(footer)) footer = "Thank You! Come Again!";
+
+        var header = string.IsNullOrEmpty(companyName) ? "WAREHOUSE SALE" : companyName.ToUpper();
+        AddLine("");
+        AddLine(header, true);
+        if (!string.IsNullOrEmpty(address)) AddLine(address);
+        if (!string.IsNullOrEmpty(mobile)) AddLine("Mobile: " + mobile);
+        AddLine("─── WALK-IN SALE ───", true);
+        AddLine("Sale #" + saleId);
+        AddLine("Customer: " + customerName);
+        AddLine("Cashier: " + cashierName);
+        AddLine(DateTime.Now.ToString("MMM dd, yyyy  hh:mm tt"));
+        AddLine(new string('─', Math.Min(chars, 40)));
+        AddLine("ITEMS", true);
+        AddLine("");
+
+        foreach (var item in items)
+        {
+            var name = item.ProductName + " (" + item.UnitName + ")";
+            if (name.Length > chars - 8) name = name[..(chars - 11)] + "...";
+            AddLine(name);
+            var qtyLine = $"  {item.Qty} x ₱{item.Price:N2}";
+            var sub = $"₱{item.Subtotal:N2}";
+            var pad = Math.Max(0, chars - qtyLine.Length - sub.Length);
+            AddLine(qtyLine + new string(' ', pad) + sub);
+        }
+
+        AddLine(new string('─', Math.Min(chars, 40)));
+        AddLine("TOTAL: ₱" + grandTotal.ToString("N2"), true);
+
+        if (!string.IsNullOrEmpty(footer))
+        {
+            AddLine("");
+            AddLine(footer, true);
+        }
+        AddLine("");
+
+        var font = new Font("Courier New", 9F);
+        var fontBold = new Font("Courier New", 9F, FontStyle.Bold);
+        var lineHeight = font.Height + 3;
+
+        ExtendPaperIfNeeded(doc, lines.Count, lineHeight);
+
+        doc.PrintPage += (_, e) =>
+        {
+            var y = 0;
+            foreach (var line in lines)
+            {
+                var f = line[2] == "1" ? fontBold : font;
+                e.Graphics.DrawString(line[0], f, Brushes.Black, 0, y);
+                if (!string.IsNullOrEmpty(line[1]))
+                {
+                    var rw = e.Graphics.MeasureString(line[1], f).Width;
+                    e.Graphics.DrawString(line[1], f, Brushes.Black, e.PageBounds.Width - marginRight - rw, y);
+                }
+                y += lineHeight;
+            }
+        };
+
+        try { doc.Print(); }
+        catch (Exception ex) { MessageBox.Show("Print error: " + ex.Message, "Print Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+    }
 }
 
 

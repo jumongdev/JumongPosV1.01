@@ -443,6 +443,7 @@ Alpine.store('app', {
   /* ΓöÇΓöÇ Warehouse ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('warehousePanel', () => ({
     products: [], clientsData: [], orders: [], transfers: [], loading: true, catFilter: '', search: '',
+    salesData: [], saleFrom: '', saleTo: '', saleViewOpen: false, saleViewItems: [],
     async init() { window.addEventListener('load-warehouse', () => this.load()); await this.load(); this.startPoll() },
     async load() {
       this.loading = true;
@@ -451,6 +452,7 @@ Alpine.store('app', {
         if (sp === 'product' || sp === 'inventory') this.products = await fetchJSON(API + '/warehouse/products');
         else if (sp === 'onlineorder') { this.clientsData = await fetchJSON(API + '/warehouse/clients'); this.orders = await fetchJSON(API + '/warehouse/orders') }
         else if (sp === 'transfer') this.transfers = await fetchJSON(API + '/warehouse/transfers');
+        else if (sp === 'sales') await this.loadSales();
       } catch (e) { this.products = []; this.clientsData = []; this.orders = []; this.transfers = [] }
       this.loading = false;
     },
@@ -466,6 +468,28 @@ Alpine.store('app', {
       return items;
     },
     setFilter(cat) { this.catFilter = cat },
+
+    async loadSales() {
+      this.loading = true;
+      try {
+        let url = API + '/warehouse/sales';
+        if (this.saleFrom || this.saleTo) {
+          const p = [];
+          if (this.saleFrom) p.push('from=' + this.saleFrom);
+          if (this.saleTo) p.push('to=' + this.saleTo);
+          url += '?' + p.join('&');
+        }
+        this.salesData = await fetchJSON(url);
+      } catch (e) { this.salesData = [] }
+      this.loading = false;
+    },
+    async viewSaleItems(id) {
+      try {
+        this.saleViewItems = await fetchJSON(API + '/warehouse/sales/' + id + '/items');
+        this.saleViewOpen = true;
+      } catch (e) { toast('Error loading items', 'error') }
+    },
+    closeSaleView() { this.saleViewOpen = false; this.saleViewItems = [] },
 
     modalOpen: false, modalTitle: '', modalMode: 'add', modalId: null, form: {},
 
@@ -539,17 +563,36 @@ Alpine.store('app', {
         this.load();
       } catch (e) { toast('Delete failed: ' + e.message, 'error') }
     },
-    async adjustStock(id) {
+    async stockMove(id, mode) {
       const p = this.products.find(x => x.id === id); if (!p) return;
-      const qty = prompt('Set stock quantity for "' + p.name + '":', p.stockQty);
-      if (qty === null) return;
-      const n = parseInt(qty); if (isNaN(n) || n < 0) { toast('Invalid quantity', 'error'); return }
+      const label = mode === 'receive' ? 'RECEIVE' : 'RETURN';
+      let reference = prompt('Reference for ' + label + ' "' + p.name + '" (optional):', '');
+      if (reference === null) return;
+      if (mode === 'return' && !reference.trim()) { toast('Reference is required for return', 'error'); return }
+      const qty = parseInt(prompt('Quantity to ' + label + ' for "' + p.name + '":', '1'));
+      if (isNaN(qty) || qty <= 0) { toast('Invalid quantity', 'error'); return }
+      const change = mode === 'receive' ? qty : -qty;
+      if (mode === 'return' && p.stockQty < qty) { toast('Not enough stock (have ' + p.stockQty + ')', 'error'); return }
       try {
-        await fetch(API + '/warehouse/products/' + id + '/stock', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stockQty: n }) });
-        toast('Stock updated', 'success');
+        const r = await fetch(API + '/warehouse/products/' + id + '/stock-move', {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ qtyChange: change, reason: reference.trim() })
+        });
+        if (!r.ok) { const j = await r.json(); throw new Error(j.error || 'Failed') }
+        toast(label + ' ' + qty + ' done', 'success');
         this.load();
       } catch (e) { toast('Error: ' + e.message, 'error') }
     },
+
+    trailModal: false, trailProduct: null, trailItems: [],
+    async showTrail(id) {
+      const p = this.products.find(x => x.id === id); if (!p) return;
+      this.trailProduct = p;
+      this.trailItems = [];
+      try { this.trailItems = await fetchJSON(API + '/warehouse/stock-trails?productId=' + id) } catch (e) { this.trailItems = [] }
+      this.trailModal = true;
+    },
+    closeTrail() { this.trailModal = false; this.trailProduct = null; this.trailItems = [] },
 
     orderModal: false, orderForm: { clientId: '', clientName: '', notes: '', items: [] },
     openNewOrder() { this.orderModal = true; this.orderForm = { clientId: '', clientName: '', notes: '', items: [] } },
