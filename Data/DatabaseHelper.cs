@@ -525,6 +525,10 @@ public class DatabaseHelper
         var uniqueIdx = conn.CreateCommand();
         uniqueIdx.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_phone ON Customers(Phone) WHERE Phone != ''";
         uniqueIdx.ExecuteNonQuery();
+        // Deduplicate customers by name before creating unique index
+        var dedupeName = conn.CreateCommand();
+        dedupeName.CommandText = "DELETE FROM Customers WHERE Id NOT IN (SELECT MIN(Id) FROM Customers WHERE Name != '' GROUP BY Name) AND Name != ''";
+        dedupeName.ExecuteNonQuery();
         var nameIdx = conn.CreateCommand();
         nameIdx.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_name ON Customers(Name)";
         nameIdx.ExecuteNonQuery();
