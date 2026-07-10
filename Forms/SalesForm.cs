@@ -20,6 +20,7 @@ public partial class SalesForm : Form
     private decimal _taxRate;
     private Label _lblUpdateBanner = null!;
     private Label _lblMasterBanner = null!;
+    private Label _lblCustomerBanner = null!;
 
     private static Color CTopbar       => ThemeManager.Current.TopbarBg;
     private static Color CTopbarChip   => ThemeManager.Current.TopbarChip;
@@ -108,6 +109,22 @@ public partial class SalesForm : Form
                     _lblMasterBanner.Text = $"MASTER: {count} NEW";
                     _lblMasterBanner.Tag = count;
                     _lblMasterBanner.Visible = true;
+                    ResizeTopbar();
+                });
+            }
+        }
+        catch { }
+
+        try
+        {
+            var custCount = await SyncService.CountPendingCustomerUpdates();
+            if (custCount > 0 && !IsDisposed)
+            {
+                BeginInvoke(() =>
+                {
+                    _lblCustomerBanner.Text = $"CUSTOMERS: {custCount} NEW";
+                    _lblCustomerBanner.Tag = custCount;
+                    _lblCustomerBanner.Visible = true;
                     ResizeTopbar();
                 });
             }
@@ -838,7 +855,34 @@ public partial class SalesForm : Form
             }
         };
 
-        _pnlTopbar.Controls.AddRange(new Control[] { lblBrand, lblCashierName, _lblUpdateBanner, _lblMasterBanner, _lblTime });
+        _lblCustomerBanner = new Label
+        {
+            Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = Color.FromArgb(155, 89, 182),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Cursor = Cursors.Hand,
+            Visible = false,
+            Padding = new Padding(6, 0, 6, 0)
+        };
+        _lblCustomerBanner.Click += async (_, _) =>
+        {
+            if (_lblCustomerBanner.Tag is int count && count > 0)
+            {
+                var result = MessageBox.Show($"There are {count} new customers available.\nSync from cloud now?", "Customers", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (result == DialogResult.Yes)
+                {
+                    _lblCustomerBanner.Visible = false;
+                    SettingsForm.ShowSyncProgress("Downloading Customers...", async p =>
+                    {
+                        p.Report("Downloading customer list from cloud...");
+                        return await SyncService.DownloadCustomersAsync();
+                    });
+                }
+            }
+        };
+
+        _pnlTopbar.Controls.AddRange(new Control[] { lblBrand, lblCashierName, _lblUpdateBanner, _lblMasterBanner, _lblCustomerBanner, _lblTime });
 
         _pnlCustomerBar = new Panel { BackColor = CCard };
         _pnlCustomerBar.Paint += (s, e) =>
@@ -1280,6 +1324,12 @@ public partial class SalesForm : Form
         {
             _lblMasterBanner.Location = new Point(bannerX, 8);
             _lblMasterBanner.Size = new Size(150, 28);
+            bannerX += 156;
+        }
+        if (_lblCustomerBanner.Visible)
+        {
+            _lblCustomerBanner.Location = new Point(bannerX, 8);
+            _lblCustomerBanner.Size = new Size(160, 28);
         }
     }
 

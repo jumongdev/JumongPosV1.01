@@ -666,6 +666,41 @@ public static class SyncService
         catch { return 0; }
     }
 
+    public static async Task<int> CountPendingCustomerUpdates()
+    {
+        try
+        {
+            var lastSync = "";
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                using var cmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'LastCustomerSync'", conn);
+                lastSync = cmd.ExecuteScalar()?.ToString() ?? "";
+            }
+            var url = ApiUrl.TrimEnd('/') + "/dashboard/customers/count";
+            if (!string.IsNullOrEmpty(lastSync))
+                url += "?since=" + Uri.EscapeDataString(lastSync);
+            var json = await _client.GetStringAsync(url);
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.GetProperty("count").GetInt32();
+        }
+        catch { return 0; }
+    }
+
+    public static void SaveLastCustomerSync()
+    {
+        try
+        {
+            var now = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            using var conn = DatabaseHelper.GetConnection();
+            conn.Open();
+            using var cmd = new SQLiteCommand("INSERT OR REPLACE INTO Settings (Key, Value) VALUES ('LastCustomerSync', @v)", conn);
+            cmd.Parameters.AddWithValue("v", now);
+            cmd.ExecuteNonQuery();
+        }
+        catch { }
+    }
+
     private static (int added, int updated) ProcessProducts(SQLiteConnection conn, List<JsonElement> products, IProgress<string>? progress)
     {
         var added = 0; var updated = 0;
@@ -878,6 +913,7 @@ public static class SyncService
                 cmd.ExecuteNonQuery();
                 count++;
             }
+            SaveLastCustomerSync();
         }
         catch (Exception ex) { ErrorLogger.Log("SyncService.DownloadCustomers", ex); throw; }
         return count;

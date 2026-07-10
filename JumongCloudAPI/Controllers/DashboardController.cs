@@ -2190,6 +2190,19 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         return Ok(new { trailsInserted = trailCount, stockDeducted = deductCount });
     }
 
+    [HttpGet("customers/count")]
+    public IActionResult GetCustomerCount([FromQuery] string? since = null)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM customers WHERE is_active = true";
+        if (!string.IsNullOrEmpty(since))
+            cmd.CommandText += " AND synced_at > @since";
+        if (!string.IsNullOrEmpty(since))
+            cmd.Parameters.AddWithValue("since", DateTime.Parse(since).ToUniversalTime());
+        return Ok(new { count = Convert.ToInt32(cmd.ExecuteScalar()) });
+    }
+
     [HttpGet("warehouse/customers")]
     public IActionResult WhGetCustomers([FromQuery] string? search = null, [FromQuery] bool all = false)
     {
