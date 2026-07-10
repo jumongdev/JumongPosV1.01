@@ -831,6 +831,8 @@ public partial class SettingsForm : Form
     private Button btnSyncFromCloud = null!;
     private Button btnUpdateMaster = null!;
     private Button btnSyncCustomers = null!;
+    private Button btnUploadCustomers = null!;
+    private Button btnDeleteCustomers = null!;
     private Button btnUpdate = null!;
     private Button btnExportProducts = null!;
     private Button btnImportAndSync = null!;
