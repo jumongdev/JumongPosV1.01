@@ -510,7 +510,7 @@ public partial class SettingsForm : Form
                 }
             });
             var btnRemoveQr = MakeBtn("\u2716 REMOVE", 225, qy, accentRed, (_, _) => { if (dgvQrCodes.SelectedRows.Count > 0) dgvQrCodes.Rows.RemoveAt(dgvQrCodes.SelectedRows[0].Index); });
-            MakeSection("QR CODES", 235, new Control[] { lblQrHint, dgvQrCodes, btnAddQr, btnRemoveQr });
+            MakeSection("QR CODES", 275, new Control[] { lblQrHint, dgvQrCodes, btnAddQr, btnRemoveQr });
         }
 
         // ═══════════════════════════════════════════
