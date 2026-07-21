@@ -5,9 +5,11 @@
 
 const API = '/api/dashboard';
 
-async function fetchJSON(url) {
+async function fetchJSON(url, opts) {
   try {
-    const r = await fetch(url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now());
+    const r = opts?.method && opts.method !== 'GET'
+      ? await fetch(url, opts)
+      : await fetch(url + (url.includes('?') ? '&' : '?') + '_t=' + Date.now());
     if (!r.ok) throw new Error('HTTP ' + r.status);
     Alpine.store('app').isOnline = true;
     return await r.json();

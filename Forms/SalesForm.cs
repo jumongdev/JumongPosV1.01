@@ -1449,9 +1449,7 @@ public partial class SalesForm : Form
         if (!string.IsNullOrEmpty(cloudMsg))
         {
             _promoText = cloudMsg;
-            _lblPromo.Text = _promoText;
-            _lblPromo.Visible = true;
-            _lblPromo.Parent?.Invalidate();
+            Recalc();
         }
     }
 

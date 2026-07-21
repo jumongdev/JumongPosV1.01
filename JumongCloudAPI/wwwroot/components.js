@@ -964,7 +964,7 @@ Alpine.store('app', {
     async save() {
       this.saved = '';
       try {
-        await fetchJSON(API + '/pos-promo', { method: 'POST', body: JSON.stringify({ message: this.promoMessage }) });
+        await fetchJSON(API + '/pos-promo', { method: 'POST', body: JSON.stringify({ message: this.promoMessage }), headers: { 'Content-Type': 'application/json' } });
         this.saved = 'Promo message saved!';
         setTimeout(() => this.saved = '', 3000);
       } catch (e) { this.saved = 'Error saving promo message.' }
