@@ -2582,6 +2582,29 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             }
             return Ok(data);
         }
+
+    [HttpGet("pos-promo")]
+    public IActionResult GetPosPromo()
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        conn.Open();
+        using var cmd = new NpgsqlCommand("SELECT message FROM pos_promo WHERE id = 1", conn);
+        var msg = cmd.ExecuteScalar()?.ToString() ?? "";
+        return Ok(new { message = msg });
+    }
+
+    [HttpPost("pos-promo")]
+    public IActionResult SetPosPromo([FromBody] PosPromoRequest req)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        conn.Open();
+        using var cmd = new NpgsqlCommand("INSERT INTO pos_promo (id, message, updated_at) VALUES (1, @m, NOW()) ON CONFLICT (id) DO UPDATE SET message = @m, updated_at = NOW()", conn);
+        cmd.Parameters.AddWithValue("m", req.Message ?? "");
+        cmd.ExecuteNonQuery();
+        return Ok(new { ok = true });
+    }
+
+    public class PosPromoRequest { public string Message { get; set; } = ""; }
     }
 
     public class WhProductDto { public string Name { get; set; } = ""; public string? Barcode { get; set; } public string? Category { get; set; } public decimal BoxPrice { get; set; } public decimal BoxCost { get; set; } public int BoxQty { get; set; } = 1; public decimal PiecePrice { get; set; } }

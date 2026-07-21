@@ -59,6 +59,7 @@ tailwind.config = {
         { id:'customers', icon:'👥', label:'Customers' },
         { id:'users', icon:'⚙️', label:'Users' },
         { id:'settings', icon:'🔧', label:'Settings' },
+        { id:'pospromo', icon:'📢', label:'POS Promo' },
         { id:'analytics', icon:'📈', label:'Analytics' }
       ]" :key="item.id">
         <div>
@@ -1982,7 +1983,26 @@ tailwind.config = {
       </div>
     </div>
 
-
+    <!-- POS PROMO SECTION                                  -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div x-show="$store.app.section === 'pospromo'" x-transition.opacity>
+      <div x-data="posPromoPanel">
+        <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[#222255]">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">POS PROMO</h3>
+          </div>
+          <div class="p-4">
+            <p class="text-xs text-gray-500 dark:text-[#7878aa] mb-3">This message appears below the QR code on all POS terminals. Leave blank to hide.</p>
+            <textarea x-model="promoMessage" class="w-full h-24 text-sm bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200 resize-y" placeholder="Type promo message here..."></textarea>
+            <div class="flex justify-end gap-2 mt-3">
+              <button @click="load()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">REFRESH</button>
+              <button @click="save()" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">SAVE</button>
+            </div>
+            <div x-show="saved" class="mt-2 text-xs text-green-500" x-text="saved"></div>
+          </div>
+        </div>
+      </div>
+    </div>
 
   </div><!-- /main content -->
 

@@ -948,4 +948,27 @@ Alpine.store('app', {
     get allGood() { return this.missing.length === 0 }
   }));
 
+  // POS PROMO panel
+  Alpine.data('posPromoPanel', () => ({
+    promoMessage: '',
+    saved: '',
+    async init() {
+      await this.load();
+    },
+    async load() {
+      try {
+        const res = await fetchJSON(API + '/pos-promo');
+        this.promoMessage = res.message || '';
+      } catch (e) { this.promoMessage = '' }
+    },
+    async save() {
+      this.saved = '';
+      try {
+        await fetchJSON(API + '/pos-promo', { method: 'POST', body: JSON.stringify({ message: this.promoMessage }) });
+        this.saved = 'Promo message saved!';
+        setTimeout(() => this.saved = '', 3000);
+      } catch (e) { this.saved = 'Error saving promo message.' }
+    }
+  }));
+
 });

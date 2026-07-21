@@ -585,5 +585,17 @@ public static class PgDatabaseHelper
             CREATE UNIQUE INDEX IF NOT EXISTS idx_master_products_barcode
             ON master_products(barcode) WHERE barcode IS NOT NULL AND barcode != '';";
         try { barcodeMig.ExecuteNonQuery(); } catch { }
+
+        // Migration: pos_promo table for cloud-managed promo message
+        using var promoMig = conn.CreateCommand();
+        promoMig.CommandText = @"
+            CREATE TABLE IF NOT EXISTS pos_promo (
+                id SERIAL PRIMARY KEY,
+                message TEXT NOT NULL DEFAULT '',
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            INSERT INTO pos_promo (id, message)
+            SELECT 1, '' WHERE NOT EXISTS (SELECT 1 FROM pos_promo);";
+        try { promoMig.ExecuteNonQuery(); } catch { }
     }
 }

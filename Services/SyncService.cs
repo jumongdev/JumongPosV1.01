@@ -973,6 +973,24 @@ public static class SyncService
         using var cmd = new SQLiteCommand("DELETE FROM Customers", conn);
         cmd.ExecuteNonQuery();
     }
+
+    public static async Task<string> FetchPromoMessageAsync()
+    {
+        try
+        {
+            var url = ApiUrl.TrimEnd('/') + "/dashboard/pos-promo";
+            var json = await _client.GetStringAsync(url);
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.GetProperty("message").GetString() ?? "";
+        }
+        catch
+        {
+            using var conn = DatabaseHelper.GetConnection();
+            conn.Open();
+            using var cmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'PosPromoMessage'", conn);
+            return cmd.ExecuteScalar()?.ToString() ?? "";
+        }
+    }
 }
 
 public class ReceiveResult

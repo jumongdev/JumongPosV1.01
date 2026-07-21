@@ -1405,6 +1405,7 @@ public partial class SalesForm : Form
         }
         if (!string.IsNullOrEmpty(_promoText))
         {
+            _lblPromo.Text = _promoText;
             _lblPromo.Location = new Point(m, ry + 4);
             _lblPromo.Size = new Size(pw, _pnlTotals.Height - ry - 16);
             _lblPromo.Visible = true;
@@ -1439,6 +1440,19 @@ public partial class SalesForm : Form
         _qrIndex = 0;
         _qrVisible = _qrEntries.Count > 0;
         if (_qrVisible) ShowQrIndex();
+        _ = FetchCloudPromoAsync();
+    }
+
+    private async Task FetchCloudPromoAsync()
+    {
+        var cloudMsg = await SyncService.FetchPromoMessageAsync();
+        if (!string.IsNullOrEmpty(cloudMsg))
+        {
+            _promoText = cloudMsg;
+            _lblPromo.Text = _promoText;
+            _lblPromo.Visible = true;
+            _lblPromo.Parent?.Invalidate();
+        }
     }
 
     private void ShowQrIndex()
