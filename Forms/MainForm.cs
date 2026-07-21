@@ -462,11 +462,11 @@ public partial class MainForm : Form
     private static readonly Color _connRed = Color.FromArgb(255, 82, 82);
     private async Task CheckApiConnectionAsync()
     {
-        var connected = await SyncService.CheckConnectionAsync();
+        var (ok, err) = await SyncService.CheckConnectionAsync();
         var serverUrl = _invServer.IsRunning ? _invServer.Url : "";
         var invText = string.IsNullOrEmpty(serverUrl) ? "" : $" | INV: {serverUrl}";
-        _lblConnStatus.Text = (connected ? "● Cloud: OK" : "● Cloud: OFF") + invText;
-        _lblConnStatus.ForeColor = connected ? _connGreen : _connRed;
+        _lblConnStatus.Text = (ok ? "● Cloud: OK" : "● Cloud: OFF " + (err ?? "")) + invText;
+        _lblConnStatus.ForeColor = ok ? _connGreen : _connRed;
     }
 
     private void LayoutMenuButtons()
