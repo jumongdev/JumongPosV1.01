@@ -1451,7 +1451,7 @@ public partial class SalesForm : Form
         if (!string.IsNullOrEmpty(cloudMsg))
         {
             _promoText = cloudMsg;
-            Recalc();
+            LayoutControls();
         }
     }
 
