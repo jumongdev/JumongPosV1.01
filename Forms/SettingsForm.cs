@@ -510,7 +510,12 @@ public partial class SettingsForm : Form
                     Directory.CreateDirectory(assetsDir);
                     var fileName = Path.GetFileName(ofd.FileName);
                     var destPath = Path.Combine(assetsDir, fileName);
-                    File.Copy(ofd.FileName, destPath, overwrite: true);
+                    try { File.Copy(ofd.FileName, destPath, overwrite: true); }
+                    catch (IOException)
+                    {
+                        try { File.Delete(destPath); File.Copy(ofd.FileName, destPath); }
+                        catch { MessageBox.Show("File is in use. Close other windows and try again.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+                    }
                     dgvQrCodes.Rows.Add("New QR", fileName);
                 }
             });
