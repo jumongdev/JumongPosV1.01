@@ -61,6 +61,9 @@ public partial class SalesForm : Form
             _barcodeTimer.Stop();
             ProcessBarcodeInput();
         };
+        var promoCheckTimer = new System.Windows.Forms.Timer { Interval = 30000 };
+        promoCheckTimer.Tick += async (_, _) => await FetchCloudPromoAsync();
+        promoCheckTimer.Start();
         DebugHelper.AddFormLabel(this);
         try
         {
@@ -1448,7 +1451,7 @@ public partial class SalesForm : Form
     private async Task FetchCloudPromoAsync()
     {
         var cloudMsg = await SyncService.FetchPromoMessageAsync();
-        if (!string.IsNullOrEmpty(cloudMsg))
+        if (!string.IsNullOrEmpty(cloudMsg) && cloudMsg != _promoText)
         {
             _promoText = cloudMsg;
             LayoutControls();

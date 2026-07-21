@@ -1,11 +1,12 @@
 using System.Diagnostics;
 using System.Text.Json;
+using JumongPosV1._01.Helpers;
 
 namespace JumongPosV1._01.Services;
 
 public static class UpdateService
 {
-    private static readonly HttpClient _client = new() { Timeout = TimeSpan.FromMinutes(5) };
+    private static readonly HttpClient _client = new() { Timeout = TimeSpan.FromMinutes(15) };
     private const string Repo = "jumongdev/JumongPosV1.01";
 
     public static async Task<(bool available, string? version, string? changes, string? downloadUrl)> CheckUpdate()
@@ -26,7 +27,7 @@ public static class UpdateService
             var currentVer = AppVersion.Current;
             return (string.Compare(version, currentVer, StringComparison.Ordinal) > 0, version, body, downloadUrl);
         }
-        catch { return (false, null, null, null); }
+        catch (Exception ex) { ErrorLogger.Log("UpdateService.Check", ex); return (false, null, null, null); }
     }
 
     public static async Task<bool> DownloadAndUpdate(string downloadUrl, IProgress<int>? progress = null)
@@ -78,6 +79,6 @@ public static class UpdateService
             Environment.Exit(0);
             return true;
         }
-        catch { return false; }
+        catch (Exception ex) { ErrorLogger.Log("UpdateService.Download", ex); return false; }
     }
 }
