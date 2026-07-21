@@ -171,7 +171,7 @@ public static class SyncService
         return cloudUsers.Count;
     }
 
-    public static async Task SyncSale(Sale sale, List<SaleItem> items)
+    public static async Task<bool> SyncSale(Sale sale, List<SaleItem> items)
     {
         var payload = new
         {
@@ -212,10 +212,10 @@ public static class SyncService
                 PointsEarned = i.PointsEarned
             }).ToList()
         };
-        await PostAsync("/sales", payload, sale.Id);
+        return await PostAsync("/sales", payload, sale.Id);
     }
 
-    public static async Task SyncVoidLog(VoidLog log)
+    public static async Task<bool> SyncVoidLog(VoidLog log)
     {
         var data = new[]
         {
@@ -234,7 +234,7 @@ public static class SyncService
                 CreatedAt = ToUtcString(log.CreatedAt)
             }
         };
-        await PostAsync("/voidlogs", data);
+        return await PostAsync("/voidlogs", data);
     }
 
     public static async Task<bool> SyncStockTrail(StockTrail trail)
@@ -258,7 +258,7 @@ public static class SyncService
         return await PostAsync("/stocktrails", data);
     }
 
-    public static async Task SyncCreditTransaction(CreditTransaction ct)
+    public static async Task<bool> SyncCreditTransaction(CreditTransaction ct)
     {
         var data = new[]
         {
@@ -278,10 +278,10 @@ public static class SyncService
                 CreatedAt = ToUtcString(ct.CreatedAt)
             }
         };
-        await PostAsync("/credittransactions", data);
+        return await PostAsync("/credittransactions", data);
     }
 
-    public static async Task SyncDailyClose(DailyClose dc)
+    public static async Task<bool> SyncDailyClose(DailyClose dc)
     {
         var data = new[]
         {
@@ -303,10 +303,10 @@ public static class SyncService
                 CreatedAt = ToUtcString(dc.CreatedAt)
             }
         };
-        await PostAsync("/dailycloses", data);
+        return await PostAsync("/dailycloses", data);
     }
 
-    public static async Task SyncExpense(Expense expense)
+    public static async Task<bool> SyncExpense(Expense expense)
     {
         var data = new[]
         {
@@ -321,7 +321,7 @@ public static class SyncService
                 ReceiptImage = expense.ReceiptImage
             }
         };
-        await PostAsync("/expenses", data);
+        return await PostAsync("/expenses", data);
     }
 
     private static async Task<bool> PostAsync(string endpoint, object data, int? saleId = null)
@@ -899,18 +899,54 @@ public static class SyncService
 
                 using var conn = DatabaseHelper.GetConnection();
                 conn.Open();
-                using var cmd = new SQLiteCommand(@"
-                    INSERT INTO Customers (Name, Phone, Email, LoyaltyPoints, IsActive, CreditBalance, Address, CreatedAt)
-                    VALUES (@n, @p, @e, @pts, 1, @cb, @a, datetime('now','localtime'))
-                    ON CONFLICT(Name) DO UPDATE SET
-                        Phone=@p, Email=@e, LoyaltyPoints=@pts, IsActive=1, CreditBalance=@cb, Address=@a", conn);
-                cmd.Parameters.AddWithValue("n", name);
-                cmd.Parameters.AddWithValue("p", phone);
-                cmd.Parameters.AddWithValue("e", email);
-                cmd.Parameters.AddWithValue("pts", points);
-                cmd.Parameters.AddWithValue("cb", creditBalance);
-                cmd.Parameters.AddWithValue("a", address);
-                cmd.ExecuteNonQuery();
+
+                // 1) Match by Name → UPDATE
+                using var findName = new SQLiteCommand("SELECT Id FROM Customers WHERE Name = @n", conn);
+                findName.Parameters.AddWithValue("n", name);
+                var existingId = findName.ExecuteScalar();
+
+                if (existingId != null)
+                {
+                    using var upd = new SQLiteCommand("UPDATE Customers SET Phone=@p, Email=@e, LoyaltyPoints=@pts, IsActive=1, CreditBalance=@cb, Address=@a WHERE Id=@id", conn);
+                    upd.Parameters.AddWithValue("id", (int)existingId);
+                    upd.Parameters.AddWithValue("p", phone);
+                    upd.Parameters.AddWithValue("e", email);
+                    upd.Parameters.AddWithValue("pts", points);
+                    upd.Parameters.AddWithValue("cb", creditBalance);
+                    upd.Parameters.AddWithValue("a", address);
+                    upd.ExecuteNonQuery();
+                }
+                else
+                {
+                    // 2) Match by Phone → OVERWRITE (cloud is latest)
+                    using var findPhone = new SQLiteCommand("SELECT Id FROM Customers WHERE Phone = @p AND Phone != ''", conn);
+                    findPhone.Parameters.AddWithValue("p", phone);
+                    var phoneId = findPhone.ExecuteScalar();
+
+                    if (phoneId != null)
+                    {
+                        using var upd = new SQLiteCommand("UPDATE Customers SET Name=@n, Email=@e, LoyaltyPoints=@pts, IsActive=1, CreditBalance=@cb, Address=@a WHERE Id=@id", conn);
+                        upd.Parameters.AddWithValue("id", (int)phoneId);
+                        upd.Parameters.AddWithValue("n", name);
+                        upd.Parameters.AddWithValue("e", email);
+                        upd.Parameters.AddWithValue("pts", points);
+                        upd.Parameters.AddWithValue("cb", creditBalance);
+                        upd.Parameters.AddWithValue("a", address);
+                        upd.ExecuteNonQuery();
+                    }
+                    else
+                    {
+                        // 3) INSERT new
+                        using var ins = new SQLiteCommand("INSERT INTO Customers (Name, Phone, Email, LoyaltyPoints, IsActive, CreditBalance, Address, CreatedAt) VALUES (@n, @p, @e, @pts, 1, @cb, @a, datetime('now','localtime'))", conn);
+                        ins.Parameters.AddWithValue("n", name);
+                        ins.Parameters.AddWithValue("p", phone);
+                        ins.Parameters.AddWithValue("e", email);
+                        ins.Parameters.AddWithValue("pts", points);
+                        ins.Parameters.AddWithValue("cb", creditBalance);
+                        ins.Parameters.AddWithValue("a", address);
+                        ins.ExecuteNonQuery();
+                    }
+                }
                 count++;
             }
             SaveLastCustomerSync();

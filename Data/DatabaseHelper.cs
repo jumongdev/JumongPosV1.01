@@ -5,7 +5,7 @@ namespace JumongPosV1._01.Data;
 public class DatabaseHelper
 {
     private static string _dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "JumongPos.db");
-    private static string _connectionString = $"Data Source={_dbPath};Version=3;";
+    private static string _connectionString = $"Data Source={_dbPath};Version=3;busy_timeout=5000;Pooling=True;";
 
     public static string DbPath => _dbPath;
     public static string ConnectionString => _connectionString;
@@ -591,6 +591,33 @@ public class DatabaseHelper
             using var alter = new SQLiteCommand("ALTER TABLE SaleItems ADD COLUMN PointsEarned INTEGER NOT NULL DEFAULT 0", conn);
             alter.ExecuteNonQuery();
         }
+
+        // InventoryCount tables for mobile inventory counting
+        using var invSessionCmd = new SQLiteCommand(@"
+            CREATE TABLE IF NOT EXISTS InventorySession (
+                SessionId TEXT PRIMARY KEY,
+                CountedBy TEXT NOT NULL DEFAULT '',
+                StartedAt TEXT NOT NULL,
+                EndedAt TEXT,
+                Status TEXT NOT NULL DEFAULT 'Active'
+            )", conn);
+        invSessionCmd.ExecuteNonQuery();
+
+        using var invCountCmd = new SQLiteCommand(@"
+            CREATE TABLE IF NOT EXISTS InventoryCount (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                SessionId TEXT NOT NULL,
+                ProductId INTEGER NOT NULL,
+                Barcode TEXT NOT NULL DEFAULT '',
+                ProductName TEXT NOT NULL DEFAULT '',
+                SystemQty INTEGER NOT NULL DEFAULT 0,
+                ActualQty INTEGER NOT NULL DEFAULT 0,
+                CountedBy TEXT NOT NULL DEFAULT '',
+                CreatedAt TEXT NOT NULL,
+                Adjusted INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY (SessionId) REFERENCES InventorySession(SessionId)
+            )", conn);
+        invCountCmd.ExecuteNonQuery();
 
         SeedDefaults(conn);
     }
