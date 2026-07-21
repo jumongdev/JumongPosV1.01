@@ -859,7 +859,7 @@ public static class SyncService
         try
         {
             var url = ApiUrl.TrimEnd('/') + "/dashboard/version";
-            using var checkClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            using var checkClient = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
             var response = await checkClient.GetAsync(url);
             return response.IsSuccessStatusCode;
         }
