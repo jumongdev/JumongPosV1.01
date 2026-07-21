@@ -854,13 +854,14 @@ public static class SyncService
         return null;
     }
 
+    private static readonly HttpClient _checkClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+
     public static async Task<bool> CheckConnectionAsync()
     {
         try
         {
             var url = ApiUrl.TrimEnd('/') + "/dashboard/version";
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            var response = await _client.GetAsync(url, cts.Token);
+            var response = await _checkClient.GetAsync(url);
             return response.IsSuccessStatusCode;
         }
         catch { return false; }
