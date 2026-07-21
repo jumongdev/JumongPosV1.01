@@ -11,7 +11,6 @@ public static class SyncService
 {
     private static readonly HttpClient _client = new HttpClient(new SocketsHttpHandler
     {
-        UseProxy = false,
         ConnectTimeout = TimeSpan.FromSeconds(30)
     })
     { Timeout = TimeSpan.FromSeconds(60) };
