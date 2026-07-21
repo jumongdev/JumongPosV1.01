@@ -854,17 +854,16 @@ public static class SyncService
         return null;
     }
 
-    private static readonly HttpClient _checkClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
-
     public static async Task<bool> CheckConnectionAsync()
     {
         try
         {
             var url = ApiUrl.TrimEnd('/') + "/dashboard/version";
-            var response = await _checkClient.GetAsync(url);
+            using var checkClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            var response = await checkClient.GetAsync(url);
             return response.IsSuccessStatusCode;
         }
-        catch { return false; }
+        catch (Exception ex) { ErrorLogger.Log("CheckConnection", ex); return false; }
     }
 
     public static async Task SyncStoreSettingsAsync()
