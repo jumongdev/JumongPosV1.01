@@ -1230,7 +1230,8 @@ public partial class SalesForm : Form
         {
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
             ForeColor = Color.FromArgb(241, 196, 15),
-            TextAlign = ContentAlignment.TopCenter,
+            BackColor = Color.FromArgb(20, 20, 40),
+            TextAlign = ContentAlignment.MiddleCenter,
             Visible = false
         };
 
@@ -1382,10 +1383,11 @@ public partial class SalesForm : Form
         rcs[10].Location = new Point(m, ry);       rcs[10].Size = new Size(pw, 1); ry += 14;
         btnPay.Location = new Point(m, ry);       btnPay.Size = new Size(pw, 52); ry += 60;
 
+        var promoH = string.IsNullOrEmpty(_promoText) ? 0 : 50;
         if (_qrVisible)
         {
-            var qrH = _pnlTotals.Height - ry - 12;
-            if (qrH > 120)
+            var qrH = _pnlTotals.Height - ry - 12 - promoH - 4;
+            if (qrH > 100)
             {
                 _lblQrHeader.Location = new Point(m, ry);
                 _lblQrHeader.Size = new Size(pw, 20);
@@ -1394,25 +1396,25 @@ public partial class SalesForm : Form
 
                 var navW = 22;
                 _btnQrPrev.Location = new Point(m, ry);
-                _btnQrPrev.Size = new Size(navW, qrH - 24);
+                _btnQrPrev.Size = new Size(navW, qrH);
                 _btnQrPrev.Visible = _qrEntries.Count > 1;
 
                 _pbQr.Location = new Point(m + navW, ry);
-                _pbQr.Size = new Size(pw - navW * 2, qrH - 24);
+                _pbQr.Size = new Size(pw - navW * 2, qrH);
                 _pbQr.Visible = true;
 
                 _btnQrNext.Location = new Point(m + pw - navW, ry);
-                _btnQrNext.Size = new Size(navW, qrH - 24);
+                _btnQrNext.Size = new Size(navW, qrH);
                 _btnQrNext.Visible = _qrEntries.Count > 1;
 
-                ry += qrH - 24;
+                ry += qrH + 4;
             }
         }
         if (!string.IsNullOrEmpty(_promoText))
         {
             _lblPromo.Text = _promoText;
-            _lblPromo.Location = new Point(m, ry + 4);
-            _lblPromo.Size = new Size(pw, _pnlTotals.Height - ry - 16);
+            _lblPromo.Location = new Point(m, ry);
+            _lblPromo.Size = new Size(pw, promoH);
             _lblPromo.Visible = true;
         }
         else _lblPromo.Visible = false;
