@@ -489,7 +489,9 @@ public partial class SettingsForm : Form
                 RowTemplate = { Height = 28 },
                 ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = panelBg, ForeColor = neonTitle, Font = new Font("Segoe UI", 9F, FontStyle.Bold) },
                 DefaultCellStyle = new DataGridViewCellStyle { BackColor = panelBg, ForeColor = inputFg, SelectionBackColor = ThemeManager.Current.DgvSelection, SelectionForeColor = Color.White },
-                EnableHeadersVisualStyles = false
+                EnableHeadersVisualStyles = false,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false
             };
             dgvQrCodes.Columns.Add("Header", "HEADER (e.g. GCash)");
             dgvQrCodes.Columns.Add("File", "FILE NAME (e.g. gcash_qr.png)");
@@ -509,7 +511,11 @@ public partial class SettingsForm : Form
                     dgvQrCodes.Rows.Add("New QR", fileName);
                 }
             });
-            var btnRemoveQr = MakeBtn("\u2716 REMOVE", 225, qy, accentRed, (_, _) => { if (dgvQrCodes.SelectedRows.Count > 0) dgvQrCodes.Rows.RemoveAt(dgvQrCodes.SelectedRows[0].Index); });
+            var btnRemoveQr = MakeBtn("\u2716 REMOVE", 225, qy, accentRed, (_, _) =>
+            {
+                var row = dgvQrCodes.SelectedRows.Count > 0 ? dgvQrCodes.SelectedRows[0] : dgvQrCodes.CurrentRow;
+                if (row != null && !row.IsNewRow) dgvQrCodes.Rows.RemoveAt(row.Index);
+            });
             MakeSection("QR CODES", 275, new Control[] { lblQrHint, dgvQrCodes, btnAddQr, btnRemoveQr });
         }
 
