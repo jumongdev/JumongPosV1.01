@@ -1223,6 +1223,14 @@ public partial class SalesForm : Form
         };
         _btnQrNext.Click += (_, _) => { _qrIndex = (_qrIndex + 1) % _qrEntries.Count; ShowQrIndex(); };
 
+        _lblPromo = new Label
+        {
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(241, 196, 15),
+            TextAlign = ContentAlignment.TopCenter,
+            Visible = false
+        };
+
         LoadQrCodes();
 
         _pnlTotals.Controls.AddRange(new Control[]
@@ -1234,7 +1242,7 @@ public partial class SalesForm : Form
             lblTaxLbl, lblTaxVal,
             sep2,
             btnPay,
-            _lblQrHeader, _btnQrPrev, _pbQr, _btnQrNext
+            _lblQrHeader, _btnQrPrev, _pbQr, _btnQrNext, _lblPromo
         });
 
         KeyPreview = true;
@@ -1395,6 +1403,13 @@ public partial class SalesForm : Form
                 _btnQrNext.Visible = _qrEntries.Count > 1;
             }
         }
+        if (!string.IsNullOrEmpty(_promoText))
+        {
+            _lblPromo.Location = new Point(m, ry + 4);
+            _lblPromo.Size = new Size(pw, _pnlTotals.Height - ry - 16);
+            _lblPromo.Visible = true;
+        }
+        else _lblPromo.Visible = false;
     }
 
     private void LoadQrCodes()
@@ -1417,6 +1432,8 @@ public partial class SalesForm : Form
                         _qrEntries.Add((h, f));
                 }
             }
+            using var promoCmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'PosPromoMessage'", conn);
+            _promoText = promoCmd.ExecuteScalar()?.ToString() ?? "";
         }
         catch { }
         _qrIndex = 0;
@@ -1503,4 +1520,6 @@ public partial class SalesForm : Form
     private List<(string header, string file)> _qrEntries = new();
     private int _qrIndex;
     private bool _qrVisible;
+    private Label _lblPromo = null!;
+    private string _promoText = "";
 }

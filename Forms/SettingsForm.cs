@@ -106,6 +106,8 @@ public partial class SettingsForm : Form
                 }
                 catch { }
             }
+            if (txtPosPromo != null)
+                txtPosPromo.Text = GetSetting(conn, "PosPromoMessage") ?? "";
         }
     }
 
@@ -183,6 +185,7 @@ public partial class SettingsForm : Form
                         qrList.Add(new { header = h, file = f });
                 }
                 UpsertSetting(conn, "StoreQrCodes", JsonSerializer.Serialize(qrList));
+                UpsertSetting(conn, "PosPromoMessage", txtPosPromo?.Text ?? "");
             }
 
             foreach (var kv in newValues)
@@ -517,6 +520,20 @@ public partial class SettingsForm : Form
                 if (row != null && !row.IsNewRow) dgvQrCodes.Rows.RemoveAt(row.Index);
             });
             MakeSection("QR CODES", 275, new Control[] { lblQrHint, dgvQrCodes, btnAddQr, btnRemoveQr });
+
+            // POS PROMO (admin only)
+            // ═══════════════════════════════════════════
+            qy = 40;
+            var lblPromoHint = new Label { Text = "Promo message or announcement displayed below QR codes on POS screen.", Font = new Font("Segoe UI", 8F), ForeColor = dimText, Location = new Point(15, qy), Size = new Size(550, 20) };
+            qy += 25;
+            txtPosPromo = new TextBox
+            {
+                Location = new Point(15, qy), Size = new Size(550, 80), Multiline = true,
+                BorderStyle = BorderStyle.FixedSingle, BackColor = inputBg, ForeColor = inputFg,
+                Font = new Font("Segoe UI", 10F), ScrollBars = ScrollBars.Vertical
+            };
+            qy += 90;
+            MakeSection("POS PROMO", 135, new Control[] { lblPromoHint, txtPosPromo });
         }
 
         // ═══════════════════════════════════════════
@@ -910,4 +927,5 @@ public partial class SettingsForm : Form
     private Button btnRestoreDb = null!;
     private Button btnAuditLog = null!;
     private DataGridView dgvQrCodes = null!;
+    private TextBox txtPosPromo = null!;
 }
