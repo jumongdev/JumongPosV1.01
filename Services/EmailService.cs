@@ -391,6 +391,10 @@ tr:nth-child(even) td {{ background: #F8F8FC; }}
             var list = JsonSerializer.Deserialize<List<PendingEmail>>(json);
             if (list == null || list.Count == 0) return;
 
+            var cutoff = TimeHelper.Now.AddDays(-7);
+            list = list.Where(e => e.QueuedAt >= cutoff).ToList();
+            if (list.Count == 0) { File.Delete(QueuePath); return; }
+
             var svc = new EmailService();
             var sent = new List<int>();
             for (int i = 0; i < list.Count; i++)

@@ -60,6 +60,13 @@ static class Program
             AutoBackup();
             var backupTime = perfSw.ElapsedMilliseconds;
 
+            ErrorLogger.TrimLog();
+
+            using var cleanupConn = DatabaseHelper.GetConnection();
+            cleanupConn.Open();
+            using (var cmd = new System.Data.SQLite.SQLiteCommand("DELETE FROM SyncLog WHERE CreatedAt < datetime('now', '-30 days')", cleanupConn))
+                cmd.ExecuteNonQuery();
+
             File.AppendAllText(perfLog,
                 $"[{TimeHelper.Now:yyyy-MM-dd HH:mm:ss}] DB={dbInit}ms Theme={themeLoad}ms Backup={backupTime}ms{Environment.NewLine}");
         }
