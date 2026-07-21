@@ -12,9 +12,9 @@ public static class SyncService
     private static readonly HttpClient _client = new HttpClient(new SocketsHttpHandler
     {
         UseProxy = false,
-        ConnectTimeout = TimeSpan.FromSeconds(10)
+        ConnectTimeout = TimeSpan.FromSeconds(30)
     })
-    { Timeout = TimeSpan.FromSeconds(15) };
+    { Timeout = TimeSpan.FromSeconds(60) };
     private static string? _storeId;
     private static string? _storeName;
     private static bool _storeNameSynced;
