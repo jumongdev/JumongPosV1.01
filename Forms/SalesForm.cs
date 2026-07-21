@@ -1401,6 +1401,8 @@ public partial class SalesForm : Form
                 _btnQrNext.Location = new Point(m + pw - navW, ry);
                 _btnQrNext.Size = new Size(navW, qrH - 24);
                 _btnQrNext.Visible = _qrEntries.Count > 1;
+
+                ry += qrH - 24;
             }
         }
         if (!string.IsNullOrEmpty(_promoText))
