@@ -496,7 +496,19 @@ public partial class SettingsForm : Form
             dgvQrCodes.Columns[0].Width = 210;
             dgvQrCodes.Columns[1].Width = 320;
             qy += 157;
-            var btnAddQr = MakeBtn("+ ADD QR CODE", 15, qy, accentGreen, (_, _) => { dgvQrCodes.Rows.Add("New QR", "gcash_qr.png"); });
+            var btnAddQr = MakeBtn("+ ADD QR CODE", 15, qy, accentGreen, (_, _) =>
+            {
+                using var ofd = new OpenFileDialog { Filter = "Image Files|*.png;*.jpg;*.jpeg;*.gif;*.bmp", Title = "Select QR Code Image" };
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    var assetsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets");
+                    Directory.CreateDirectory(assetsDir);
+                    var fileName = Path.GetFileName(ofd.FileName);
+                    var destPath = Path.Combine(assetsDir, fileName);
+                    File.Copy(ofd.FileName, destPath, overwrite: true);
+                    dgvQrCodes.Rows.Add("New QR", fileName);
+                }
+            });
             var btnRemoveQr = MakeBtn("\u2716 REMOVE", 225, qy, accentRed, (_, _) => { if (dgvQrCodes.SelectedRows.Count > 0) dgvQrCodes.Rows.RemoveAt(dgvQrCodes.SelectedRows[0].Index); });
             MakeSection("QR CODES", 235, new Control[] { lblQrHint, dgvQrCodes, btnAddQr, btnRemoveQr });
         }
