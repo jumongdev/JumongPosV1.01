@@ -10,6 +10,9 @@ public class DailyClose
     public decimal TotalCredit { get; set; }
     public decimal TotalVoided { get; set; }
     public decimal TotalExpenses { get; set; }
+    public decimal TotalInventoryCost { get; set; }
+    public decimal TotalCostSold { get; set; }
+    public decimal TotalStockReceivedCost { get; set; }
     public int Denom1000 { get; set; }
     public int Denom500 { get; set; }
     public int Denom200 { get; set; }

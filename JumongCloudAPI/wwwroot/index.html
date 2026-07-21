@@ -48,7 +48,9 @@ tailwind.config = {
       <template x-for="item in [
         { id:'dashboard', icon:'📊', label:'Dashboard' },
         { id:'products', icon:'📦', label:'Products' },
-        { id:'available', icon:'📉', label:'Stock' },
+        { id:'st-header', label:'STOCK', isHeader:true },
+        { id:'st-receiving', icon:'📥', label:'Recent Receiving' },
+        { id:'st-status', icon:'📊', label:'Stock Status' },
         { id:'wh-header', label:'WAREHOUSE', isHeader:true },
         { id:'wh-product', icon:'📦', label:'Product' },
         { id:'wh-inventory', icon:'📊', label:'Inventory' },
@@ -72,9 +74,9 @@ tailwind.config = {
             :class="$store.app.isActive(item.id)
               ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-400 font-semibold border-l-2 border-cyan-500'
               : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] hover:text-gray-700 dark:hover:text-slate-200'"
-            :style="item.id.startsWith('wh-') ? 'padding-left: 32px' : ''">
-            <span class="text-base shrink-0" x-show="item.id.startsWith('wh-')" style="opacity:0.5">└</span>
-            <span class="text-lg shrink-0" x-show="!item.id.startsWith('wh-')" x-text="item.icon"></span>
+            :style="item.id.startsWith('wh-') || item.id.startsWith('st-') ? 'padding-left: 32px' : ''">
+            <span class="text-base shrink-0" x-show="item.id.startsWith('wh-') || item.id.startsWith('st-')" style="opacity:0.5">└</span>
+            <span class="text-lg shrink-0" x-show="!item.id.startsWith('wh-') && !item.id.startsWith('st-')" x-text="item.icon"></span>
             <span class="nav-label text-xs" x-show="$store.app._sidebarOpen" x-text="item.label"></span>
             <span class="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
               x-show="item.id==='wh-transfer' && $store.app._sidebarOpen"
@@ -84,7 +86,7 @@ tailwind.config = {
       </template>
     </nav>
     <div class="p-3 border-t border-gray-200 dark:border-[#222255]" x-show="$store.app._sidebarOpen">
-      <div class="text-[10px] text-gray-400 dark:text-[#4a4a7a] uppercase tracking-wider">v1.0.5 &middot; Cloud Dashboard</div>
+      <div class="text-[10px] text-gray-400 dark:text-[#4a4a7a] uppercase tracking-wider">v1.0.9 &middot; Cloud Dashboard</div>
     </div>
   </aside>
 
@@ -152,6 +154,39 @@ tailwind.config = {
       <!-- DASHBOARD SECTION                              -->
       <!-- ═══════════════════════════════════════════════ -->
       <div x-show="$store.app.section === 'dashboard'" x-transition.opacity>
+
+        <!-- Missing End Shifts Alert (top) -->
+        <div x-data="missingShifts" class="mb-3">
+          <template x-if="!loading && !allGood">
+            <div class="rounded-xl border-2 p-3"
+              :class="missingWithSales.length > 0
+                ? 'bg-red-900/10 border-red-500/40 text-red-600 dark:text-red-400'
+                : 'bg-amber-900/10 border-amber-500/40 text-amber-600 dark:text-amber-400'">
+              <div class="flex items-center gap-2">
+                <span class="text-lg" x-text="missingWithSales.length > 0 ? '🚨' : '⚠️'"></span>
+                <div>
+                  <div class="font-bold text-xs" x-text="missingWithSales.length > 0
+                    ? missingWithSales.length + ' store(s) have sales today but NO end shift submitted!'
+                    : missing.length + ' store(s) missing end shift today'"></div>
+                  <div class="text-[10px] mt-0.5 opacity-80">
+                    <template x-for="(s,i) in missing" :key="s.storeId">
+                      <span>
+                        <span x-text="shortStore(s.storeId, s.storeName)"></span>
+                        <span x-show="s.todaySaleCount > 0" class="font-semibold" x-text="' (' + s.todaySaleCount + ' sales today)'"></span>
+                        <span x-show="i < missing.length-1">, </span>
+                      </span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+          <template x-if="!loading && allGood">
+            <div class="bg-emerald-900/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 rounded-xl p-2 text-center text-[10px] font-medium">
+              All stores have submitted end shift today ✓
+            </div>
+          </template>
+        </div>
 
         <!-- Summary Cards -->
         <div x-data="summaryCards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3 mb-4">
@@ -675,115 +710,137 @@ tailwind.config = {
       </div>
 
       <!-- ═══════════════════════════════════════════════ -->
-      <!-- STOCK SECTION (Available Stock)               -->
+      <!-- STOCK SECTION (subpage tabs)                  -->
       <!-- ═══════════════════════════════════════════════ -->
-      <div x-show="$store.app.section === 'available'" x-transition.opacity class="space-y-4">
+      <div x-show="$store.app.section === 'stock'" x-transition.opacity>
+        <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
 
-        <!-- Stock Receiving -->
-        <div x-data="receivingPanel" class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
-          <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#222255] gap-2">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">RECENT STOCK RECEIVING</h3>
-            <div class="flex items-center gap-2">
-              <select x-model="limit" @change="load()" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1.5 text-gray-700 dark:text-slate-200">
-                <option value="50">50</option>
-                <option value="100" selected>100</option>
-                <option value="200">200</option>
-                <option value="500">500</option>
-              </select>
-              <button @click="load()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">LOAD</button>
-              <button @click="exportCSV('receiving')" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CSV</button>
+          <!-- Section Header -->
+          <div class="px-4 py-3 border-b border-gray-100 dark:border-[#222255]">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">
+              STOCK — <span x-text="$store.app.stockSubpage==='receiving' ? 'Recent Receiving' : 'Stock Status'"></span>
+            </h3>
+          </div>
+
+          <!-- Subpage Tab Bar -->
+          <div class="flex items-center justify-between px-4 py-2 border-b border-gray-100 dark:border-[#222255] gap-2">
+            <div class="flex gap-1">
+              <button @click="$store.app.switchStockSubpage('receiving')"
+                :class="$store.app.stockSubpage==='receiving' ? 'bg-cyan-600 text-white' : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'"
+                class="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors">Recent Receiving</button>
+              <button @click="$store.app.switchStockSubpage('status')"
+                :class="$store.app.stockSubpage==='status' ? 'bg-cyan-600 text-white' : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'"
+                class="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors">Stock Status</button>
             </div>
           </div>
-          <div class="overflow-x-auto">
-            <template x-if="loading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
-            <template x-if="!loading && d.length===0"><div class="text-center py-6 text-gray-400">No receiving data</div></template>
-            <template x-if="d.length > 0">
-              <table class="w-full text-xs">
-                <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Product</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Barcode</th>
-                  <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Qty Added</th>
-                  <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Before</th>
-                  <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">After</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Reference</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Cashier</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Store</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
-                </tr></thead>
-                <tbody>
-                  <template x-for="(x,i) in d" :key="i">
-                    <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                      <td class="px-3 py-2" x-text="x.productName"></td>
-                      <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.barcode || ''"></td>
-                      <td class="px-3 py-2 text-right" x-text="x.quantityAdded"></td>
-                      <td class="px-3 py-2 text-right" x-text="x.stockBefore"></td>
-                      <td class="px-3 py-2 text-right text-emerald-500 font-medium" x-text="x.stockAfter"></td>
-                      <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.reference || ''"></td>
-                      <td class="px-3 py-2" x-text="x.userName || ''"></td>
-                      <td class="px-3 py-2"><span class="text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded" x-text="shortStore(x.storeId, $store.app.storeMap[x.storeId])"></span></td>
-                      <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})"></td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-            </template>
-          </div>
-        </div>
 
-        <!-- Stock Status -->
-        <div x-data="stockStatus" class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
-          <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#222255] gap-2">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">STOCK STATUS</h3>
-            <div class="flex items-center gap-2">
-              <input type="text" placeholder="Search..." x-model="search"
-                class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2.5 py-1.5 w-28 text-gray-700 dark:text-slate-200 placeholder-gray-400">
-              <select @change="setFilter($event.target.value)" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1.5 text-gray-700 dark:text-slate-200 max-w-[110px]">
-                <option value="">All Categories</option>
-                <template x-for="c in categories" :key="c">
-                  <option :value="c" x-text="c"></option>
-                </template>
-              </select>
-              <button @click="load()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">LOAD</button>
-              <button @click="exportCSV('stock')" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CSV</button>
+          <!-- Recent Receiving Subpage -->
+          <div x-show="$store.app.stockSubpage === 'receiving'" x-data="receivingPanel">
+            <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#222255] gap-2">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">RECENT STOCK RECEIVING</h3>
+              <div class="flex items-center gap-2">
+                <select x-model="limit" @change="load()" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1.5 text-gray-700 dark:text-slate-200">
+                  <option value="50">50</option>
+                  <option value="100" selected>100</option>
+                  <option value="200">200</option>
+                  <option value="500">500</option>
+                </select>
+                <button @click="load()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">LOAD</button>
+                <button @click="exportCSV('receiving')" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CSV</button>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <template x-if="loading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
+              <template x-if="!loading && d.length===0"><div class="text-center py-6 text-gray-400">No receiving data</div></template>
+              <template x-if="d.length > 0">
+                <table class="w-full text-xs">
+                  <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Product</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Barcode</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Qty Added</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Before</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">After</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Reference</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Cashier</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Store</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
+                  </tr></thead>
+                  <tbody>
+                    <template x-for="(x,i) in d" :key="i">
+                      <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                        <td class="px-3 py-2" x-text="x.productName"></td>
+                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.barcode || ''"></td>
+                        <td class="px-3 py-2 text-right" x-text="x.quantityAdded"></td>
+                        <td class="px-3 py-2 text-right" x-text="x.stockBefore"></td>
+                        <td class="px-3 py-2 text-right text-emerald-500 font-medium" x-text="x.stockAfter"></td>
+                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.reference || ''"></td>
+                        <td class="px-3 py-2" x-text="x.userName || ''"></td>
+                        <td class="px-3 py-2"><span class="text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded" x-text="shortStore(x.storeId, $store.app.storeMap[x.storeId])"></span></td>
+                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </template>
             </div>
           </div>
-          <div class="overflow-x-auto">
-            <template x-if="loading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
-            <template x-if="!loading && paged.length===0 && total===0"><div class="text-center py-6 text-gray-400">No stock data</div></template>
-            <template x-if="total > 0">
-              <table class="w-full text-xs">
-                <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Product</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Barcode</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Category</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Store</th>
-                  <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Stock</th>
-                  <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Price</th>
-                  <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Cost</th>
-                </tr></thead>
-                <tbody>
-                  <template x-for="(x,i) in paged" :key="i">
-                    <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                      <td class="px-3 py-2" x-text="x.name"></td>
-                      <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.barcode"></td>
-                      <td class="px-3 py-2" x-text="x.category"></td>
-                      <td class="px-3 py-2 text-cyan-600 dark:text-cyan-400 text-xs"><span x-text="shortStore(x.storeId, $store.app.storeMap[x.storeId])"></span></td>
-                      <td class="px-3 py-2 text-right font-semibold" :class="stockClass(x.stockQty)" x-text="fmtInt(x.stockQty)"></td>
-                      <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.price)"></span></td>
-                      <td class="px-3 py-2 text-right text-red-500">&#8369;<span x-text="fmt(x.cost)"></span></td>
-                    </tr>
+
+          <!-- Stock Status Subpage -->
+          <div x-show="$store.app.stockSubpage === 'status'" x-data="stockStatus">
+            <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#222255] gap-2">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">STOCK STATUS</h3>
+              <div class="flex items-center gap-2">
+                <input type="text" placeholder="Search..." x-model="search"
+                  class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2.5 py-1.5 w-28 text-gray-700 dark:text-slate-200 placeholder-gray-400">
+                <select @change="setFilter($event.target.value)" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1.5 text-gray-700 dark:text-slate-200 max-w-[110px]">
+                  <option value="">All Categories</option>
+                  <template x-for="c in categories" :key="c">
+                    <option :value="c" x-text="c"></option>
                   </template>
-                </tbody>
-              </table>
-            </template>
-            <div class="flex items-center justify-between px-3 py-2 text-xs text-gray-400" x-show="pages > 1">
-              <span x-text="'Page '+(page+1)+' of '+pages+' ('+total+' rows)'"></span>
-              <div class="flex gap-2">
-                <button :disabled="page===0" @click="prev()" class="px-3 py-1 rounded border border-gray-200 dark:border-[#222255] disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-[#181848]">Prev</button>
-                <button :disabled="page>=pages-1" @click="next()" class="px-3 py-1 rounded border border-gray-200 dark:border-[#222255] disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-[#181848]">Next</button>
+                </select>
+                <button @click="load()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">LOAD</button>
+                <button @click="exportCSV('stock')" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CSV</button>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <template x-if="loading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
+              <template x-if="!loading && paged.length===0 && total===0"><div class="text-center py-6 text-gray-400">No stock data</div></template>
+              <template x-if="total > 0">
+                <table class="w-full text-xs">
+                  <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Product</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Barcode</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Category</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Store</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Stock</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Price</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Cost</th>
+                  </tr></thead>
+                  <tbody>
+                    <template x-for="(x,i) in paged" :key="i">
+                      <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                        <td class="px-3 py-2" x-text="x.name"></td>
+                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.barcode"></td>
+                        <td class="px-3 py-2" x-text="x.category"></td>
+                        <td class="px-3 py-2 text-cyan-600 dark:text-cyan-400 text-xs"><span x-text="shortStore(x.storeId, $store.app.storeMap[x.storeId])"></span></td>
+                        <td class="px-3 py-2 text-right font-semibold" :class="stockClass(x.stockQty)" x-text="fmtInt(x.stockQty)"></td>
+                        <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.price)"></span></td>
+                        <td class="px-3 py-2 text-right text-red-500">&#8369;<span x-text="fmt(x.cost)"></span></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </template>
+              <div class="flex items-center justify-between px-3 py-2 text-xs text-gray-400" x-show="pages > 1">
+                <span x-text="'Page '+(page+1)+' of '+pages+' ('+total+' rows)'"></span>
+                <div class="flex gap-2">
+                  <button :disabled="page===0" @click="prev()" class="px-3 py-1 rounded border border-gray-200 dark:border-[#222255] disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-[#181848]">Prev</button>
+                  <button :disabled="page>=pages-1" @click="next()" class="px-3 py-1 rounded border border-gray-200 dark:border-[#222255] disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-[#181848]">Next</button>
+                </div>
               </div>
             </div>
           </div>
+
         </div>
       </div>
 
@@ -883,6 +940,64 @@ tailwind.config = {
 
             <!-- ═══ Inventory subpage ═══ -->
             <div x-show="!loading && $store.app.whSubpage==='inventory'">
+
+              <!-- STOCK MOVEMENT HISTORY -->
+              <div class="border-b border-gray-100 dark:border-[#222255]/50">
+                <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-[#222255]/50">
+                  <h4 class="text-[11px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">STOCK MOVEMENT HISTORY</h4>
+                  <div class="flex items-center gap-2">
+                    <input type="text" placeholder="Search product..." x-model="invSearch" @keydown.enter="loadInvActivity()" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2.5 py-1.5 w-36 text-gray-700 dark:text-slate-200 placeholder-gray-400">
+                    <button @click="loadInvActivity()" class="text-[10px] px-2 py-1 rounded bg-cyan-600 text-white font-medium hover:bg-cyan-700">GO</button>
+                    <button @click="exportCSV('wh-inventory-activity')" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CSV</button>
+                  </div>
+                </div>
+                <div class="overflow-x-auto max-h-56 overflow-y-auto">
+                  <template x-if="invActivityLoading"><div class="flex justify-center py-4"><span class="spinner"></span></div></template>
+                  <template x-if="!invActivityLoading && invActivity.length===0"><div class="text-center py-4 text-gray-400 text-xs">No stock movement history</div></template>
+                  <template x-if="invActivity.length > 0">
+                    <table class="w-full text-xs">
+                      <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px] sticky top-0 bg-white dark:bg-[#10102a]">
+                        <th class="text-left px-2 py-1.5 border-b border-gray-100 dark:border-[#222255]">Date</th>
+                        <th class="text-left px-2 py-1.5 border-b border-gray-100 dark:border-[#222255]">Product</th>
+                        <th class="text-right px-2 py-1.5 border-b border-gray-100 dark:border-[#222255]">Change</th>
+                        <th class="text-left px-2 py-1.5 border-b border-gray-100 dark:border-[#222255]">Type</th>
+                        <th class="text-left px-2 py-1.5 border-b border-gray-100 dark:border-[#222255]">Reference</th>
+                      </tr></thead>
+                      <tbody>
+                        <template x-for="(x,i) in invActivity" :key="i">
+                          <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                            <td class="px-2 py-1.5 text-gray-500 dark:text-[#7878aa] whitespace-nowrap text-[10px]" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})"></td>
+                            <td class="px-2 py-1.5 font-medium text-[11px]"><span x-text="x.productName"></span></td>
+                            <td class="px-2 py-1.5 text-right font-bold text-[11px]" :class="x.qtyChange > 0 ? 'text-emerald-400' : x.qtyChange < 0 ? 'text-red-400' : 'text-gray-400'" x-text="(x.qtyChange > 0 ? '+' : '') + x.qtyChange"></td>
+                            <td class="px-2 py-1.5 text-[10px]" x-text="formatType(x.referenceType||'')"></td>
+                            <td class="px-2 py-1.5 text-[9px] text-gray-500 dark:text-[#7878aa] truncate max-w-[100px]" x-text="x.reference||''"></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Inventory Summary -->
+              <template x-if="inventorySummary">
+                <div class="px-4 py-2 border-b border-gray-100 dark:border-[#222255]/50">
+                  <div class="flex items-center gap-4 text-xs flex-wrap">
+                    <span class="text-gray-500 dark:text-[#7878aa]">Items: <strong class="text-gray-700 dark:text-slate-200" x-text="fmtInt(inventorySummary.totalItems)"></strong></span>
+                    <span class="text-gray-500 dark:text-[#7878aa]">Total Stock: <strong class="text-gray-700 dark:text-slate-200" x-text="fmtInt(inventorySummary.totalStockQty)"></strong></span>
+                    <span class="text-gray-500 dark:text-[#7878aa]">Inventory Cost: <strong class="text-cyan-600 dark:text-cyan-400" x-text="'₱' + fmt(inventorySummary.totalCost)"></strong></span>
+                    <span class="text-gray-500 dark:text-[#7878aa]">Total Price: <strong class="text-emerald-600 dark:text-emerald-400" x-text="'₱' + fmt(inventorySummary.totalPrice)"></strong></span>
+                    <template x-if="inventorySummary.zeroCostItems > 0">
+                      <span class="text-amber-600 dark:text-amber-400 font-medium ml-2">⚠ <span x-text="inventorySummary.zeroCostItems"></span> item(s) have no cost</span>
+                    </template>
+                  </div>
+                </div>
+              </template>
+
+              <!-- WAREHOUSE — Inventory -->
+              <div class="px-4 py-2.5 border-b border-gray-100 dark:border-[#222255]/50 bg-gray-50/50 dark:bg-[#0d0d25]/50">
+                <h4 class="text-[11px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">WAREHOUSE — INVENTORY</h4>
+              </div>
               <template x-if="filtered.length===0"><div class="text-center py-6 text-gray-400">No products</div></template>
               <template x-if="filtered.length > 0">
                 <table class="w-full text-xs">
@@ -1463,7 +1578,7 @@ tailwind.config = {
               <tbody>
                 <template x-for="(x,i) in trailItems" :key="i">
                   <tr class="border-b border-gray-50 dark:border-[#222255]/40">
-                    <td class="px-2 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded" :class="x.type==='transfer_out' ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300' : x.type==='manual_receive' ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' : x.type==='manual_return' ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300' : 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300'" x-text="x.type==='transfer_out' ? 'TRANSFER OUT' : x.type==='manual_receive' ? 'RECEIVE' : x.type==='manual_return' ? 'RETURN' : 'SHORTAGE RETURN'"></span></td>
+                    <td class="px-2 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded" :class="x.type==='transfer_out' ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300' : x.type==='manual_receive' || x.type==='manual_set' ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' : x.type==='manual_return' || x.type==='shortage_return' || x.type==='walkin_sale' ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300' : 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300'" x-text="formatType(x.type||'').toUpperCase()"></span></td>
                     <td class="px-2 py-2 text-right font-bold" :class="x.qtyChange < 0 ? 'text-red-400' : 'text-emerald-400'" x-text="(x.qtyChange > 0 ? '+' : '') + x.qtyChange"></td>
                     <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.reference || ''"></td>
                     <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Manila'})"></td>

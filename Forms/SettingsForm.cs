@@ -1,6 +1,7 @@
 using System.Data;
 using System.Data.SQLite;
 using System.Diagnostics;
+using System.Text.Json;
 using JumongPosV1._01.Data;
 using JumongPosV1._01.Helpers;
 using JumongPosV1._01.Models;
@@ -87,6 +88,24 @@ public partial class SettingsForm : Form
             var cloudUrl = GetSetting(conn, "CloudApiUrl") ?? "https://jumong-pos-api-p285q.ondigitalocean.app/api";
             txtCloudApiUrl.Text = cloudUrl;
             _originalSettings["CloudApiUrl"] = cloudUrl;
+
+            // Load QR codes
+            var qrJson = GetSetting(conn, "StoreQrCodes") ?? "[{\"header\":\"GCash\",\"file\":\"gcash_qr.png\"}]";
+            if (dgvQrCodes != null)
+            {
+                dgvQrCodes.Rows.Clear();
+                try
+                {
+                    using var doc = JsonDocument.Parse(qrJson);
+                    foreach (var e in doc.RootElement.EnumerateArray())
+                    {
+                        var h = e.TryGetProperty("header", out var hp) ? hp.GetString() ?? "" : "";
+                        var f = e.TryGetProperty("file", out var fp) ? fp.GetString() ?? "" : "";
+                        dgvQrCodes.Rows.Add(h, f);
+                    }
+                }
+                catch { }
+            }
         }
     }
 
@@ -154,6 +173,16 @@ public partial class SettingsForm : Form
                 UpsertSetting(conn, "CustomerScreenIndex", cmbCustomerScreen.SelectedIndex.ToString());
                 UpsertSetting(conn, "EmailScheduleHour", numEmailScheduleHour.Value.ToString());
                 UpsertSetting(conn, "CloudApiUrl", txtCloudApiUrl.Text);
+                // Save QR codes
+                var qrList = new List<object>();
+                foreach (DataGridViewRow row in dgvQrCodes.Rows)
+                {
+                    var h = row.Cells[0].Value?.ToString() ?? "";
+                    var f = row.Cells[1].Value?.ToString() ?? "";
+                    if (!string.IsNullOrEmpty(h) || !string.IsNullOrEmpty(f))
+                        qrList.Add(new { header = h, file = f });
+                }
+                UpsertSetting(conn, "StoreQrCodes", JsonSerializer.Serialize(qrList));
             }
 
             foreach (var kv in newValues)
@@ -437,6 +466,42 @@ public partial class SettingsForm : Form
         MakeSection("THEME", 80, new Control[] { lblTheme, cmbTheme, lblThemeHint });
 
         // ═══════════════════════════════════════════
+        // QR CODES (admin only)
+        // ═══════════════════════════════════════════
+        if (_currentUser.Role == "Admin")
+        {
+            var qy = 40;
+            var lblQrHint = new Label { Text = "Configure QR code images for POS payment screen (header + filename in assets/ folder).", Font = new Font("Segoe UI", 8F), ForeColor = dimText, Location = new Point(15, qy), Size = new Size(550, 20) };
+            qy += 25;
+            dgvQrCodes = new DataGridView
+            {
+                Location = new Point(15, qy),
+                Size = new Size(550, 150),
+                BackColor = panelBg,
+                ForeColor = inputFg,
+                BorderStyle = BorderStyle.FixedSingle,
+                BackgroundColor = panelBg,
+                GridColor = borderColor,
+                RowHeadersVisible = false,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                ColumnHeadersHeight = 30,
+                RowTemplate = { Height = 28 },
+                ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle { BackColor = panelBg, ForeColor = neonTitle, Font = new Font("Segoe UI", 9F, FontStyle.Bold) },
+                DefaultCellStyle = new DataGridViewCellStyle { BackColor = panelBg, ForeColor = inputFg, SelectionBackColor = ThemeManager.Current.DgvSelection, SelectionForeColor = Color.White },
+                EnableHeadersVisualStyles = false
+            };
+            dgvQrCodes.Columns.Add("Header", "HEADER (e.g. GCash)");
+            dgvQrCodes.Columns.Add("File", "FILE NAME (e.g. gcash_qr.png)");
+            dgvQrCodes.Columns[0].Width = 210;
+            dgvQrCodes.Columns[1].Width = 320;
+            qy += 157;
+            var btnAddQr = MakeBtn("+ ADD QR CODE", 15, qy, accentGreen, (_, _) => { dgvQrCodes.Rows.Add("New QR", "gcash_qr.png"); });
+            var btnRemoveQr = MakeBtn("\u2716 REMOVE", 225, qy, accentRed, (_, _) => { if (dgvQrCodes.SelectedRows.Count > 0) dgvQrCodes.Rows.RemoveAt(dgvQrCodes.SelectedRows[0].Index); });
+            MakeSection("QR CODES", 235, new Control[] { lblQrHint, dgvQrCodes, btnAddQr, btnRemoveQr });
+        }
+
+        // ═══════════════════════════════════════════
         // 3. CLOUD SYNC
         // ═══════════════════════════════════════════
         if (_currentUser.Role == "Admin")
@@ -535,6 +600,15 @@ public partial class SettingsForm : Form
 
     internal static void ShowSyncProgress(string title, Func<IProgress<string>, Task<int>> work)
     {
+        ShowSyncProgress(title, async p =>
+        {
+            var count = await work(p);
+            return (count, 0);
+        });
+    }
+
+    internal static void ShowSyncProgress(string title, Func<IProgress<string>, Task<(int total, int failed)>> work)
+    {
         var form = new Form
         {
             Text = title,
@@ -558,11 +632,15 @@ public partial class SettingsForm : Form
             });
             try
             {
-                var count = await work(progress);
-                try { form.Invoke(() => { lbl.Text = "Complete! " + count + " items. Closing..."; }); } catch { }
+                var (total, failed) = await work(progress);
+                var msg = failed > 0
+                    ? $"Complete! {total} items ({failed} failed). Check Sync Log."
+                    : $"Complete! {total} items. Closing...";
+                try { form.Invoke(() => { lbl.Text = msg; }); } catch { }
+                if (failed > 0) await Task.Delay(4000);
+                else await Task.Delay(1500);
             }
-            catch (Exception ex) { try { form.Invoke(() => { lbl.Text = "Error: " + ex.Message; }); } catch { } }
-            await Task.Delay(1500);
+            catch (Exception ex) { try { form.Invoke(() => { lbl.Text = "Error: " + ex.Message; }); } catch { } await Task.Delay(4000); }
             try { form.Close(); } catch { }
         };
         form.Show();
@@ -585,14 +663,15 @@ public partial class SettingsForm : Form
             var dailyCloses = DailyCloseService.GetHistory().Where(dc => dc.CloseDate.StartsWith(today)).ToList();
             var total = allSales.Count + expenses.Count + voids.Count + stockTrails.Count + creditTxns.Count + dailyCloses.Count;
             var done = 0;
-            if (total == 0) { p.Report("Nothing to sync today."); await Task.Delay(1500); return 0; }
-            foreach (var x in allSales) { p.Report($"Sales: {++done}/{total}"); await SyncService.SyncSale(x, x.Items); }
-            foreach (var x in expenses) { p.Report($"Expenses: {++done}/{total}"); await SyncService.SyncExpense(x); }
-            foreach (var x in voids) { p.Report($"Voids: {++done}/{total}"); await SyncService.SyncVoidLog(x); }
-            foreach (var x in stockTrails) { p.Report($"Stock: {++done}/{total}"); await SyncService.SyncStockTrail(x); }
-            foreach (var x in creditTxns) { p.Report($"Credit: {++done}/{total}"); await SyncService.SyncCreditTransaction(x); }
-            foreach (var x in dailyCloses) { p.Report($"Shifts: {++done}/{total}"); await SyncService.SyncDailyClose(x); }
-            return total;
+            var failed = 0;
+            if (total == 0) { p.Report("Nothing to sync today."); await Task.Delay(1500); return (0, 0); }
+            foreach (var x in allSales) { p.Report($"Sales: {++done}/{total}"); if (!await SyncService.SyncSale(x, x.Items)) failed++; }
+            foreach (var x in expenses) { p.Report($"Expenses: {++done}/{total}"); if (!await SyncService.SyncExpense(x)) failed++; }
+            foreach (var x in voids) { p.Report($"Voids: {++done}/{total}"); if (!await SyncService.SyncVoidLog(x)) failed++; }
+            foreach (var x in stockTrails) { p.Report($"Stock: {++done}/{total}"); if (!await SyncService.SyncStockTrail(x)) failed++; }
+            foreach (var x in creditTxns) { p.Report($"Credit: {++done}/{total}"); if (!await SyncService.SyncCreditTransaction(x)) failed++; }
+            foreach (var x in dailyCloses) { p.Report($"Shifts: {++done}/{total}"); if (!await SyncService.SyncDailyClose(x)) failed++; }
+            return (total, failed);
         });
     }
 
@@ -611,13 +690,14 @@ public partial class SettingsForm : Form
             var creditTxns = CreditService.GetAll().Where(ct => ct.CreatedAt?.StartsWith(today) == true).ToList();
             var total = unsyncedSales.Count + expenses.Count + voids.Count + stockTrails.Count + creditTxns.Count;
             var done = 0;
-            if (total == 0) { p.Report("Nothing to sync today."); await Task.Delay(1500); return 0; }
-            foreach (var x in unsyncedSales) { p.Report($"Sales: {++done}/{total}"); await SyncService.SyncSale(x, x.Items); }
-            foreach (var x in expenses) { p.Report($"Expenses: {++done}/{total}"); await SyncService.SyncExpense(x); }
-            foreach (var x in voids) { p.Report($"Voids: {++done}/{total}"); await SyncService.SyncVoidLog(x); }
-            foreach (var x in stockTrails) { p.Report($"Stock: {++done}/{total}"); await SyncService.SyncStockTrail(x); }
-            foreach (var x in creditTxns) { p.Report($"Credit: {++done}/{total}"); await SyncService.SyncCreditTransaction(x); }
-            return total;
+            var failed = 0;
+            if (total == 0) { p.Report("Nothing to sync today."); await Task.Delay(1500); return (0, 0); }
+            foreach (var x in unsyncedSales) { p.Report($"Sales: {++done}/{total}"); if (!await SyncService.SyncSale(x, x.Items)) failed++; }
+            foreach (var x in expenses) { p.Report($"Expenses: {++done}/{total}"); if (!await SyncService.SyncExpense(x)) failed++; }
+            foreach (var x in voids) { p.Report($"Voids: {++done}/{total}"); if (!await SyncService.SyncVoidLog(x)) failed++; }
+            foreach (var x in stockTrails) { p.Report($"Stock: {++done}/{total}"); if (!await SyncService.SyncStockTrail(x)) failed++; }
+            foreach (var x in creditTxns) { p.Report($"Credit: {++done}/{total}"); if (!await SyncService.SyncCreditTransaction(x)) failed++; }
+            return (total, failed);
         });
     }
 
@@ -811,4 +891,5 @@ public partial class SettingsForm : Form
     private Button btnBackupDb = null!;
     private Button btnRestoreDb = null!;
     private Button btnAuditLog = null!;
+    private DataGridView dgvQrCodes = null!;
 }

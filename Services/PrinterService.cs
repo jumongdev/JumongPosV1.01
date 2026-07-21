@@ -333,7 +333,8 @@ public class PrinterService
         decimal totalSales, decimal totalCash, decimal totalEWallet, decimal totalCredit, decimal totalVoided,
         List<Expense> expenses, List<(string InvoiceNo, string SaleDate, decimal Amount, string ReferenceNo)> gcashTxns,
         List<(string Name, decimal Amount)> creditCustomers, List<(string CustomerName, string PaymentMethod, decimal Amount, string Timestamp)> creditPayments,
-        int denom1000, int denom500, int denom200, int denom100, int denom50, int denom20, decimal denomCoins)
+        int denom1000, int denom500, int denom200, int denom100, int denom50, int denom20, decimal denomCoins,
+        decimal totalInventoryCost = 0, decimal totalCostSold = 0, decimal totalStockReceivedCost = 0, decimal previousInventory = 0)
     {
         var printerName = GetSetting("PrinterName");
         if (string.IsNullOrEmpty(printerName))
@@ -354,7 +355,7 @@ public class PrinterService
         if (lineChars < 20) lineChars = 20;
         if (lineChars > 48) lineChars = 48;
 
-        var lines = BuildAuditEndShiftReportLines(cashOnHand, difference, cashierName, timestamp, notes, totalSales, totalCash, totalEWallet, totalCredit, totalVoided, expenses, gcashTxns, creditCustomers, creditPayments, lineChars, denom1000, denom500, denom200, denom100, denom50, denom20, denomCoins);
+        var lines = BuildAuditEndShiftReportLines(cashOnHand, difference, cashierName, timestamp, notes, totalSales, totalCash, totalEWallet, totalCredit, totalVoided, expenses, gcashTxns, creditCustomers, creditPayments, lineChars, denom1000, denom500, denom200, denom100, denom50, denom20, denomCoins, totalInventoryCost, totalCostSold, totalStockReceivedCost, previousInventory);
         ExtendPaperIfNeeded(doc, lines.Count, 16);
 
         doc.PrintPage += (sender, e) =>
@@ -412,7 +413,8 @@ public class PrinterService
         decimal totalSales, decimal totalCash, decimal totalEWallet, decimal totalCredit, decimal totalVoided,
         List<Expense> expenses, List<(string InvoiceNo, string SaleDate, decimal Amount, string ReferenceNo)> gcashTxns,
         List<(string Name, decimal Amount)> creditCustomers, List<(string CustomerName, string PaymentMethod, decimal Amount, string Timestamp)> creditPayments, int lineChars,
-        int denom1000, int denom500, int denom200, int denom100, int denom50, int denom20, decimal denomCoins)
+        int denom1000, int denom500, int denom200, int denom100, int denom50, int denom20, decimal denomCoins,
+        decimal totalInventoryCost = 0, decimal totalCostSold = 0, decimal totalStockReceivedCost = 0, decimal previousInventory = 0)
     {
         var lines = new List<LineEntry>();
         var company = GetSetting("CompanyName");
@@ -499,6 +501,25 @@ public class PrinterService
             }
             var totalCollected = creditPayments.Sum(t => t.Amount);
             lines.Add(new LineEntry { Text = "TOTAL COLLECTED", RightText = totalCollected.ToString("N2"), Bold = true, Spacing = 18 });
+        }
+
+        // Inventory Reconciliation
+        if (previousInventory > 0 || totalCostSold > 0 || totalStockReceivedCost > 0 || totalInventoryCost > 0)
+        {
+            var expected = previousInventory + totalStockReceivedCost - totalCostSold;
+            var variance = totalInventoryCost - expected;
+            lines.Add(new LineEntry { Text = new string('=', lineChars), Align = TextAlign.Center, Spacing = 14 });
+            lines.Add(new LineEntry { Text = "INVENTORY RECONCILIATION", Bold = true, Spacing = 14 });
+            lines.Add(new LineEntry { Text = "Previous Inventory", RightText = previousInventory.ToString("N2"), Spacing = 14 });
+            if (totalStockReceivedCost > 0)
+                lines.Add(new LineEntry { Text = "+ Stock Received", RightText = totalStockReceivedCost.ToString("N2"), Spacing = 14 });
+            lines.Add(new LineEntry { Text = "- Cost of Goods Sold", RightText = $"({totalCostSold.ToString("N2")})", Spacing = 14 });
+            lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Align = TextAlign.Center, Spacing = 12 });
+            lines.Add(new LineEntry { Text = "Expected Inventory", RightText = expected.ToString("N2"), Bold = true, Spacing = 14 });
+            lines.Add(new LineEntry { Text = "Actual Inventory", RightText = totalInventoryCost.ToString("N2"), Bold = true, Spacing = 14 });
+            lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Align = TextAlign.Center, Spacing = 12 });
+            var label = variance == 0 ? "✔ BALANCED" : variance > 0 ? $"⚠ OVER by {variance:N2}" : $"❌ SHORT by {Math.Abs(variance):N2}";
+            lines.Add(new LineEntry { Text = label, Align = TextAlign.Center, Bold = true, Spacing = 18 });
         }
 
         lines.Add(new LineEntry { Text = new string('=', lineChars), Align = TextAlign.Center, Spacing = 14 });

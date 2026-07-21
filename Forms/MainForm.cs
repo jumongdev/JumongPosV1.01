@@ -16,6 +16,7 @@ public partial class MainForm : Form
     private System.Windows.Forms.Timer? _connTimer;
     private static int _lastTransferCount;
     private Label _lblConnStatus = null!;
+    private readonly InventoryWebServer _invServer = new(port: 5002, pin: "1234");
 
     private string? _lastDailyReportSent;
 
@@ -54,7 +55,11 @@ public partial class MainForm : Form
         StartSyncRetry();
         StartTransferPoll();
         DebugHelper.AddFormLabel(this);
-        Load += (_, _) => LayoutMenuButtons();
+        Load += (_, _) =>
+        {
+            LayoutMenuButtons();
+            StartInventoryServer();
+        };
     }
 
     private void StartSyncRetry()
@@ -137,7 +142,7 @@ public partial class MainForm : Form
     {
         try
         {
-            var (totalSales, totalCash, totalEWallet, totalCredit, totalVoided, creditPayCash, creditPayEWallet, totalExpenses) = DailyCloseService.GetShiftTotals();
+            var (totalSales, totalCash, totalEWallet, totalCredit, totalVoided, creditPayCash, creditPayEWallet, totalExpenses, _, _) = DailyCloseService.GetShiftTotals();
             var expenses = ExpenseService.GetExpensesForCurrentShift();
             var gcashTxns = DailyCloseService.GetGcashTransactionsSinceLastClose();
             var creditCustomers = DailyCloseService.GetCreditCustomersSinceLastClose();
@@ -238,6 +243,7 @@ public partial class MainForm : Form
             else if (f is ProductUnitsForm puf) puf.ApplyTheme();
             else if (f is LoginForm lf) lf.ApplyTheme();
             else if (f is PaymentForm pmf) pmf.ApplyTheme();
+            else if (f is InventoryHistoryForm ihf) ihf.ApplyTheme();
         }
     }
 
@@ -247,6 +253,7 @@ public partial class MainForm : Form
         _schedulerTimer?.Dispose();
         _transferTimer?.Stop();
         _transferTimer?.Dispose();
+        _invServer.Stop();
         base.OnFormClosed(e);
     }
 
@@ -299,6 +306,27 @@ public partial class MainForm : Form
             ErrorLogger.Log("btnWhSell", ex);
             MessageBox.Show($"Error: {ex.Message}", "Wholesale Error",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void btnInventoryCount_Click(object? sender, EventArgs e)
+    {
+        using var form = new InventoryHistoryForm(_currentUser);
+        form.ShowDialog();
+    }
+
+    private void StartInventoryServer()
+    {
+        try
+        {
+            _invServer.Start();
+            var ip = _invServer.Url;
+            _lblConnStatus.Text = $"\u25CF Server: {ip}";
+            _lblConnStatus.ForeColor = _connGreen;
+        }
+        catch (Exception ex)
+        {
+            ErrorLogger.Log("MainForm.StartInventoryServer", ex);
         }
     }
 
@@ -389,27 +417,28 @@ public partial class MainForm : Form
         btnInventory = CreateMenuButton("Inventory", 0, 395, btnInventory_Click, cardBg, textColor, hoverBg);
         btnWhSell = CreateMenuButton("Wholesale", 0, 430, btnWhSell_Click, cardBg, textColor, hoverBg);
         btnWhSell.Visible = false;
-        btnOnlineOrders = CreateMenuButton("Incoming Stock", 0, 450, btnOnlineOrders_Click, cardBg, textColor, hoverBg);
-        btnExpenses = CreateMenuButton("Expenses", 0, 505, btnExpenses_Click, cardBg, textColor, hoverBg);
-        btnUsers = CreateMenuButton("User Management", 0, 560, btnUsers_Click, cardBg, textColor, hoverBg);
+        btnInventoryCount = CreateMenuButton("Inventory Count", 0, 450, btnInventoryCount_Click, cardBg, textColor, hoverBg);
+        btnOnlineOrders = CreateMenuButton("Incoming Stock", 0, 505, btnOnlineOrders_Click, cardBg, textColor, hoverBg);
+        btnExpenses = CreateMenuButton("Expenses", 0, 560, btnExpenses_Click, cardBg, textColor, hoverBg);
+        btnUsers = CreateMenuButton("User Management", 0, 615, btnUsers_Click, cardBg, textColor, hoverBg);
         btnUsers.Visible = _currentUser.Role == "Admin";
-        btnEndShift = CreateMenuButton("End Shift", 0, 615, btnEndShift_Click, cardBg, textColor, hoverBg);
-        btnSettings = CreateMenuButton("Settings", 0, 670, btnSettings_Click, cardBg, textColor, hoverBg);
-        btnLogout = CreateMenuButton("Logout", 0, 725, btnLogout_Click, t.SidebarLogoutBg, t.SidebarLogoutFg, t.SidebarLogoutHover);
+        btnEndShift = CreateMenuButton("End Shift", 0, 670, btnEndShift_Click, cardBg, textColor, hoverBg);
+        btnSettings = CreateMenuButton("Settings", 0, 725, btnSettings_Click, cardBg, textColor, hoverBg);
+        btnLogout = CreateMenuButton("Logout", 0, 780, btnLogout_Click, t.SidebarLogoutBg, t.SidebarLogoutFg, t.SidebarLogoutHover);
 
         _lblConnStatus = new Label
         {
             Text = "Checking API...",
             Font = new Font("Segoe UI", 8F),
             ForeColor = t.SidebarUserInfo,
-            Location = new Point(60, 780),
+            Location = new Point(60, 835),
             Size = new Size(400, 20),
             TextAlign = ContentAlignment.MiddleLeft
         };
 
-        Controls.AddRange(new Control[] { title, userInfo, divider, btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnWhSell, btnOnlineOrders, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout, _lblConnStatus });
+        Controls.AddRange(new Control[] { title, userInfo, divider, btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnWhSell, btnInventoryCount, btnOnlineOrders, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout, _lblConnStatus });
 
-        _menuButtons = new Button[] { btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnWhSell, btnOnlineOrders, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout };
+        _menuButtons = new Button[] { btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnWhSell, btnInventoryCount, btnOnlineOrders, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout };
         LayoutMenuButtons();
 
         _ = CheckApiConnectionAsync();
@@ -434,7 +463,9 @@ public partial class MainForm : Form
     private async Task CheckApiConnectionAsync()
     {
         var connected = await SyncService.CheckConnectionAsync();
-        _lblConnStatus.Text = connected ? "● Connected" : "● Disconnected";
+        var serverUrl = _invServer.IsRunning ? _invServer.Url : "";
+        var invText = string.IsNullOrEmpty(serverUrl) ? "" : $" | INV: {serverUrl}";
+        _lblConnStatus.Text = (connected ? "● Cloud: OK" : "● Cloud: OFF") + invText;
         _lblConnStatus.ForeColor = connected ? _connGreen : _connRed;
     }
 
@@ -484,6 +515,7 @@ public partial class MainForm : Form
     private Button btnInventory = null!;
     private Button btnWhSell = null!;
     private Button btnOnlineOrders = null!;
+    private Button btnInventoryCount = null!;
     private Button btnExpenses = null!;
     private Button btnEndShift = null!;
     private Button btnSettings = null!;

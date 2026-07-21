@@ -26,7 +26,8 @@ public class DailyCloseService
     }
 
     public static (decimal TotalSales, decimal TotalCash, decimal TotalEWallet, decimal TotalCredit,
-        decimal TotalVoided, decimal CreditPayCash, decimal CreditPayEWallet, decimal TotalExpenses) GetShiftTotals()
+        decimal TotalVoided, decimal CreditPayCash, decimal CreditPayEWallet, decimal TotalExpenses,
+        decimal TotalCostSold, decimal TotalStockReceivedCost) GetShiftTotals()
     {
         var since = GetLastCloseTime();
         using var conn = DatabaseHelper.GetConnection();
@@ -60,7 +61,7 @@ public class DailyCloseService
             }
             else
             {
-                return (0, 0, 0, 0, 0, 0, 0, 0);
+                return (0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
             }
         }
 
@@ -110,7 +111,27 @@ public class DailyCloseService
             expCmd.Parameters.AddWithValue("@since_exp", since);
         var totalExpenses = Convert.ToDecimal(expCmd.ExecuteScalar());
 
-        return (total, cash, ewallet, credit, voided, creditPayCash, creditPayEWallet, totalExpenses);
+        // Total Cost of Goods Sold (non-voided items only)
+        var cogsSql = $@"SELECT COALESCE(SUM(si.UnitCost * si.Qty), 0)
+            FROM SaleItems si JOIN Sales s ON si.SaleId = s.Id
+            WHERE si.IsVoided = 0 AND {cond}";
+        using var cogsCmd = new SQLiteCommand(cogsSql, conn);
+        if (!string.IsNullOrEmpty(since))
+            cogsCmd.Parameters.AddWithValue("@since", since);
+        var totalCostSold = Convert.ToDecimal(cogsCmd.ExecuteScalar());
+
+        // Total Stock Received cost (today)
+        var recvSql = "SELECT COALESCE(SUM(st.Cost * st.QuantityAdded), 0) FROM StockTrail st " +
+                      "WHERE st.Type = 'Stock Receiving'";
+        if (!string.IsNullOrEmpty(since))
+            recvSql += " AND st.CreatedAt > @since_recv";
+        using var recvCmd = new SQLiteCommand(recvSql, conn);
+        if (!string.IsNullOrEmpty(since))
+            recvCmd.Parameters.AddWithValue("@since_recv", since);
+        var totalStockReceivedCost = Convert.ToDecimal(recvCmd.ExecuteScalar());
+
+        return (total, cash, ewallet, credit, voided, creditPayCash, creditPayEWallet, totalExpenses,
+            totalCostSold, totalStockReceivedCost);
     }
 
     public static string? SaveClose(DailyClose dc)
@@ -120,9 +141,11 @@ public class DailyCloseService
         try
         {
             var sql = @"INSERT INTO DailyClose (CloseDate, CreatedAt, TotalSales, TotalCash, TotalEWallet, TotalCredit,
-                        TotalVoided, TotalExpenses, OpeningCash, Denom1000, Denom500, Denom200, Denom100, Denom50, Denom20, DenomCoins,
+                        TotalVoided, TotalExpenses, TotalInventoryCost, TotalCostSold, TotalStockReceivedCost,
+                        OpeningCash, Denom1000, Denom500, Denom200, Denom100, Denom50, Denom20, DenomCoins,
                         CashOnHand, Difference, Notes, UserId, UserName)
-                        VALUES (@d, @ca, @ts, @tc, @te, @tcr, @tv, @texp, @opn, @d1k, @d5h, @d2h, @d1h, @d50, @d20, @coins,
+                        VALUES (@d, @ca, @ts, @tc, @te, @tcr, @tv, @texp, @tic, @tcs, @tsrc,
+                        @opn, @d1k, @d5h, @d2h, @d1h, @d50, @d20, @coins,
                         @coh, @diff, @notes, @uid, @uname)";
             using var cmd = new SQLiteCommand(sql, conn);
             cmd.Parameters.AddWithValue("@d", dc.CloseDate);
@@ -133,6 +156,9 @@ public class DailyCloseService
             cmd.Parameters.AddWithValue("@tcr", dc.TotalCredit);
             cmd.Parameters.AddWithValue("@tv", dc.TotalVoided);
             cmd.Parameters.AddWithValue("@texp", dc.TotalExpenses);
+            cmd.Parameters.AddWithValue("@tic", dc.TotalInventoryCost);
+            cmd.Parameters.AddWithValue("@tcs", dc.TotalCostSold);
+            cmd.Parameters.AddWithValue("@tsrc", dc.TotalStockReceivedCost);
             cmd.Parameters.AddWithValue("@opn", dc.OpeningCash);
             cmd.Parameters.AddWithValue("@d1k", dc.Denom1000);
             cmd.Parameters.AddWithValue("@d5h", dc.Denom500);
@@ -273,6 +299,9 @@ public class DailyCloseService
                 TotalCredit = Convert.ToDecimal(rdr["TotalCredit"]),
                 TotalVoided = Convert.ToDecimal(rdr["TotalVoided"]),
                 TotalExpenses = Convert.ToDecimal(rdr["TotalExpenses"]),
+                TotalInventoryCost = rdr["TotalInventoryCost"] != DBNull.Value ? Convert.ToDecimal(rdr["TotalInventoryCost"]) : 0m,
+                TotalCostSold = rdr["TotalCostSold"] != DBNull.Value ? Convert.ToDecimal(rdr["TotalCostSold"]) : 0m,
+                TotalStockReceivedCost = rdr["TotalStockReceivedCost"] != DBNull.Value ? Convert.ToDecimal(rdr["TotalStockReceivedCost"]) : 0m,
                 OpeningCash = Convert.ToDecimal(rdr["OpeningCash"]),
                 CashOnHand = Convert.ToDecimal(rdr["CashOnHand"]),
                 Difference = Convert.ToDecimal(rdr["Difference"]),
@@ -289,6 +318,15 @@ public class DailyCloseService
             });
         }
         return list;
+    }
+
+    public static decimal GetLastInventoryCost()
+    {
+        using var conn = DatabaseHelper.GetConnection();
+        conn.Open();
+        using var cmd = new SQLiteCommand("SELECT TotalInventoryCost FROM DailyClose ORDER BY Id DESC LIMIT 1", conn);
+        var val = cmd.ExecuteScalar();
+        return val == null || val == DBNull.Value ? 0m : Convert.ToDecimal(val);
     }
 
     public static string? GetPreviousCloseTime(int currentCloseId)

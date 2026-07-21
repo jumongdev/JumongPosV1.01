@@ -1,4 +1,5 @@
 using JumongPosV1._01.Helpers;
+using JumongPosV1._01.Data;
 using JumongPosV1._01.Models;
 using JumongPosV1._01.Services;
 
@@ -7,7 +8,7 @@ namespace JumongPosV1._01.Forms;
 public class EndShiftForm : Form
 {
     private readonly User _currentUser;
-    private decimal _totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, _creditPayCash, _creditPayEWallet, _totalExpenses;
+    private decimal _totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, _creditPayCash, _creditPayEWallet, _totalExpenses, _totalCostSold, _totalStockReceivedCost;
     private decimal _openingBalance;
     private bool _denominationsEntered = false;
     private Label lblTotal1000 = null!, lblTotal500 = null!, lblTotal200 = null!, lblTotal100 = null!, lblTotal50 = null!, lblTotal20 = null!, lblTotalCoins = null!;
@@ -29,7 +30,7 @@ public class EndShiftForm : Form
 
     private void LoadTotals()
     {
-        (_totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, _creditPayCash, _creditPayEWallet, _totalExpenses) = DailyCloseService.GetShiftTotals();
+        (_totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, _creditPayCash, _creditPayEWallet, _totalExpenses, _totalCostSold, _totalStockReceivedCost) = DailyCloseService.GetShiftTotals();
         lblDate.Text = TimeHelper.Now.ToString("MMMM dd, yyyy  hh:mm tt");
         var cashierName = string.IsNullOrEmpty(_currentUser.FullName) ? _currentUser.Username : _currentUser.FullName;
         lblCashierName.Text = cashierName;
@@ -94,6 +95,17 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
     var diff = cashOnHand + _totalExpenses - _totalCash - _creditPayCash - _openingBalance;
     var now = TimeHelper.Now;
 
+    // Compute total inventory cost (SUM of stock_qty * cost for all products)
+    var totalInvCost = 0m;
+    try
+    {
+        using var invConn = DatabaseHelper.GetConnection();
+        invConn.Open();
+        using var invCmd = new System.Data.SQLite.SQLiteCommand("SELECT COALESCE(SUM(StockQty * Cost), 0) FROM Products", invConn);
+        totalInvCost = Convert.ToDecimal(invCmd.ExecuteScalar());
+    }
+    catch { }
+
     var dc = new DailyClose 
     { 
         CloseDate = now.ToString("yyyy-MM-dd HH:mm:ss"), 
@@ -103,7 +115,10 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
         TotalEWallet = _totalEWallet, 
         TotalCredit = _totalCredit, 
         TotalVoided = _totalVoided, 
-        TotalExpenses = _totalExpenses, 
+        TotalExpenses = _totalExpenses,
+        TotalInventoryCost = totalInvCost,
+        TotalCostSold = _totalCostSold,
+        TotalStockReceivedCost = _totalStockReceivedCost,
         OpeningCash = _openingBalance,
         UserId = _currentUser.Id, 
         UserName = cashierName, 
@@ -126,34 +141,40 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
         return; 
     }
     
-    MessageBox.Show("Shift ended successfully. Your count has been recorded.", "Shift Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
     ShiftSessionService.EndSession();
 
+    var printErrorMsg = "";
+    var prevInv = DailyCloseService.GetLastInventoryCost();
     try
     {
         PrinterService.PrintAuditEndShiftReport(cashOnHand, diff, cashierName, now, txtNotes.Text.Trim(), _totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, expenses, gcashTxns, creditCustomers, creditPayments,
-            (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value);
+            (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value,
+            totalInvCost, _totalCostSold, _totalStockReceivedCost, prevInv);
     }
     catch (Exception printEx)
     {
-        MessageBox.Show($"Close saved, but print failed: {printEx.Message}", "Print Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        printErrorMsg = $"\n\nPrint error: {printEx.Message}";
     }
 
+    var emailErrorMsg = "";
     try
     {
         var emailSvc = new EmailService();
         if (emailSvc.IsConfigured)
         {
-            var emailError = emailSvc.SendEndShiftReport(_totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, cashOnHand, diff, cashierName, _totalExpenses, expenses, gcashTxns, creditCustomers, creditPayments,
-                (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value);
-            if (emailError != null) MessageBox.Show($"Auto-email failed: {emailError}", "Email Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            var ee = emailSvc.SendEndShiftReport(_totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, cashOnHand, diff, cashierName, _totalExpenses, expenses, gcashTxns, creditCustomers, creditPayments,
+                (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value,
+                totalInvCost, _totalCostSold, _totalStockReceivedCost, prevInv);
+            if (ee != null) emailErrorMsg = $"\n\nEmail error: {ee}";
         }
     }
     catch (Exception emailEx)
     {
-        MessageBox.Show($"Auto-email failed: {emailEx.Message}", "Email Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        emailErrorMsg = $"\n\nEmail error: {emailEx.Message}";
     }
+
+    var finalMsg = "Shift ended successfully. Your count has been recorded." + printErrorMsg + emailErrorMsg;
+    MessageBox.Show(finalMsg, "Shift Complete", MessageBoxButtons.OK, emailErrorMsg != "" ? MessageBoxIcon.Warning : MessageBoxIcon.Information);
 
     num1000.Value = num500.Value = num200.Value = num100.Value = num50.Value = num20.Value = 0;
     txtCoins.Value = 0;
@@ -176,7 +197,11 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
     var gcashTxns = DailyCloseService.GetGcashTransactionsSinceLastClose();
     var creditCustomers = DailyCloseService.GetCreditCustomersSinceLastClose();
     var creditPayments = DailyCloseService.GetCreditPaymentsSinceLastClose();
-        PrinterService.PrintAuditEndShiftReport(cashOnHand, diff, cashierName, TimeHelper.Now, txtNotes.Text.Trim(), _totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, expenses, gcashTxns, creditCustomers, creditPayments, (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value);
+    var totalInvCost = 0m;
+    try { using var invConn = DatabaseHelper.GetConnection(); invConn.Open(); using var invCmd = new System.Data.SQLite.SQLiteCommand("SELECT COALESCE(SUM(StockQty * Cost), 0) FROM Products", invConn); totalInvCost = Convert.ToDecimal(invCmd.ExecuteScalar()); } catch { }
+        PrinterService.PrintAuditEndShiftReport(cashOnHand, diff, cashierName, TimeHelper.Now, txtNotes.Text.Trim(), _totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, expenses, gcashTxns, creditCustomers, creditPayments,
+            (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value,
+            totalInvCost, _totalCostSold, _totalStockReceivedCost, DailyCloseService.GetLastInventoryCost());
 }
 
 private void btnEmail_Click(object? sender, EventArgs e)
@@ -192,6 +217,8 @@ private void btnEmail_Click(object? sender, EventArgs e)
     var gcashTxns = DailyCloseService.GetGcashTransactionsSinceLastClose();
     var creditCustomers = DailyCloseService.GetCreditCustomersSinceLastClose();
     var creditPayments = DailyCloseService.GetCreditPaymentsSinceLastClose();
+    var totalInvCost = 0m;
+    try { using var invConn = DatabaseHelper.GetConnection(); invConn.Open(); using var invCmd = new System.Data.SQLite.SQLiteCommand("SELECT COALESCE(SUM(StockQty * Cost), 0) FROM Products", invConn); totalInvCost = Convert.ToDecimal(invCmd.ExecuteScalar()); } catch { }
 
     var emailSvc = new EmailService();
     if (!emailSvc.IsConfigured) 
@@ -200,7 +227,9 @@ private void btnEmail_Click(object? sender, EventArgs e)
         return; 
     }
     
-        var error = emailSvc.SendEndShiftReport(_totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, cashOnHand, diff, cashierName, _totalExpenses, expenses, gcashTxns, creditCustomers, creditPayments, (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value);
+        var error = emailSvc.SendEndShiftReport(_totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, cashOnHand, diff, cashierName, _totalExpenses, expenses, gcashTxns, creditCustomers, creditPayments,
+            (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value,
+            totalInvCost, _totalCostSold, _totalStockReceivedCost, DailyCloseService.GetLastInventoryCost());
     if (error != null) 
     {
         MessageBox.Show($"Email error: {error}", "Email Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -248,7 +277,10 @@ private void btnEmail_Click(object? sender, EventArgs e)
             var creditPayments = DailyCloseService.GetCreditPaymentsBetween(since, closeDate);
             var expenses = ExpenseService.GetExpensesBetween(since, closeDate);
             var cashOnHand = dc.Denom1000 * 1000m + dc.Denom500 * 500m + dc.Denom200 * 200m + dc.Denom100 * 100m + dc.Denom50 * 50m + dc.Denom20 * 20m + dc.DenomCoins;
-            PrinterService.PrintAuditEndShiftReport(cashOnHand, dc.Difference, dc.UserName, closeDate, dc.Notes, dc.TotalSales, dc.TotalCash, dc.TotalEWallet, dc.TotalCredit, dc.TotalVoided, expenses, gcashTxns, creditCustomers, creditPayments, dc.Denom1000, dc.Denom500, dc.Denom200, dc.Denom100, dc.Denom50, dc.Denom20, dc.DenomCoins);
+            var prevInv2 = since != null ? DailyCloseService.GetLastInventoryCost() : 0m;
+            PrinterService.PrintAuditEndShiftReport(cashOnHand, dc.Difference, dc.UserName, closeDate, dc.Notes, dc.TotalSales, dc.TotalCash, dc.TotalEWallet, dc.TotalCredit, dc.TotalVoided, expenses, gcashTxns, creditCustomers, creditPayments,
+                dc.Denom1000, dc.Denom500, dc.Denom200, dc.Denom100, dc.Denom50, dc.Denom20, dc.DenomCoins,
+                dc.TotalInventoryCost, dc.TotalCostSold, dc.TotalStockReceivedCost, prevInv2);
         };
         var btnTrends = new Button { Text = "\uD83D\uDCCA TRENDS", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(170, 10), Size = new Size(100, 30), BackColor = t2.AccentGreen, ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
         btnTrends.Click += (_, __) =>

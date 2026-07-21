@@ -948,7 +948,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.0.8" });
+            return Ok(new { version = "1.0.9" });
     }
 
         [HttpGet("fix-hvr-times")]
@@ -1187,8 +1187,18 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             using var tx = conn.BeginTransaction();
             try
             {
+                var skipped = 0;
                 foreach (var p in products)
                 {
+                    // Skip duplicate barcodes
+                    if (!string.IsNullOrEmpty(p.Barcode))
+                    {
+                        using var chk = new NpgsqlCommand("SELECT id FROM master_products WHERE barcode = @b AND is_active = true", conn, tx);
+                        chk.Parameters.AddWithValue("b", p.Barcode);
+                        using var chr = chk.ExecuteReader();
+                        if (chr.Read()) { skipped++; continue; }
+                    }
+
                     using var cmd = new NpgsqlCommand(@"
                         INSERT INTO master_products (name, barcode, category, price, cost, stock_qty, image_data, updated_at)
                         VALUES (@name, @barcode, @cat, @price, @cost, @qty, @img, NOW()) RETURNING id", conn, tx);
@@ -1219,7 +1229,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     }
                 }
                 tx.Commit();
-                return Ok(new { success = true, count = products.Count });
+                return Ok(new { success = true, count = products.Count - skipped, skipped });
             }
             catch (Exception ex)
             {
@@ -1235,6 +1245,15 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             using var tx = conn.BeginTransaction();
             try
             {
+                // Check duplicate barcode
+                if (!string.IsNullOrEmpty(p.Barcode))
+                {
+                    using var chk = new NpgsqlCommand("SELECT id, name FROM master_products WHERE barcode = @b AND is_active = true", conn, tx);
+                    chk.Parameters.AddWithValue("b", p.Barcode);
+                    using var chr = chk.ExecuteReader();
+                    if (chr.Read()) return Conflict(new { error = $"Barcode '{p.Barcode}' already used by: {chr.GetString(1)}" });
+                }
+
                 using var cmd = new NpgsqlCommand(@"
                     INSERT INTO master_products (name, barcode, category, price, cost, stock_qty, image_data, points_exempt, points_per_unit, updated_at)
                     VALUES (@n, @b, @c, @p, @co, 0, @img, @pe, @ppu, NOW()) RETURNING id", conn, tx);
@@ -1278,6 +1297,16 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             using var tx = conn.BeginTransaction();
             try
             {
+                // Check duplicate barcode
+                if (!string.IsNullOrEmpty(p.Barcode))
+                {
+                    using var chk = new NpgsqlCommand("SELECT id, name FROM master_products WHERE barcode = @b AND is_active = true AND id != @id", conn, tx);
+                    chk.Parameters.AddWithValue("b", p.Barcode);
+                    chk.Parameters.AddWithValue("id", id);
+                    using var chr = chk.ExecuteReader();
+                    if (chr.Read()) return Conflict(new { error = $"Barcode '{p.Barcode}' already used by: {chr.GetString(1)}" });
+                }
+
                 using var cmd = new NpgsqlCommand(@"
                     UPDATE master_products SET name=@n, barcode=@b, category=@c, price=@p, cost=@co, image_data=@img, points_exempt=@pe, points_per_unit=@ppu, updated_at=NOW()
                     WHERE id=@id", conn, tx);
@@ -1408,6 +1437,42 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             cmd.Parameters.AddWithValue("id", id); cmd.Parameters.AddWithValue("n", p.Name); cmd.Parameters.AddWithValue("b", (object?)p.Barcode ?? DBNull.Value); cmd.Parameters.AddWithValue("c", p.Category ?? ""); cmd.Parameters.AddWithValue("bp", p.BoxPrice); cmd.Parameters.AddWithValue("bc", p.BoxCost); cmd.Parameters.AddWithValue("bq", p.BoxQty); cmd.Parameters.AddWithValue("pp", p.PiecePrice);
             cmd.ExecuteNonQuery();
             return Ok(new { success = true });
+        }
+
+        [HttpGet("warehouse/products/imported-ids")]
+        public IActionResult WhGetImportedIds()
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT master_product_id FROM wh_products WHERE master_product_id IS NOT NULL AND is_active = true";
+            var ids = new List<int>();
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) ids.Add(r.GetInt32(0));
+            return Ok(ids);
+        }
+
+        [HttpGet("warehouse/inventory-summary")]
+        public IActionResult WhInventorySummary()
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT
+                    COUNT(*)::bigint AS total_items,
+                    COALESCE(SUM(stock_qty), 0)::bigint AS total_stock_qty,
+                    COALESCE(SUM((box_cost / NULLIF(box_qty, 0)) * stock_qty), 0) AS total_cost,
+                    COALESCE(SUM(piece_price * stock_qty), 0) AS total_price,
+                    COUNT(*) FILTER (WHERE box_cost = 0 OR box_cost IS NULL)::bigint AS zero_cost_items
+                FROM wh_products WHERE is_active = true";
+            using var r = cmd.ExecuteReader();
+            if (r.Read()) return Ok(new {
+                totalItems = r.GetInt64(0),
+                totalStockQty = r.GetInt64(1),
+                totalCost = r.GetDecimal(2),
+                totalPrice = r.GetDecimal(3),
+                zeroCostItems = r.GetInt64(4)
+            });
+            return Ok(new { totalItems = 0L, totalStockQty = 0L, totalCost = 0m, totalPrice = 0m, zeroCostItems = 0L });
         }
 
         [HttpPut("warehouse/products/{id}/stock-move")]
@@ -2143,7 +2208,56 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         return Ok(list);
     }
 
-    [HttpGet("warehouse/stock-trails/backfill-all")]
+        [HttpGet("warehouse/inventory-activity")]
+        public IActionResult WhGetInventoryActivity(
+            [FromQuery] string? search = null,
+            [FromQuery] string? from = null,
+            [FromQuery] string? to = null)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+
+            var sql = "SELECT product_name, barcode, qty_change, reference, reference_type, created_at FROM wh_stock_trails WHERE 1=1";
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                sql += " AND (product_name ILIKE @q OR barcode ILIKE @q)";
+                cmd.Parameters.AddWithValue("q", $"%{search}%");
+            }
+
+            if (!string.IsNullOrEmpty(from) && DateTime.TryParse(from, out var fromDate))
+            {
+                sql += " AND created_at >= @from";
+                cmd.Parameters.AddWithValue("from", fromDate);
+            }
+
+            if (!string.IsNullOrEmpty(to) && DateTime.TryParse(to, out var toDate))
+            {
+                sql += " AND created_at <= @to";
+                cmd.Parameters.AddWithValue("to", toDate.Date.AddDays(1));
+            }
+
+            sql += " ORDER BY created_at DESC LIMIT 500";
+
+            cmd.CommandText = sql;
+            var list = new List<object>();
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+                list.Add(new
+                {
+                    productName = r.GetString(0),
+                    barcode = r.IsDBNull(1) ? "" : r.GetString(1),
+                    stockBefore = (int?)null,
+                    stockAfter = (int?)null,
+                    qtyChange = r.GetInt32(2),
+                    reference = r.IsDBNull(3) ? "" : r.GetString(3),
+                    referenceType = r.IsDBNull(4) ? "" : r.GetString(4),
+                    createdAt = r.GetDateTime(5)
+                });
+            return Ok(list);
+        }
+
+        [HttpGet("warehouse/stock-trails/backfill-all")]
     public IActionResult WhBackfillStockTrails()
     {
         using var conn = Data.PgDatabaseHelper.GetConnection();
@@ -2251,15 +2365,16 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             {
                 // Get product info + units
                 string productName = "", barcode = "";
-                int stockQty = 0;
+                int stockQty = 0, boxQty = 1;
                 using (var get = conn.CreateCommand()) { get.Transaction = tx;
-                    get.CommandText = "SELECT name, barcode, stock_qty FROM wh_products WHERE id = @pid";
+                    get.CommandText = "SELECT name, barcode, stock_qty, box_qty FROM wh_products WHERE id = @pid";
                     get.Parameters.AddWithValue("pid", item.ProductId);
                     using var r = get.ExecuteReader();
                     if (!r.Read()) return BadRequest(new { error = "Product not found: " + item.ProductId });
                     productName = r.GetString(0);
                     barcode = r.IsDBNull(1) ? "" : r.GetString(1);
                     stockQty = r.GetInt32(2);
+                    boxQty = r.IsDBNull(3) ? 1 : Math.Max(1, r.GetInt32(3));
                 }
 
                 // Find unit by index (0 = default piece)
@@ -2291,8 +2406,8 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     }
                     else
                     {
-                        // Fallback to piece_price
-                        unitPrice = 0;
+                        // Fallback: use wh_products.box_qty and piece_price
+                        qtyPerUnit = boxQty;
                         using var fp = conn.CreateCommand(); fp.Transaction = tx;
                         fp.CommandText = "SELECT piece_price FROM wh_products WHERE id = @pid";
                         fp.Parameters.AddWithValue("pid", item.ProductId);
@@ -2420,6 +2535,52 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             cmd.CommandText = "SELECT COUNT(*) FROM wh_transfers WHERE status = 'pending'";
             var count = Convert.ToInt32(cmd.ExecuteScalar());
             return Ok(new { pending = count });
+        }
+
+        [HttpGet("missing-shifts")]
+        public IActionResult GetMissingShifts()
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                WITH store_list AS (
+                    SELECT DISTINCT s.store_id, COALESCE(st.store_name, '') AS store_name
+                    FROM sales s
+                    LEFT JOIN stores st ON s.store_id = st.store_id
+                    WHERE s.store_id != ''
+                ),
+                today_closes AS (
+                    SELECT DISTINCT store_id FROM daily_closes WHERE close_date::date = CURRENT_DATE
+                ),
+                today_sales AS (
+                    SELECT store_id, COUNT(*) AS sale_count FROM sales
+                    WHERE is_voided = false AND sale_date::date = CURRENT_DATE AND store_id != ''
+                    GROUP BY store_id
+                )
+                SELECT sl.store_id, sl.store_name,
+                       COALESCE(ts.sale_count, 0) AS today_sale_count,
+                       CASE WHEN tc.store_id IS NOT NULL THEN true ELSE false END AS has_close
+                FROM store_list sl
+                LEFT JOIN today_closes tc ON sl.store_id = tc.store_id
+                LEFT JOIN today_sales ts ON sl.store_id = ts.store_id
+                ORDER BY sl.store_id";
+            var data = new List<object>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var storeId = reader.GetString(0);
+                var storeName = reader.GetString(1);
+                var saleCount = reader.GetInt32(2);
+                var hasClose = reader.GetBoolean(3);
+                data.Add(new {
+                    storeId,
+                    storeName,
+                    todaySaleCount = saleCount,
+                    hasClose,
+                    missing = !hasClose
+                });
+            }
+            return Ok(data);
         }
     }
 

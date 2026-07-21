@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Data.SQLite;
+using System.IO;
 using JumongPosV1._01.Data;
 using JumongPosV1._01.Helpers;
 using JumongPosV1._01.Models;
@@ -1164,6 +1165,48 @@ public partial class SalesForm : Form
         };
         btnPay.Click += btnPay_Click;
 
+        _pbQr = new PictureBox
+        {
+            SizeMode = PictureBoxSizeMode.Zoom,
+            BackColor = Color.Transparent,
+            Cursor = Cursors.Hand,
+            Visible = false
+        };
+
+        _lblQrHeader = new Label
+        {
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            ForeColor = ThemeManager.Current.AccentCyan,
+            TextAlign = ContentAlignment.MiddleCenter,
+            Visible = false
+        };
+        _btnQrPrev = new Button
+        {
+            Text = "\u25C0",
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            FlatStyle = FlatStyle.Flat,
+            FlatAppearance = { BorderSize = 0 },
+            BackColor = Color.FromArgb(30, 30, 50),
+            ForeColor = Color.FromArgb(0, 195, 255),
+            Cursor = Cursors.Hand,
+            Visible = false
+        };
+        _btnQrPrev.Click += (_, _) => { _qrIndex = (_qrIndex - 1 + _qrEntries.Count) % _qrEntries.Count; ShowQrIndex(); };
+        _btnQrNext = new Button
+        {
+            Text = "\u25B6",
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            FlatStyle = FlatStyle.Flat,
+            FlatAppearance = { BorderSize = 0 },
+            BackColor = Color.FromArgb(30, 30, 50),
+            ForeColor = Color.FromArgb(0, 195, 255),
+            Cursor = Cursors.Hand,
+            Visible = false
+        };
+        _btnQrNext.Click += (_, _) => { _qrIndex = (_qrIndex + 1) % _qrEntries.Count; ShowQrIndex(); };
+
+        LoadQrCodes();
+
         _pnlTotals.Controls.AddRange(new Control[]
         {
             lblTotalDueHint, lblGrandTotal, lblInvoiceHint,
@@ -1172,7 +1215,8 @@ public partial class SalesForm : Form
             lblDiscountLbl, lblDiscountVal,
             lblTaxLbl, lblTaxVal,
             sep2,
-            btnPay
+            btnPay,
+            _lblQrHeader, _btnQrPrev, _pbQr, _btnQrNext
         });
 
         KeyPreview = true;
@@ -1307,7 +1351,80 @@ public partial class SalesForm : Form
         rcs[8].Location = new Point(m, ry);        rcs[8].Size = new Size(pw / 2, 22);
         rcs[9].Location = new Point(m + pw / 2, ry); rcs[9].Size = new Size(pw / 2, 22); ry += 28;
         rcs[10].Location = new Point(m, ry);       rcs[10].Size = new Size(pw, 1); ry += 14;
-        btnPay.Location = new Point(m, ry);       btnPay.Size = new Size(pw, 52);
+        btnPay.Location = new Point(m, ry);       btnPay.Size = new Size(pw, 52); ry += 60;
+
+        if (_qrVisible)
+        {
+            var qrH = _pnlTotals.Height - ry - 12;
+            if (qrH > 100)
+            {
+                _lblQrHeader.Location = new Point(m, ry);
+                _lblQrHeader.Size = new Size(pw, 20);
+                _lblQrHeader.Visible = true;
+                ry += 24;
+
+                var navW = 28;
+                _btnQrPrev.Location = new Point(m, ry);
+                _btnQrPrev.Size = new Size(navW, qrH - 24);
+                _btnQrPrev.Visible = _qrEntries.Count > 1;
+
+                _pbQr.Location = new Point(m + navW, ry);
+                _pbQr.Size = new Size(pw - navW * 2, qrH - 24);
+                _pbQr.Visible = true;
+
+                _btnQrNext.Location = new Point(m + pw - navW, ry);
+                _btnQrNext.Size = new Size(navW, qrH - 24);
+                _btnQrNext.Visible = _qrEntries.Count > 1;
+            }
+        }
+    }
+
+    private void LoadQrCodes()
+    {
+        _qrEntries.Clear();
+        try
+        {
+            using var conn = DatabaseHelper.GetConnection();
+            conn.Open();
+            using var cmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'StoreQrCodes'", conn);
+            var json = cmd.ExecuteScalar()?.ToString();
+            if (!string.IsNullOrEmpty(json))
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                foreach (var e in doc.RootElement.EnumerateArray())
+                {
+                    var h = e.TryGetProperty("header", out var hp) ? hp.GetString() ?? "" : "";
+                    var f = e.TryGetProperty("file", out var fp) ? fp.GetString() ?? "" : "";
+                    if (!string.IsNullOrEmpty(h) || !string.IsNullOrEmpty(f))
+                        _qrEntries.Add((h, f));
+                }
+            }
+        }
+        catch { }
+        _qrIndex = 0;
+        _qrVisible = _qrEntries.Count > 0;
+        if (_qrVisible) ShowQrIndex();
+    }
+
+    private void ShowQrIndex()
+    {
+        if (_qrEntries.Count == 0) return;
+        var (header, file) = _qrEntries[_qrIndex];
+        _lblQrHeader.Text = header;
+        var qrPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", file);
+        try
+        {
+            if (File.Exists(qrPath))
+            {
+                if (_pbQr.Image != null) { _pbQr.Image.Dispose(); _pbQr.Image = null; }
+                _pbQr.Image = Image.FromFile(qrPath);
+            }
+            else
+            {
+                _pbQr.Image = null;
+            }
+        }
+        catch { _pbQr.Image = null; }
     }
 
     private void ResizeTopbar()
@@ -1361,4 +1478,11 @@ public partial class SalesForm : Form
     private Button btnHold = null!;
     private Button btnRetrieve = null!;
     private Button btnPay = null!;
+    private PictureBox _pbQr = null!;
+    private Label _lblQrHeader = null!;
+    private Button _btnQrPrev = null!;
+    private Button _btnQrNext = null!;
+    private List<(string header, string file)> _qrEntries = new();
+    private int _qrIndex;
+    private bool _qrVisible;
 }

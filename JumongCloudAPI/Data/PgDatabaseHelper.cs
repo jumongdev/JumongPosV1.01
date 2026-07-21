@@ -237,6 +237,15 @@ public static class PgDatabaseHelper
         mig2.CommandText = "ALTER TABLE sales ADD COLUMN IF NOT EXISTS cashier_name TEXT DEFAULT ''";
         mig2.ExecuteNonQuery();
 
+        // Migration: add inventory cost columns to daily_closes
+        using var invMig = conn.CreateCommand();
+        invMig.CommandText = "ALTER TABLE daily_closes ADD COLUMN IF NOT EXISTS total_inventory_cost NUMERIC NOT NULL DEFAULT 0";
+        invMig.ExecuteNonQuery();
+        invMig.CommandText = "ALTER TABLE daily_closes ADD COLUMN IF NOT EXISTS total_cost_sold NUMERIC NOT NULL DEFAULT 0";
+        invMig.ExecuteNonQuery();
+        invMig.CommandText = "ALTER TABLE daily_closes ADD COLUMN IF NOT EXISTS total_stock_received_cost NUMERIC NOT NULL DEFAULT 0";
+        invMig.ExecuteNonQuery();
+
         // Migration: backfill empty cashier_name from users table
         using var backfill = conn.CreateCommand();
         backfill.CommandText = @"
@@ -557,5 +566,24 @@ public static class PgDatabaseHelper
             CREATE INDEX IF NOT EXISTS idx_wh_walkin_sales_customer ON wh_walkin_sales(customer_id);
         ";
         try { wsMig.ExecuteNonQuery(); } catch { }
+
+        // Migration: UNIQUE index on barcode (partial — multiple NULL/empty allowed)
+        using var barcodeMig = conn.CreateCommand();
+        barcodeMig.CommandText = @"
+            -- First: nullify duplicate barcodes (keep first by id)
+            UPDATE master_products SET barcode = NULL
+            WHERE id NOT IN (
+                SELECT MIN(id) FROM master_products
+                WHERE barcode IS NOT NULL AND barcode != '' GROUP BY barcode
+            )
+            AND barcode IN (
+                SELECT barcode FROM master_products
+                WHERE barcode IS NOT NULL AND barcode != ''
+                GROUP BY barcode HAVING COUNT(*) > 1
+            );
+            -- Then: add unique partial index
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_master_products_barcode
+            ON master_products(barcode) WHERE barcode IS NOT NULL AND barcode != '';";
+        try { barcodeMig.ExecuteNonQuery(); } catch { }
     }
 }

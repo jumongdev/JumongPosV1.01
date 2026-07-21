@@ -19,7 +19,7 @@ public class EmailService
         _smtpHost = "smtp.gmail.com";
         _smtpPort = 587;
         _smtpUser = "admin@jumongdev.com";
-        _smtpPass = "swgtjgflwszvtssi";
+        _smtpPass = "muni fyee ooph iqnq";
         _recipient = "admin@jumongdev.com";
         try
         {
@@ -54,7 +54,8 @@ public class EmailService
         List<(string InvoiceNo, string SaleDate, decimal Amount, string ReferenceNo)> gcashTxns,
         List<(string Name, decimal Amount)> creditCustomers,
         List<(string CustomerName, string PaymentMethod, decimal Amount, string Timestamp)> creditPayments,
-        int denom1000, int denom500, int denom200, int denom100, int denom50, int denom20, decimal denomCoins)
+        int denom1000, int denom500, int denom200, int denom100, int denom50, int denom20, decimal denomCoins,
+        decimal totalInventoryCost = 0, decimal totalCostSold = 0, decimal totalStockReceivedCost = 0, decimal previousInventory = 0)
     {
         if (!IsConfigured) return "Email not configured. Set SMTP settings first.";
 
@@ -164,13 +165,27 @@ tr:nth-child(even) td {{ background: #F8F8FC; }}
 
 <div class=""section"">
 <h2>Debt Collections (Paid Credit)</h2>
-{(creditPayments.Count > 0 ? $@"
+        {(creditPayments.Count > 0 ? $@"
 <table>
 <tr><th>Customer</th><th>Payment Type</th><th>Time</th><th>Amount Collected</th></tr>
 {string.Join("\n", creditPayments.Select(p => $"<tr><td>{p.CustomerName}</td><td>{p.PaymentMethod}</td><td>{p.Timestamp[10..]}</td><td>Php {p.Amount:N2}</td></tr>"))}
 <tr class=""total-row""><td colspan=""3"">Total Collected</td><td>Php {creditPayments.Sum(p => p.Amount):N2}</td></tr>
 </table>" : "<p style='color:#8C8CAA'>No debt collections this shift.</p>")}
 </div>
+
+{(previousInventory > 0 || totalCostSold > 0 || totalStockReceivedCost > 0 || totalInventoryCost > 0 ? $@"
+<div class=""section"">
+<h2>Inventory Reconciliation</h2>
+<table>
+<tr><th>Description</th><th style=""text-align:right"">Amount</th></tr>
+<tr><td>Previous Inventory</td><td style=""text-align:right"">Php {previousInventory:N2}</td></tr>
+{(totalStockReceivedCost > 0 ? $"<tr><td>+ Stock Received Today</td><td style='text-align:right'>Php {totalStockReceivedCost:N2}</td></tr>" : "")}
+<tr><td>- Cost of Goods Sold Today</td><td style=""text-align:right"">(Php {totalCostSold:N2})</td></tr>
+<tr class=""total-row""><td>Expected Inventory</td><td style=""text-align:right"">Php {(previousInventory + totalStockReceivedCost - totalCostSold):N2}</td></tr>
+<tr class=""total-row""><td>Actual Inventory</td><td style=""text-align:right"">Php {totalInventoryCost:N2}</td></tr>
+<tr class=""total-row""><td>Variance</td><td style=""text-align:right; color:{(previousInventory + totalStockReceivedCost - totalCostSold == totalInventoryCost ? "#27AE60" : "#E74C3C")}"">{(previousInventory + totalStockReceivedCost - totalCostSold == totalInventoryCost ? "✔" : "⚠")} Php {Math.Abs(totalInventoryCost - (previousInventory + totalStockReceivedCost - totalCostSold)):N2} {(previousInventory + totalStockReceivedCost - totalCostSold == totalInventoryCost ? "Balanced" : totalInventoryCost > previousInventory + totalStockReceivedCost - totalCostSold ? "OVER" : "SHORT")}</td></tr>
+</table>
+</div>" : "")}
 
 <div class=""footer"">
 <p>— End of Report —</p>

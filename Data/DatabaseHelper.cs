@@ -368,6 +368,18 @@ public class DatabaseHelper
             alter.ExecuteNonQuery();
         }
 
+        // Migrate: add TotalInventoryCost to DailyClose
+        using var checkDcInvCost = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('DailyClose') WHERE name = 'TotalInventoryCost'", conn);
+        if (Convert.ToInt32(checkDcInvCost.ExecuteScalar()) == 0)
+        {
+            using var alter = new SQLiteCommand("ALTER TABLE DailyClose ADD COLUMN TotalInventoryCost REAL NOT NULL DEFAULT 0", conn);
+            alter.ExecuteNonQuery();
+            alter.CommandText = "ALTER TABLE DailyClose ADD COLUMN TotalCostSold REAL NOT NULL DEFAULT 0";
+            alter.ExecuteNonQuery();
+            alter.CommandText = "ALTER TABLE DailyClose ADD COLUMN TotalStockReceivedCost REAL NOT NULL DEFAULT 0";
+            alter.ExecuteNonQuery();
+        }
+
         // AuditLog table
         var auditLogTable = "CREATE TABLE IF NOT EXISTS AuditLog (" +
             "Id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -552,7 +564,8 @@ public class DatabaseHelper
         using var seedMissing = new SQLiteCommand(
             "INSERT OR IGNORE INTO Settings (Key, Value) VALUES " +
             "('SmtpHost', ''), ('SmtpPort', '587'), ('SmtpUser', ''), ('SmtpPass', ''), ('SmtpTo', ''), " +
-            "('AppTimezone', '480'), ('LastMasterSync', ''), ('AppTheme', 'Dark'), ('PointsRate', '200')",
+            "('AppTimezone', '480'), ('LastMasterSync', ''), ('AppTheme', 'Dark'), ('PointsRate', '200'), " +
+            "('StoreQrCodes', '[{\"header\":\"GCash\",\"file\":\"gcash_qr.png\"}]')",
             conn);
         seedMissing.ExecuteNonQuery();
 

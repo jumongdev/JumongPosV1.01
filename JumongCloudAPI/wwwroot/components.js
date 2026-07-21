@@ -14,6 +14,7 @@ document.addEventListener('alpine:init', () => {
 Alpine.store('app', {
     section: 'dashboard',
     whSubpage: 'product',
+    stockSubpage: 'receiving',
     storeId: '',
     range: 'today',
     customFrom: '',
@@ -72,19 +73,29 @@ Alpine.store('app', {
         dispatchEvent(new CustomEvent('load-warehouse'));
         return;
       }
+      if (section.startsWith('st-')) {
+        this.section = 'stock';
+        this.stockSubpage = section.replace('st-', '');
+        dispatchEvent(new CustomEvent('load-stock'));
+        return;
+      }
       this.section = section;
       if (section === 'customers') dispatchEvent(new CustomEvent('load-customers'));
       if (section === 'users') dispatchEvent(new CustomEvent('load-users'));
       if (section === 'warehouse') { this.whSubpage = 'product'; dispatchEvent(new CustomEvent('load-warehouse')); }
       if (section === 'products') dispatchEvent(new CustomEvent('load-products'));
-      if (section === 'available') { dispatchEvent(new CustomEvent('load-stock')); dispatchEvent(new CustomEvent('load-receiving')) }
+      if (section === 'stock') { this.stockSubpage = 'receiving'; dispatchEvent(new CustomEvent('load-stock')); }
       if (section === 'analytics') dispatchEvent(new CustomEvent('load-analytics'));
     },
     switchWhSubpage(subpage) {
       this.whSubpage = subpage;
     },
+    switchStockSubpage(subpage) {
+      this.stockSubpage = subpage;
+    },
     isActive(id) {
       if (id.startsWith('wh-')) return this.section === 'warehouse' && this.whSubpage === id.replace('wh-', '');
+      if (id.startsWith('st-')) return this.section === 'stock' && this.stockSubpage === id.replace('st-', '');
       return this.section === id;
     },
     setStore(val) { this.storeId = val; this.refreshAll() },
@@ -311,7 +322,7 @@ Alpine.store('app', {
   /* ΓöÇΓöÇ Stock Status ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('stockStatus', () => ({
     d: [], loading: false, search: '', catFilter: '', page: 0,
-    async init() { await this.load(); window.addEventListener('refresh-data', () => this.load()) },
+    async init() { await this.load(); window.addEventListener('refresh-data', () => this.load()); window.addEventListener('load-stock', () => this.load()) },
     async load() {
       this.loading = true;
       try {
@@ -340,7 +351,7 @@ Alpine.store('app', {
   /* ΓöÇΓöÇ Stock Receiving ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('receivingPanel', () => ({
     d: [], loading: false, limit: 100,
-    async init() { await this.load(); window.addEventListener('refresh-data', () => this.load()) },
+    async init() { await this.load(); window.addEventListener('refresh-data', () => this.load()); window.addEventListener('load-stock', () => this.load()) },
     async load() {
       this.loading = true;
       try {
@@ -421,16 +432,14 @@ Alpine.store('app', {
       };
       try {
         const api = API + '/products/master';
-        if (this.productId) {
-          const r = await fetch(api + '/' + this.productId, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-          if (!r.ok) throw new Error('Failed'); toast('Product updated', 'success');
-        } else {
-          const r = await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-          if (!r.ok) throw new Error('Failed'); toast('Product created', 'success');
-        }
+        const r = this.productId
+          ? await fetch(api + '/' + this.productId, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+          : await fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+        if (!r.ok) { const j = await r.json(); throw new Error(j.error || 'Failed') }
+        toast(this.productId ? 'Product updated' : 'Product created', 'success');
         this.reset();
         dispatchEvent(new CustomEvent('load-products'));
-      } catch (e) { toast('Save failed: ' + e.message, 'error') }
+      } catch (e) { toast(e.message, 'error') }
     },
     previewImage(e) {
       const file = e.target.files[0]; if (!file) return;
@@ -444,17 +453,38 @@ Alpine.store('app', {
   Alpine.data('warehousePanel', () => ({
     products: [], clientsData: [], orders: [], transfers: [], loading: true, catFilter: '', search: '',
     salesData: [], saleFrom: '', saleTo: '', saleViewOpen: false, saleViewItems: [],
+    invActivity: [], invSearch: '', invFrom: '', invTo: '', invExpanded: true, invActivityLoading: false,
+    inventorySummary: null,
     async init() { window.addEventListener('load-warehouse', () => this.load()); await this.load(); this.startPoll() },
     async load() {
       this.loading = true;
       try {
         const sp = Alpine.store('app').whSubpage;
-        if (sp === 'product' || sp === 'inventory') this.products = await fetchJSON(API + '/warehouse/products');
+        if (sp === 'product' || sp === 'inventory') { this.products = await fetchJSON(API + '/warehouse/products'); if (sp === 'inventory') await this.loadInvActivity() }
         else if (sp === 'onlineorder') { this.clientsData = await fetchJSON(API + '/warehouse/clients'); this.orders = await fetchJSON(API + '/warehouse/orders') }
         else if (sp === 'transfer') this.transfers = await fetchJSON(API + '/warehouse/transfers');
         else if (sp === 'sales') await this.loadSales();
+        if (sp === 'inventory') await this.loadInventorySummary();
       } catch (e) { this.products = []; this.clientsData = []; this.orders = []; this.transfers = [] }
       this.loading = false;
+    },
+    async loadInvActivity() {
+      this.invActivityLoading = true;
+      try {
+        const p = [];
+        if (this.invSearch) p.push('search=' + encodeURIComponent(this.invSearch));
+        const qs = p.length ? '?' + p.join('&') : '';
+        this.invActivity = await fetchJSON(API + '/warehouse/inventory-activity' + qs);
+      } catch (e) { this.invActivity = [] }
+      this.invActivityLoading = false;
+    },
+    async loadInventorySummary() {
+      try { this.inventorySummary = await fetchJSON(API + '/warehouse/inventory-summary') }
+      catch (e) { this.inventorySummary = null }
+    },
+    formatType(t) {
+      const map = { manual_receive: 'Receive', manual_return: 'Return', manual_set: 'Manual Set', transfer_out: 'Transfer Out', shortage_return: 'Shortage Return', walkin_sale: 'Walk-in Sale' };
+      return map[t] || t.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     },
     get sp() { return Alpine.store('app').whSubpage },
     get categories() {
@@ -660,18 +690,23 @@ Alpine.store('app', {
     closeOrderView() { this.orderViewOpen = false; this.orderViewItems = [] },
     async importFromMaster() {
       try {
-        const mp = await fetchJSON(API + '/products/master');
+        const [mp, importedIds] = await Promise.all([
+          fetchJSON(API + '/products/master'),
+          fetchJSON(API + '/warehouse/products/imported-ids')
+        ]);
         this.masterImportList = mp;
+        this.importedMasterIds = importedIds || [];
         this.masterImportOpen = true;
       } catch (e) { toast('Error loading master products', 'error') }
     },
     masterImportOpen: false, masterImportList: [], masterSearch: '', importBoxQty: 1,
+    importedMasterIds: [],
     closeImport() { this.masterImportOpen = false; this.masterSearch = '' },
     async doImport(mid) {
       try {
         const r = await fetch(API + '/warehouse/products/from-master/' + mid + '?boxQty=' + this.importBoxQty, { method: 'POST' });
         const j = await r.json();
-        if (j.id) { toast('Imported (ID: ' + j.id + ')', 'success'); this.masterImportOpen = false; this.load() }
+        if (j.id) { toast('Imported (ID: ' + j.id + ')', 'success'); this.importedMasterIds.push(mid); this.masterImportOpen = false; this.load() }
         else toast('Failed to import', 'error');
       } catch (e) { toast('Error: ' + e.message, 'error') }
     },
@@ -737,9 +772,10 @@ Alpine.store('app', {
     },
 
     get filteredMaster() {
-      if (!this.masterSearch) return this.masterImportList || [];
+      const list = (this.masterImportList || []).filter(x => !this.importedMasterIds.includes(x.id));
+      if (!this.masterSearch) return list;
       const q = this.masterSearch.toLowerCase();
-      return this.masterImportList.filter(x => (x.name || '').toLowerCase().includes(q) || (x.barcode || '').toLowerCase().includes(q) || (x.category || '').toLowerCase().includes(q));
+      return list.filter(x => (x.name || '').toLowerCase().includes(q) || (x.barcode || '').toLowerCase().includes(q) || (x.category || '').toLowerCase().includes(q));
     },
     badgeCount: 0,
     async updateBadge() {
@@ -894,6 +930,22 @@ Alpine.store('app', {
       } catch (e) { toast('Failed to save: ' + e.message, 'error') }
       this.saving = false;
     }
+  }));
+
+  /* ΓöÇΓöÇ Missing End Shifts ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
+  Alpine.data('missingShifts', () => ({
+    stores: [], loading: true,
+    async init() { await this.load(); window.addEventListener('refresh-data', () => this.load()) },
+    async load() {
+      this.loading = true;
+      try {
+        this.stores = await fetchJSON(API + '/missing-shifts');
+      } catch (e) { this.stores = [] }
+      this.loading = false;
+    },
+    get missing() { return this.stores.filter(x => x.missing) },
+    get missingWithSales() { return this.missing.filter(x => x.todaySaleCount > 0) },
+    get allGood() { return this.missing.length === 0 }
   }));
 
 });

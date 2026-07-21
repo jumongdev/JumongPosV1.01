@@ -226,10 +226,10 @@ public class SyncController : ControllerBase
     public IActionResult SyncDailyCloses([FromBody] List<JsonElement> items)
     {
         var sid = StoreId();
-        return SyncTable("daily_closes", items, new[] { "pos_id", "close_date", "total_sales", "total_cash", "total_ewallet", "total_credit", "total_voided", "cash_on_hand", "difference", "opening_cash", "total_expenses", "notes", "user_id", "user_name", "created_at" },
-            "INSERT INTO daily_closes (pos_id, store_id, close_date, total_sales, total_cash, total_ewallet, total_credit, total_voided, cash_on_hand, difference, opening_cash, total_expenses, notes, user_id, user_name, created_at, synced_at) " +
-            "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,@p12,@p13,@p14,NOW()) " +
-            "ON CONFLICT (store_id, pos_id) DO UPDATE SET close_date=@p1, total_sales=@p2, total_cash=@p3, total_ewallet=@p4, total_credit=@p5, total_voided=@p6, cash_on_hand=@p7, difference=@p8, opening_cash=@p9, total_expenses=@p10, notes=@p11, user_id=@p12, user_name=@p13, created_at=@p14, synced_at=NOW()", sid);
+        return SyncTable("daily_closes", items, new[] { "pos_id", "close_date", "total_sales", "total_cash", "total_ewallet", "total_credit", "total_voided", "cash_on_hand", "difference", "opening_cash", "total_expenses", "total_inventory_cost", "total_cost_sold", "total_stock_received_cost", "notes", "user_id", "user_name", "created_at" },
+            "INSERT INTO daily_closes (pos_id, store_id, close_date, total_sales, total_cash, total_ewallet, total_credit, total_voided, cash_on_hand, difference, opening_cash, total_expenses, total_inventory_cost, total_cost_sold, total_stock_received_cost, notes, user_id, user_name, created_at, synced_at) " +
+            "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,@p12,@p13,@p14,@p15,@p16,@p17,NOW()) " +
+            "ON CONFLICT (store_id, pos_id) DO UPDATE SET close_date=@p1, total_sales=@p2, total_cash=@p3, total_ewallet=@p4, total_credit=@p5, total_voided=@p6, cash_on_hand=@p7, difference=@p8, opening_cash=@p9, total_expenses=@p10, total_inventory_cost=@p11, total_cost_sold=@p12, total_stock_received_cost=@p13, notes=@p14, user_id=@p15, user_name=@p16, created_at=@p17, synced_at=NOW()", sid);
     }
 
     [HttpPost("expenses")]
