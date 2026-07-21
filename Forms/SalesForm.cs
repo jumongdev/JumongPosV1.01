@@ -1172,6 +1172,24 @@ public partial class SalesForm : Form
             Cursor = Cursors.Hand,
             Visible = false
         };
+        var qrTip = new ToolTip();
+        qrTip.SetToolTip(_pbQr, "Click to enlarge");
+        _pbQr.Click += (_, _) =>
+        {
+            if (_pbQr.Image == null) return;
+            using var f = new Form
+            {
+                Text = _lblQrHeader.Text,
+                WindowState = FormWindowState.Maximized,
+                FormBorderStyle = FormBorderStyle.Sizable,
+                StartPosition = FormStartPosition.CenterScreen,
+                BackColor = Color.Black
+            };
+            var pb = new PictureBox { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, Image = (Image)_pbQr.Image.Clone() };
+            f.Controls.Add(pb);
+            f.ShowDialog();
+            pb.Image?.Dispose();
+        };
 
         _lblQrHeader = new Label
         {
@@ -1356,14 +1374,14 @@ public partial class SalesForm : Form
         if (_qrVisible)
         {
             var qrH = _pnlTotals.Height - ry - 12;
-            if (qrH > 100)
+            if (qrH > 120)
             {
                 _lblQrHeader.Location = new Point(m, ry);
                 _lblQrHeader.Size = new Size(pw, 20);
                 _lblQrHeader.Visible = true;
                 ry += 24;
 
-                var navW = 28;
+                var navW = 22;
                 _btnQrPrev.Location = new Point(m, ry);
                 _btnQrPrev.Size = new Size(navW, qrH - 24);
                 _btnQrPrev.Visible = _qrEntries.Count > 1;

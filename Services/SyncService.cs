@@ -911,7 +911,7 @@ public static class SyncService
                 if (existingId != null)
                 {
                     using var upd = new SQLiteCommand("UPDATE Customers SET Phone=@p, Email=@e, LoyaltyPoints=@pts, IsActive=1, CreditBalance=@cb, Address=@a WHERE Id=@id", conn);
-                    upd.Parameters.AddWithValue("id", (int)existingId);
+                    upd.Parameters.AddWithValue("id", Convert.ToInt32(existingId));
                     upd.Parameters.AddWithValue("p", phone);
                     upd.Parameters.AddWithValue("e", email);
                     upd.Parameters.AddWithValue("pts", points);
@@ -929,7 +929,7 @@ public static class SyncService
                     if (phoneId != null)
                     {
                         using var upd = new SQLiteCommand("UPDATE Customers SET Name=@n, Email=@e, LoyaltyPoints=@pts, IsActive=1, CreditBalance=@cb, Address=@a WHERE Id=@id", conn);
-                        upd.Parameters.AddWithValue("id", (int)phoneId);
+                        upd.Parameters.AddWithValue("id", Convert.ToInt32(phoneId));
                         upd.Parameters.AddWithValue("n", name);
                         upd.Parameters.AddWithValue("e", email);
                         upd.Parameters.AddWithValue("pts", points);
