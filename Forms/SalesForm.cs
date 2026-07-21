@@ -1450,12 +1450,16 @@ public partial class SalesForm : Form
 
     private async Task FetchCloudPromoAsync()
     {
-        var cloudMsg = await SyncService.FetchPromoMessageAsync();
-        if (!string.IsNullOrEmpty(cloudMsg) && cloudMsg != _promoText)
+        try
         {
-            _promoText = cloudMsg;
-            LayoutControls();
+            var cloudMsg = await SyncService.FetchPromoMessageAsync();
+            if (!string.IsNullOrEmpty(cloudMsg) && cloudMsg != _promoText)
+            {
+                _promoText = cloudMsg;
+                BeginInvoke(() => LayoutControls());
+            }
         }
+        catch (Exception ex) { ErrorLogger.Log("FetchCloudPromo", ex); }
     }
 
     private void ShowQrIndex()
