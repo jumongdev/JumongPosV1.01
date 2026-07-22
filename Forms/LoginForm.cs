@@ -206,6 +206,16 @@ public partial class LoginForm : Form
         };
         pnlHeader.Controls.Add(lblTitle);
 
+        pnlHeader.Controls.Add(new Label
+        {
+            Text = $"v{AppVersion.Current}",
+            Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(0, 195, 255),
+            Location = new Point(0, 58),
+            Size = new Size(380, 18),
+            TextAlign = ContentAlignment.MiddleCenter
+        });
+
         var lblUser = new Label
         {
             Text = "Username",
@@ -267,17 +277,7 @@ public partial class LoginForm : Form
         };
         btnLogin.Click += btnLogin_Click;
 
-        var lblVersion = new Label
-        {
-            Text = $"v{AppVersion.Current}",
-            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-            ForeColor = t.AccentCyan,
-            Location = new Point(0, 62),
-            Size = new Size(380, 20),
-            TextAlign = ContentAlignment.MiddleCenter
-        };
-
-        Controls.AddRange(new Control[] { pnlHeader, lblVersion, lblUser, txtUsername, lblPass, txtPassword, lblError, btnLogin });
+        Controls.AddRange(new Control[] { pnlHeader, lblUser, txtUsername, lblPass, txtPassword, lblError, btnLogin });
     }
 
     public void ApplyTheme()
