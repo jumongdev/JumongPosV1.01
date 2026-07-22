@@ -982,8 +982,9 @@ public static class SyncService
             using var doc = JsonDocument.Parse(json);
             return doc.RootElement.GetProperty("message").GetString() ?? "";
         }
-        catch
+        catch (Exception ex)
         {
+            ErrorLogger.Log("FetchPromoMessage", ex);
             using var conn = DatabaseHelper.GetConnection();
             conn.Open();
             using var cmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'PosPromoMessage'", conn);

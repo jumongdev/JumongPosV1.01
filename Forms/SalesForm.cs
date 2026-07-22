@@ -1455,7 +1455,7 @@ public partial class SalesForm : Form
         try
         {
             var cloudMsg = await SyncService.FetchPromoMessageAsync();
-            if (!string.IsNullOrEmpty(cloudMsg) && cloudMsg != _promoText)
+            if (!string.IsNullOrEmpty(cloudMsg))
             {
                 _promoText = cloudMsg;
                 BeginInvoke(() => LayoutControls());
