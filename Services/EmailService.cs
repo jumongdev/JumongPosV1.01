@@ -388,11 +388,6 @@ tr:nth-child(even) td {{ background: #F8F8FC; }}
         {
             if (!File.Exists(QueuePath)) return;
             var svc = new EmailService();
-            if (!svc.IsConfigured)
-            {
-                File.Delete(QueuePath);
-                return;
-            }
             var json = File.ReadAllText(QueuePath);
             var list = JsonSerializer.Deserialize<List<PendingEmail>>(json);
             if (list == null || list.Count == 0) return;
@@ -400,6 +395,8 @@ tr:nth-child(even) td {{ background: #F8F8FC; }}
             var cutoff = TimeHelper.Now.AddDays(-1);
             list = list.Where(e => e.QueuedAt >= cutoff).ToList();
             if (list.Count == 0) { File.Delete(QueuePath); return; }
+
+            if (!svc.IsConfigured) return;
 
             var sent = new List<int>();
             for (int i = 0; i < list.Count; i++)
