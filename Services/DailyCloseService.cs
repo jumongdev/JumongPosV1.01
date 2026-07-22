@@ -121,8 +121,8 @@ public class DailyCloseService
         var totalCostSold = Convert.ToDecimal(cogsCmd.ExecuteScalar());
 
         // Total Stock Received cost (today)
-        var recvSql = "SELECT COALESCE(SUM(st.Cost * st.QuantityAdded), 0) FROM StockTrail st " +
-                      "WHERE st.Type = 'Stock Receiving'";
+        var recvSql = "SELECT COALESCE(SUM(p.Cost * st.QuantityAdded), 0) FROM StockTrail st " +
+                      "LEFT JOIN Products p ON st.ProductId = p.Id WHERE st.Type = 'Stock Receiving'";
         if (!string.IsNullOrEmpty(since))
             recvSql += " AND st.CreatedAt > @since_recv";
         using var recvCmd = new SQLiteCommand(recvSql, conn);
