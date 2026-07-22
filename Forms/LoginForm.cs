@@ -267,7 +267,17 @@ public partial class LoginForm : Form
         };
         btnLogin.Click += btnLogin_Click;
 
-        Controls.AddRange(new Control[] { pnlHeader, lblUser, txtUsername, lblPass, txtPassword, lblError, btnLogin });
+        var lblVersion = new Label
+        {
+            Text = $"v{AppVersion.Current}",
+            Font = new Font("Segoe UI", 8F),
+            ForeColor = t.TextMuted,
+            Location = new Point(0, ClientSize.Height - 25),
+            Size = new Size(ClientSize.Width, 20),
+            TextAlign = ContentAlignment.MiddleCenter
+        };
+
+        Controls.AddRange(new Control[] { pnlHeader, lblUser, txtUsername, lblPass, txtPassword, lblError, btnLogin, lblVersion });
     }
 
     public void ApplyTheme()
