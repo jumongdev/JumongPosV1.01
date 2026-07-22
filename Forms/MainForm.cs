@@ -418,11 +418,11 @@ public partial class MainForm : Form
 
         var title = new Label
         {
-            Text = "JUMONG POS",
+            Text = $"JUMONG POS    v{AppVersion.Current}",
             Font = new Font("Segoe UI", 22F, FontStyle.Bold),
             ForeColor = t.SidebarTitleAccent,
             Location = new Point(30, 20),
-            Size = new Size(280, 40),
+            Size = new Size(600, 40),
             TextAlign = ContentAlignment.MiddleLeft
         };
 
