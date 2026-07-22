@@ -409,22 +409,22 @@ public partial class MainForm : Form
             BackColor = t.SidebarDivider
         };
 
-        btnPOS = CreateMenuButton("POS / Sales", 0, 120, btnPOS_Click, cardBg, textColor, hoverBg);
-        btnProducts = CreateMenuButton("Products", 0, 175, btnProducts_Click, cardBg, textColor, hoverBg);
-        btnCustomers = CreateMenuButton("Customers", 0, 230, btnCustomers_Click, cardBg, textColor, hoverBg);
-        btnReports = CreateMenuButton("Reports", 0, 285, btnReports_Click, cardBg, textColor, hoverBg);
-        btnCredit = CreateMenuButton("Credit Management", 0, 340, btnCredit_Click, cardBg, textColor, hoverBg);
-        btnInventory = CreateMenuButton("Inventory", 0, 395, btnInventory_Click, cardBg, textColor, hoverBg);
-        btnWhSell = CreateMenuButton("Wholesale", 0, 430, btnWhSell_Click, cardBg, textColor, hoverBg);
+        btnPOS = CreateMenuButton("\uD83D\uDCC5 POS / Sales", 0, 120, btnPOS_Click, cardBg, textColor, hoverBg);
+        btnProducts = CreateMenuButton("\uD83D\uDCE6 Products", 0, 175, btnProducts_Click, cardBg, textColor, hoverBg);
+        btnCustomers = CreateMenuButton("\uD83D\uDC65 Customers", 0, 230, btnCustomers_Click, cardBg, textColor, hoverBg);
+        btnReports = CreateMenuButton("\uD83D\uDCCA Reports", 0, 285, btnReports_Click, cardBg, textColor, hoverBg);
+        btnCredit = CreateMenuButton("\uD83D\uDCB3 Credit Management", 0, 340, btnCredit_Click, cardBg, textColor, hoverBg);
+        btnInventory = CreateMenuButton("\uD83D\uDCE6 Inventory", 0, 395, btnInventory_Click, cardBg, textColor, hoverBg);
+        btnWhSell = CreateMenuButton("\uD83C\uDFEA Wholesale", 0, 430, btnWhSell_Click, cardBg, textColor, hoverBg);
         btnWhSell.Visible = false;
-        btnInventoryCount = CreateMenuButton("Inventory Count", 0, 450, btnInventoryCount_Click, cardBg, textColor, hoverBg);
-        btnOnlineOrders = CreateMenuButton("Incoming Stock", 0, 505, btnOnlineOrders_Click, cardBg, textColor, hoverBg);
-        btnExpenses = CreateMenuButton("Expenses", 0, 560, btnExpenses_Click, cardBg, textColor, hoverBg);
-        btnUsers = CreateMenuButton("User Management", 0, 615, btnUsers_Click, cardBg, textColor, hoverBg);
+        btnInventoryCount = CreateMenuButton("\uD83D\uDCCA Inventory Count", 0, 450, btnInventoryCount_Click, cardBg, textColor, hoverBg);
+        btnOnlineOrders = CreateMenuButton("\uD83D\uDCE6 Incoming Stock", 0, 505, btnOnlineOrders_Click, cardBg, textColor, hoverBg);
+        btnExpenses = CreateMenuButton("\uD83D\uDCB8 Expenses", 0, 560, btnExpenses_Click, cardBg, textColor, hoverBg);
+        btnUsers = CreateMenuButton("\uD83D\uDC64 User Management", 0, 615, btnUsers_Click, cardBg, textColor, hoverBg);
         btnUsers.Visible = _currentUser.Role == "Admin";
-        btnEndShift = CreateMenuButton("End Shift", 0, 670, btnEndShift_Click, cardBg, textColor, hoverBg);
-        btnSettings = CreateMenuButton("Settings", 0, 725, btnSettings_Click, cardBg, textColor, hoverBg);
-        btnLogout = CreateMenuButton("Logout", 0, 780, btnLogout_Click, t.SidebarLogoutBg, t.SidebarLogoutFg, t.SidebarLogoutHover);
+        btnEndShift = CreateMenuButton("\uD83D\uDD14 End Shift", 0, 670, btnEndShift_Click, cardBg, textColor, hoverBg);
+        btnSettings = CreateMenuButton("\u2699\uFE0F Settings", 0, 725, btnSettings_Click, cardBg, textColor, hoverBg);
+        btnLogout = CreateMenuButton("\uD83D\uDEAA Logout", 0, 780, btnLogout_Click, t.SidebarLogoutBg, t.SidebarLogoutFg, t.SidebarLogoutHover);
 
         _lblConnStatus = new Label
         {
@@ -489,19 +489,20 @@ public partial class MainForm : Form
     {
         var btn = new Button
         {
-            Text = "    " + text,
-            Location = new Point(60, y),
-            Size = new Size(400, 48),
+            Text = "  " + text,
+            Location = new Point(50, y),
+            Size = new Size(420, 48),
             Font = new Font("Segoe UI", 13F, FontStyle.Bold),
             FlatStyle = FlatStyle.Flat,
-            FlatAppearance = { BorderSize = 0, MouseOverBackColor = hoverBg },
+            FlatAppearance = { BorderSize = 1, MouseOverBackColor = hoverBg },
             BackColor = bg,
             ForeColor = fg,
             TextAlign = ContentAlignment.MiddleLeft,
             Cursor = Cursors.Hand,
-            Padding = new Padding(20, 0, 0, 0)
+            Padding = new Padding(16, 0, 0, 0),
+            TextImageRelation = TextImageRelation.ImageBeforeText
         };
-        btn.FlatAppearance.BorderColor = bg;
+        btn.FlatAppearance.BorderColor = Color.FromArgb(60, 60, 90);
         btn.Click += click;
         return btn;
     }
