@@ -44,22 +44,16 @@ public partial class MainForm : Form
             WindowState = FormWindowState.Maximized;
         }
 
-        btnOnlineOrders.Text = "    Incoming Stock";
-        LayoutMenuButtons();
-
         var storeId = SyncService.StoreId;
-        btnWhSell.Visible = storeId == "STORE-20260602-7159" || storeId == "STORE-DEV-0001";
-        LayoutMenuButtons();
+        foreach (Control c in Controls)
+            if (c is Panel card && card.Controls.Count > 0 && card.Controls[1] is Label lbl && lbl.Text == "Wholesale")
+                card.Visible = storeId == "STORE-20260602-7159" || storeId == "STORE-DEV-0001";
 
         StartEmailScheduler();
         StartSyncRetry();
         StartTransferPoll();
         DebugHelper.AddFormLabel(this);
-        Load += (_, _) =>
-        {
-            LayoutMenuButtons();
-            StartInventoryServer();
-        };
+        Load += (_, _) => StartInventoryServer();
     }
 
     private void StartSyncRetry()
@@ -97,10 +91,9 @@ public partial class MainForm : Form
                     icon.ShowBalloonTip(5000);
                 }
                 _lastTransferCount = count;
-                if (btnOnlineOrders != null)
-                    btnOnlineOrders.Text = count > 0
-                        ? $"    Incoming Stock ({count})"
-                        : "    Incoming Stock";
+                foreach (Control c in Controls)
+                    if (c is Panel card && card.Controls.Count >= 2 && card.Controls[1] is Label lbl && lbl.Text == "Incoming Stock")
+                        lbl.Text = count > 0 ? $"Incoming Stock ({count})" : "Incoming Stock";
             }
             catch (Exception ex) { ErrorLogger.Log("MainForm.StartTransferPoll", ex); }
         };
@@ -187,35 +180,28 @@ public partial class MainForm : Form
     public void ApplyTheme()
     {
         var t = ThemeManager.Current;
-        BackColor = t.SidebarBg;
-        ForeColor = Color.White;
-
-        foreach (var c in Controls)
+        BackColor = Color.FromArgb(15, 15, 35);
+        var topPanel = Controls[^1] as Panel;
+        if (topPanel != null)
         {
-            if (c is Label lbl)
+            topPanel.BackColor = t.SidebarBg;
+            foreach (Control cc in topPanel.Controls)
             {
-                if (lbl.Text == "JUMONG POS")
-                    lbl.ForeColor = t.SidebarTitleAccent;
-                else if (lbl.Text.StartsWith("Logged in as"))
-                    lbl.ForeColor = t.SidebarUserInfo;
+                if (cc is Label lbl)
+                {
+                    if (lbl.Text == "JUMONG POS")
+                        lbl.ForeColor = t.SidebarTitleAccent;
+                    else
+                        lbl.ForeColor = t.SidebarUserInfo;
+                }
             }
-            if (c is Panel p && p.Size.Height == 1 && p.Size.Width == 400)
-                p.BackColor = t.SidebarDivider;
         }
-
-        foreach (var btn in _menuButtons)
+        foreach (Control c in Controls)
         {
-            if (btn == btnLogout)
+            if (c is Panel card && card.Controls.Count >= 2)
             {
-                btn.BackColor = t.SidebarLogoutBg;
-                btn.ForeColor = t.SidebarLogoutFg;
-                btn.FlatAppearance.MouseOverBackColor = t.SidebarLogoutHover;
-            }
-            else
-            {
-                btn.BackColor = t.SidebarCardBg;
-                btn.ForeColor = t.SidebarFg;
-                btn.FlatAppearance.MouseOverBackColor = t.SidebarHoverBg;
+                card.BackColor = t.SidebarCardBg;
+                card.Invalidate();
             }
         }
     }
@@ -365,88 +351,157 @@ public partial class MainForm : Form
         Close();
     }
 
+    private Panel MakeCard(string icon, string label, EventHandler click)
+    {
+        var t = ThemeManager.Current;
+        var p = new Panel
+        {
+            Size = new Size(220, 160),
+            BackColor = t.SidebarCardBg,
+            Cursor = Cursors.Hand
+        };
+        p.Paint += (s, e) =>
+        {
+            using var pen = new Pen(Color.FromArgb(60, 60, 90), 1);
+            e.Graphics.DrawRectangle(pen, 0, 0, p.Width - 1, p.Height - 1);
+        };
+        var lblIcon = new Label
+        {
+            Text = icon,
+            Font = new Font("Segoe UI", 36F),
+            ForeColor = t.SidebarTitleAccent,
+            Location = new Point(0, 30),
+            Size = new Size(220, 60),
+            TextAlign = ContentAlignment.MiddleCenter,
+            BackColor = Color.Transparent
+        };
+        var lblText = new Label
+        {
+            Text = label,
+            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+            ForeColor = t.SidebarFg,
+            Location = new Point(0, 100),
+            Size = new Size(220, 40),
+            TextAlign = ContentAlignment.MiddleCenter,
+            BackColor = Color.Transparent
+        };
+        p.Controls.Add(lblIcon);
+        p.Controls.Add(lblText);
+        p.Click += click;
+        lblIcon.Click += click;
+        lblText.Click += click;
+        p.MouseEnter += (_, _) => p.BackColor = t.SidebarHoverBg;
+        p.MouseLeave += (_, _) => p.BackColor = t.SidebarCardBg;
+        return p;
+    }
+
     private void InitializeComponent()
     {
         var t = ThemeManager.Current;
         var darkBg = t.SidebarBg;
         var cardBg = t.SidebarCardBg;
-        var accent = t.AccentBlue;
         var textColor = t.SidebarFg;
-        var hoverBg = t.SidebarHoverBg;
 
-        BackColor = darkBg;
+        BackColor = Color.FromArgb(15, 15, 35);
         Text = $"Jumong POS v{AppVersion.Current}";
         StartPosition = FormStartPosition.CenterScreen;
         WindowState = FormWindowState.Maximized;
         ForeColor = textColor;
 
+        var topPanel = new Panel
+        {
+            Location = new Point(0, 0),
+            Size = new Size(ClientSize.Width, 110),
+            BackColor = darkBg,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+
         var title = new Label
         {
             Text = "JUMONG POS",
-            Font = new Font("Segoe UI", 24F, FontStyle.Bold),
+            Font = new Font("Segoe UI", 22F, FontStyle.Bold),
             ForeColor = t.SidebarTitleAccent,
-            Location = new Point(0, 25),
-            Size = new Size(520, 40),
-            TextAlign = ContentAlignment.MiddleCenter
+            Location = new Point(30, 20),
+            Size = new Size(280, 40),
+            TextAlign = ContentAlignment.MiddleLeft
         };
 
         var userInfo = new Label
         {
             Text = string.IsNullOrEmpty(_currentUser.FullName)
-                ? $"Logged in as: {_currentUser.Username}  ({_currentUser.Role})"
-                : $"Logged in as: {_currentUser.FullName}  ({_currentUser.Role})",
+                ? $"{_currentUser.Username}  ({_currentUser.Role})"
+                : $"{_currentUser.FullName}  ({_currentUser.Role})",
             Font = new Font("Segoe UI", 9F),
             ForeColor = t.SidebarUserInfo,
-            Location = new Point(0, 65),
-            Size = new Size(520, 20),
-            TextAlign = ContentAlignment.MiddleCenter
+            Location = new Point(30, 60),
+            Size = new Size(280, 20),
+            TextAlign = ContentAlignment.MiddleLeft
         };
-
-        var divider = new Panel
-        {
-            Location = new Point(60, 95),
-            Size = new Size(400, 1),
-            BackColor = t.SidebarDivider
-        };
-
-        btnPOS = CreateMenuButton("\uD83D\uDCC5 POS / Sales", 0, 120, btnPOS_Click, cardBg, textColor, hoverBg);
-        btnProducts = CreateMenuButton("\uD83D\uDCE6 Products", 0, 175, btnProducts_Click, cardBg, textColor, hoverBg);
-        btnCustomers = CreateMenuButton("\uD83D\uDC65 Customers", 0, 230, btnCustomers_Click, cardBg, textColor, hoverBg);
-        btnReports = CreateMenuButton("\uD83D\uDCCA Reports", 0, 285, btnReports_Click, cardBg, textColor, hoverBg);
-        btnCredit = CreateMenuButton("\uD83D\uDCB3 Credit Management", 0, 340, btnCredit_Click, cardBg, textColor, hoverBg);
-        btnInventory = CreateMenuButton("\uD83D\uDCE6 Inventory", 0, 395, btnInventory_Click, cardBg, textColor, hoverBg);
-        btnWhSell = CreateMenuButton("\uD83C\uDFEA Wholesale", 0, 430, btnWhSell_Click, cardBg, textColor, hoverBg);
-        btnWhSell.Visible = false;
-        btnInventoryCount = CreateMenuButton("\uD83D\uDCCA Inventory Count", 0, 450, btnInventoryCount_Click, cardBg, textColor, hoverBg);
-        btnOnlineOrders = CreateMenuButton("\uD83D\uDCE6 Incoming Stock", 0, 505, btnOnlineOrders_Click, cardBg, textColor, hoverBg);
-        btnExpenses = CreateMenuButton("\uD83D\uDCB8 Expenses", 0, 560, btnExpenses_Click, cardBg, textColor, hoverBg);
-        btnUsers = CreateMenuButton("\uD83D\uDC64 User Management", 0, 615, btnUsers_Click, cardBg, textColor, hoverBg);
-        btnUsers.Visible = _currentUser.Role == "Admin";
-        btnEndShift = CreateMenuButton("\uD83D\uDD14 End Shift", 0, 670, btnEndShift_Click, cardBg, textColor, hoverBg);
-        btnSettings = CreateMenuButton("\u2699\uFE0F Settings", 0, 725, btnSettings_Click, cardBg, textColor, hoverBg);
-        btnLogout = CreateMenuButton("\uD83D\uDEAA Logout", 0, 780, btnLogout_Click, t.SidebarLogoutBg, t.SidebarLogoutFg, t.SidebarLogoutHover);
 
         _lblConnStatus = new Label
         {
             Text = "Checking API...",
             Font = new Font("Segoe UI", 8F),
             ForeColor = t.SidebarUserInfo,
-            Location = new Point(60, 835),
-            Size = new Size(400, 20),
+            Location = new Point(30, 82),
+            Size = new Size(280, 18),
             TextAlign = ContentAlignment.MiddleLeft
         };
 
-        Controls.AddRange(new Control[] { title, userInfo, divider, btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnWhSell, btnInventoryCount, btnOnlineOrders, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout, _lblConnStatus });
+        var items = new (string icon, string label, EventHandler click, bool admin)[]
+        {
+            ("\uD83D\uDCC5", "POS / Sales", btnPOS_Click, false),
+            ("\uD83D\uDCE6", "Products", btnProducts_Click, false),
+            ("\uD83D\uDC65", "Customers", btnCustomers_Click, false),
+            ("\uD83D\uDCCA", "Reports", btnReports_Click, false),
+            ("\uD83D\uDCB3", "Credit", btnCredit_Click, false),
+            ("\uD83D\uDCE6", "Inventory", btnInventory_Click, false),
+            ("\uD83C\uDFEA", "Wholesale", btnWhSell_Click, false),
+            ("\uD83D\uDCCA", "Inventory Count", btnInventoryCount_Click, false),
+            ("\uD83D\uDCE6", "Incoming Stock", btnOnlineOrders_Click, false),
+            ("\uD83D\uDCB8", "Expenses", btnExpenses_Click, false),
+            ("\uD83D\uDC64", "Users", btnUsers_Click, true),
+            ("\uD83D\uDD14", "End Shift", btnEndShift_Click, false),
+            ("\u2699\uFE0F", "Settings", btnSettings_Click, false),
+            ("\uD83D\uDEAA", "Logout", btnLogout_Click, false),
+        };
 
-        _menuButtons = new Button[] { btnPOS, btnProducts, btnCustomers, btnReports, btnCredit, btnInventory, btnWhSell, btnInventoryCount, btnOnlineOrders, btnExpenses, btnUsers, btnEndShift, btnSettings, btnLogout };
-        LayoutMenuButtons();
+        var cardW = 220;
+        var cardH = 160;
+        var gapX = 20;
+        var gapY = 20;
+        var cols = 4;
+        var startX = 30;
+        var startY = 130;
+        var idx = 0;
+
+        foreach (var (icon, label, click, admin) in items)
+        {
+            if (admin && _currentUser.Role != "Admin") { idx++; continue; }
+            var col = idx % cols;
+            var row = idx / cols;
+            var card = MakeCard(icon, label, click);
+            card.Location = new Point(startX + col * (cardW + gapX), startY + row * (cardH + gapY));
+            if (label == "Wholesale") card.Visible = false;
+            Controls.Add(card);
+            idx++;
+        }
+
+        Controls.Add(topPanel);
+        topPanel.Controls.Add(title);
+        topPanel.Controls.Add(userInfo);
+        topPanel.Controls.Add(_lblConnStatus);
 
         _ = CheckApiConnectionAsync();
         _connTimer = new System.Windows.Forms.Timer { Interval = 10000 };
         _connTimer.Tick += async (_, _) => await CheckApiConnectionAsync();
         _connTimer.Start();
 
-        // Delay user sync to avoid slowing down app startup
+        Resize += (_, _) =>
+        {
+            topPanel.Width = ClientSize.Width;
+        };
+
         var syncTimer = new System.Windows.Forms.Timer { Interval = 8000 };
         syncTimer.Tick += async (_, _) =>
         {
@@ -469,56 +524,4 @@ public partial class MainForm : Form
         _lblConnStatus.ForeColor = ok ? _connGreen : _connRed;
     }
 
-    private void LayoutMenuButtons()
-    {
-        var y = 120;
-        var step = 55;
-        foreach (var btn in _menuButtons)
-        {
-            if (btn.Visible)
-            {
-                btn.Location = new Point(60, y);
-                y += step;
-            }
-        }
-    }
-
-    private Button[] _menuButtons = null!;
-
-    private Button CreateMenuButton(string text, int x, int y, EventHandler click, Color bg, Color fg, Color hoverBg)
-    {
-        var btn = new Button
-        {
-            Text = "  " + text,
-            Location = new Point(50, y),
-            Size = new Size(420, 48),
-            Font = new Font("Segoe UI", 13F, FontStyle.Bold),
-            FlatStyle = FlatStyle.Flat,
-            FlatAppearance = { BorderSize = 1, MouseOverBackColor = hoverBg },
-            BackColor = bg,
-            ForeColor = fg,
-            TextAlign = ContentAlignment.MiddleLeft,
-            Cursor = Cursors.Hand,
-            Padding = new Padding(16, 0, 0, 0),
-            TextImageRelation = TextImageRelation.ImageBeforeText
-        };
-        btn.FlatAppearance.BorderColor = Color.FromArgb(60, 60, 90);
-        btn.Click += click;
-        return btn;
-    }
-
-    private Button btnPOS = null!;
-    private Button btnProducts = null!;
-    private Button btnCustomers = null!;
-    private Button btnReports = null!;
-    private Button btnUsers = null!;
-    private Button btnCredit = null!;
-    private Button btnInventory = null!;
-    private Button btnWhSell = null!;
-    private Button btnOnlineOrders = null!;
-    private Button btnInventoryCount = null!;
-    private Button btnExpenses = null!;
-    private Button btnEndShift = null!;
-    private Button btnSettings = null!;
-    private Button btnLogout = null!;
 }
