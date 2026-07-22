@@ -112,7 +112,7 @@ public class DailyCloseService
         var totalExpenses = Convert.ToDecimal(expCmd.ExecuteScalar());
 
         // Total Cost of Goods Sold (non-voided items only)
-        var cogsSql = $@"SELECT COALESCE(SUM(si.UnitCost * si.Qty), 0)
+        var cogsSql = $@"SELECT COALESCE(SUM(si.UnitCost * si.Quantity), 0)
             FROM SaleItems si JOIN Sales s ON si.SaleId = s.Id
             WHERE si.IsVoided = 0 AND {cond}";
         using var cogsCmd = new SQLiteCommand(cogsSql, conn);
