@@ -270,14 +270,14 @@ public partial class LoginForm : Form
         var lblVersion = new Label
         {
             Text = $"v{AppVersion.Current}",
-            Font = new Font("Segoe UI", 8F),
-            ForeColor = t.TextMuted,
-            Location = new Point(0, ClientSize.Height - 25),
-            Size = new Size(ClientSize.Width, 20),
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            ForeColor = t.AccentCyan,
+            Location = new Point(0, 62),
+            Size = new Size(380, 20),
             TextAlign = ContentAlignment.MiddleCenter
         };
 
-        Controls.AddRange(new Control[] { pnlHeader, lblUser, txtUsername, lblPass, txtPassword, lblError, btnLogin, lblVersion });
+        Controls.AddRange(new Control[] { pnlHeader, lblVersion, lblUser, txtUsername, lblPass, txtPassword, lblError, btnLogin });
     }
 
     public void ApplyTheme()
