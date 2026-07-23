@@ -534,12 +534,13 @@ public static class SyncService
 
                 var ptsExempt = p.TryGetProperty("pointsExempt", out var pe) && pe.ValueKind == JsonValueKind.True;
                 var ptsPerUnit = p.TryGetProperty("pointsPerUnit", out var ppu) ? ppu.GetInt32() : 0;
+                var isActive = !p.TryGetProperty("isActive", out var ia) || ia.ValueKind != JsonValueKind.False;
 
                 if (existingId > 0)
                 {
                     var imageData = p.TryGetProperty("imageData", out var img) ? img.GetString() : null;
                     // Update existing product
-                    using var upd = new SQLiteCommand("UPDATE Products SET Name=@n, Barcode=@b, Category=@c, Price=@p, Cost=@co, image_data=@img, PointsExempt=@pe, PointsPerUnit=@ppu, ModifiedBy='cloud' WHERE Id=@id", conn);
+                    using var upd = new SQLiteCommand("UPDATE Products SET Name=@n, Barcode=@b, Category=@c, Price=@p, Cost=@co, image_data=@img, PointsExempt=@pe, PointsPerUnit=@ppu, IsActive=@ia, ModifiedBy='cloud' WHERE Id=@id", conn);
                     upd.Parameters.AddWithValue("@n", name);
                     upd.Parameters.AddWithValue("@b", (object?)barcode ?? DBNull.Value);
                     upd.Parameters.AddWithValue("@c", category ?? "");
@@ -548,6 +549,7 @@ public static class SyncService
                     upd.Parameters.AddWithValue("@img", (object?)imageData ?? DBNull.Value);
                     upd.Parameters.AddWithValue("@pe", ptsExempt ? 1 : 0);
                     upd.Parameters.AddWithValue("@ppu", ptsPerUnit);
+                    upd.Parameters.AddWithValue("@ia", isActive ? 1 : 0);
                     upd.Parameters.AddWithValue("@id", existingId);
                     upd.ExecuteNonQuery();
 
@@ -568,7 +570,8 @@ public static class SyncService
                     // Insert new product
                     using var ins = new SQLiteCommand(@"
                         INSERT INTO Products (Name, Barcode, Category, Price, Cost, StockQty, IsActive, CreatedAt, ModifiedBy, SourceId, image_data, PointsExempt, PointsPerUnit)
-                        VALUES (@n, @b, @c, @p, @co, 0, 1, datetime('now','localtime'), 'cloud', 'master', @img, @pe, @ppu)", conn);
+                        VALUES (@n, @b, @c, @p, @co, 0, @ia, datetime('now','localtime'), 'cloud', 'master', @img, @pe, @ppu)", conn);
+                    ins.Parameters.AddWithValue("@ia", isActive ? 1 : 0);
                     ins.Parameters.AddWithValue("@n", name);
                     ins.Parameters.AddWithValue("@b", (object?)barcode ?? DBNull.Value);
                     ins.Parameters.AddWithValue("@c", category ?? "");

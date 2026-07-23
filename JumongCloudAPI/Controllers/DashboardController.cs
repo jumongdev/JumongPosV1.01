@@ -1144,7 +1144,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            var where = "mp.is_active = true";
+            var where = "1=1";
             if (!string.IsNullOrEmpty(since) && DateTime.TryParse(since, out var sinceDate))
             {
                 where += " AND mp.updated_at > @since";
@@ -1152,7 +1152,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             }
             cmd.CommandText = $@"
                 SELECT mp.id, mp.name, mp.barcode, mp.category, mp.price, mp.cost, mp.stock_qty, mp.image_data,
-                       mp.points_exempt, mp.points_per_unit,
+                       mp.points_exempt, mp.points_per_unit, mp.is_active,
                        COALESCE(json_agg(
                            json_build_object('unitName', mpu.unit_name, 'price', mpu.price, 'cost', mpu.cost, 'qtyPerUnit', mpu.qty_per_unit, 'isDefault', mpu.is_default, 'pointsPerUnit', mpu.points_per_unit)
                            ORDER BY mpu.is_default DESC, mpu.unit_name
@@ -1175,7 +1175,8 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     imageData = reader.IsDBNull(7) ? "" : reader.GetString(7),
                     pointsExempt = reader.GetBoolean(8),
                     pointsPerUnit = reader.GetInt32(9),
-                    units = reader.IsDBNull(10) ? null : System.Text.Json.JsonSerializer.Deserialize<object>(reader.GetString(10))
+                    isActive = reader.GetBoolean(10),
+                    units = reader.IsDBNull(11) ? null : System.Text.Json.JsonSerializer.Deserialize<object>(reader.GetString(11))
                 });
             return Ok(products);
         }
@@ -1308,8 +1309,9 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 }
 
                 using var cmd = new NpgsqlCommand(@"
-                    UPDATE master_products SET name=@n, barcode=@b, category=@c, price=@p, cost=@co, image_data=@img, points_exempt=@pe, points_per_unit=@ppu, updated_at=NOW()
+                    UPDATE master_products SET name=@n, barcode=@b, category=@c, price=@p, cost=@co, image_data=@img, points_exempt=@pe, points_per_unit=@ppu, is_active=@ia, updated_at=NOW()
                     WHERE id=@id", conn, tx);
+                cmd.Parameters.AddWithValue("ia", p.IsActive);
                 cmd.Parameters.AddWithValue("n", p.Name);
                 cmd.Parameters.AddWithValue("b", (object?)p.Barcode ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("c", p.Category ?? "");
@@ -2654,6 +2656,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         public string? ImageData { get; set; }
         public bool PointsExempt { get; set; }
         public int PointsPerUnit { get; set; }
+        public bool IsActive { get; set; } = true;
         public List<SeedProductUnitDto>? Units { get; set; }
     }
 

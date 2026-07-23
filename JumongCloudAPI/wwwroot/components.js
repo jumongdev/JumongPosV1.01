@@ -405,7 +405,7 @@ Alpine.store('app', {
   /* ΓöÇΓöÇ Product Editor ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('productEditor', () => ({
     name: '', barcode: '', category: '', price: 0, cost: 0, imageData: '',
-    pointsExempt: false, pointsPerUnit: 0,
+    pointsExempt: false, pointsPerUnit: 0, isActive: true,
     units: [], productId: null, categories: [],
     async init() {
       this.$watch('$store.app.section', () => { if (this.$store.app.section !== 'products') this.reset() });
@@ -415,10 +415,10 @@ Alpine.store('app', {
     open(id) {
       this.productId = id || null;
       const p = Alpine.store('app').editingProductData;
-      if (id && p) { this.name = p.name; this.barcode = p.barcode || ''; this.category = p.category || ''; this.price = p.price; this.cost = p.cost; this.imageData = p.imageData || ''; this.pointsExempt = p.pointsExempt || false; this.pointsPerUnit = p.pointsPerUnit || 0; this.units = (p.units || []).map(u => ({ ...u })) }
-      else { this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.units = [] }
+      if (id && p) { this.name = p.name; this.barcode = p.barcode || ''; this.category = p.category || ''; this.price = p.price; this.cost = p.cost; this.imageData = p.imageData || ''; this.pointsExempt = p.pointsExempt || false; this.pointsPerUnit = p.pointsPerUnit || 0; this.isActive = p.isActive !== false; this.units = (p.units || []).map(u => ({ ...u })) }
+      else { this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.units = [] }
     },
-    reset() { this.productId = null; this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.units = []; Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null; Alpine.store('app').editingProductData = null },
+    reset() { this.productId = null; this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.units = []; Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null; Alpine.store('app').editingProductData = null },
     addUnit() { this.units.push({ unitName: '', price: 0, qtyPerUnit: 1, isDefault: false, pointsPerUnit: 0 }) },
     removeUnit(i) { this.units.splice(i, 1) },
     async save() {
@@ -426,7 +426,7 @@ Alpine.store('app', {
       const data = {
         name: this.name, barcode: this.barcode, category: this.category,
         price: parseFloat(this.price) || 0, cost: parseFloat(this.cost) || 0,
-        imageData: this.imageData,
+        imageData: this.imageData, isActive: this.isActive,
         pointsExempt: this.pointsExempt, pointsPerUnit: parseInt(this.pointsPerUnit) || 0,
         units: this.units.filter(u => u.unitName).map(u => ({ ...u, cost: (u.qtyPerUnit || 1) * (parseFloat(this.cost) || 0), pointsPerUnit: parseInt(u.pointsPerUnit) || 0 }))
       };
