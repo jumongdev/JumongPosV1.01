@@ -950,6 +950,64 @@ public class WarehouseSellForm : Form
                 ? _selectedCustomer.GetProperty("id").GetInt32()
                 : 0;
 
+            var totalDue = _cart.Sum(x => x.TotalPrice);
+
+            // Payment dialog
+            var payMethod = "Cash";
+            var cashReceived = totalDue;
+            using (var payForm = new Form
+            {
+                Text = "Payment",
+                Size = new Size(380, 260),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = ThemeManager.Current.SurfaceBg,
+                ForeColor = ThemeManager.Current.TextPrimary
+            })
+            {
+                var cartTotal = _cart.Sum(x => x.TotalPrice);
+                var lblTotal = new Label { Text = $"Total: ₱{cartTotal:N2}", Font = new Font("Segoe UI", 16F, FontStyle.Bold), Location = new Point(20, 15), Size = new Size(340, 30), TextAlign = ContentAlignment.MiddleCenter, ForeColor = ThemeManager.Current.AccentCyan };
+                var lblMethod = new Label { Text = "Payment Method:", Location = new Point(20, 60), Size = new Size(120, 25), ForeColor = ThemeManager.Current.TextSecondary };
+                var cmbMethod = new ComboBox { Location = new Point(150, 58), Size = new Size(190, 25), DropDownStyle = ComboBoxStyle.DropDownList, BackColor = ThemeManager.Current.InputBg, ForeColor = ThemeManager.Current.TextPrimary };
+                cmbMethod.Items.AddRange(new[] { "Cash", "E-Wallet", "Credit" });
+                cmbMethod.SelectedIndex = 0;
+                var lblCash = new Label { Text = "Amount Received:", Location = new Point(20, 100), Size = new Size(120, 25), ForeColor = ThemeManager.Current.TextSecondary };
+                var txtCash = new TextBox { Text = totalDue.ToString("N2"), Location = new Point(150, 98), Size = new Size(190, 25), BorderStyle = BorderStyle.FixedSingle, BackColor = ThemeManager.Current.InputBg, ForeColor = ThemeManager.Current.TextPrimary, TextAlign = HorizontalAlignment.Right };
+                var lblChange = new Label { Text = "Change: ₱0.00", Location = new Point(20, 135), Size = new Size(320, 25), ForeColor = Color.FromArgb(0, 200, 83), Font = new Font("Segoe UI", 10F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter };
+                txtCash.TextChanged += (_, _) =>
+                {
+                    decimal.TryParse(txtCash.Text, out var amt);
+                    lblChange.Text = $"Change: ₱{Math.Max(0, amt - cartTotal):N2}";
+                    lblChange.ForeColor = amt >= cartTotal ? Color.FromArgb(0, 200, 83) : Color.FromArgb(255, 82, 82);
+                };
+                cmbMethod.SelectedIndexChanged += (_, _) =>
+                {
+                    var isCash = cmbMethod.SelectedItem?.ToString() == "Cash";
+                    txtCash.Visible = isCash;
+                    lblCash.Visible = isCash;
+                    if (!isCash) lblChange.Text = "Change: ₱0.00";
+                };
+                var btnOk = new Button { Text = "CONFIRM PAYMENT", Location = new Point(30, 175), Size = new Size(150, 40), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(46, 204, 113), ForeColor = Color.White, Font = new Font("Segoe UI", 10F, FontStyle.Bold), Cursor = Cursors.Hand };
+                var btnCancel = new Button { Text = "CANCEL", Location = new Point(200, 175), Size = new Size(130, 40), FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(255, 82, 82), ForeColor = Color.White, Font = new Font("Segoe UI", 10F, FontStyle.Bold), Cursor = Cursors.Hand };
+                string? resultMethod = null;
+                decimal resultCash = 0;
+                btnOk.Click += (_, _) =>
+                {
+                    if (cmbMethod.SelectedItem?.ToString() == "Cash" && (!decimal.TryParse(txtCash.Text, out var amt) || amt < cartTotal))
+                    { MessageBox.Show("Amount must cover the total.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+                    resultMethod = cmbMethod.SelectedItem?.ToString();
+                    resultCash = decimal.TryParse(txtCash.Text, out var a) ? a : cartTotal;
+                    payForm.DialogResult = DialogResult.OK;
+                };
+                btnCancel.Click += (_, _) => payForm.DialogResult = DialogResult.Cancel;
+                payForm.Controls.AddRange(new Control[] { lblTotal, lblMethod, cmbMethod, lblCash, txtCash, lblChange, btnOk, btnCancel });
+                if (payForm.ShowDialog() != DialogResult.OK) { btnSell.Enabled = true; btnSell.Text = "SELL  ₱0.00"; return; }
+                payMethod = resultMethod ?? "Cash";
+                cashReceived = resultCash;
+            }
+
             var items = _cart.Select(c => new
             {
                 productId = c.ProductId,
@@ -958,7 +1016,7 @@ public class WarehouseSellForm : Form
                 qty = c.Quantity
             }).ToList();
 
-            var body = new { customerId, customerName = _customerName, items };
+            var body = new { customerId, customerName = _customerName, paymentMethod = payMethod, cashReceived, items };
 
             var url = SyncService.ApiUrl.TrimEnd('/') + "/dashboard/warehouse/sell";
             var json = JsonSerializer.Serialize(body, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
@@ -982,12 +1040,16 @@ public class WarehouseSellForm : Form
                     var invNo = "WH-" + saleId;
                     using var insSale = new SQLiteCommand(@"
                         INSERT INTO Sales (InvoiceNo, SaleDate, SubTotal, Discount, Tax, GrandTotal, AmountPaid, Change, PaymentMethod, ReferenceNo, CustomerId, UserId, OrderType, CashPaid, EwPaid)
-                        VALUES (@inv, @dt, @sub, 0, 0, @total, @total, 0, 'Cash', '', 0, @uid, 'Wholesale', @total, 0);
+                        VALUES (@inv, @dt, @sub, 0, 0, @total, @paid, GREATEST(0, @paid - @total), @pm, '', 0, @uid, 'Wholesale', @cp, @ep);
                         SELECT last_insert_rowid();", localConn);
                     insSale.Parameters.AddWithValue("@inv", invNo);
                     insSale.Parameters.AddWithValue("@dt", now);
                     insSale.Parameters.AddWithValue("@sub", grandTotal);
                     insSale.Parameters.AddWithValue("@total", grandTotal);
+                    insSale.Parameters.AddWithValue("@paid", cashReceived);
+                    insSale.Parameters.AddWithValue("@pm", payMethod);
+                    insSale.Parameters.AddWithValue("@cp", payMethod == "Cash" ? cashReceived : 0m);
+                    insSale.Parameters.AddWithValue("@ep", payMethod == "E-Wallet" ? grandTotal : 0m);
                     insSale.Parameters.AddWithValue("@uid", _currentUser?.Id ?? 0);
                     var localSaleId = Convert.ToInt32(insSale.ExecuteScalar());
 

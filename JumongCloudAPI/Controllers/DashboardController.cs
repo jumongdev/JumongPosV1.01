@@ -2677,6 +2677,8 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     {
         public int CustomerId { get; set; }
         public string CustomerName { get; set; } = "";
+        public string PaymentMethod { get; set; } = "Cash";
+        public decimal CashReceived { get; set; }
         public List<WhWalkinSellItem> Items { get; set; } = new();
     }
     public class WhWalkinSellItem

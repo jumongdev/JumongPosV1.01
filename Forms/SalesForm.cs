@@ -1256,8 +1256,11 @@ public partial class SalesForm : Form
             else if (e.KeyCode == Keys.F2) { ShowSearchPopup(""); e.SuppressKeyPress = true; }
             else if (e.KeyCode == Keys.F3)
             {
-                if (dgvCart.Rows.Count > 0 && dgvCart.CurrentCell != null)
-                    EditCartItemQuantity(dgvCart.CurrentCell.RowIndex);
+                if (dgvCart.Rows.Count > 0)
+                {
+                    var row = dgvCart.CurrentCell != null ? dgvCart.CurrentCell.RowIndex : 0;
+                    EditCartItemQuantity(row);
+                }
                 e.SuppressKeyPress = true;
             }
             else if (e.KeyCode == Keys.F4) { btnPay_Click(null!, e); e.SuppressKeyPress = true; }
