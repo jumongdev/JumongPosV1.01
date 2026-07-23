@@ -565,7 +565,8 @@ public class DatabaseHelper
             "INSERT OR IGNORE INTO Settings (Key, Value) VALUES " +
             "('SmtpHost', ''), ('SmtpPort', '587'), ('SmtpUser', ''), ('SmtpPass', ''), ('SmtpTo', ''), " +
             "('AppTimezone', '480'), ('LastMasterSync', ''), ('AppTheme', 'Dark'), ('PointsRate', '200'), " +
-            "('StoreQrCodes', '[{\"header\":\"GCash\",\"file\":\"gcash_qr.png\"}]')",
+            "('StoreQrCodes', '[{\"header\":\"GCash\",\"file\":\"gcash_qr.png\"}]'), " +
+            "('WholesaleLastClose', '')",
             conn);
         seedMissing.ExecuteNonQuery();
 

@@ -1,3 +1,4 @@
+using System.Data.SQLite;
 using System.ComponentModel;
 using System.Text;
 using System.Text.Json;
@@ -535,10 +536,19 @@ public class WarehouseSellForm : Form
         };
         btnSell.Click += async (_, _) => await DoSellAsync();
 
+        btnEndShiftWh = new Button
+        {
+            Text = "\uD83D\uDD14 END SHIFT",
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 },
+            BackColor = Color.FromArgb(200, 160, 0), ForeColor = Color.White, Cursor = Cursors.Hand
+        };
+        btnEndShiftWh.Click += async (_, _) => await DoWholesaleEndShiftAsync();
+
         _pnlTotals.Controls.AddRange(new Control[] {
             lblTotalDueHint, lblGrandTotal, sep1,
             lblSubTotalLbl, lblSubTotal,
-            sep2, btnSell
+            sep2, btnSell, btnEndShiftWh
         });
 
         Controls.AddRange(new Control[] { _pnlTopbar, _pnlCustomerBar, _pnlSearch, _pnlCart, _pnlTotals });
@@ -616,7 +626,8 @@ public class WarehouseSellForm : Form
         lblSubTotalLbl.Location = new Point(m, ry); lblSubTotalLbl.Size = new Size(pw / 2, 22);
         lblSubTotal.Location = new Point(m + pw / 2, ry); lblSubTotal.Size = new Size(pw / 2, 22); ry += 28;
         sep2.Location = new Point(m, ry); sep2.Width = pw; ry += 14;
-        btnSell.Location = new Point(m, ry); btnSell.Size = new Size(pw, 52);
+        btnSell.Location = new Point(m, ry); btnSell.Size = new Size(pw, 52); ry += 58;
+        btnEndShiftWh.Location = new Point(m, ry); btnEndShiftWh.Size = new Size(pw, 40);
     }
 
     private async Task ShowCustomerPickerAsync()
@@ -962,6 +973,40 @@ public class WarehouseSellForm : Form
                 var grandTotal = result.GetProperty("grandTotal").GetDecimal();
                 var saleId = result.GetProperty("saleId").GetInt32();
 
+                // Save locally so End Shift captures this sale
+                try
+                {
+                    using var localConn = DatabaseHelper.GetConnection();
+                    localConn.Open();
+                    var now = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                    var invNo = "WH-" + saleId;
+                    using var insSale = new SQLiteCommand(@"
+                        INSERT INTO Sales (InvoiceNo, SaleDate, SubTotal, Discount, Tax, GrandTotal, AmountPaid, Change, PaymentMethod, ReferenceNo, CustomerId, UserId, OrderType, CashPaid, EwPaid)
+                        VALUES (@inv, @dt, @sub, 0, 0, @total, @total, 0, 'Cash', '', 0, @uid, 'Wholesale', @total, 0);
+                        SELECT last_insert_rowid();", localConn);
+                    insSale.Parameters.AddWithValue("@inv", invNo);
+                    insSale.Parameters.AddWithValue("@dt", now);
+                    insSale.Parameters.AddWithValue("@sub", grandTotal);
+                    insSale.Parameters.AddWithValue("@total", grandTotal);
+                    insSale.Parameters.AddWithValue("@uid", _currentUser?.Id ?? 0);
+                    var localSaleId = Convert.ToInt32(insSale.ExecuteScalar());
+
+                    foreach (var ci in _cart)
+                    {
+                        using var insItem = new SQLiteCommand(@"
+                            INSERT INTO SaleItems (SaleId, ProductId, ProductName, Barcode, Quantity, Price, TotalPrice, UnitName, QtyPerUnit, UnitCost, IsVoided, PointsExempt, PointsPerUnit, PointsEarned)
+                            VALUES (@sid, 0, @pn, '', @qty, @pr, @tot, @un, 1, 0, 0, 1, 0, 0)", localConn);
+                        insItem.Parameters.AddWithValue("@sid", localSaleId);
+                        insItem.Parameters.AddWithValue("@pn", ci.ProductName);
+                        insItem.Parameters.AddWithValue("@qty", ci.Quantity);
+                        insItem.Parameters.AddWithValue("@pr", ci.Price);
+                        insItem.Parameters.AddWithValue("@tot", ci.TotalPrice);
+                        insItem.Parameters.AddWithValue("@un", ci.UnitName);
+                        insItem.ExecuteNonQuery();
+                    }
+                }
+                catch (Exception localEx) { ErrorLogger.Log("WhSellForm.LocalSave", localEx); }
+
                 try
                 {
                     var printItems = _cart.Select(c => (c.ProductName, c.UnitName, c.Quantity, c.Price, c.TotalPrice)).ToList();
@@ -997,6 +1042,48 @@ public class WarehouseSellForm : Form
             btnSell.Text = "SELL  " + (_cart.Count > 0 ? "\u20b1" + _cart.Sum(x => x.TotalPrice).ToString("N2") : "\u20b10.00");
         }
     }
+
+    private async Task DoWholesaleEndShiftAsync()
+    {
+        try
+        {
+            using var conn = DatabaseHelper.GetConnection();
+            conn.Open();
+
+            var since = "";
+            using (var getLast = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'WholesaleLastClose'", conn))
+                since = getLast.ExecuteScalar()?.ToString() ?? "";
+
+            var cond = string.IsNullOrEmpty(since) ? "1=1" : "s.SaleDate > @since";
+            using var cmd = new SQLiteCommand($@"SELECT COUNT(*), COALESCE(SUM(s.GrandTotal), 0)
+                FROM Sales s WHERE s.OrderType = 'Wholesale' AND {cond}", conn);
+            if (!string.IsNullOrEmpty(since))
+                cmd.Parameters.AddWithValue("@since", since);
+            using var rdr = cmd.ExecuteReader();
+            rdr.Read();
+            var count = rdr.GetInt32(0);
+            var total = rdr.GetDecimal(1);
+
+            var msg = $"Wholesale End Shift\n━━━━━━━━━━━━━━━\n" +
+                      $"Transactions: {count}\n" +
+                      $"Total Sales: ₱{total:N2}\n" +
+                      $"Since: {(string.IsNullOrEmpty(since) ? "Beginning" : since)}\n\n" +
+                      $"End shift and reset counter?";
+
+            if (MessageBox.Show(msg, "Wholesale End Shift", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            {
+                var now = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                using var ups = new SQLiteCommand("INSERT OR REPLACE INTO Settings (Key, Value) VALUES ('WholesaleLastClose', @val)", conn);
+                ups.Parameters.AddWithValue("@val", now);
+                ups.ExecuteNonQuery();
+
+                MessageBox.Show($"Wholesale shift ended.\n{count} transaction(s)\nTotal: ₱{total:N2}", "Shift Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+        catch (Exception ex) { ErrorLogger.Log("WholesaleEndShift", ex); MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+    }
+
+    private Button btnEndShiftWh = null!;
 }
 
 public class WhCartItem : INotifyPropertyChanged
