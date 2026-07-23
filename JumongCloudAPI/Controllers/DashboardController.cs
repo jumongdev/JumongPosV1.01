@@ -2049,8 +2049,25 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
 
                 if (t.Items != null)
                 {
-                    foreach (var item in t.Items)
+                    // Merge duplicate items by productId
+                    var merged = t.Items.GroupBy(x => x.ProductId)
+                        .Select(g => new { g.First().ProductId, g.First().ProductName, g.First().Barcode, Qty = g.Sum(x => x.Qty) })
+                        .ToList();
+
+                    foreach (var item in merged)
                     {
+                        // Deduct stock from warehouse immediately (prevents overselling)
+                        using var deductCmd = new NpgsqlCommand(
+                            "UPDATE wh_products SET stock_qty = stock_qty - @qty WHERE id = @pid AND stock_qty >= @qty", conn, tx);
+                        deductCmd.Parameters.AddWithValue("pid", item.ProductId);
+                        deductCmd.Parameters.AddWithValue("qty", item.Qty);
+                        var affected = deductCmd.ExecuteNonQuery();
+                        if (affected == 0)
+                        {
+                            tx.Rollback();
+                            return BadRequest(new { error = $"Not enough stock for {item.ProductName}" });
+                        }
+
                         using var icmd = new NpgsqlCommand(
                             "INSERT INTO wh_transfer_items (transfer_id, product_id, product_name, barcode, qty) VALUES (@ti, @pi, @pn, @bc, @q)", conn, tx);
                         icmd.Parameters.AddWithValue("ti", transferId);
@@ -2141,24 +2158,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
 
                     if (accepted)
                     {
-                        // Deduct from warehouse stock
-                        using var deduct = conn.CreateCommand(); deduct.Transaction = tx;
-                        deduct.CommandText = "UPDATE wh_products SET stock_qty = stock_qty - @bq WHERE id = @pid";
-                        deduct.Parameters.AddWithValue("bq", baseQty);
-                        deduct.Parameters.AddWithValue("pid", productId);
-                        deduct.ExecuteNonQuery();
-
-                        // Log trail
-                        using var trail = conn.CreateCommand(); trail.Transaction = tx;
-                        trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) VALUES (@pid, @pn, @bc, @qty, @ref, 'transfer_out')";
-                        trail.Parameters.AddWithValue("pid", productId);
-                        trail.Parameters.AddWithValue("pn", productName);
-                        trail.Parameters.AddWithValue("bc", barcode);
-                        trail.Parameters.AddWithValue("qty", -baseQty);
-                        trail.Parameters.AddWithValue("ref", $"Transfer #{id}{(clientName != null ? " → " + clientName : "")}");
-                        trail.ExecuteNonQuery();
-
-                        transferOut.Add(new { productId, productName, baseQty });
+                        // Stock already deducted on transfer creation
                     }
                     else
                     {
@@ -2192,6 +2192,48 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
 
                 tx.Commit();
                 return Ok(new { success = true, orderId = id, status = finalStatus, shortages });
+            }
+            catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
+        }
+
+        [HttpPut("warehouse/transfers/{id}/cancel")]
+        public IActionResult WhCancelTransfer(int id)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var tx = conn.BeginTransaction();
+            try
+            {
+                using var checkCmd = conn.CreateCommand(); checkCmd.Transaction = tx;
+                checkCmd.CommandText = "SELECT status FROM wh_transfers WHERE id = @id";
+                checkCmd.Parameters.AddWithValue("id", id);
+                var status = checkCmd.ExecuteScalar()?.ToString();
+                if (status != "pending") return BadRequest(new { error = "Only pending transfers can be cancelled" });
+
+                // Restore stock to warehouse
+                using var itemsCmd = conn.CreateCommand(); itemsCmd.Transaction = tx;
+                itemsCmd.CommandText = "SELECT product_id, qty FROM wh_transfer_items WHERE transfer_id = @tid";
+                itemsCmd.Parameters.AddWithValue("tid", id);
+                using var r = itemsCmd.ExecuteReader();
+                var restoreList = new List<(int pid, int qty)>();
+                while (r.Read()) restoreList.Add((r.GetInt32(0), r.GetInt32(1)));
+                r.Close();
+
+                foreach (var (pid, qty) in restoreList)
+                {
+                    using var upd = conn.CreateCommand(); upd.Transaction = tx;
+                    upd.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @qty WHERE id = @pid";
+                    upd.Parameters.AddWithValue("pid", pid);
+                    upd.Parameters.AddWithValue("qty", qty);
+                    upd.ExecuteNonQuery();
+                }
+
+                using var updateCmd = conn.CreateCommand(); updateCmd.Transaction = tx;
+                updateCmd.CommandText = "UPDATE wh_transfers SET status = 'cancelled', updated_at = NOW() WHERE id = @id";
+                updateCmd.Parameters.AddWithValue("id", id);
+                updateCmd.ExecuteNonQuery();
+
+                tx.Commit();
+                return Ok(new { success = true });
             }
             catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
         }

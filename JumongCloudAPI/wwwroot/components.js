@@ -765,7 +765,7 @@ Alpine.store('app', {
     async cancelTransfer(id) {
       if (!confirm('Cancel transfer #' + id + '?')) return;
       try {
-        await fetch(API + '/warehouse/transfers/' + id + '/receive', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        await fetch(API + '/warehouse/transfers/' + id + '/cancel', { method: 'PUT' });
         toast('Transfer cancelled', 'success');
         this.load(); this.updateBadge();
       } catch (e) { toast('Error: ' + e.message, 'error') }
