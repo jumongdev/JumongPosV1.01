@@ -47,6 +47,10 @@ tailwind.config = {
     <nav class="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
       <template x-for="item in [
         { id:'dashboard', icon:'📊', label:'Dashboard' },
+        { id:'rpt-header', label:'REPORTS', isHeader:true },
+        { id:'rpt-sales', icon:'📈', label:'Sales Report' },
+        { id:'rpt-invcost', icon:'💰', label:'Inventory Cost' },
+        { id:'rpt-shifts', icon:'🕐', label:'Shift History' },
         { id:'products', icon:'📦', label:'Products' },
         { id:'st-header', label:'STOCK', isHeader:true },
         { id:'st-receiving', icon:'📥', label:'Recent Receiving' },
@@ -75,9 +79,9 @@ tailwind.config = {
             :class="$store.app.isActive(item.id)
               ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-400 font-semibold border-l-2 border-cyan-500'
               : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] hover:text-gray-700 dark:hover:text-slate-200'"
-            :style="item.id.startsWith('wh-') || item.id.startsWith('st-') ? 'padding-left: 32px' : ''">
-            <span class="text-base shrink-0" x-show="item.id.startsWith('wh-') || item.id.startsWith('st-')" style="opacity:0.5">└</span>
-            <span class="text-lg shrink-0" x-show="!item.id.startsWith('wh-') && !item.id.startsWith('st-')" x-text="item.icon"></span>
+            :style="item.id.startsWith('wh-') || item.id.startsWith('st-') || item.id.startsWith('rpt-') ? 'padding-left: 32px' : ''">
+            <span class="text-base shrink-0" x-show="item.id.startsWith('wh-') || item.id.startsWith('st-') || item.id.startsWith('rpt-')" style="opacity:0.5">└</span>
+            <span class="text-lg shrink-0" x-show="!item.id.startsWith('wh-') && !item.id.startsWith('st-') && !item.id.startsWith('rpt-')" x-text="item.icon"></span>
             <span class="nav-label text-xs" x-show="$store.app._sidebarOpen" x-text="item.label"></span>
             <span class="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
               x-show="item.id==='wh-transfer' && $store.app._sidebarOpen"
@@ -571,69 +575,141 @@ tailwind.config = {
           </div>
         </div>
 
-        <!-- Shift History -->
-        <div x-data="shiftHistory" class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl mb-4">
-          <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#222255] cursor-pointer"
-            @click="collapsed = !collapsed">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400 flex items-center gap-2">
-              <span class="text-[10px] transition-transform" :class="collapsed ? '-rotate-90' : ''">&#9660;</span> SHIFT HISTORY</h3>
-            <div class="flex items-center gap-2">
-              <input type="text" placeholder="Search..." @click.stop
-                class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2.5 py-1.5 w-28 text-gray-700 dark:text-slate-200 placeholder-gray-400"
-                x-model="search">
-              <button @click.stop="exportCSV('shifts')" class="text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 px-2 py-0.5 rounded border border-gray-200 dark:border-[#222255]">CSV</button>
-            </div>
+      </div><!-- /dashboard section -->
+
+      <!-- ═══════════════════════════════════════════════ -->
+      <!-- REPORTS - SALES                                -->
+      <!-- ═══════════════════════════════════════════════ -->
+      <div x-show="$store.app.section === 'rpt-sales'" x-transition.opacity>
+        <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[#222255]">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">SALES REPORT</h3>
           </div>
-          <div class="panel-body" x-show="!collapsed">
-            <div class="overflow-x-auto">
-              <template x-if="loading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
-              <template x-if="!loading && d.length===0"><div class="text-center py-6 text-gray-400">No shift data</div></template>
+          <div class="p-4">
+            <p class="text-xs text-gray-500 dark:text-[#7878aa]">Sales data is displayed on the Dashboard. Use the date filters at the top to customize.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════ -->
+      <!-- REPORTS - INVENTORY COST                       -->
+      <!-- ═══════════════════════════════════════════════ -->
+      <div x-show="$store.app.section === 'rpt-invcost'" x-transition.opacity>
+        <div x-data="inventoryCostReport">
+          <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[#222255]">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">INVENTORY COST REPORT</h3>
+              <button @click="exportCSV('invcost')" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CSV</button>
+            </div>
+            <div class="p-4">
+              <template x-if="loading"><div class="flex justify-center py-8"><span class="spinner"></span></div></template>
+              <template x-if="!loading && d.length===0"><div class="text-center py-8 text-gray-400">No shift data available</div></template>
               <template x-if="d.length > 0">
-                <table class="w-full text-xs">
-                  <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
-                    <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Close Date</th>
-                    <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Store</th>
-                    <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Sales</th>
-                    <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Cash</th>
-                    <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">E-Wallet</th>
-                    <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Credit</th>
-                    <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Voided</th>
-                    <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Expenses</th>
-                    <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Cash on Hand</th>
-                    <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Variance</th>
-                    <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">User</th>
-                  </tr></thead>
-                  <tbody>
-                    <template x-for="x in paged" :key="x.closeDate+x.userName">
-                      <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                        <td class="px-2 py-2 whitespace-nowrap" x-text="new Date(x.closeDate).toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})"></td>
-                        <td class="px-2 py-2"><span class="text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded" x-text="shortStore(x.storeId, $store.app.storeMap[x.storeId])"></span></td>
-                        <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalSales)"></span></td>
-                        <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalCash)"></span></td>
-                        <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalEwallet)"></span></td>
-                        <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalCredit)"></span></td>
-                        <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalVoided)"></span></td>
-                        <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalExpenses)"></span></td>
-                        <td class="px-2 py-2 text-right font-medium">&#8369;<span x-text="fmt(x.cashOnHand)"></span></td>
-                        <td class="px-2 py-2 text-right font-semibold" :class="x.difference >= 0 ? 'text-emerald-500' : 'text-red-500'">&#8369;<span x-text="fmt(x.difference)"></span></td>
-                        <td class="px-2 py-2" x-text="x.userName"></td>
-                      </tr>
-                    </template>
-                  </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-xs">
+                    <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                      <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
+                      <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Store</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Inv Cost</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">COGS</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Recv Cost</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Expected</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Variance</th>
+                    </tr></thead>
+                    <tbody>
+                      <template x-for="x in d" :key="x.closeDate+x.storeId">
+                        <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                          <td class="px-2 py-2" x-text="new Date(x.closeDate).toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})"></td>
+                          <td class="px-2 py-2"><span class="text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded" x-text="shortStore(x.storeId, $store.app.storeMap[x.storeId])"></span></td>
+                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalInventoryCost)"></span></td>
+                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalCostSold)"></span></td>
+                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalStockReceivedCost)"></span></td>
+                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt((x.totalInventoryCost||0) + (x.totalStockReceivedCost||0) - (x.totalCostSold||0))"></span></td>
+                          <td class="px-2 py-2 text-right font-semibold" :class="(x.totalInventoryCost||0) >= ((x.totalInventoryCost||0) + (x.totalStockReceivedCost||0) - (x.totalCostSold||0)) ? 'text-emerald-500' : 'text-red-500'">&#8369;<span x-text="fmt((x.totalInventoryCost||0) - ((x.totalInventoryCost||0) + (x.totalStockReceivedCost||0) - (x.totalCostSold||0)))"></span></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
               </template>
             </div>
-            <div class="flex items-center justify-between px-3 py-2 text-xs text-gray-400" x-show="pages > 1">
-              <span x-text="'Page '+(page+1)+' of '+pages"></span>
-              <div class="flex gap-2">
-                <button :disabled="page===0" @click="prev()" class="px-3 py-1 rounded border border-gray-200 dark:border-[#222255] disabled:opacity-30">Prev</button>
-                <button :disabled="page>=pages-1" @click="next()" class="px-3 py-1 rounded border border-gray-200 dark:border-[#222255] disabled:opacity-30">Next</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════ -->
+      <!-- REPORTS - SHIFT HISTORY                        -->
+      <!-- ═══════════════════════════════════════════════ -->
+      <div x-show="$store.app.section === 'rpt-shifts'" x-transition.opacity>
+        <div x-data="shiftHistory">
+          <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#222255] cursor-pointer"
+              @click="collapsed = !collapsed">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400 flex items-center gap-2">
+                <span class="text-[10px] transition-transform" :class="collapsed ? '-rotate-90' : ''">&#9660;</span> SHIFT HISTORY</h3>
+              <div class="flex items-center gap-2">
+                <input type="text" placeholder="Search..." @click.stop
+                  class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2.5 py-1.5 w-28 text-gray-700 dark:text-slate-200 placeholder-gray-400"
+                  x-model="search">
+                <button @click.stop="exportCSV('shifts')" class="text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 px-2 py-0.5 rounded border border-gray-200 dark:border-[#222255]">CSV</button>
+              </div>
+            </div>
+            <div class="panel-body" x-show="!collapsed">
+              <div class="overflow-x-auto">
+                <template x-if="loading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
+                <template x-if="!loading && d.length===0"><div class="text-center py-6 text-gray-400">No shift data</div></template>
+                <template x-if="d.length > 0">
+                  <table class="w-full text-xs">
+                    <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                      <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Close Date</th>
+                      <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Store</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Sales</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Cash</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">E-Wallet</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Credit</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Voided</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Expenses</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Cash on Hand</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Variance</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Inv Cost</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">COGS</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Recv Cost</th>
+                      <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">User</th>
+                    </tr></thead>
+                    <tbody>
+                      <template x-for="x in paged" :key="x.closeDate+x.userName">
+                        <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                          <td class="px-2 py-2 whitespace-nowrap" x-text="new Date(x.closeDate).toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})"></td>
+                          <td class="px-2 py-2"><span class="text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded" x-text="shortStore(x.storeId, $store.app.storeMap[x.storeId])"></span></td>
+                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalSales)"></span></td>
+                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalCash)"></span></td>
+                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalEwallet)"></span></td>
+                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalCredit)"></span></td>
+                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalVoided)"></span></td>
+                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalExpenses)"></span></td>
+                          <td class="px-2 py-2 text-right font-medium">&#8369;<span x-text="fmt(x.cashOnHand)"></span></td>
+                          <td class="px-2 py-2 text-right font-semibold" :class="x.difference >= 0 ? 'text-emerald-500' : 'text-red-500'">&#8369;<span x-text="fmt(x.difference)"></span></td>
+                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalInventoryCost)"></span></td>
+                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalCostSold)"></span></td>
+                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalStockReceivedCost)"></span></td>
+                          <td class="px-2 py-2" x-text="x.userName"></td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </template>
+              </div>
+              <div class="flex items-center justify-between px-3 py-2 text-xs text-gray-400" x-show="pages > 1">
+                <span x-text="'Page '+(page+1)+' of '+pages"></span>
+                <div class="flex gap-2">
+                  <button :disabled="page===0" @click="prev()" class="px-3 py-1 rounded border border-gray-200 dark:border-[#222255] disabled:opacity-30">Prev</button>
+                  <button :disabled="page>=pages-1" @click="next()" class="px-3 py-1 rounded border border-gray-200 dark:border-[#222255] disabled:opacity-30">Next</button>
+                </div>
               </div>
             </div>
           </div>
         </div>
-
-      </div><!-- /dashboard section -->
+      </div>
 
       <!-- ═══════════════════════════════════════════════ -->
       <!-- PRODUCTS SECTION                              -->

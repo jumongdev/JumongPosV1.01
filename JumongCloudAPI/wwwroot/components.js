@@ -948,6 +948,19 @@ Alpine.store('app', {
     get allGood() { return this.missing.length === 0 }
   }));
 
+  // Inventory Cost Report
+  Alpine.data('inventoryCostReport', () => ({
+    d: [], loading: true,
+    async init() { await this.load() },
+    async load() {
+      this.loading = true;
+      try {
+        this.d = await fetchJSON(API + '/shift-history?days=365');
+      } catch (e) { this.d = [] }
+      this.loading = false;
+    }
+  }));
+
   // POS PROMO panel
   Alpine.data('posPromoPanel', () => ({
     promoMessage: '',
