@@ -1,3 +1,5 @@
+using System.Data.SQLite;
+using JumongPosV1._01.Data;
 using JumongPosV1._01.Helpers;
 using JumongPosV1._01.Models;
 using JumongPosV1._01.Services;
@@ -513,7 +515,10 @@ public partial class ProductsForm : Form
             form.ShowDialog();
         };
 
-        pnlToolbar.Controls.AddRange(new Control[] { lblPageTitle, lblSearchIcon, txtSearch, lblCatFilter, cmbFilterCategory, btnUpdateMaster });
+        var btnInvCheck = new Button { Text = "\uD83D\uDCCA INV CHECK", Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), Location = new Point(1100, 12), Size = new Size(110, 28), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(100, 80, 180), ForeColor = Color.White, Cursor = Cursors.Hand };
+        btnInvCheck.Click += ShowInventoryCheck;
+
+        pnlToolbar.Controls.AddRange(new Control[] { lblPageTitle, lblSearchIcon, txtSearch, lblCatFilter, cmbFilterCategory, btnUpdateMaster, btnInvCheck });
 
         // ── METRICS BAR ──
         var pnlMetrics = new Panel { Dock = DockStyle.Top, Height = 35, BackColor = canvasBg };
@@ -705,6 +710,168 @@ public partial class ProductsForm : Form
             Visible = false,
             Text = source.Text
         };
+    }
+
+    private void ShowInventoryCheck(object? sender, EventArgs e)
+    {
+        var popup = new Form
+        {
+            Text = "Inventory Reconciliation Check",
+            Size = new Size(820, 520),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            BackColor = ThemeManager.Current.SurfaceBg
+        };
+        var txt = new RichTextBox { Location = new Point(12, 12), Size = new Size(780, 430), ReadOnly = true, Font = new Font("Consolas", 10F), BackColor = ThemeManager.Current.CardBg, ForeColor = ThemeManager.Current.TextPrimary, BorderStyle = BorderStyle.None, WordWrap = false };
+        var btnClose = new Button { Text = "CLOSE", Location = new Point(680, 450), Size = new Size(110, 32), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = ThemeManager.Current.CardBg, ForeColor = ThemeManager.Current.TextSecondary, Cursor = Cursors.Hand };
+        btnClose.Click += (_, _) => popup.Close();
+        popup.Controls.AddRange(new Control[] { txt, btnClose });
+
+        popup.Shown += (_, _) =>
+        {
+            try
+            {
+                using var conn = DatabaseHelper.GetConnection();
+                conn.Open();
+
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("=== INVENTORY RECONCILIATION CHECK ===");
+                sb.AppendLine();
+
+                // Check if DailyClose has inventory columns
+                using (var chk = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('DailyClose') WHERE name='TotalInventoryCost'", conn))
+                {
+                    if (Convert.ToInt32(chk.ExecuteScalar()) == 0)
+                    {
+                        sb.AppendLine("DailyClose table missing inventory columns.");
+                        sb.AppendLine("Update POS client to v1.0.86+.");
+                        txt.Text = sb.ToString();
+                        return;
+                    }
+                }
+
+                // Latest end shift
+                string? closeDate = null;
+                decimal totalInvCost = 0, totalCOGS = 0, totalRecvCost = 0;
+                using (var dcCmd = new SQLiteCommand("SELECT CloseDate, TotalInventoryCost, TotalCostSold, TotalStockReceivedCost FROM DailyClose ORDER BY Id DESC LIMIT 1", conn))
+                using (var r = dcCmd.ExecuteReader())
+                {
+                    if (!r.Read())
+                    {
+                        sb.AppendLine("No end shift found. Run End Shift first.");
+                        txt.Text = sb.ToString();
+                        return;
+                    }
+                    closeDate = r.GetString(0);
+                    totalInvCost = r.GetDecimal(1);
+                    totalCOGS = r.GetDecimal(2);
+                    totalRecvCost = r.GetDecimal(3);
+                }
+
+                // Previous shift
+                decimal prevInvCost = 0;
+                using (var pCmd = new SQLiteCommand("SELECT TotalInventoryCost FROM DailyClose WHERE CloseDate < @cd ORDER BY Id DESC LIMIT 1", conn))
+                {
+                    pCmd.Parameters.AddWithValue("@cd", closeDate);
+                    var o = pCmd.ExecuteScalar();
+                    if (o != DBNull.Value && o != null) prevInvCost = Convert.ToDecimal(o);
+                }
+
+                var expected = prevInvCost + totalRecvCost - totalCOGS;
+                var variance = totalInvCost - expected;
+
+                sb.AppendLine($"Close Date:    {closeDate}");
+                sb.AppendLine($"Prev. Inv:     {prevInvCost,14:N2}");
+                sb.AppendLine($"+ Received:    {totalRecvCost,14:N2}");
+                sb.AppendLine($"- COGS:        {totalCOGS,14:N2}");
+                sb.AppendLine($"= Expected:    {expected,14:N2}");
+                sb.AppendLine($"Actual Inv:    {totalInvCost,14:N2}");
+                sb.AppendLine($"Variance:      {variance,14:N2} {(variance == 0 ? "[OK]" : (variance > 0 ? "[OVER]" : "[SHORT]"))}");
+                sb.AppendLine();
+
+                if (variance == 0)
+                {
+                    sb.AppendLine("Balanced. No issue.");
+                    txt.Text = sb.ToString();
+                    return;
+                }
+
+                // Cost mismatches in sales
+                sb.AppendLine("=== ITEMS WITH COST MISMATCH (sale vs current) ===");
+                using (var sCmd = new SQLiteCommand(@"SELECT si.ProductName, si.Quantity, si.UnitCost, COALESCE(p.Cost,0) AS ProdCost,
+                    ROUND((COALESCE(p.Cost,0) - si.UnitCost/si.Quantity) * si.Quantity, 2) AS Impact
+                    FROM SaleItems si JOIN Sales s ON si.SaleId=s.Id
+                    LEFT JOIN Products p ON si.ProductId=p.Id
+                    WHERE si.IsVoided=0 AND s.IsVoided=0 AND s.SaleDate>=@since
+                    AND ABS(COALESCE(p.Cost,0) - si.UnitCost/si.Quantity) > 0.005
+                    ORDER BY ABS(Impact) DESC LIMIT 20", conn))
+                {
+                    sCmd.Parameters.AddWithValue("@since", closeDate);
+                    using var r = sCmd.ExecuteReader();
+                    var found = false;
+                    var saleImpact = 0m;
+                    while (r.Read())
+                    {
+                        found = true;
+                        var name = r.GetString(0);
+                        if (name.Length > 30) name = name[..30];
+                        var qty = r.GetInt32(1);
+                        var impact = r.GetDecimal(4);
+                        saleImpact += impact;
+                        sb.AppendLine($"  {name,-30} qty={qty,4}  impact={impact,10:N2}");
+                    }
+                    if (!found) sb.AppendLine("  (none — all sale costs match)");
+                    sb.AppendLine($"  Subtotal sale mismatch: {saleImpact,12:N2}");
+                    sb.AppendLine();
+                }
+
+                // Receiving recompute
+                sb.AppendLine("=== RECEIVING TODAY ===");
+                using (var rCmd = new SQLiteCommand(@"SELECT st.ProductName, SUM(st.QuantityAdded), COALESCE(p.Cost,0)
+                    FROM StockTrail st LEFT JOIN Products p ON st.ProductId=p.Id
+                    WHERE st.QuantityAdded>0 AND st.CreatedAt>=@since
+                    GROUP BY st.ProductId ORDER BY st.ProductName", conn))
+                {
+                    rCmd.Parameters.AddWithValue("@since", closeDate);
+                    using var r = rCmd.ExecuteReader();
+                    var calc = 0m;
+                    while (r.Read())
+                    {
+                        var name = r.GetString(0); if (name.Length > 30) name = name[..30];
+                        var qty = r.GetDecimal(1);
+                        var cost = r.GetDecimal(2);
+                        var ext = qty * cost;
+                        calc += ext;
+                        sb.AppendLine($"  {name,-30} qty={qty,5:N0}  cost={cost,8:N2}  ext={ext,10:N2}");
+                    }
+                    sb.AppendLine($"  Calculated: {calc,12:N2}  Stored: {totalRecvCost,12:N2}  Diff: {calc - totalRecvCost,10:N2}");
+                    sb.AppendLine();
+                }
+
+                // Zero cost products
+                using (var zCmd = new SQLiteCommand("SELECT Name, StockQty FROM Products WHERE IsActive=1 AND StockQty>0 AND (Cost=0 OR Cost IS NULL)", conn))
+                using (var r = zCmd.ExecuteReader())
+                {
+                    var found = false;
+                    while (r.Read())
+                    {
+                        if (!found) { sb.AppendLine("=== ZERO-COST PRODUCTS WITH STOCK ==="); found = true; }
+                        sb.AppendLine($"  {r.GetString(0)}  (stock: {r.GetInt32(1)})");
+                    }
+                    if (!found) sb.AppendLine("(no zero-cost products)");
+                }
+
+                txt.Text = sb.ToString();
+            }
+            catch (Exception ex)
+            {
+                txt.Text = "Error: " + ex.Message + "\n" + ex.StackTrace;
+            }
+        };
+
+        popup.ShowDialog(this);
     }
 
     private TextBox txtSearch = null!;

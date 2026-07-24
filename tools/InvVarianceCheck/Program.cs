@@ -1,12 +1,51 @@
 using System;
 using System.Data.SQLite;
 using System.Globalization;
+using System.IO;
 
+try
+{
 var dbPath = "JumongPos.db";
 if (args.Length > 0) dbPath = args[0];
 
+Console.WriteLine("Inventory Variance Checker v1.0");
+Console.WriteLine("===============================");
+Console.WriteLine($"Looking for: {Path.GetFullPath(dbPath)}");
+
+if (!File.Exists(dbPath))
+{
+    Console.WriteLine();
+    Console.WriteLine("ERROR: Database file not found!");
+    Console.WriteLine($"  Tried: {Path.GetFullPath(dbPath)}");
+    Console.WriteLine();
+    Console.WriteLine("Usage: run this from the POS folder, or:");
+    Console.WriteLine("  invcheck.exe \"C:\\full\\path\\to\\JumongPos.db\"");
+    Console.WriteLine();
+    Console.WriteLine("Press any key to exit...");
+    Console.ReadLine();
+    return;
+}
+
+Console.WriteLine($"Found DB ({new FileInfo(dbPath).Length / 1024} KB). Connecting...");
 using var conn = new SQLiteConnection($"Data Source={dbPath}");
 conn.Open();
+Console.WriteLine("Connected. Running queries...");
+Console.WriteLine();
+
+// Check if DailyClose has inventory columns
+var hasInvColumns = false;
+using (var chkCol = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('DailyClose') WHERE name = 'TotalInventoryCost'", conn))
+    hasInvColumns = Convert.ToInt32(chkCol.ExecuteScalar()) > 0;
+
+if (!hasInvColumns)
+{
+    Console.WriteLine("ERROR: DailyClose table is missing TotalInventoryCost column.");
+    Console.WriteLine("Update POS client to v1.0.86+ to enable inventory cost tracking.");
+    Console.WriteLine();
+    Console.WriteLine("Press Enter to exit...");
+    Console.ReadLine();
+    return;
+}
 
 // 1. Get the latest end shift
 using var dcCmd = new SQLiteCommand(@"
@@ -142,3 +181,16 @@ Console.WriteLine($"Variance:      {variance,12:N2}");
 Console.WriteLine($"Sale mismatch: {saleImpactTotal,12:N2}");
 Console.WriteLine($"RecvCost diff: {calcRecvCost - totalRecvCost,12:N2}");
 Console.WriteLine($"Unexplained:   {variance - saleImpactTotal - (calcRecvCost - totalRecvCost),12:N2}");
+Console.WriteLine();
+Console.WriteLine("Press any key to exit...");
+Console.ReadLine();
+}
+catch (Exception ex)
+{
+    Console.WriteLine();
+    Console.WriteLine("ERROR: " + ex.Message);
+    Console.WriteLine(ex.StackTrace);
+    Console.WriteLine();
+    Console.WriteLine("Press any key to exit...");
+    Console.ReadLine();
+}

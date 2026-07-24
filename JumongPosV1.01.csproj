@@ -42,6 +42,10 @@
     <Content Remove="JumongCloudAPI\**" />
     <EmbeddedResource Remove="JumongCloudAPI\**" />
     <None Remove="JumongCloudAPI\**" />
+    <Compile Remove="tools\**" />
+    <Content Remove="tools\**" />
+    <EmbeddedResource Remove="tools\**" />
+    <None Remove="tools\**" />
   </ItemGroup>
 
   <Target Name="CopyAssetsAfterPublish" AfterTargets="Publish">
