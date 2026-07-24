@@ -848,6 +848,40 @@ public partial class ProductsForm : Form
                     }
                     sb.AppendLine($"  Calculated: {calc,12:N2}  Stored: {totalRecvCost,12:N2}  Diff: {calc - totalRecvCost,10:N2}");
                     sb.AppendLine();
+                    sb.AppendLine("  --- Per-item cost change detection ---");
+                    // Try to find old cost from prior sales of received products
+                    using (var ccCmd = new SQLiteCommand(@"
+                        SELECT p.Name, st.qty AS RcvdQty, p.Cost AS CurrentCost,
+                               (SELECT si.UnitCost/si.Quantity FROM SaleItems si JOIN Sales s ON si.SaleId=s.Id 
+                                WHERE si.ProductId=p.Id AND si.IsVoided=0 AND s.IsVoided=0 AND si.Quantity>0
+                                ORDER BY s.SaleDate DESC LIMIT 1) AS LastSaleUnitCost
+                        FROM (SELECT ProductId, SUM(QuantityAdded) AS qty FROM StockTrail 
+                              WHERE QuantityAdded>0 AND CreatedAt>=@since2 GROUP BY ProductId) st
+                        JOIN Products p ON st.ProductId=p.Id
+                        ORDER BY ABS(COALESCE(p.Cost,0) - (SELECT si.UnitCost/si.Quantity FROM SaleItems si JOIN Sales s ON si.SaleId=s.Id WHERE si.ProductId=p.Id AND si.IsVoided=0 AND s.IsVoided=0 AND si.Quantity>0 ORDER BY s.SaleDate DESC LIMIT 1)) DESC", conn))
+                    {
+                        ccCmd.Parameters.AddWithValue("@since2", closeDate);
+                        using var r = ccCmd.ExecuteReader();
+                        sb.AppendLine($"    {"Product",-28} {"Rcvd",5} {"NowCost",9}  {"LastSaleCost",12}  {"Delta",10}");
+                        var hadChanges = false;
+                        while (r.Read())
+                        {
+                            var name = r.GetString(0); if (name.Length > 26) name = name[..26];
+                            var rcvdQty = r.GetDecimal(1);
+                            var curCost = r.GetDecimal(2);
+                            var lastCost = r.IsDBNull(3) ? 0m : r.GetDecimal(3);
+                            var delta = lastCost > 0 ? curCost - lastCost : 0m;
+                            var marker = "";
+                            if (lastCost == 0)
+                                marker = " [no prior sale]";
+                            else if (Math.Abs(delta) > 0.01m)
+                                marker = delta > 0 ? " [COST UP]" : " [COST DOWN]";
+                            if (marker != "") hadChanges = true;
+                            sb.AppendLine($"    {name,-28} {rcvdQty,5:N0} {curCost,9:N2}  {lastCost,12:N2}  {delta,10:N2}{marker}");
+                        }
+                        if (!hadChanges) sb.AppendLine("    (no cost changes detected)");
+                    }
+                    sb.AppendLine();
                 }
 
                 // Zero cost products
