@@ -703,8 +703,8 @@ tailwind.config = {
                           <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalInventoryCost)"></span></td>
                           <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalCostSold)"></span></td>
                           <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalStockReceivedCost)"></span></td>
-                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt((x.totalInventoryCost||0) + (x.totalStockReceivedCost||0) - (x.totalCostSold||0))"></span></td>
-                          <td class="px-2 py-2 text-right font-semibold" :class="(x.totalInventoryCost||0) >= ((x.totalInventoryCost||0) + (x.totalStockReceivedCost||0) - (x.totalCostSold||0)) ? 'text-emerald-500' : 'text-red-500'">&#8369;<span x-text="fmt((x.totalInventoryCost||0) - ((x.totalInventoryCost||0) + (x.totalStockReceivedCost||0) - (x.totalCostSold||0)))"></span></td>
+                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.expected)"></span></td>
+                          <td class="px-2 py-2 text-right font-semibold" :class="x.variance >= 0 ? 'text-emerald-500' : 'text-red-500'">&#8369;<span x-text="fmt(x.variance)"></span></td>
                         </tr>
                       </template>
                     </tbody>
