@@ -2649,6 +2649,94 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
     }
 
+    [HttpPut("warehouse/sales/{id}")]
+    public IActionResult WhEditSale(int id, [FromBody] WhWalkinSellRequest req)
+    {
+        if (req == null || req.Items == null || req.Items.Count == 0)
+            return BadRequest(new { error = "No items" });
+
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var tx = conn.BeginTransaction();
+        try
+        {
+            // Restore all original stock deductions
+            using var orig = conn.CreateCommand(); orig.Transaction = tx;
+            orig.CommandText = "SELECT product_id, stock_deduction FROM wh_walkin_sale_items WHERE sale_id = @sid";
+            orig.Parameters.AddWithValue("sid", id);
+            using var rOrig = orig.ExecuteReader();
+            var restores = new List<(int pid, int qty)>();
+            while (rOrig.Read()) restores.Add((rOrig.GetInt32(0), rOrig.GetInt32(1)));
+            rOrig.Close();
+            foreach (var (pid, qty) in restores)
+            {
+                using var res = conn.CreateCommand(); res.Transaction = tx;
+                res.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @qty WHERE id = @pid";
+                res.Parameters.AddWithValue("pid", pid);
+                res.Parameters.AddWithValue("qty", qty);
+                res.ExecuteNonQuery();
+            }
+
+            // Delete old items
+            using var del = conn.CreateCommand(); del.Transaction = tx;
+            del.CommandText = "DELETE FROM wh_walkin_sale_items WHERE sale_id = @sid";
+            del.Parameters.AddWithValue("sid", id);
+            del.ExecuteNonQuery();
+
+            // Insert new items + deduct stock
+            decimal grandTotal = 0;
+            foreach (var item in req.Items)
+            {
+                // Get product info
+                string pn = ""; int boxQty = 1; decimal unitPrice = 0; int qtyPerUnit = 1;
+                using (var get = conn.CreateCommand()) { get.Transaction = tx;
+                    get.CommandText = "SELECT name, box_qty, piece_price FROM wh_products WHERE id = @pid";
+                    get.Parameters.AddWithValue("pid", item.ProductId);
+                    using var r = get.ExecuteReader();
+                    if (!r.Read()) return BadRequest(new { error = "Product not found: " + item.ProductId });
+                    pn = r.GetString(0); boxQty = Math.Max(1, r.IsDBNull(1) ? 1 : r.GetInt32(1));
+                }
+
+                // Get unit by index
+                string unitName = "Piece"; unitPrice = 0; qtyPerUnit = 1;
+                using (var get = conn.CreateCommand()) { get.Transaction = tx;
+                    get.CommandText = @"SELECT mu.unit_name, mu.price, mu.qty_per_unit FROM master_product_units mu JOIN wh_products wp ON wp.master_product_id = mu.product_id WHERE wp.id = @pid ORDER BY mu.is_default DESC, mu.id LIMIT 20";
+                    get.Parameters.AddWithValue("pid", item.ProductId);
+                    var units = new List<(string n, decimal p, int q)>();
+                    using var r = get.ExecuteReader(); while (r.Read()) units.Add((r.GetString(0), r.GetDecimal(1), r.GetInt32(2)));
+                    if (units.Count > 0) { var idx = item.UnitIndex >= 0 && item.UnitIndex < units.Count ? item.UnitIndex : 0; unitName = units[idx].n; unitPrice = units[idx].p; qtyPerUnit = units[idx].q; }
+                }
+
+                var stockDeduction = item.Qty * qtyPerUnit;
+                var subtotal = item.Qty * unitPrice;
+
+                using var ins = conn.CreateCommand(); ins.Transaction = tx;
+                ins.CommandText = "INSERT INTO wh_walkin_sale_items (sale_id, product_id, product_name, barcode, unit_name, qty, price, subtotal, stock_deduction) VALUES (@sid, @pid, @pn, '', @un, @qty, @pr, @st, @sd)";
+                ins.Parameters.AddWithValue("sid", id); ins.Parameters.AddWithValue("pid", item.ProductId);
+                ins.Parameters.AddWithValue("pn", pn); ins.Parameters.AddWithValue("un", unitName);
+                ins.Parameters.AddWithValue("qty", item.Qty); ins.Parameters.AddWithValue("pr", unitPrice);
+                ins.Parameters.AddWithValue("st", subtotal); ins.Parameters.AddWithValue("sd", stockDeduction);
+                ins.ExecuteNonQuery();
+
+                using var ded = conn.CreateCommand(); ded.Transaction = tx;
+                ded.CommandText = "UPDATE wh_products SET stock_qty = stock_qty - @sd WHERE id = @pid";
+                ded.Parameters.AddWithValue("pid", item.ProductId); ded.Parameters.AddWithValue("sd", stockDeduction);
+                ded.ExecuteNonQuery();
+
+                grandTotal += subtotal;
+            }
+
+            using var upd = conn.CreateCommand(); upd.Transaction = tx;
+            upd.CommandText = "UPDATE wh_walkin_sales SET total_amount = @t, item_count = @ic WHERE id = @sid";
+            upd.Parameters.AddWithValue("t", grandTotal); upd.Parameters.AddWithValue("ic", req.Items.Count);
+            upd.Parameters.AddWithValue("sid", id);
+            upd.ExecuteNonQuery();
+
+            tx.Commit();
+            return Ok(new { ok = true, grandTotal });
+        }
+        catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
+    }
+
     [HttpGet("warehouse/transfers/pending-count")]
     public IActionResult WhGetPendingTransferCount()
         {

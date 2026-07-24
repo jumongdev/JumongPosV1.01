@@ -520,6 +520,37 @@ Alpine.store('app', {
       } catch (e) { toast('Error loading items', 'error') }
     },
     closeSaleView() { this.saleViewOpen = false; this.saleViewItems = [] },
+    editId: null, editItems: [], editingSale: false,
+    async editSaleItems(id) {
+      this.editId = id; this.editingSale = true;
+      try {
+        const items = await fetchJSON(API + '/warehouse/sales/' + id + '/items');
+        this.editItems = items.map(x => ({ ...x }));
+
+        const prods = await fetchJSON(API + '/warehouse/products?activeOnly=false');
+        // Map barcode to find products for adding
+        this._saleEditProds = prods;
+      } catch (e) { toast('Error loading', 'error') }
+    },
+    closeEditSale() { this.editingSale = false; this.editId = null; this.editItems = [] },
+    addEditSaleItem(pid, pn, qty) {
+      var existing = this.editItems.find(x => x.productId === pid);
+      if (existing) { existing.qty += qty; existing.subtotal = existing.qty * existing.price; }
+      else this.editItems.push({ productId: pid, productName: pn, unitIndex: 0, qty, price: 0, subtotal: 0, unitName: 'Piece' });
+    },
+    removeEditSaleItem(i) { this.editItems.splice(i, 1) },
+    async saveEditSale() {
+      if (!this.editItems.length) { toast('Add at least one item', 'error'); return }
+      try {
+        var body = {
+          customerId: 0, customerName: '',
+          items: this.editItems.map(x => ({ productId: x.productId, productName: x.productName, unitIndex: x.unitIndex || 0, qty: x.qty }))
+        };
+        var r = await fetch(API + '/warehouse/sales/' + this.editId, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (r.ok) { toast('Sale updated — stock corrected', 'success'); this.closeEditSale(); this.loadSales() }
+        else { var j = await r.json(); toast('Error: ' + (j.error || 'Failed'), 'error') }
+      } catch (e) { toast('Error: ' + e.message, 'error') }
+    },
 
     modalOpen: false, modalTitle: '', modalMode: 'add', modalId: null, form: {},
 
