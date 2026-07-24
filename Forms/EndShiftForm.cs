@@ -1,3 +1,4 @@
+using System.Data.SQLite;
 using JumongPosV1._01.Helpers;
 using JumongPosV1._01.Data;
 using JumongPosV1._01.Models;
@@ -142,6 +143,56 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
     }
     
     ShiftSessionService.EndSession();
+
+    // Show sync progress popup (blocks user until done or failed)
+    var syncForm = new Form
+    {
+        Text = "Syncing...",
+        Size = new Size(400, 120),
+        StartPosition = FormStartPosition.CenterParent,
+        FormBorderStyle = FormBorderStyle.FixedDialog,
+        ControlBox = false,
+        ShowInTaskbar = false,
+        TopMost = true,
+        BackColor = Color.FromArgb(20, 20, 40),
+        ForeColor = Color.FromArgb(230, 230, 245)
+    };
+    var syncLbl = new Label { Text = "Uploading shift data to cloud...", Location = new Point(15, 15), Size = new Size(370, 22), ForeColor = Color.FromArgb(0, 245, 255), Font = new Font("Segoe UI", 10F, FontStyle.Bold) };
+    var syncBar = new ProgressBar { Location = new Point(15, 45), Size = new Size(370, 28), Style = ProgressBarStyle.Marquee };
+    var syncSub = new Label { Text = "Please wait — do not close.", Location = new Point(15, 80), Size = new Size(370, 20), ForeColor = Color.FromArgb(140, 140, 170), Font = new Font("Segoe UI", 8F) };
+    syncForm.Controls.AddRange(new Control[] { syncLbl, syncBar, syncSub });
+    syncForm.Show(this);
+
+    _ = Task.Run(async () =>
+    {
+        try
+        {
+            // 1. Sync the daily close
+            await SyncService.SyncDailyClose(dc);
+
+            // 2. Sync any pending unsynced sales
+            await SyncService.RetryFailedAsync();
+
+            // 3. Push inventory stock snapshot
+            var stocks = new List<(int productId, string productName, int currentStock)>();
+            using (var sConn = DatabaseHelper.GetConnection())
+            {
+                sConn.Open();
+                using var sCmd = new SQLiteCommand("SELECT Id, Name, StockQty FROM Products WHERE IsActive = 1", sConn);
+                using var sRdr = sCmd.ExecuteReader();
+                while (sRdr.Read())
+                    stocks.Add((sRdr.GetInt32(0), sRdr.GetString(1), sRdr.GetInt32(2)));
+            }
+            if (stocks.Count > 0)
+                await SyncService.SyncStockSnapshotAsync(stocks);
+
+            syncForm.BeginInvoke(() => syncForm.Close());
+        }
+        catch
+        {
+            try { syncForm.BeginInvoke(() => { syncLbl.Text = "Sync failed — will retry later."; syncBar.Visible = false; syncForm.ControlBox = true; }); } catch { }
+        }
+    });
 
     var printErrorMsg = "";
     var prevInv = DailyCloseService.GetLastInventoryCost();

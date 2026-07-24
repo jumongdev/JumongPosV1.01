@@ -689,6 +689,7 @@ tailwind.config = {
                     <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
                       <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
                       <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Store</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Previous</th>
                       <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Inv Cost</th>
                       <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">COGS</th>
                       <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Recv Cost</th>
@@ -700,6 +701,7 @@ tailwind.config = {
                         <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                           <td class="px-2 py-2" x-text="new Date(x.closeDate).toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})"></td>
                           <td class="px-2 py-2"><span class="text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded" x-text="shortStore(x.storeId, $store.app.storeMap[x.storeId])"></span></td>
+                          <td class="px-2 py-2 text-right text-gray-500 dark:text-[#7878aa]">&#8369;<span x-text="fmt(x.prevInvCost)"></span></td>
                           <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalInventoryCost)"></span></td>
                           <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalCostSold)"></span></td>
                           <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalStockReceivedCost)"></span></td>
