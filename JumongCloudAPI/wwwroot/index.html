@@ -1312,7 +1312,7 @@ tailwind.config = {
                         <td class="px-3 py-2">
                           <button @click="viewTransfer(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">VIEW</button>
                           <template x-if="x.status==='pending'">
-                            <button @click="receiveTransfer(x.id)" class="text-[10px] px-2 py-1 rounded border border-cyan-300 text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/20">RECEIVE</button>
+                            <button @click="cancelTransfer(x.id)" class="text-[10px] px-2 py-1 rounded border border-red-300 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">CANCEL</button>
                           </template>
                         </td>
                       </tr>
