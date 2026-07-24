@@ -597,5 +597,10 @@ public static class PgDatabaseHelper
             INSERT INTO pos_promo (id, message)
             SELECT 1, '' WHERE NOT EXISTS (SELECT 1 FROM pos_promo);";
         try { promoMig.ExecuteNonQuery(); } catch { }
+
+        // Migration: add is_voided to wh_walkin_sales
+        using var voidMig = conn.CreateCommand();
+        voidMig.CommandText = "ALTER TABLE wh_walkin_sales ADD COLUMN IF NOT EXISTS is_voided BOOLEAN NOT NULL DEFAULT FALSE";
+        try { voidMig.ExecuteNonQuery(); } catch { }
     }
 }

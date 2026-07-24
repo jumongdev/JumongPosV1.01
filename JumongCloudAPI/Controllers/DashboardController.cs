@@ -2565,16 +2565,14 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     }
 
     [HttpGet("warehouse/sales")]
-    public IActionResult WhGetSales([FromQuery] string? from, [FromQuery] string? to)
+    public IActionResult WhGetSales([FromQuery] string? from, [FromQuery] string? to, [FromQuery] int limit = 500)
     {
         using var conn = Data.PgDatabaseHelper.GetConnection();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT s.id, s.customer_name, s.total_amount, s.item_count, s.created_at FROM wh_walkin_sales s";
-        var wheres = new List<string>();
-        if (!string.IsNullOrEmpty(from)) { wheres.Add("s.created_at >= @from"); cmd.Parameters.AddWithValue("from", from); }
-        if (!string.IsNullOrEmpty(to)) { wheres.Add("s.created_at <= @to"); cmd.Parameters.AddWithValue("to", to + " 23:59:59"); }
-        if (wheres.Count > 0) cmd.CommandText += " WHERE " + string.Join(" AND ", wheres);
-        cmd.CommandText += " ORDER BY s.created_at DESC LIMIT 500";
+        cmd.CommandText = "SELECT s.id, s.customer_name, s.total_amount, s.item_count, s.created_at FROM wh_walkin_sales s WHERE COALESCE(s.is_voided, FALSE) = FALSE";
+        if (!string.IsNullOrEmpty(from)) { cmd.CommandText += " AND s.created_at >= @from"; cmd.Parameters.AddWithValue("from", from); }
+        if (!string.IsNullOrEmpty(to)) { cmd.CommandText += " AND s.created_at <= @to"; cmd.Parameters.AddWithValue("to", to + " 23:59:59"); }
+        cmd.CommandText += " ORDER BY s.created_at DESC LIMIT " + limit;
 
         var list = new List<object>();
         using var r = cmd.ExecuteReader();
@@ -2598,6 +2596,57 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         while (r.Read())
             list.Add(new { productName = r.GetString(0), unitName = r.GetString(1), qty = r.GetInt32(2), price = r.GetDecimal(3), subtotal = r.GetDecimal(4), points = r.GetInt32(5) });
         return Ok(list);
+    }
+
+    [HttpPost("warehouse/sales/{id}/void")]
+    public IActionResult WhVoidSale(int id, [FromBody] WhVoidRequest? req)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var tx = conn.BeginTransaction();
+        try
+        {
+            using var chk = conn.CreateCommand(); chk.Transaction = tx;
+            chk.CommandText = "SELECT is_voided FROM wh_walkin_sales WHERE id = @id";
+            chk.Parameters.AddWithValue("id", id);
+            var existing = chk.ExecuteScalar();
+            if (existing == null) return NotFound(new { error = "Sale not found" });
+            if (existing is bool b && b) return BadRequest(new { error = "Sale already voided" });
+
+            // Restore stock
+            using var items = conn.CreateCommand(); items.Transaction = tx;
+            items.CommandText = "SELECT product_id, stock_deduction FROM wh_walkin_sale_items WHERE sale_id = @sid";
+            items.Parameters.AddWithValue("sid", id);
+            using var r = items.ExecuteReader();
+            var restores = new List<(int pid, int qty)>();
+            while (r.Read()) restores.Add((r.GetInt32(0), r.GetInt32(1)));
+            r.Close();
+
+            foreach (var (pid, qty) in restores)
+            {
+                using var upd = conn.CreateCommand(); upd.Transaction = tx;
+                upd.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @qty WHERE id = @pid";
+                upd.Parameters.AddWithValue("pid", pid);
+                upd.Parameters.AddWithValue("qty", qty);
+                upd.ExecuteNonQuery();
+
+                using var trail = conn.CreateCommand(); trail.Transaction = tx;
+                trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, qty_change, reference, reference_type) " +
+                    "SELECT @pid, name, @qty, 'Wholesale Void #' || @sid, 'void_return' FROM wh_products WHERE id = @pid";
+                trail.Parameters.AddWithValue("pid", pid);
+                trail.Parameters.AddWithValue("qty", qty);
+                trail.Parameters.AddWithValue("sid", id);
+                trail.ExecuteNonQuery();
+            }
+
+            using var mark = conn.CreateCommand(); mark.Transaction = tx;
+            mark.CommandText = "UPDATE wh_walkin_sales SET is_voided = TRUE WHERE id = @id";
+            mark.Parameters.AddWithValue("id", id);
+            mark.ExecuteNonQuery();
+
+            tx.Commit();
+            return Ok(new { ok = true });
+        }
+        catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
     }
 
     [HttpGet("warehouse/transfers/pending-count")]
@@ -2721,6 +2770,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         public decimal CashReceived { get; set; }
         public List<WhWalkinSellItem> Items { get; set; } = new();
     }
+    public class WhVoidRequest { public string Reason { get; set; } = ""; }
     public class WhWalkinSellItem
     {
         public int ProductId { get; set; }

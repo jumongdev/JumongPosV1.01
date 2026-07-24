@@ -545,10 +545,19 @@ public class WarehouseSellForm : Form
         };
         btnEndShiftWh.Click += async (_, _) => await DoWholesaleEndShiftAsync();
 
+        var btnVoid = new Button
+        {
+            Text = "\u2716 VOID RECEIPT",
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 },
+            BackColor = Color.FromArgb(255, 60, 60), ForeColor = Color.White, Cursor = Cursors.Hand
+        };
+        btnVoid.Click += async (_, _) => await ShowVoidPopupAsync();
+
         _pnlTotals.Controls.AddRange(new Control[] {
             lblTotalDueHint, lblGrandTotal, sep1,
             lblSubTotalLbl, lblSubTotal,
-            sep2, btnSell, btnEndShiftWh
+            sep2, btnSell, btnEndShiftWh, btnVoid
         });
 
         Controls.AddRange(new Control[] { _pnlTopbar, _pnlCustomerBar, _pnlSearch, _pnlCart, _pnlTotals });
@@ -627,7 +636,8 @@ public class WarehouseSellForm : Form
         lblSubTotal.Location = new Point(m + pw / 2, ry); lblSubTotal.Size = new Size(pw / 2, 22); ry += 28;
         sep2.Location = new Point(m, ry); sep2.Width = pw; ry += 14;
         btnSell.Location = new Point(m, ry); btnSell.Size = new Size(pw, 52); ry += 58;
-        btnEndShiftWh.Location = new Point(m, ry); btnEndShiftWh.Size = new Size(pw, 40);
+        btnEndShiftWh.Location = new Point(m, ry); btnEndShiftWh.Size = new Size(pw, 40); ry += 46;
+        btnVoid.Location = new Point(m, ry); btnVoid.Size = new Size(pw, 36);
     }
 
     private async Task ShowCustomerPickerAsync()
@@ -1110,7 +1120,60 @@ public class WarehouseSellForm : Form
         catch (Exception ex) { ErrorLogger.Log("WholesaleEndShift", ex); MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
     }
 
+    private async Task ShowVoidPopupAsync()
+    {
+        var popup = new Form { Text = "Void Wholesale Receipt", Size = new Size(600, 450), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, BackColor = ThemeManager.Current.SurfaceBg };
+        var lbl = new Label { Text = "Select a sale to void:", Font = new Font("Segoe UI", 10F, FontStyle.Bold), Location = new Point(12, 12), Size = new Size(560, 24), ForeColor = ThemeManager.Current.TextPrimary };
+        var dgv = new DataGridView { Location = new Point(12, 42), Size = new Size(560, 300), ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, BackgroundColor = ThemeManager.Current.CardBg, Font = new Font("Segoe UI", 9F), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ColumnHeadersHeight = 28, EnableHeadersVisualStyles = false };
+        dgv.Columns.Add("Id", "#"); dgv.Columns.Add("Customer", "Customer"); dgv.Columns.Add("Total", "Total"); dgv.Columns.Add("Date", "Date");
+        dgv.Columns[0].Width = 50; dgv.Columns[2].Width = 80; dgv.Columns[3].Width = 140;
+
+        var btnDoVoid = new Button { Text = "✖ VOID SELECTED SALE", Font = new Font("Segoe UI", 10F, FontStyle.Bold), BackColor = Color.FromArgb(255, 60, 60), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, Cursor = Cursors.Hand, Enabled = false, Location = new Point(12, 352), Size = new Size(200, 36) };
+        var btnClose = new Button { Text = "CLOSE", Location = new Point(370, 352), Size = new Size(200, 36), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = ThemeManager.Current.CardBg, ForeColor = ThemeManager.Current.TextSecondary, Cursor = Cursors.Hand };
+        btnClose.Click += (_, _) => popup.Close();
+
+        dgv.SelectionChanged += (_, _) => btnDoVoid.Enabled = dgv.SelectedRows.Count > 0;
+
+        btnDoVoid.Click += async (_, _) =>
+        {
+            if (dgv.SelectedRows.Count == 0) return;
+            var saleId = (int)dgv.SelectedRows[0].Cells[0].Value;
+            if (MessageBox.Show($"Void wholesale sale #{saleId}?\nThis will restore stock to the warehouse.", "Confirm Void", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+
+            try
+            {
+                var url = SyncService.ApiUrl.TrimEnd('/') + "/dashboard/warehouse/sales/" + saleId + "/void";
+                var response = await _http.PostAsync(url, new StringContent("{}", Encoding.UTF8, "application/json"));
+                if (response.IsSuccessStatusCode) { MessageBox.Show("Sale #" + saleId + " voided. Stock restored.", "Voided", MessageBoxButtons.OK, MessageBoxIcon.Information); popup.Close(); }
+                else { var err = await response.Content.ReadAsStringAsync(); MessageBox.Show("Failed: " + err, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            }
+            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        };
+
+        popup.Controls.AddRange(new Control[] { lbl, dgv, btnDoVoid, btnClose });
+
+        // Load recent sales
+        try
+        {
+            var url = SyncService.ApiUrl.TrimEnd('/') + "/dashboard/warehouse/sales?limit=200";
+            var json = await _http.GetStringAsync(url);
+            using var doc = JsonDocument.Parse(json);
+            foreach (var s in doc.RootElement.EnumerateArray())
+            {
+                var sid = s.GetProperty("id").GetInt32();
+                var cn = s.GetProperty("customerName").GetString();
+                var total = s.GetProperty("total").GetDecimal();
+                var dt = s.GetProperty("createdAt").GetDateTime().ToString("MMM dd hh:mm tt");
+                dgv.Rows.Add(sid, cn, "₱" + total.ToString("N2"), dt);
+            }
+        }
+        catch { dgv.Rows.Add(0, "Failed to load", "", ""); }
+
+        popup.ShowDialog(this);
+    }
+
     private Button btnEndShiftWh = null!;
+    private Button btnVoid = null!;
 }
 
 public class WhCartItem : INotifyPropertyChanged
