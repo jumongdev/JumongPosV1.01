@@ -511,7 +511,8 @@ public class DashboardController : ControllerBase
             using var cmd = conn.CreateCommand();
             cmd.CommandText = $@"
                 SELECT close_date, total_sales, total_cash, total_ewallet, total_credit, total_voided, 
-                       total_expenses, cash_on_hand, difference, user_name, notes, store_id
+                       total_expenses, cash_on_hand, difference, user_name, notes, store_id,
+                       COALESCE(total_inventory_cost, 0), COALESCE(total_cost_sold, 0), COALESCE(total_stock_received_cost, 0)
                 FROM daily_closes d
                 WHERE close_date >= CURRENT_DATE - @days {StoreFilter(storeId, "d")}
                 ORDER BY close_date DESC";
@@ -520,7 +521,7 @@ public class DashboardController : ControllerBase
             var data = new List<object>();
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
-                data.Add(new { closeDate = reader.GetDateTime(0), totalSales = reader.GetDecimal(1), totalCash = reader.GetDecimal(2), totalEwallet = reader.GetDecimal(3), totalCredit = reader.GetDecimal(4), totalVoided = reader.GetDecimal(5), totalExpenses = reader.GetDecimal(6), cashOnHand = reader.GetDecimal(7), difference = reader.GetDecimal(8), userName = reader.GetString(9), notes = reader.IsDBNull(10) ? "" : reader.GetString(10), storeId = reader.GetString(11) });
+                data.Add(new { closeDate = reader.GetDateTime(0), totalSales = reader.GetDecimal(1), totalCash = reader.GetDecimal(2), totalEwallet = reader.GetDecimal(3), totalCredit = reader.GetDecimal(4), totalVoided = reader.GetDecimal(5), totalExpenses = reader.GetDecimal(6), cashOnHand = reader.GetDecimal(7), difference = reader.GetDecimal(8), userName = reader.GetString(9), notes = reader.IsDBNull(10) ? "" : reader.GetString(10), storeId = reader.GetString(11), totalInventoryCost = reader.GetDecimal(12), totalCostSold = reader.GetDecimal(13), totalStockReceivedCost = reader.GetDecimal(14) });
             return Ok(data);
         }
 
@@ -2252,6 +2253,34 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         return Ok(list);
     }
 
+        [HttpPost("warehouse/stock-snapshot")]
+        public IActionResult WhStockSnapshot([FromBody] WhStockSnapshotRequest req)
+        {
+            if (req?.Items == null) return Ok(new { ok = true });
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var tx = conn.BeginTransaction();
+            try
+            {
+                foreach (var item in req.Items)
+                {
+                    using var cmd = conn.CreateCommand(); cmd.Transaction = tx;
+                    cmd.CommandText = "UPDATE wh_products SET stock_qty = @sq WHERE id = @pid";
+                    cmd.Parameters.AddWithValue("pid", item.ProductId);
+                    cmd.Parameters.AddWithValue("sq", item.CurrentStock);
+                    cmd.ExecuteNonQuery();
+
+                    using var trail = conn.CreateCommand(); trail.Transaction = tx;
+                    trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, qty_change, reference, reference_type) VALUES (@pid, @pn, 0, 'Stock snapshot from POS', 'snapshot')";
+                    trail.Parameters.AddWithValue("pid", item.ProductId);
+                    trail.Parameters.AddWithValue("pn", item.ProductName);
+                    trail.ExecuteNonQuery();
+                }
+                tx.Commit();
+                return Ok(new { ok = true });
+            }
+            catch { tx.Rollback(); return Ok(new { ok = false }); }
+        }
+
         [HttpGet("warehouse/inventory-activity")]
         public IActionResult WhGetInventoryActivity(
             [FromQuery] string? search = null,
@@ -2672,6 +2701,17 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     public class WhTransferItemDto { public int ProductId { get; set; } public string ProductName { get; set; } = ""; public string? Barcode { get; set; } public int Qty { get; set; } }
     public class WhTransferReceiveRequest { public List<WhTransferReceivedItemDto>? Items { get; set; } }
     public class WhTransferReceivedItemDto { public int ProductId { get; set; } public string ProductName { get; set; } = ""; }
+
+    public class WhStockSnapshotRequest
+    {
+        public List<WhStockSnapshotItem>? Items { get; set; }
+    }
+    public class WhStockSnapshotItem
+    {
+        public int ProductId { get; set; }
+        public string ProductName { get; set; } = "";
+        public int CurrentStock { get; set; }
+    }
 
     public class WhWalkinSellRequest
     {
