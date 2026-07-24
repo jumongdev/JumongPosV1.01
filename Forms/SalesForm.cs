@@ -95,7 +95,7 @@ public partial class SalesForm : Form
             {
                 BeginInvoke(() =>
                 {
-                    _lblUpdateBanner.Text = "UPDATE AVAILABLE";
+                    _lblUpdateBanner.Text = "APP UPDATE";
                     _lblUpdateBanner.Visible = true;
                     ResizeTopbar();
                 });
