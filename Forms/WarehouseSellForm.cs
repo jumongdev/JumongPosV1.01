@@ -1041,13 +1041,14 @@ public class WarehouseSellForm : Form
                 var result = doc.RootElement;
                 var grandTotal = result.GetProperty("grandTotal").GetDecimal();
                 var saleId = result.GetProperty("saleId").GetInt32();
+                var invoiceNo = result.TryGetProperty("invoiceNo", out var invProp) ? invProp.GetString() : "";
 
                 // Wholesale stays in cloud only — no local save
 
                 try
                 {
                     var printItems = _cart.Select(c => (c.ProductName, c.UnitName, c.Quantity, c.Price, c.TotalPrice)).ToList();
-                    PrinterService.PrintWhReceipt(saleId, _customerName, printItems, grandTotal, _currentUser?.FullName ?? "Admin");
+                    PrinterService.PrintWhReceipt(saleId, _customerName, printItems, grandTotal, _currentUser?.FullName ?? "Admin", invoiceNo ?? "");
                 }
                 catch (Exception printEx)
                 {
@@ -1125,8 +1126,8 @@ public class WarehouseSellForm : Form
         var popup = new Form { Text = "Sales History / Void", Size = new Size(600, 450), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, BackColor = ThemeManager.Current.SurfaceBg };
         var lbl = new Label { Text = "Select a sale:", Font = new Font("Segoe UI", 10F, FontStyle.Bold), Location = new Point(12, 12), Size = new Size(560, 24), ForeColor = ThemeManager.Current.TextPrimary };
         var dgv = new DataGridView { Location = new Point(12, 42), Size = new Size(560, 300), ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, BackgroundColor = ThemeManager.Current.CardBg, Font = new Font("Segoe UI", 9F), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ColumnHeadersHeight = 28, EnableHeadersVisualStyles = false };
-        dgv.Columns.Add("Id", "#"); dgv.Columns.Add("Customer", "Customer"); dgv.Columns.Add("Total", "Total"); dgv.Columns.Add("Date", "Date");
-        dgv.Columns[0].Width = 50; dgv.Columns[2].Width = 80; dgv.Columns[3].Width = 140;
+        dgv.Columns.Add("Id", "#"); dgv.Columns.Add("Invoice", "Invoice"); dgv.Columns.Add("Customer", "Customer"); dgv.Columns.Add("Total", "Total"); dgv.Columns.Add("Date", "Date"); dgv.Columns.Add("Voided", "V");
+        dgv.Columns[0].Width = 45; dgv.Columns[1].Width = 120; dgv.Columns[3].Width = 80; dgv.Columns[4].Width = 130; dgv.Columns[5].Width = 25;
 
         var btnDoVoid = new Button { Text = "✖ VOID", Font = new Font("Segoe UI", 9F, FontStyle.Bold), BackColor = Color.FromArgb(255, 60, 60), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, Cursor = Cursors.Hand, Enabled = false, Location = new Point(12, 352), Size = new Size(130, 36) };
         var btnReprint = new Button { Text = "🖨 REPRINT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), BackColor = Color.FromArgb(0, 150, 200), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, Cursor = Cursors.Hand, Enabled = false, Location = new Point(150, 352), Size = new Size(130, 36) };
@@ -1139,7 +1140,8 @@ public class WarehouseSellForm : Form
         {
             if (dgv.SelectedRows.Count == 0) return;
             var saleId = (int)dgv.SelectedRows[0].Cells[0].Value;
-            var cust = dgv.SelectedRows[0].Cells[1].Value?.ToString() ?? "";
+            var cust = dgv.SelectedRows[0].Cells[2].Value?.ToString() ?? "";
+            var invNo = dgv.SelectedRows[0].Cells[1].Value?.ToString() ?? "";
             try
             {
                 var url = SyncService.ApiUrl.TrimEnd('/') + "/dashboard/warehouse/sales/" + saleId + "/items";
@@ -1157,7 +1159,7 @@ public class WarehouseSellForm : Form
                     items.Add((pn, un, qty, pr, st));
                     gTotal += st;
                 }
-                PrinterService.PrintWhReceipt(saleId, cust, items, gTotal, _currentUser?.FullName ?? "Admin");
+                PrinterService.PrintWhReceipt(saleId, cust, items, gTotal, _currentUser?.FullName ?? "Admin", invNo);
                 MessageBox.Show("Receipt reprinted.", "Reprint", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex) { MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
@@ -1179,7 +1181,7 @@ public class WarehouseSellForm : Form
             catch (Exception ex) { MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         };
 
-        popup.Controls.AddRange(new Control[] { lbl, dgv, btnDoVoid, btnClose });
+        popup.Controls.AddRange(new Control[] { lbl, dgv, btnDoVoid, btnReprint, btnClose });
 
         // Load recent sales
         try
@@ -1189,15 +1191,16 @@ public class WarehouseSellForm : Form
             using var doc = JsonDocument.Parse(json);
             foreach (var s in doc.RootElement.EnumerateArray())
             {
-                if (s.TryGetProperty("isVoided", out var iv) && iv.GetBoolean()) continue;
                 var sid = s.GetProperty("id").GetInt32();
+                var inv = s.TryGetProperty("invoiceNo", out var ip) ? ip.GetString() ?? "" : "";
                 var cn = s.GetProperty("customerName").GetString();
                 var total = s.GetProperty("total").GetDecimal();
                 var dt = s.GetProperty("createdAt").GetDateTime().ToString("MMM dd hh:mm tt");
-                dgv.Rows.Add(sid, cn, "₱" + total.ToString("N2"), dt);
+                var isVoided = s.TryGetProperty("isVoided", out var iv) && iv.GetBoolean();
+                dgv.Rows.Add(sid, inv, cn, "₱" + total.ToString("N2"), dt, isVoided ? "Y" : "");
             }
         }
-        catch { dgv.Rows.Add(0, "Failed to load", "", ""); }
+        catch { dgv.Rows.Add(0, "", "Failed to load", "", "", ""); }
 
         popup.ShowDialog(this);
     }

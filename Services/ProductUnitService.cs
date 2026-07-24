@@ -39,50 +39,23 @@ public class ProductUnitService
     public static List<ProductUnit> GetByProduct(int productId)
     {
         var list = new List<ProductUnit>();
-        if (CloudDatabaseHelper.IsConfigured)
-        {
-            try
-            {
-                using var pgConn = CloudDatabaseHelper.GetConnection()!;
-                pgConn.Open();
-                using var cmd = new NpgsqlCommand("SELECT * FROM product_units WHERE product_pos_id = @pid ORDER BY is_default DESC, unit_name", pgConn);
-                cmd.Parameters.AddWithValue("pid", productId);
-                using var rdr = cmd.ExecuteReader();
-                while (rdr.Read()) list.Add(MapPg(rdr));
-                if (list.Count > 0) return list;
-            }
-            catch { }
-        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        using var cmd2 = new SQLiteCommand("SELECT * FROM ProductUnits WHERE ProductId = @pid ORDER BY IsDefault DESC, UnitName", conn);
-        cmd2.Parameters.AddWithValue("@pid", productId);
-        using var rdr2 = cmd2.ExecuteReader();
-        while (rdr2.Read()) list.Add(Map(rdr2));
+        using var cmd = new SQLiteCommand("SELECT * FROM ProductUnits WHERE ProductId = @pid ORDER BY IsDefault DESC, UnitName", conn);
+        cmd.Parameters.AddWithValue("@pid", productId);
+        using var rdr = cmd.ExecuteReader();
+        while (rdr.Read()) list.Add(Map(rdr));
         return list;
     }
 
     public static ProductUnit? GetDefault(int productId)
     {
-        if (CloudDatabaseHelper.IsConfigured)
-        {
-            try
-            {
-                using var pgConn = CloudDatabaseHelper.GetConnection()!;
-                pgConn.Open();
-                using var cmd = new NpgsqlCommand("SELECT * FROM product_units WHERE product_pos_id = @pid AND is_default = 1 LIMIT 1", pgConn);
-                cmd.Parameters.AddWithValue("pid", productId);
-                using var rdr = cmd.ExecuteReader();
-                if (rdr.Read()) return MapPg(rdr);
-            }
-            catch { }
-        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        using var cmd2 = new SQLiteCommand("SELECT * FROM ProductUnits WHERE ProductId = @pid AND IsDefault = 1 LIMIT 1", conn);
-        cmd2.Parameters.AddWithValue("@pid", productId);
-        using var rdr2 = cmd2.ExecuteReader();
-        if (rdr2.Read()) return Map(rdr2);
+        using var cmd = new SQLiteCommand("SELECT * FROM ProductUnits WHERE ProductId = @pid AND IsDefault = 1 LIMIT 1", conn);
+        cmd.Parameters.AddWithValue("@pid", productId);
+        using var rdr = cmd.ExecuteReader();
+        if (rdr.Read()) return Map(rdr);
         return null;
     }
 
@@ -186,20 +159,6 @@ public class ProductUnitService
             QtyPerUnit = Convert.ToInt32(rdr["QtyPerUnit"]),
             IsDefault = Convert.ToBoolean(rdr["IsDefault"]),
             PointsPerUnit = rdr["PointsPerUnit"] != DBNull.Value ? Convert.ToInt32(rdr["PointsPerUnit"]) : 0
-        };
-    }
-
-    private static ProductUnit MapPg(NpgsqlDataReader rdr)
-    {
-        return new ProductUnit
-        {
-            Id = Convert.ToInt32(rdr["pos_id"]),
-            ProductId = Convert.ToInt32(rdr["product_pos_id"]),
-            UnitName = rdr["unit_name"].ToString() ?? "",
-            Price = Convert.ToDecimal(rdr["price"]),
-            Cost = Convert.ToDecimal(rdr["cost"]),
-            QtyPerUnit = Convert.ToInt32(rdr["qty_per_unit"]),
-            IsDefault = Convert.ToInt32(rdr["is_default"]) == 1
         };
     }
 }

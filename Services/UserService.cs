@@ -38,24 +38,11 @@ public static class UserService
     public static List<User> GetAll()
     {
         var list = new List<User>();
-        if (CloudDatabaseHelper.IsConfigured)
-        {
-            try
-            {
-                using var pgConn = CloudDatabaseHelper.GetConnection()!;
-                pgConn.Open();
-                using var cmd = new NpgsqlCommand("SELECT * FROM users ORDER BY username", pgConn);
-                using var rdr = cmd.ExecuteReader();
-                while (rdr.Read()) list.Add(MapPg(rdr));
-                if (list.Count > 0) return list;
-            }
-            catch { }
-        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        using var cmd2 = new SQLiteCommand("SELECT * FROM Users ORDER BY Username", conn);
-        using var rdr2 = cmd2.ExecuteReader();
-        while (rdr2.Read()) list.Add(Map(rdr2));
+        using var cmd = new SQLiteCommand("SELECT * FROM Users ORDER BY Username", conn);
+        using var rdr = cmd.ExecuteReader();
+        while (rdr.Read()) list.Add(Map(rdr));
         return list;
     }
 
@@ -143,19 +130,6 @@ public static class UserService
             PasswordHash = rdr["PasswordHash"].ToString() ?? "",
             Role = rdr["Role"].ToString() ?? "Cashier",
             IsActive = Convert.ToBoolean(rdr["IsActive"])
-        };
-    }
-
-    private static User MapPg(NpgsqlDataReader rdr)
-    {
-        return new User
-        {
-            Id = Convert.ToInt32(rdr["pos_id"]),
-            Username = rdr["username"].ToString() ?? "",
-            FullName = rdr["full_name"]?.ToString() ?? "",
-            PasswordHash = rdr["password_hash"]?.ToString() ?? "",
-            Role = rdr["role"]?.ToString() ?? "Cashier",
-            IsActive = Convert.ToInt32(rdr["is_active"]) == 1
         };
     }
 

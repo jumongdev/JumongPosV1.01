@@ -1336,6 +1336,7 @@ tailwind.config = {
               <template x-if="salesData.length > 0">
                 <table class="w-full text-xs">
                   <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Invoice #</th>
                     <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Customer</th>
                     <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Items</th>
                     <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Total</th>
@@ -1345,6 +1346,7 @@ tailwind.config = {
                   <tbody>
                     <template x-for="(x,i) in salesData" :key="i">
                       <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]" :class="x.isVoided ? 'opacity-50' : ''">
+                        <td class="px-3 py-2 font-mono text-[10px] text-gray-500 dark:text-[#7878aa]" :class="x.isVoided ? 'line-through' : ''" x-text="x.invoiceNo||'—'"></td>
                         <td class="px-3 py-2 font-medium" x-text="x.customerName"></td>
                         <td class="px-3 py-2 text-right" x-text="x.itemCount"></td>
                         <td class="px-3 py-2 text-right" :class="x.isVoided ? 'line-through' : ''">&#8369;<span x-text="fmt(x.total)"></span></td>

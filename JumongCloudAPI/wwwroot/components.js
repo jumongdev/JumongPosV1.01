@@ -989,18 +989,17 @@ Alpine.store('app', {
         const raw = await fetchJSON(API + '/shift-history?days=365');
         // Sort ascending by date for proper expected calculation
         const sorted = [...raw].sort((a, b) => new Date(a.closeDate) - new Date(b.closeDate));
-        var prevInvCost = 0;
-        var prevStore = '';
+        var prevInvByStore = {};
         for (var i = 0; i < sorted.length; i++) {
           var x = sorted[i];
           var ic = x.totalInventoryCost || 0;
           var cs = x.totalCostSold || 0;
           var sr = x.totalStockReceivedCost || 0;
-          // If store changed, reset previous inventory
-          if (x.storeId !== prevStore) { prevInvCost = 0; prevStore = x.storeId }
+          var prevInvCost = prevInvByStore[x.storeId] || 0;
+          x.prevInvCost = prevInvCost;
           x.expected = prevInvCost + sr - cs;
           x.variance = ic - x.expected;
-          prevInvCost = ic;
+          prevInvByStore[x.storeId] = ic;
         }
         // Sort back to descending for display
         this.d = sorted.sort((a, b) => new Date(b.closeDate) - new Date(a.closeDate));

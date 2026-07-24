@@ -41,74 +41,33 @@ public class ProductService
     public static List<Product> GetAll()
     {
         var list = new List<Product>();
-        if (CloudDatabaseHelper.IsConfigured)
-        {
-            try
-            {
-                using var pgConn = CloudDatabaseHelper.GetConnection()!;
-                pgConn.Open();
-                using var cmd = new NpgsqlCommand("SELECT * FROM products WHERE is_active = 1 ORDER BY name", pgConn);
-                using var rdr = cmd.ExecuteReader();
-                while (rdr.Read())
-                    list.Add(MapPg(rdr));
-                if (list.Count > 0) return list;
-            }
-            catch { }
-        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        using var cmd2 = new SQLiteCommand("SELECT * FROM Products WHERE IsActive = 1 ORDER BY Name", conn);
-        using var rdr2 = cmd2.ExecuteReader();
-        while (rdr2.Read()) list.Add(Map(rdr2));
+        using var cmd = new SQLiteCommand("SELECT * FROM Products WHERE IsActive = 1 ORDER BY Name", conn);
+        using var rdr = cmd.ExecuteReader();
+        while (rdr.Read()) list.Add(Map(rdr));
         return list;
     }
 
     public static Product? GetById(int id)
     {
-        if (CloudDatabaseHelper.IsConfigured)
-        {
-            try
-            {
-                using var pgConn = CloudDatabaseHelper.GetConnection()!;
-                pgConn.Open();
-                using var cmd = new NpgsqlCommand("SELECT * FROM products WHERE pos_id = @id AND store_id = @sid", pgConn);
-                cmd.Parameters.AddWithValue("id", id);
-                cmd.Parameters.AddWithValue("sid", StoreId);
-                using var rdr = cmd.ExecuteReader();
-                if (rdr.Read()) return MapPg(rdr);
-            }
-            catch { }
-        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        using var cmd2 = new SQLiteCommand("SELECT * FROM Products WHERE Id = @id", conn);
-        cmd2.Parameters.AddWithValue("@id", id);
-        using var rdr2 = cmd2.ExecuteReader();
-        if (rdr2.Read()) return Map(rdr2);
+        using var cmd = new SQLiteCommand("SELECT * FROM Products WHERE Id = @id", conn);
+        cmd.Parameters.AddWithValue("@id", id);
+        using var rdr = cmd.ExecuteReader();
+        if (rdr.Read()) return Map(rdr);
         return null;
     }
 
     public static Product? GetByBarcode(string barcode)
     {
-        if (CloudDatabaseHelper.IsConfigured)
-        {
-            try
-            {
-                using var pgConn = CloudDatabaseHelper.GetConnection()!;
-                pgConn.Open();
-                using var cmd = new NpgsqlCommand("SELECT * FROM products WHERE barcode = @b AND is_active = 1", pgConn);
-                cmd.Parameters.AddWithValue("b", barcode);
-                using var rdr = cmd.ExecuteReader();
-                if (rdr.Read()) return MapPg(rdr);
-            }
-            catch { }
-        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        using var cmd2 = new SQLiteCommand("SELECT * FROM Products WHERE Barcode = @barcode AND IsActive = 1", conn);
-        cmd2.Parameters.AddWithValue("@barcode", barcode);
-        using var rdr2 = cmd2.ExecuteReader();
-        if (rdr2.Read()) return Map(rdr2);
+        using var cmd = new SQLiteCommand("SELECT * FROM Products WHERE Barcode = @barcode AND IsActive = 1", conn);
+        cmd.Parameters.AddWithValue("@barcode", barcode);
+        using var rdr = cmd.ExecuteReader();
+        if (rdr.Read()) return Map(rdr);
         return null;
     }
 
@@ -166,28 +125,13 @@ public class ProductService
 
     public static List<string> GetCategories()
     {
-        if (CloudDatabaseHelper.IsConfigured)
-        {
-            try
-            {
-                var list = new List<string>();
-                using var pgConn = CloudDatabaseHelper.GetConnection()!;
-                pgConn.Open();
-                using var cmd = new NpgsqlCommand("SELECT DISTINCT category FROM products WHERE is_active = 1 AND category != '' ORDER BY category", pgConn);
-                using var rdr = cmd.ExecuteReader();
-                while (rdr.Read()) list.Add(rdr.GetString(0));
-                if (list.Count > 0) return list;
-            }
-            catch { }
-        }
-        var list2 = new List<string>();
+        var list = new List<string>();
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        using var cmd2 = new SQLiteCommand("SELECT DISTINCT Category FROM Products WHERE IsActive = 1 AND Category != '' ORDER BY Category", conn);
-        using var rdr2 = cmd2.ExecuteReader();
-        while (rdr2.Read())
-            list2.Add(rdr2.GetString(0));
-        return list2;
+        using var cmd = new SQLiteCommand("SELECT DISTINCT Category FROM Products WHERE IsActive = 1 AND Category != '' ORDER BY Category", conn);
+        using var rdr = cmd.ExecuteReader();
+        while (rdr.Read()) list.Add(rdr.GetString(0));
+        return list;
     }
 
     public static List<Product> Search(string keyword, string? category = null, string? stockFilter = null)
@@ -233,63 +177,25 @@ public class ProductService
 
     public static (int total, int lowStock, int outOfStock) GetStockStats()
     {
-        if (CloudDatabaseHelper.IsConfigured)
-        {
-            try
-            {
-                using var pgConn = CloudDatabaseHelper.GetConnection()!;
-                pgConn.Open();
-                var threshold = GetLowStockThreshold();
-                var cmd = new NpgsqlCommand("SELECT COUNT(*), SUM(CASE WHEN stock_qty = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN stock_qty > 0 AND stock_qty <= @thresh THEN 1 ELSE 0 END) FROM products WHERE is_active = 1", pgConn);
-                cmd.Parameters.AddWithValue("thresh", threshold);
-                using var rdr = cmd.ExecuteReader();
-                if (rdr.Read())
-                {
-                    var total = Convert.ToInt32(rdr[0]);
-                    var outOf = rdr[1] != DBNull.Value ? Convert.ToInt32(rdr[1]) : 0;
-                    var low = rdr[2] != DBNull.Value ? Convert.ToInt32(rdr[2]) : 0;
-                    return (total, low, outOf);
-                }
-            }
-            catch { }
-        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var threshold2 = GetLowStockThreshold();
-        var total2 = 0; var low2 = 0; var outOf2 = 0;
-        var cmd2 = new SQLiteCommand("SELECT COUNT(*), SUM(CASE WHEN StockQty = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN StockQty > 0 AND StockQty <= @thresh THEN 1 ELSE 0 END) FROM Products WHERE IsActive = 1", conn);
-        cmd2.Parameters.AddWithValue("@thresh", threshold2);
-        using var rdr2 = cmd2.ExecuteReader();
-        if (rdr2.Read())
-        {
-            total2 = Convert.ToInt32(rdr2[0]);
-            outOf2 = rdr2[1] != DBNull.Value ? Convert.ToInt32(rdr2[1]) : 0;
-            low2 = rdr2[2] != DBNull.Value ? Convert.ToInt32(rdr2[2]) : 0;
-        }
-        return (total2, low2, outOf2);
+        var threshold = GetLowStockThreshold();
+        var cmd = new SQLiteCommand("SELECT COUNT(*), SUM(CASE WHEN StockQty = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN StockQty > 0 AND StockQty <= @thresh THEN 1 ELSE 0 END) FROM Products WHERE IsActive = 1", conn);
+        cmd.Parameters.AddWithValue("@thresh", threshold);
+        using var rdr = cmd.ExecuteReader();
+        if (rdr.Read())
+            return (Convert.ToInt32(rdr[0]), rdr[2] != DBNull.Value ? Convert.ToInt32(rdr[2]) : 0, rdr[1] != DBNull.Value ? Convert.ToInt32(rdr[1]) : 0);
+        return (0, 0, 0);
     }
 
     public static (decimal retailValue, decimal costValue) GetStockValues()
     {
-        if (CloudDatabaseHelper.IsConfigured)
-        {
-            try
-            {
-                using var pgConn = CloudDatabaseHelper.GetConnection()!;
-                pgConn.Open();
-                var cmd = new NpgsqlCommand("SELECT COALESCE(SUM(stock_qty * price), 0), COALESCE(SUM(stock_qty * cost), 0) FROM products WHERE is_active = 1", pgConn);
-                using var rdr = cmd.ExecuteReader();
-                if (rdr.Read())
-                    return (Convert.ToDecimal(rdr[0]), Convert.ToDecimal(rdr[1]));
-            }
-            catch { }
-        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var cmd2 = new SQLiteCommand("SELECT COALESCE(SUM(StockQty * Price), 0), COALESCE(SUM(StockQty * Cost), 0) FROM Products WHERE IsActive = 1", conn);
-        using var rdr2 = cmd2.ExecuteReader();
-        if (rdr2.Read())
-            return (Convert.ToDecimal(rdr2[0]), Convert.ToDecimal(rdr2[1]));
+        var cmd = new SQLiteCommand("SELECT COALESCE(SUM(StockQty * Price), 0), COALESCE(SUM(StockQty * Cost), 0) FROM Products WHERE IsActive = 1", conn);
+        using var rdr = cmd.ExecuteReader();
+        if (rdr.Read())
+            return (Convert.ToDecimal(rdr[0]), Convert.ToDecimal(rdr[1]));
         return (0, 0);
     }
 
@@ -350,23 +256,6 @@ public class ProductService
             ImageData = rdr["image_data"]?.ToString() ?? "",
             PointsExempt = rdr["PointsExempt"] != DBNull.Value && Convert.ToBoolean(rdr["PointsExempt"]),
             PointsPerUnit = rdr["PointsPerUnit"] != DBNull.Value ? Convert.ToInt32(rdr["PointsPerUnit"]) : 0
-        };
-    }
-
-    private static Product MapPg(NpgsqlDataReader rdr)
-    {
-        return new Product
-        {
-            Id = Convert.ToInt32(rdr["pos_id"]),
-            Name = rdr["name"].ToString() ?? "",
-            Barcode = rdr["barcode"]?.ToString() ?? "",
-            Category = rdr["category"]?.ToString() ?? "",
-            Price = Convert.ToDecimal(rdr["price"]),
-            Cost = Convert.ToDecimal(rdr["cost"]),
-            StockQty = Convert.ToInt32(rdr["stock_qty"]),
-            IsActive = Convert.ToInt32(rdr["is_active"]) == 1,
-            CreatedAt = DateTime.TryParse(rdr["created_at"]?.ToString(), out var dt) ? dt : TimeHelper.Now,
-            ImageData = rdr["image_data"]?.ToString() ?? ""
         };
     }
 }

@@ -2421,13 +2421,27 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         using var tx = conn.BeginTransaction();
         try
         {
+            // Generate invoice number: WH-YYYYMMDD-NNNN
+            var today = DateTime.Now.ToString("yyyyMMdd");
+            var seq = 0;
+            using (var genInv = conn.CreateCommand()) { genInv.Transaction = tx;
+                genInv.CommandText = @"
+                    INSERT INTO wh_invoice_counter (date_key, last_seq) VALUES (@d, 0)
+                    ON CONFLICT (date_key) DO UPDATE SET last_seq = wh_invoice_counter.last_seq + 1
+                    RETURNING last_seq";
+                genInv.Parameters.AddWithValue("d", today);
+                seq = Convert.ToInt32(genInv.ExecuteScalar());
+            }
+            var invoiceNo = $"WH-{today}-{seq:D4}";
+
             // Create sale header
             int saleId;
             using (var hdr = conn.CreateCommand()) { hdr.Transaction = tx;
-                hdr.CommandText = "INSERT INTO wh_walkin_sales (customer_id, customer_name, total_amount, item_count) VALUES (@cid, @cn, 0, @ic) RETURNING id";
+                hdr.CommandText = "INSERT INTO wh_walkin_sales (customer_id, customer_name, total_amount, item_count, invoice_no) VALUES (@cid, @cn, 0, @ic, @inv) RETURNING id";
                 hdr.Parameters.AddWithValue("cid", req.CustomerId > 0 ? req.CustomerId : 0);
                 hdr.Parameters.AddWithValue("cn", req.CustomerName.Trim());
                 hdr.Parameters.AddWithValue("ic", req.Items.Count);
+                hdr.Parameters.AddWithValue("inv", invoiceNo);
                 saleId = Convert.ToInt32(hdr.ExecuteScalar());
             }
 
@@ -2551,15 +2565,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             tx.Commit();
 
             // Return receipt data
-            return Ok(new
-            {
-                success = true,
-                saleId,
-                customerName = req.CustomerName.Trim(),
-                grandTotal,
-                totalPoints,
-                date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-            });
+            return Ok(new { saleId, grandTotal, invoiceNo, totalPoints });
         }
         catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
     }
@@ -2569,7 +2575,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     {
         using var conn = Data.PgDatabaseHelper.GetConnection();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT s.id, s.customer_name, s.total_amount, s.item_count, s.created_at, COALESCE(s.is_voided, FALSE) FROM wh_walkin_sales s WHERE 1=1";
+        cmd.CommandText = "SELECT s.id, s.customer_name, s.total_amount, s.item_count, s.created_at, COALESCE(s.is_voided, FALSE), COALESCE(s.invoice_no, '') FROM wh_walkin_sales s WHERE 1=1";
         if (!string.IsNullOrEmpty(from)) { cmd.CommandText += " AND s.created_at >= @from"; cmd.Parameters.AddWithValue("from", from); }
         if (!string.IsNullOrEmpty(to)) { cmd.CommandText += " AND s.created_at <= @to"; cmd.Parameters.AddWithValue("to", to + " 23:59:59"); }
         cmd.CommandText += " ORDER BY s.created_at DESC LIMIT " + limit;
@@ -2579,7 +2585,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         while (r.Read())
         {
             var saleId = r.GetInt32(0);
-            list.Add(new { id = saleId, customerName = r.GetString(1), total = r.GetDecimal(2), itemCount = r.GetInt32(3), createdAt = r.GetDateTime(4), isVoided = r.GetBoolean(5) });
+            list.Add(new { id = saleId, customerName = r.GetString(1), total = r.GetDecimal(2), itemCount = r.GetInt32(3), createdAt = r.GetDateTime(4), isVoided = r.GetBoolean(5), invoiceNo = r.IsDBNull(6) ? "" : r.GetString(6) });
         }
         return Ok(list);
     }

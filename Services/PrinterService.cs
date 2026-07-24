@@ -894,7 +894,7 @@ public class PrinterService
         return val?.ToString() ?? "";
     }
 
-    public static void PrintWhReceipt(int saleId, string customerName, List<(string ProductName, string UnitName, int Qty, decimal Price, decimal Subtotal)> items, decimal grandTotal, string cashierName)
+    public static void PrintWhReceipt(int saleId, string customerName, List<(string ProductName, string UnitName, int Qty, decimal Price, decimal Subtotal)> items, decimal grandTotal, string cashierName, string invoiceNo = "")
     {
         var printer = GetSetting("PrinterName");
         if (string.IsNullOrEmpty(printer)) { MessageBox.Show("No printer configured. Go to Settings to set a printer.", "Printer Not Set", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
@@ -930,6 +930,7 @@ public class PrinterService
         if (!string.IsNullOrEmpty(mobile)) AddLine("Mobile: " + mobile);
         AddLine("─── WALK-IN SALE ───", true);
         AddLine("Sale #" + saleId);
+        if (!string.IsNullOrEmpty(invoiceNo)) AddLine("Invoice: " + invoiceNo);
         AddLine("Customer: " + customerName);
         AddLine("Cashier: " + cashierName);
         AddLine(DateTime.Now.ToString("MMM dd, yyyy  hh:mm tt"));

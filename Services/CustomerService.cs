@@ -42,73 +42,33 @@ public class CustomerService
     public static List<Customer> GetAll()
     {
         var list = new List<Customer>();
-        if (CloudDatabaseHelper.IsConfigured)
-        {
-            try
-            {
-                using var pgConn = CloudDatabaseHelper.GetConnection()!;
-                pgConn.Open();
-                using var cmd = new NpgsqlCommand("SELECT * FROM customers ORDER BY name", pgConn);
-                using var rdr = cmd.ExecuteReader();
-                while (rdr.Read()) list.Add(MapPg(rdr));
-                if (list.Count > 0) return list;
-            }
-            catch { }
-        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        using var cmd2 = new SQLiteCommand("SELECT * FROM Customers ORDER BY Name", conn);
-        using var rdr2 = cmd2.ExecuteReader();
-        while (rdr2.Read()) list.Add(Map(rdr2));
+        using var cmd = new SQLiteCommand("SELECT * FROM Customers ORDER BY Name", conn);
+        using var rdr = cmd.ExecuteReader();
+        while (rdr.Read()) list.Add(Map(rdr));
         return list;
     }
 
     public static Customer? GetById(int id)
     {
-        if (CloudDatabaseHelper.IsConfigured)
-        {
-            try
-            {
-                using var pgConn = CloudDatabaseHelper.GetConnection()!;
-                pgConn.Open();
-                using var cmd = new NpgsqlCommand("SELECT * FROM customers WHERE pos_id = @id AND store_id = @sid", pgConn);
-                cmd.Parameters.AddWithValue("id", id);
-                cmd.Parameters.AddWithValue("sid", StoreId);
-                using var rdr = cmd.ExecuteReader();
-                if (rdr.Read()) return MapPg(rdr);
-            }
-            catch { }
-        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        using var cmd2 = new SQLiteCommand("SELECT * FROM Customers WHERE Id = @id", conn);
-        cmd2.Parameters.AddWithValue("@id", id);
-        using var rdr2 = cmd2.ExecuteReader();
-        if (rdr2.Read()) return Map(rdr2);
+        using var cmd = new SQLiteCommand("SELECT * FROM Customers WHERE Id = @id", conn);
+        cmd.Parameters.AddWithValue("@id", id);
+        using var rdr = cmd.ExecuteReader();
+        if (rdr.Read()) return Map(rdr);
         return null;
     }
 
     public static Customer? GetByPhone(string phone)
     {
-        if (CloudDatabaseHelper.IsConfigured)
-        {
-            try
-            {
-                using var pgConn = CloudDatabaseHelper.GetConnection()!;
-                pgConn.Open();
-                using var cmd = new NpgsqlCommand("SELECT * FROM customers WHERE phone = @p", pgConn);
-                cmd.Parameters.AddWithValue("p", phone);
-                using var rdr = cmd.ExecuteReader();
-                if (rdr.Read()) return MapPg(rdr);
-            }
-            catch { }
-        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        using var cmd2 = new SQLiteCommand("SELECT * FROM Customers WHERE Phone = @p", conn);
-        cmd2.Parameters.AddWithValue("@p", phone);
-        using var rdr2 = cmd2.ExecuteReader();
-        if (rdr2.Read()) return Map(rdr2);
+        using var cmd = new SQLiteCommand("SELECT * FROM Customers WHERE Phone = @p", conn);
+        cmd.Parameters.AddWithValue("@p", phone);
+        using var rdr = cmd.ExecuteReader();
+        if (rdr.Read()) return Map(rdr);
         return null;
     }
 
@@ -293,26 +253,12 @@ public class CustomerService
     public static List<Customer> Search(string keyword)
     {
         var list = new List<Customer>();
-        if (CloudDatabaseHelper.IsConfigured)
-        {
-            try
-            {
-                using var pgConn = CloudDatabaseHelper.GetConnection()!;
-                pgConn.Open();
-                using var cmd = new NpgsqlCommand("SELECT * FROM customers WHERE name ILIKE @kw OR phone ILIKE @kw ORDER BY name LIMIT 30", pgConn);
-                cmd.Parameters.AddWithValue("kw", $"%{keyword}%");
-                using var rdr = cmd.ExecuteReader();
-                while (rdr.Read()) list.Add(MapPg(rdr));
-                if (list.Count > 0) return list;
-            }
-            catch { }
-        }
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        using var cmd2 = new SQLiteCommand("SELECT * FROM Customers WHERE Name LIKE @kw OR Phone LIKE @kw ORDER BY Name LIMIT 30", conn);
-        cmd2.Parameters.AddWithValue("@kw", $"%{keyword}%");
-        using var rdr2 = cmd2.ExecuteReader();
-        while (rdr2.Read()) list.Add(Map(rdr2));
+        using var cmd = new SQLiteCommand("SELECT * FROM Customers WHERE Name LIKE @kw OR Phone LIKE @kw ORDER BY Name LIMIT 30", conn);
+        cmd.Parameters.AddWithValue("@kw", $"%{keyword}%");
+        using var rdr = cmd.ExecuteReader();
+        while (rdr.Read()) list.Add(Map(rdr));
         return list;
     }
 
@@ -330,23 +276,6 @@ public class CustomerService
             CreditLimit = rdr["CreditLimit"] != DBNull.Value ? Convert.ToDecimal(rdr["CreditLimit"]) : 0,
             IsActive = rdr["IsActive"] != DBNull.Value ? Convert.ToBoolean(rdr["IsActive"]) : true,
             CreatedAt = DateTime.SpecifyKind(DateTime.Parse(rdr["CreatedAt"].ToString()!), DateTimeKind.Local)
-        };
-    }
-
-    private static Customer MapPg(NpgsqlDataReader rdr)
-    {
-        return new Customer
-        {
-            Id = Convert.ToInt32(rdr["pos_id"]),
-            Name = rdr["name"].ToString() ?? "",
-            Phone = rdr["phone"]?.ToString() ?? "",
-            Email = rdr["email"]?.ToString() ?? "",
-            Address = rdr["address"]?.ToString() ?? "",
-            LoyaltyPoints = Convert.ToInt32(rdr["loyalty_points"]),
-            CreditBalance = rdr["credit_balance"] != DBNull.Value ? Convert.ToDecimal(rdr["credit_balance"]) : 0,
-            CreditLimit = rdr["credit_limit"] != DBNull.Value ? Convert.ToDecimal(rdr["credit_limit"]) : 0,
-            IsActive = rdr["is_active"] != DBNull.Value ? Convert.ToInt32(rdr["is_active"]) == 1 : true,
-            CreatedAt = DateTime.TryParse(rdr["created_at"]?.ToString(), out var dt) ? dt : TimeHelper.Now
         };
     }
 }

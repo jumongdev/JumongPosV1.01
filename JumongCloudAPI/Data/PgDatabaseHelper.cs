@@ -602,5 +602,19 @@ public static class PgDatabaseHelper
         using var voidMig = conn.CreateCommand();
         voidMig.CommandText = "ALTER TABLE wh_walkin_sales ADD COLUMN IF NOT EXISTS is_voided BOOLEAN NOT NULL DEFAULT FALSE";
         try { voidMig.ExecuteNonQuery(); } catch { }
+
+        // Migration: add invoice_no to wh_walkin_sales
+        using var invnoMig = conn.CreateCommand();
+        invnoMig.CommandText = "ALTER TABLE wh_walkin_sales ADD COLUMN IF NOT EXISTS invoice_no TEXT DEFAULT ''";
+        try { invnoMig.ExecuteNonQuery(); } catch { }
+
+        // Migration: wh_invoice_counter for invoice number generation
+        using var icMig = conn.CreateCommand();
+        icMig.CommandText = @"
+            CREATE TABLE IF NOT EXISTS wh_invoice_counter (
+                date_key TEXT PRIMARY KEY,
+                last_seq INTEGER NOT NULL DEFAULT 0
+            )";
+        try { icMig.ExecuteNonQuery(); } catch { }
     }
 }
