@@ -1122,17 +1122,46 @@ public class WarehouseSellForm : Form
 
     private async Task ShowVoidPopupAsync()
     {
-        var popup = new Form { Text = "Void Wholesale Receipt", Size = new Size(600, 450), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, BackColor = ThemeManager.Current.SurfaceBg };
-        var lbl = new Label { Text = "Select a sale to void:", Font = new Font("Segoe UI", 10F, FontStyle.Bold), Location = new Point(12, 12), Size = new Size(560, 24), ForeColor = ThemeManager.Current.TextPrimary };
-        var dgv = new DataGridView { Location = new Point(12, 42), Size = new Size(560, 300), ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, BackgroundColor = ThemeManager.Current.CardBg, Font = new Font("Segoe UI", 9F), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ColumnHeadersHeight = 28, EnableHeadersVisualStyles = false };
+        var popup = new Form { Text = "Sales History / Void", Size = new Size(600, 450), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, BackColor = ThemeManager.Current.SurfaceBg };
+        var lbl = new Label { Text = "Select a sale:", Font = new Font("Segoe UI", 10F, FontStyle.Bold), Location = new Point(12, 12), Size = new Size(560, 24), ForeColor = ThemeManager.Current.TextPrimary };
+        var dgv = new DataGridView { Location = new Point(12, 42), Size = new Size(560, 300), ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false, BackgroundColor = ThemeManager.Current.CardBg, Font = new Font("Segoe UI", 9F), AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ColumnHeadersHeight = 28, EnableHeadersVisualStyles = false };
         dgv.Columns.Add("Id", "#"); dgv.Columns.Add("Customer", "Customer"); dgv.Columns.Add("Total", "Total"); dgv.Columns.Add("Date", "Date");
         dgv.Columns[0].Width = 50; dgv.Columns[2].Width = 80; dgv.Columns[3].Width = 140;
 
-        var btnDoVoid = new Button { Text = "✖ VOID SELECTED SALE", Font = new Font("Segoe UI", 10F, FontStyle.Bold), BackColor = Color.FromArgb(255, 60, 60), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, Cursor = Cursors.Hand, Enabled = false, Location = new Point(12, 352), Size = new Size(200, 36) };
-        var btnClose = new Button { Text = "CLOSE", Location = new Point(370, 352), Size = new Size(200, 36), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = ThemeManager.Current.CardBg, ForeColor = ThemeManager.Current.TextSecondary, Cursor = Cursors.Hand };
+        var btnDoVoid = new Button { Text = "✖ VOID", Font = new Font("Segoe UI", 9F, FontStyle.Bold), BackColor = Color.FromArgb(255, 60, 60), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, Cursor = Cursors.Hand, Enabled = false, Location = new Point(12, 352), Size = new Size(130, 36) };
+        var btnReprint = new Button { Text = "🖨 REPRINT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), BackColor = Color.FromArgb(0, 150, 200), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, Cursor = Cursors.Hand, Enabled = false, Location = new Point(150, 352), Size = new Size(130, 36) };
+        var btnClose = new Button { Text = "CLOSE", Location = new Point(440, 352), Size = new Size(130, 36), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = ThemeManager.Current.CardBg, ForeColor = ThemeManager.Current.TextSecondary, Cursor = Cursors.Hand };
         btnClose.Click += (_, _) => popup.Close();
 
-        dgv.SelectionChanged += (_, _) => btnDoVoid.Enabled = dgv.SelectedRows.Count > 0;
+        dgv.SelectionChanged += (_, _) => { var en = dgv.SelectedRows.Count > 0; btnDoVoid.Enabled = en; btnReprint.Enabled = en; };
+
+        btnReprint.Click += async (_, _) =>
+        {
+            if (dgv.SelectedRows.Count == 0) return;
+            var saleId = (int)dgv.SelectedRows[0].Cells[0].Value;
+            var cust = dgv.SelectedRows[0].Cells[1].Value?.ToString() ?? "";
+            try
+            {
+                var url = SyncService.ApiUrl.TrimEnd('/') + "/dashboard/warehouse/sales/" + saleId + "/items";
+                var json = await _http.GetStringAsync(url);
+                using var doc = JsonDocument.Parse(json);
+                var items = new List<(string, string, int, decimal, decimal)>();
+                decimal gTotal = 0;
+                foreach (var it in doc.RootElement.EnumerateArray())
+                {
+                    var pn = it.GetProperty("productName").GetString() ?? "";
+                    var un = it.GetProperty("unitName").GetString() ?? "";
+                    var qty = it.GetProperty("qty").GetInt32();
+                    var pr = it.GetProperty("price").GetDecimal();
+                    var st = it.GetProperty("subtotal").GetDecimal();
+                    items.Add((pn, un, qty, pr, st));
+                    gTotal += st;
+                }
+                PrinterService.PrintWhReceipt(saleId, cust, items, gTotal, _currentUser?.FullName ?? "Admin");
+                MessageBox.Show("Receipt reprinted.", "Reprint", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        };
 
         btnDoVoid.Click += async (_, _) =>
         {
