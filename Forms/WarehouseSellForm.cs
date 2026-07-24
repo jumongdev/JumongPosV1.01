@@ -781,6 +781,7 @@ public class WarehouseSellForm : Form
                     var idx = dgv.Rows.Add(p.GetProperty("name").GetString(), "₱" + price.ToString("N2"), stock.ToString());
                     dgv.Rows[idx].Tag = p;
                 }
+                if (dgv.Rows.Count > 0) dgv.ClearSelection();
             }
             catch (Exception ex) { ErrorLogger.Log("WhSellForm.LoadProds", ex); }
         }
