@@ -1160,6 +1160,7 @@ public class WarehouseSellForm : Form
             using var doc = JsonDocument.Parse(json);
             foreach (var s in doc.RootElement.EnumerateArray())
             {
+                if (s.TryGetProperty("isVoided", out var iv) && iv.GetBoolean()) continue;
                 var sid = s.GetProperty("id").GetInt32();
                 var cn = s.GetProperty("customerName").GetString();
                 var total = s.GetProperty("total").GetDecimal();
