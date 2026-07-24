@@ -1031,43 +1031,7 @@ public class WarehouseSellForm : Form
                 var grandTotal = result.GetProperty("grandTotal").GetDecimal();
                 var saleId = result.GetProperty("saleId").GetInt32();
 
-                // Save locally so End Shift captures this sale
-                try
-                {
-                    using var localConn = DatabaseHelper.GetConnection();
-                    localConn.Open();
-                    var now = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                    var invNo = "WH-" + saleId;
-                    using var insSale = new SQLiteCommand(@"
-                        INSERT INTO Sales (InvoiceNo, SaleDate, SubTotal, Discount, Tax, GrandTotal, AmountPaid, Change, PaymentMethod, ReferenceNo, CustomerId, UserId, OrderType, CashPaid, EwPaid)
-                        VALUES (@inv, @dt, @sub, 0, 0, @total, @paid, GREATEST(0, @paid - @total), @pm, '', 0, @uid, 'Wholesale', @cp, @ep);
-                        SELECT last_insert_rowid();", localConn);
-                    insSale.Parameters.AddWithValue("@inv", invNo);
-                    insSale.Parameters.AddWithValue("@dt", now);
-                    insSale.Parameters.AddWithValue("@sub", grandTotal);
-                    insSale.Parameters.AddWithValue("@total", grandTotal);
-                    insSale.Parameters.AddWithValue("@paid", cashReceived);
-                    insSale.Parameters.AddWithValue("@pm", payMethod);
-                    insSale.Parameters.AddWithValue("@cp", payMethod == "Cash" ? cashReceived : 0m);
-                    insSale.Parameters.AddWithValue("@ep", payMethod == "E-Wallet" ? grandTotal : 0m);
-                    insSale.Parameters.AddWithValue("@uid", _currentUser?.Id ?? 0);
-                    var localSaleId = Convert.ToInt32(insSale.ExecuteScalar());
-
-                    foreach (var ci in _cart)
-                    {
-                        using var insItem = new SQLiteCommand(@"
-                            INSERT INTO SaleItems (SaleId, ProductId, ProductName, Barcode, Quantity, Price, TotalPrice, UnitName, QtyPerUnit, UnitCost, IsVoided, PointsExempt, PointsPerUnit, PointsEarned)
-                            VALUES (@sid, 0, @pn, '', @qty, @pr, @tot, @un, 1, 0, 0, 1, 0, 0)", localConn);
-                        insItem.Parameters.AddWithValue("@sid", localSaleId);
-                        insItem.Parameters.AddWithValue("@pn", ci.ProductName);
-                        insItem.Parameters.AddWithValue("@qty", ci.Quantity);
-                        insItem.Parameters.AddWithValue("@pr", ci.Price);
-                        insItem.Parameters.AddWithValue("@tot", ci.TotalPrice);
-                        insItem.Parameters.AddWithValue("@un", ci.UnitName);
-                        insItem.ExecuteNonQuery();
-                    }
-                }
-                catch (Exception localEx) { ErrorLogger.Log("WhSellForm.LocalSave", localEx); }
+                // Wholesale stays in cloud only — no local save
 
                 try
                 {

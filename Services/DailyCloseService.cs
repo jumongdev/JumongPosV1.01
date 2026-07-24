@@ -33,7 +33,7 @@ public class DailyCloseService
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
 
-        var cond = string.IsNullOrEmpty(since) ? "s.OrderType != 'Wholesale'" : "s.SaleDate > @since AND s.OrderType != 'Wholesale'";
+        var cond = string.IsNullOrEmpty(since) ? "1=1" : "s.SaleDate > @since";
 
         // All totals from SaleItems (item-level) to correctly handle partial voids
         var sql = $@"SELECT 
