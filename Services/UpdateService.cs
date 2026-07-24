@@ -74,9 +74,9 @@ public static class UpdateService
             File.Move(newPath, exePath);
 
             var batch = Path.Combine(Path.GetTempPath(), "jumong_update.bat");
-            File.WriteAllText(batch, $"@echo off{Environment.NewLine}timeout /t 2 /nobreak >nul{Environment.NewLine}del \"{backupPath}\"{Environment.NewLine}start \"\" \"{exePath}\"{Environment.NewLine}del \"%~f0\"");
+            File.WriteAllText(batch, $"@echo off{Environment.NewLine}ping 127.0.0.1 -n 3 >nul{Environment.NewLine}del \"{backupPath}\" 2>nul{Environment.NewLine}start \"\" \"{exePath}\"{Environment.NewLine}del \"%~f0\" 2>nul");
             Process.Start(new ProcessStartInfo(batch) { UseShellExecute = true });
-            Environment.Exit(0);
+            Process.GetCurrentProcess().Kill();
             return true;
         }
         catch (Exception ex) { ErrorLogger.Log("UpdateService.Download", ex); return false; }
