@@ -606,6 +606,35 @@ public class DatabaseHelper
             alter.ExecuteNonQuery();
         }
 
+        // Migrate: add Synced flag to VoidLog, CreditTransactions, DailyClose, Expenses
+        using var checkVlSynced = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('VoidLog') WHERE name = 'Synced'", conn);
+        if (Convert.ToInt32(checkVlSynced.ExecuteScalar()) == 0)
+        {
+            using var alter = new SQLiteCommand("ALTER TABLE VoidLog ADD COLUMN Synced INTEGER NOT NULL DEFAULT 0", conn);
+            alter.ExecuteNonQuery();
+        }
+
+        using var checkCtSynced = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('CreditTransactions') WHERE name = 'Synced'", conn);
+        if (Convert.ToInt32(checkCtSynced.ExecuteScalar()) == 0)
+        {
+            using var alter = new SQLiteCommand("ALTER TABLE CreditTransactions ADD COLUMN Synced INTEGER NOT NULL DEFAULT 0", conn);
+            alter.ExecuteNonQuery();
+        }
+
+        using var checkDcSynced = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('DailyClose') WHERE name = 'Synced'", conn);
+        if (Convert.ToInt32(checkDcSynced.ExecuteScalar()) == 0)
+        {
+            using var alter = new SQLiteCommand("ALTER TABLE DailyClose ADD COLUMN Synced INTEGER NOT NULL DEFAULT 0", conn);
+            alter.ExecuteNonQuery();
+        }
+
+        using var checkExpSynced = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('Expenses') WHERE name = 'Synced'", conn);
+        if (Convert.ToInt32(checkExpSynced.ExecuteScalar()) == 0)
+        {
+            using var alter = new SQLiteCommand("ALTER TABLE Expenses ADD COLUMN Synced INTEGER NOT NULL DEFAULT 0", conn);
+            alter.ExecuteNonQuery();
+        }
+
         // InventoryCount tables for mobile inventory counting
         using var invSessionCmd = new SQLiteCommand(@"
             CREATE TABLE IF NOT EXISTS InventorySession (

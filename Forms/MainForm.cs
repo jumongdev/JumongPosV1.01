@@ -511,6 +511,40 @@ public partial class MainForm : Form
             try { await SyncService.DownloadUsersAsync(storeId); } catch { }
         };
         syncTimer.Start();
+
+        // Auto-sync: push unsynced transactions every 30 seconds
+        var pushTimer = new System.Windows.Forms.Timer { Interval = 30000 };
+        pushTimer.Tick += async (_, _) =>
+        {
+            pushTimer.Stop();
+            try
+            {
+                var storeId = SyncService.StoreId;
+                if (string.IsNullOrEmpty(storeId) || storeId == "STORE-DEV-0001") { pushTimer.Start(); return; }
+                await SyncService.PushAllUnsyncedAsync();
+            }
+            catch { }
+            pushTimer.Start();
+        };
+        pushTimer.Start();
+
+        // Master sync: download cloud updates every 5 minutes
+        var masterPullTimer = new System.Windows.Forms.Timer { Interval = 300000 };
+        masterPullTimer.Tick += async (_, _) =>
+        {
+            masterPullTimer.Stop();
+            try
+            {
+                var storeId = SyncService.StoreId;
+                if (string.IsNullOrEmpty(storeId) || storeId == "STORE-DEV-0001") { masterPullTimer.Start(); return; }
+                await SyncService.DownloadUpdatedMasterCatalog(new Progress<string>());
+                await SyncService.DownloadCustomersAsync();
+                await SyncService.SyncStoreSettingsAsync();
+            }
+            catch { }
+            masterPullTimer.Start();
+        };
+        masterPullTimer.Start();
     }
 
     private static readonly Color _connGreen = Color.FromArgb(0, 200, 83);

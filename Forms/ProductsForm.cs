@@ -861,15 +861,15 @@ public partial class ProductsForm : Form
                         ORDER BY ABS(COALESCE(p.Cost,0) - (SELECT si.UnitCost/si.Quantity FROM SaleItems si JOIN Sales s ON si.SaleId=s.Id WHERE si.ProductId=p.Id AND si.IsVoided=0 AND s.IsVoided=0 AND si.Quantity>0 ORDER BY s.SaleDate DESC LIMIT 1)) DESC", conn))
                     {
                         ccCmd.Parameters.AddWithValue("@since2", closeDate);
-                        using var r = ccCmd.ExecuteReader();
+                        using var r2 = ccCmd.ExecuteReader();
                         sb.AppendLine($"    {"Product",-28} {"Rcvd",5} {"NowCost",9}  {"LastSaleCost",12}  {"Delta",10}");
                         var hadChanges = false;
-                        while (r.Read())
+                        while (r2.Read())
                         {
-                            var name = r.GetString(0); if (name.Length > 26) name = name[..26];
-                            var rcvdQty = r.GetDecimal(1);
-                            var curCost = r.GetDecimal(2);
-                            var lastCost = r.IsDBNull(3) ? 0m : r.GetDecimal(3);
+                            var name = r2.GetString(0); if (name.Length > 26) name = name[..26];
+                            var rcvdQty = r2.GetDecimal(1);
+                            var curCost = r2.GetDecimal(2);
+                            var lastCost = r2.IsDBNull(3) ? 0m : r2.GetDecimal(3);
                             var delta = lastCost > 0 ? curCost - lastCost : 0m;
                             var marker = "";
                             if (lastCost == 0)

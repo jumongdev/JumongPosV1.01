@@ -374,6 +374,213 @@ public static class SyncService
         catch (Exception ex) { ErrorLogger.Log("SyncService.MarkSynced", ex); }
     }
 
+    private static void MarkSync(string table, string idCol, int id)
+    {
+        try
+        {
+            using var conn = DatabaseHelper.GetConnection();
+            conn.Open();
+            using var cmd = new SQLiteCommand($"UPDATE {table} SET Synced = 1 WHERE {idCol} = @id", conn);
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.ExecuteNonQuery();
+        }
+        catch (Exception ex) { ErrorLogger.Log($"SyncService.MarkSync({table})", ex); }
+    }
+
+    public static async Task PushAllUnsyncedAsync(IProgress<string>? progress = null)
+    {
+        try
+        {
+            // Push unsynced Sales
+            List<int> unsyncedSales = new();
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                using var cmd = new SQLiteCommand("SELECT Id FROM Sales WHERE Synced = 0 AND IsVoided = 0 ORDER BY Id ASC LIMIT 20", conn);
+                using var r = cmd.ExecuteReader();
+                while (r.Read()) unsyncedSales.Add(r.GetInt32(0));
+            }
+            foreach (var sid in unsyncedSales)
+            {
+                var sale = SaleService.GetById(sid);
+                if (sale == null) { MarkSync("Sales", "Id", sid); continue; }
+                if (await SyncSale(sale, sale.Items))
+                    MarkSync("Sales", "Id", sid);
+            }
+
+            // Push unsynced StockTrails
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                using var cmd = new SQLiteCommand("SELECT * FROM StockTrail WHERE Synced = 0 ORDER BY Id ASC LIMIT 30", conn);
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    var trail = new StockTrail
+                    {
+                        Id = r.GetInt32(0),
+                        ProductId = Convert.ToInt32(r["ProductId"]),
+                        ProductName = r["ProductName"].ToString() ?? "",
+                        Barcode = r["Barcode"].ToString() ?? "",
+                        QuantityAdded = Convert.ToDecimal(r["QuantityAdded"]),
+                        StockBefore = Convert.ToInt32(r["StockBefore"]),
+                        StockAfter = Convert.ToInt32(r["StockAfter"]),
+                        Reference = r["Reference"].ToString() ?? "",
+                        InvoiceNo = r["InvoiceNo"].ToString() ?? "",
+                        CustomerName = r["CustomerName"].ToString() ?? "",
+                        UserId = Convert.ToInt32(r["UserId"]),
+                        UserName = r["UserName"].ToString() ?? "",
+                        CreatedAt = r["CreatedAt"].ToString() ?? ""
+                    };
+                    if (await SyncStockTrail(trail))
+                    {
+                        using var mark = new SQLiteCommand("UPDATE StockTrail SET Synced = 1 WHERE Id = @id", conn);
+                        mark.Parameters.AddWithValue("@id", trail.Id);
+                        mark.ExecuteNonQuery();
+                    }
+                }
+            }
+
+            // Push unsynced VoidLogs
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                using var cmd = new SQLiteCommand("SELECT * FROM VoidLog WHERE Synced = 0 ORDER BY Id ASC LIMIT 20", conn);
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    var log = new VoidLog
+                    {
+                        Id = r.GetInt32(0),
+                        Action = r["Action"].ToString() ?? "",
+                        Reason = r["Reason"].ToString() ?? "",
+                        InvoiceNo = r["InvoiceNo"].ToString() ?? "",
+                        ProductName = r["ProductName"].ToString() ?? "",
+                        Quantity = Convert.ToInt32(r["Quantity"]),
+                        Amount = Convert.ToDecimal(r["Amount"]),
+                        SaleId = Convert.ToInt32(r["SaleId"]),
+                        SaleItemId = r["SaleItemId"] != DBNull.Value ? Convert.ToInt32(r["SaleItemId"]) : null,
+                        UserId = Convert.ToInt32(r["UserId"]),
+                        UserName = r["UserName"].ToString() ?? "",
+                        CreatedAt = r["CreatedAt"].ToString() ?? ""
+                    };
+                    if (await SyncVoidLog(log))
+                    {
+                        using var mark = new SQLiteCommand("UPDATE VoidLog SET Synced = 1 WHERE Id = @id", conn);
+                        mark.Parameters.AddWithValue("@id", log.Id);
+                        mark.ExecuteNonQuery();
+                    }
+                }
+            }
+
+            // Push unsynced CreditTransactions
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                using var cmd = new SQLiteCommand("SELECT * FROM CreditTransactions WHERE Synced = 0 ORDER BY Id ASC LIMIT 20", conn);
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    var ct = new CreditTransaction
+                    {
+                        Id = r.GetInt32(0),
+                        CustomerId = Convert.ToInt32(r["CustomerId"]),
+                        CustomerName = r["CustomerName"].ToString() ?? "",
+                        Debit = Convert.ToDecimal(r["Debit"]),
+                        Credit = Convert.ToDecimal(r["Credit"]),
+                        Balance = r["Balance"] != DBNull.Value ? Convert.ToDecimal(r["Balance"]) : 0,
+                        Description = r["Description"].ToString() ?? "",
+                        InvoiceNo = r["InvoiceNo"].ToString() ?? "",
+                        UserId = Convert.ToInt32(r["UserId"]),
+                        UserName = r["UserName"].ToString() ?? "",
+                        PaymentMethod = r["PaymentMethod"].ToString() ?? "",
+                        ReferenceNo = r["ReferenceNo"].ToString() ?? "",
+                        CreatedAt = r["CreatedAt"].ToString() ?? ""
+                    };
+                    if (await SyncCreditTransaction(ct))
+                    {
+                        using var mark = new SQLiteCommand("UPDATE CreditTransactions SET Synced = 1 WHERE Id = @id", conn);
+                        mark.Parameters.AddWithValue("@id", ct.Id);
+                        mark.ExecuteNonQuery();
+                    }
+                }
+            }
+
+            // Push unsynced DailyCloses
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                using var cmd = new SQLiteCommand("SELECT * FROM DailyClose WHERE Synced = 0 ORDER BY Id ASC LIMIT 5", conn);
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    var dc = new DailyClose
+                    {
+                        Id = r.GetInt32(0),
+                        CloseDate = r["CloseDate"].ToString() ?? "",
+                        CreatedAt = r["CreatedAt"].ToString() ?? "",
+                        TotalSales = Convert.ToDecimal(r["TotalSales"]),
+                        TotalCash = Convert.ToDecimal(r["TotalCash"]),
+                        TotalEWallet = Convert.ToDecimal(r["TotalEWallet"]),
+                        TotalCredit = Convert.ToDecimal(r["TotalCredit"]),
+                        TotalVoided = Convert.ToDecimal(r["TotalVoided"]),
+                        TotalExpenses = Convert.ToDecimal(r["TotalExpenses"]),
+                        OpeningCash = Convert.ToDecimal(r["OpeningCash"]),
+                        Denom1000 = r["Denom1000"] != DBNull.Value ? Convert.ToInt32(r["Denom1000"]) : 0,
+                        Denom500 = r["Denom500"] != DBNull.Value ? Convert.ToInt32(r["Denom500"]) : 0,
+                        Denom200 = r["Denom200"] != DBNull.Value ? Convert.ToInt32(r["Denom200"]) : 0,
+                        Denom100 = r["Denom100"] != DBNull.Value ? Convert.ToInt32(r["Denom100"]) : 0,
+                        Denom50 = r["Denom50"] != DBNull.Value ? Convert.ToInt32(r["Denom50"]) : 0,
+                        Denom20 = r["Denom20"] != DBNull.Value ? Convert.ToInt32(r["Denom20"]) : 0,
+                        DenomCoins = r["DenomCoins"] != DBNull.Value ? Convert.ToDecimal(r["DenomCoins"]) : 0,
+                        CashOnHand = Convert.ToDecimal(r["CashOnHand"]),
+                        Difference = Convert.ToDecimal(r["Difference"]),
+                        Notes = r["Notes"].ToString() ?? "",
+                        UserId = Convert.ToInt32(r["UserId"]),
+                        UserName = r["UserName"].ToString() ?? "",
+                        TotalInventoryCost = r["TotalInventoryCost"] != DBNull.Value ? Convert.ToDecimal(r["TotalInventoryCost"]) : 0,
+                        TotalCostSold = r["TotalCostSold"] != DBNull.Value ? Convert.ToDecimal(r["TotalCostSold"]) : 0,
+                        TotalStockReceivedCost = r["TotalStockReceivedCost"] != DBNull.Value ? Convert.ToDecimal(r["TotalStockReceivedCost"]) : 0
+                    };
+                    if (await SyncDailyClose(dc))
+                    {
+                        using var mark = new SQLiteCommand("UPDATE DailyClose SET Synced = 1 WHERE Id = @id", conn);
+                        mark.Parameters.AddWithValue("@id", dc.Id);
+                        mark.ExecuteNonQuery();
+                    }
+                }
+            }
+
+            // Push unsynced Expenses
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                using var cmd = new SQLiteCommand("SELECT * FROM Expenses WHERE Synced = 0 ORDER BY Id ASC LIMIT 20", conn);
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    var exp = new Expense
+                    {
+                        Id = r.GetInt32(0),
+                        Description = r["Description"].ToString() ?? "",
+                        Amount = Convert.ToDecimal(r["Amount"]),
+                        Category = r["Category"].ToString() ?? "",
+                        CashierUsername = r["CashierUsername"].ToString() ?? "",
+                        ReceiptImage = r["ReceiptImage"] != DBNull.Value ? r["ReceiptImage"].ToString() : null,
+                        Timestamp = r["Timestamp"].ToString() ?? ""
+                    };
+                    if (await SyncExpense(exp))
+                    {
+                        using var mark = new SQLiteCommand("UPDATE Expenses SET Synced = 1 WHERE Id = @id", conn);
+                        mark.Parameters.AddWithValue("@id", exp.Id);
+                        mark.ExecuteNonQuery();
+                    }
+                }
+            }
+        }
+        catch (Exception ex) { ErrorLogger.Log("SyncService.PushAllUnsynced", ex); }
+    }
+
     private static string ToUtcString(string? localTime)
     {
         if (string.IsNullOrEmpty(localTime)) return "";
