@@ -2069,6 +2069,16 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                             return BadRequest(new { error = $"Not enough stock for {item.ProductName}" });
                         }
 
+                        // Log stock trail
+                        using var trail = new NpgsqlCommand(
+                            "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) VALUES (@pid, @pn, @bc, @qc, @ref, 'transfer_out')", conn, tx);
+                        trail.Parameters.AddWithValue("pid", item.ProductId);
+                        trail.Parameters.AddWithValue("pn", item.ProductName);
+                        trail.Parameters.AddWithValue("bc", item.Barcode ?? "");
+                        trail.Parameters.AddWithValue("qc", -item.Qty);
+                        trail.Parameters.AddWithValue("ref", $"Transfer #{transferId} -> {t.ClientName}");
+                        trail.ExecuteNonQuery();
+
                         using var icmd = new NpgsqlCommand(
                             "INSERT INTO wh_transfer_items (transfer_id, product_id, product_name, barcode, qty) VALUES (@ti, @pi, @pn, @bc, @q)", conn, tx);
                         icmd.Parameters.AddWithValue("ti", transferId);
@@ -2226,6 +2236,15 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     upd.Parameters.AddWithValue("pid", pid);
                     upd.Parameters.AddWithValue("qty", qty);
                     upd.ExecuteNonQuery();
+
+                    // Log stock trail
+                    using var trail = conn.CreateCommand(); trail.Transaction = tx;
+                    trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, qty_change, reference, reference_type) " +
+                        "SELECT @pid, name, @qty, 'Transfer #' || @tid || ' cancelled', 'transfer_cancel' FROM wh_products WHERE id = @pid";
+                    trail.Parameters.AddWithValue("pid", pid);
+                    trail.Parameters.AddWithValue("qty", qty);
+                    trail.Parameters.AddWithValue("tid", id);
+                    trail.ExecuteNonQuery();
                 }
 
                 using var updateCmd = conn.CreateCommand(); updateCmd.Transaction = tx;
