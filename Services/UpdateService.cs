@@ -37,8 +37,8 @@ public static class UpdateService
             var url = downloadUrl;
             var exePath = Environment.ProcessPath ?? "";
             if (string.IsNullOrEmpty(exePath)) return false;
-            var newPath = exePath + ".new";
-            var backupPath = exePath + ".bak";
+            var exeDir = Path.GetDirectoryName(exePath) ?? "";
+            var newPath = Path.Combine(Path.GetTempPath(), "JumongPosV1.01_update.exe");
 
             using var response = await _client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
             if (!response.IsSuccessStatusCode) return false;
@@ -69,12 +69,17 @@ public static class UpdateService
                 return false;
             }
 
-            if (File.Exists(backupPath)) File.Delete(backupPath);
-            File.Move(exePath, backupPath);
-            File.Move(newPath, exePath);
-
+            // Write batch: waits, copies new exe over old, starts new exe, cleans up
             var batch = Path.Combine(Path.GetTempPath(), "jumong_update.bat");
-            File.WriteAllText(batch, $"@echo off{Environment.NewLine}ping 127.0.0.1 -n 3 >nul{Environment.NewLine}del \"{backupPath}\" 2>nul{Environment.NewLine}start \"\" \"{exePath}\"{Environment.NewLine}del \"%~f0\" 2>nul");
+            File.WriteAllText(batch, 
+                "@echo off\r\n" +
+                "ping 127.0.0.1 -n 3 >nul\r\n" +
+                "copy /y \"" + newPath + "\" \"" + exePath + "\"\r\n" +
+                "if %errorlevel% equ 0 (\r\n" +
+                "  del \"" + newPath + "\" 2>nul\r\n" +
+                "  start \"\" \"" + exePath + "\"\r\n" +
+                ")\r\n" +
+                "del \"%~f0\" 2>nul\r\n");
             Process.Start(new ProcessStartInfo(batch) { UseShellExecute = true });
             Process.GetCurrentProcess().Kill();
             return true;
