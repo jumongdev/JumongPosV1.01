@@ -977,3 +977,34 @@ Restart-Service JumongCloudAPI
 | Services/AppVersion.cs | Current bumped to "1.0.90" |
 
 **Impact:** Admin sets promo message once on dashboard, all POS clients auto-fetch. Falls back to local setting if cloud unreachable.
+
+### v1.1.00–v1.1.07 — Local-First Reads, Wholesale Invoice, INV CHECK, Transfer Stock Trail, Update Fixes
+
+| File | Change |
+|---|---|
+| `Services/ProductService.cs` | Removed all 6 PG-read fallback blocks (GetAll, GetById, GetByBarcode, GetCategories, GetStockStats, GetStockValues). Reads now SQLite-only, instant, zero timeout. Kept TryWriteToPgAsync, Save PG write, Delete PG write. Removed MapPg helper. |
+| `Services/CustomerService.cs` | Removed all 4 PG-read fallback blocks (GetAll, GetById, GetByPhone, Search). SQLite-only reads. Kept TryWriteToPgAsync, Save, Delete, UpdateLoyaltyPoints, UpdateCreditBalance PG writes. Removed MapPg helper. |
+| `Services/UserService.cs` | Removed 1 PG-read fallback (GetAll). SQLite-only. Kept TryWriteToPgAsync, Save, Delete PG writes. Removed MapPg helper. |
+| `Services/ProductUnitService.cs` | Removed 2 PG-read fallbacks (GetByProduct, GetDefault). SQLite-only. Kept TryWriteToPgAsync, Save, Delete PG write. Removed MapPg helper. |
+| `Services/StockService.cs` | Removed 2 PG-read fallbacks (GetByBarcode, Search). SQLite-only. Kept ConfirmReceiving PG write. Removed MapPg helper. |
+| `JumongPosV1.01.csproj` | Added `tools\**` exclusion (prevent duplicate AssemblyInfo build errors). |
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs` | Added `invoice_no` column to `wh_walkin_sales`. Added `wh_invoice_counter` table for sequence generation. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:2424-2435` | WhSell: generates invoice number `WH-YYYYMMDD-NNNN` via `wh_invoice_counter`, stores in `invoice_no` column. WhGetSales returns `invoiceNo`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:2060-2075` | WhCreateTransfer: logs stock trail (`transfer_out`) in `wh_stock_trails` on stock deduction. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:2232-2245` | WhCancelTransfer: logs stock trail (`transfer_cancel`) in `wh_stock_trails` on stock restoration. Backfilled 515 existing transfer items. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1387-1421` | WhGetProducts: added `LEFT JOIN master_products mp` to return `imageData` column. |
+| `JumongCloudAPI/wwwroot/index.html:1061-1097` | Warehouse Product table: added Image column (from master catalog base64). |
+| `JumongCloudAPI/wwwroot/index.html:1162-1189` | Warehouse Inventory table: added Image column. |
+| `JumongCloudAPI/wwwroot/index.html:1065-1095` | Wholesale Sales table: added Invoice # column (`x.invoiceNo`). |
+| `JumongCloudAPI/wwwroot/index.html:2142-2148` | Master product editor: "+" button next to Category dropdown — prompts for new category, validates duplicates. |
+| `JumongCloudAPI/wwwroot/components.js:421-430` | productEditor: added `addCategory()` method with duplicate check. |
+| `JumongCloudAPI/wwwroot/components.js:982-1009` | inventoryCostReport: changed from single `prevInvCost` variable to per-store dictionary `prevInvByStore`. Fixes Previous column showing ₱0 for interleaved stores. Added `x.prevInvCost` property assignment. |
+| `JumongCloudAPI/wwwroot/components.js:1000` | Added `x.prevInvCost = prevInvCost;` line (was missing — every row showed ₱0). |
+| `Forms/WarehouseSellForm.cs:1129-1205` | ShowVoidPopupAsync: added Invoice column to DGV. btnReprint was missing from Controls.AddRange — now included. Fixed column indices after adding Invoice column. |
+| `Forms/ProductsForm.cs:700-890` | Added "INV CHECK" button to toolbar. Opens popup showing inventory reconciliation (Previous/Received/COGS/Expected/Actual/Variance), cost mismatch details, receiving recompute, per-item cost change detection via last sale comparison. |
+| `Forms/SalesForm.cs:98` | Changed update banner text from "UPDATE AVAILABLE" to "APP UPDATE". |
+| `Services/UpdateService.cs:33-83` | Rewrote DownloadAndUpdate: downloads to `%TEMP%\JumongPosV1.01_update.exe`, batch copies over old exe after process kill. No more File.Move on running exe. Process.Kill() instead of Environment.Exit. Ping instead of timeout. |
+| `Services/AppVersion.cs` | Current bumped to `"1.1.07"`. |
+| `tools/InvVarianceCheck/` | New standalone diagnostic tool (Console app). Checks inventory reconciliation, cost mismatches, receiving recompute, zero-cost products. Self-contained publish to `invcheck.exe`. |
+
+**Impact:** POS reads now instant from SQLite — zero PG timeout, fully offline. Wholesale sales now have invoice numbers (visible on dashboard and receipts). Inventory Cost Report Previous column fixed for multi-store scenarios. INV CHECK button on Products page provides in-POS inventory reconciliation. Transfer stock movements now logged to warehouse stock trails (backfilled 515 records). Warehouse products/inventory show master catalog images. Master editor category field has "+" button for adding new categories with duplicate validation. Update system now uses batch copy instead of File.Move — no more update loops. btnReprint was missing from void popup — now visible.
