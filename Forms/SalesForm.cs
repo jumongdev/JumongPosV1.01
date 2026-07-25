@@ -1246,11 +1246,8 @@ public partial class SalesForm : Form
             lblTaxLbl, lblTaxVal,
             sep2,
             btnPay,
-            _lblQrHeader, _btnQrPrev, _pbQr, _btnQrNext
+            _lblQrHeader, _btnQrPrev, _pbQr, _btnQrNext, _lblPromo
         });
-
-        if (_lblPromo != null)
-            Controls.Add(_lblPromo);
 
         KeyPreview = true;
         KeyDown += (s, e) =>
@@ -1389,16 +1386,16 @@ public partial class SalesForm : Form
         rcs[10].Location = new Point(m, ry);       rcs[10].Size = new Size(pw, 1); ry += 14;
         btnPay.Location = new Point(m, ry);       btnPay.Size = new Size(pw, 52); ry += 60;
 
-        var promoH = string.IsNullOrEmpty(_promoText) ? 0 : 40;
+        var promoH = string.IsNullOrEmpty(_promoText) ? 0 : 38;
         if (_qrVisible)
         {
-            var qrH = _pnlTotals.Height - ry - 16 - promoH - 4;
-            if (qrH > 100)
+            var qrH = _pnlTotals.Height - ry - 4 - promoH - 6;
+            if (qrH > 80)
             {
                 _lblQrHeader.Location = new Point(m, ry);
-                _lblQrHeader.Size = new Size(pw, 18);
-                _lblQrHeader.Visible = true;
-                ry += 20;
+                _lblQrHeader.Size = new Size(pw, 16);
+                _lblQrHeader.Visible = !string.IsNullOrEmpty(_lblQrHeader.Text);
+                ry += 14;
 
                 var navW = 22;
                 _btnQrPrev.Location = new Point(m, ry);
@@ -1419,10 +1416,9 @@ public partial class SalesForm : Form
         if (!string.IsNullOrEmpty(_promoText))
         {
             _lblPromo.Text = _promoText;
-            _lblPromo.Location = new Point(0, h - promoH);
-            _lblPromo.Size = new Size(w, promoH);
+            _lblPromo.Location = new Point(m, ry);
+            _lblPromo.Size = new Size(pw, promoH);
             _lblPromo.Visible = true;
-            _lblPromo.BringToFront();
         }
         else _lblPromo.Visible = false;
     }
