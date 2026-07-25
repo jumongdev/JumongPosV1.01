@@ -1396,8 +1396,11 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                        CASE WHEN wp.master_product_id IS NOT NULL THEN
                            (SELECT COALESCE(json_agg(json_build_object('unitName', mpu.unit_name, 'price', mpu.price, 'cost', mpu.cost, 'qtyPerUnit', mpu.qty_per_unit, 'isDefault', mpu.is_default) ORDER BY mpu.is_default DESC, mpu.unit_name), '[]'::json)
                             FROM master_product_units mpu WHERE mpu.product_id = wp.master_product_id)
-                       ELSE '[]'::json END AS units
-                FROM wh_products wp WHERE {where} ORDER BY wp.name {(string.IsNullOrEmpty(search) ? "" : "LIMIT 100")}";
+                       ELSE '[]'::json END AS units,
+                       COALESCE(mp.image_data, '') AS imageData
+                FROM wh_products wp
+                LEFT JOIN master_products mp ON mp.id = wp.master_product_id
+                WHERE {where} ORDER BY wp.name {(string.IsNullOrEmpty(search) ? "" : "LIMIT 100")}";
             if (!string.IsNullOrEmpty(search))
                 cmd.Parameters.AddWithValue("s", $"%{search}%");
             var data = new List<object>();
@@ -1405,6 +1408,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             while (r.Read())
             {
                 var unitsJson = r.GetString(9);
+                var imageData = r.IsDBNull(10) ? "" : r.GetString(10);
                 data.Add(new {
                     id = r.GetInt32(0),
                     name = r.GetString(1),
@@ -1415,7 +1419,8 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     boxQty = r.GetInt32(6),
                     piecePrice = r.GetDecimal(7),
                     stockQty = r.GetInt32(8),
-                    units = unitsJson != "[]" ? System.Text.Json.JsonSerializer.Deserialize<object>(unitsJson) : null
+                    units = unitsJson != "[]" ? System.Text.Json.JsonSerializer.Deserialize<object>(unitsJson) : null,
+                    imageData = imageData
                 });
             }
             return Ok(data);
