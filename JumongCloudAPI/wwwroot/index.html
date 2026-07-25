@@ -2140,10 +2140,13 @@ tailwind.config = {
             <div class="col-span-2 sm:col-span-1"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">NAME</label><input x-model="name" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
             <div class="col-span-2 sm:col-span-1"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BARCODE</label><input x-model="barcode" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
             <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">CATEGORY</label>
-              <select x-model="category" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+              <div class="flex gap-1">
+              <select x-model="category" class="flex-1 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
                 <option value="">— Select —</option>
                 <template x-for="c in categories" :key="c"><option :value="c" x-text="c"></option></template>
               </select>
+              <button @click="addCategory()" title="Add new category" class="text-xs px-2 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 transition-colors">+</button>
+              </div>
             </div>
             <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">PRICE</label><input type="number" step="0.01" x-model="price" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
             <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">COST</label><input type="number" step="0.01" x-model="cost" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>

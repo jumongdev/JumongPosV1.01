@@ -419,6 +419,16 @@ Alpine.store('app', {
       else { this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.units = [] }
     },
     reset() { this.productId = null; this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.units = []; Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null; Alpine.store('app').editingProductData = null },
+    addCategory() {
+      var name = prompt('Enter new category name:');
+      if (!name || !name.trim()) return;
+      name = name.trim();
+      var lower = name.toLowerCase();
+      if (this.categories.some(function(c) { return c.toLowerCase() === lower }))
+        { alert('Category "' + name + '" already exists'); return }
+      this.categories.push(name);
+      this.category = name;
+    },
     addUnit() { this.units.push({ unitName: '', price: 0, qtyPerUnit: 1, isDefault: false, pointsPerUnit: 0 }) },
     removeUnit(i) { this.units.splice(i, 1) },
     async save() {
