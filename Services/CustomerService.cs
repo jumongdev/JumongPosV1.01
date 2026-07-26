@@ -165,7 +165,7 @@ public class CustomerService
             {
                 using var pgConn = CloudDatabaseHelper.GetConnection()!;
                 pgConn.Open();
-                using var pgCmd = new NpgsqlCommand("DELETE FROM customers WHERE pos_id = @id AND store_id = @sid", pgConn);
+                using var pgCmd = new NpgsqlCommand("DELETE FROM customers WHERE pos_id = @id", pgConn);
                 pgCmd.Parameters.AddWithValue("id", id);
                 pgCmd.Parameters.AddWithValue("sid", StoreId);
                 pgCmd.ExecuteNonQuery();
@@ -216,7 +216,7 @@ public class CustomerService
             {
                 using var pgConn = CloudDatabaseHelper.GetConnection()!;
                 pgConn.Open();
-                using var pgCmd = new NpgsqlCommand("UPDATE customers SET loyalty_points = @pts WHERE pos_id = @id AND store_id = @sid", pgConn);
+                using var pgCmd = new NpgsqlCommand("UPDATE customers SET loyalty_points = @pts WHERE pos_id = @id", pgConn);
                 pgCmd.Parameters.AddWithValue("pts", points);
                 pgCmd.Parameters.AddWithValue("id", customerId);
                 pgCmd.Parameters.AddWithValue("sid", StoreId);
@@ -240,7 +240,7 @@ public class CustomerService
             {
                 using var pgConn = CloudDatabaseHelper.GetConnection()!;
                 pgConn.Open();
-                using var pgCmd = new NpgsqlCommand("UPDATE customers SET credit_balance = @bal WHERE pos_id = @id AND store_id = @sid", pgConn);
+                using var pgCmd = new NpgsqlCommand("UPDATE customers SET credit_balance = @bal WHERE pos_id = @id", pgConn);
                 pgCmd.Parameters.AddWithValue("bal", newBalance);
                 pgCmd.Parameters.AddWithValue("id", customerId);
                 pgCmd.Parameters.AddWithValue("sid", StoreId);
