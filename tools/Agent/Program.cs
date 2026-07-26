@@ -8,6 +8,15 @@ using System.Text.Json;
 
 var baseDir = Path.GetDirectoryName(Environment.ProcessPath) ?? AppDomain.CurrentDomain.BaseDirectory;
 var dbPath = Path.Combine(baseDir, "JumongPos.db");
+if (!File.Exists(dbPath))
+{
+    var parentDir = Directory.GetParent(baseDir)?.FullName;
+    if (parentDir != null)
+    {
+        var parentDb = Path.Combine(parentDir, "JumongPos.db");
+        if (File.Exists(parentDb)) dbPath = parentDb;
+    }
+}
 var apiUrl = "https://admin.jumongdev.com/api";
 var storeId = "";
 var version = "1.0";
