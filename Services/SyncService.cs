@@ -396,7 +396,7 @@ public static class SyncService
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
-                using var cmd = new SQLiteCommand("SELECT Id FROM Sales WHERE Synced = 0 AND IsVoided = 0 ORDER BY Id ASC LIMIT 20", conn);
+                using var cmd = new SQLiteCommand("SELECT Id FROM Sales WHERE Synced = 0 AND IsVoided = 0 ORDER BY Id DESC LIMIT 20", conn);
                 using var r = cmd.ExecuteReader();
                 while (r.Read()) unsyncedSales.Add(r.GetInt32(0));
             }
@@ -413,7 +413,7 @@ public static class SyncService
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
-                using var cmd = new SQLiteCommand("SELECT * FROM StockTrail WHERE Synced = 0 ORDER BY Id ASC LIMIT 30", conn);
+                using var cmd = new SQLiteCommand("SELECT * FROM StockTrail WHERE Synced = 0 ORDER BY Id DESC LIMIT 30", conn);
                 using var r = cmd.ExecuteReader();
                 while (r.Read())
                 {
@@ -446,7 +446,7 @@ public static class SyncService
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
-                using var cmd = new SQLiteCommand("SELECT * FROM VoidLog WHERE Synced = 0 ORDER BY Id ASC LIMIT 20", conn);
+                using var cmd = new SQLiteCommand("SELECT * FROM VoidLog WHERE Synced = 0 ORDER BY Id DESC LIMIT 20", conn);
                 using var r = cmd.ExecuteReader();
                 while (r.Read())
                 {
@@ -479,7 +479,7 @@ public static class SyncService
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
-                using var cmd = new SQLiteCommand("SELECT * FROM CreditTransactions WHERE Synced = 0 ORDER BY Id ASC LIMIT 20", conn);
+                using var cmd = new SQLiteCommand("SELECT * FROM CreditTransactions WHERE Synced = 0 ORDER BY Id DESC LIMIT 20", conn);
                 using var r = cmd.ExecuteReader();
                 while (r.Read())
                 {
@@ -513,7 +513,7 @@ public static class SyncService
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
-                using var cmd = new SQLiteCommand("SELECT * FROM DailyClose WHERE Synced = 0 ORDER BY Id ASC LIMIT 5", conn);
+                using var cmd = new SQLiteCommand("SELECT * FROM DailyClose WHERE Synced = 0 ORDER BY Id DESC LIMIT 5", conn);
                 using var r = cmd.ExecuteReader();
                 while (r.Read())
                 {
@@ -559,7 +559,7 @@ public static class SyncService
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
-                using var cmd = new SQLiteCommand("SELECT * FROM Expenses WHERE Synced = 0 ORDER BY Id ASC LIMIT 20", conn);
+                using var cmd = new SQLiteCommand("SELECT * FROM Expenses WHERE Synced = 0 ORDER BY Id DESC LIMIT 20", conn);
                 using var r = cmd.ExecuteReader();
                 while (r.Read())
                 {
