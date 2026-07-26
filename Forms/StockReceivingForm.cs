@@ -166,7 +166,7 @@ public partial class StockReceivingForm : Form
                     : "";
                 MessageBox.Show($"{matched} of {checkedItems.Count} item(s) received from transfer #{orderId}.{shortageMsg}", "Transfer Received", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                _ = SyncService.SyncStockSnapshotAsync(_pending.Select(p => (p.ProductId, p.ProductName, p.StockBefore + p.Qty)).ToList());
+                _ = SyncService.SyncStockSnapshotAsync(_pending.Select(p => (p.ProductId, p.ProductName, "", p.StockBefore + p.Qty)).ToList());
             };
 
             pnl.Controls.AddRange(new Control[] { lbl, dgv, btnReceive });

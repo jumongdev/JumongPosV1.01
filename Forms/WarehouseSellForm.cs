@@ -545,7 +545,7 @@ public class WarehouseSellForm : Form
         };
         btnEndShiftWh.Click += async (_, _) => await DoWholesaleEndShiftAsync();
 
-        var btnVoid = new Button
+        btnVoid = new Button
         {
             Text = "\u2716 VOID RECEIPT",
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),

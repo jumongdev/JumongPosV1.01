@@ -1206,12 +1206,12 @@ public static class SyncService
         }
     }
 
-    public static async Task SyncStockSnapshotAsync(List<(int productId, string productName, int currentStock)> stocks)
+    public static async Task SyncStockSnapshotAsync(List<(int productId, string productName, string barcode, int currentStock)> stocks)
     {
         try
         {
             var url = ApiUrl.TrimEnd('/') + "/dashboard/warehouse/stock-snapshot";
-            var body = JsonSerializer.Serialize(new { items = stocks.Select(s => new { s.productId, s.productName, currentStock = s.currentStock }) });
+            var body = JsonSerializer.Serialize(new { items = stocks.Select(s => new { s.productId, s.productName, s.barcode, currentStock = s.currentStock }) });
             var content = new StringContent(body, Encoding.UTF8, "application/json");
             await _client.PostAsync(url, content);
         }

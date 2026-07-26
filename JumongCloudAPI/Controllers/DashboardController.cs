@@ -2287,16 +2287,53 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             {
                 foreach (var item in req.Items)
                 {
-                    using var cmd = conn.CreateCommand(); cmd.Transaction = tx;
-                    cmd.CommandText = "UPDATE wh_products SET stock_qty = @sq WHERE id = @pid";
-                    cmd.Parameters.AddWithValue("pid", item.ProductId);
-                    cmd.Parameters.AddWithValue("sq", item.CurrentStock);
-                    cmd.ExecuteNonQuery();
+                    // Match by barcode first, then by name
+                    using var find = conn.CreateCommand(); find.Transaction = tx;
+                    find.CommandText = "SELECT id, stock_qty FROM wh_products WHERE barcode = @bc AND barcode != '' AND is_active = true LIMIT 1";
+                    find.Parameters.AddWithValue("bc", (object?)item.Barcode ?? "");
+                    using var fr = find.ExecuteReader();
+                    if (!fr.Read())
+                    {
+                        fr.Close();
+                        find.CommandText = "SELECT id, stock_qty FROM wh_products WHERE name = @pn AND is_active = true LIMIT 1";
+                        find.Parameters.AddWithValue("pn", item.ProductName);
+                        using var fr2 = find.ExecuteReader();
+                        if (!fr2.Read()) continue;
+                        var wid2 = fr2.GetInt32(0);
+                        var oldQty2 = fr2.GetInt32(1);
+                        fr2.Close();
 
+                        using var cmd = conn.CreateCommand(); cmd.Transaction = tx;
+                        cmd.CommandText = "UPDATE wh_products SET stock_qty = @sq WHERE id = @pid";
+                        cmd.Parameters.AddWithValue("pid", wid2);
+                        cmd.Parameters.AddWithValue("sq", item.CurrentStock);
+                        cmd.ExecuteNonQuery();
+
+                        var change = item.CurrentStock - oldQty2;
+                        using var trail2 = conn.CreateCommand(); trail2.Transaction = tx;
+                        trail2.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, qty_change, reference, reference_type) VALUES (@pid, @pn, @qc, 'Stock snapshot from POS', 'snapshot')";
+                        trail2.Parameters.AddWithValue("pid", wid2);
+                        trail2.Parameters.AddWithValue("pn", item.ProductName);
+                        trail2.Parameters.AddWithValue("qc", change);
+                        trail2.ExecuteNonQuery();
+                        continue;
+                    }
+                    var wid = fr.GetInt32(0);
+                    var oldQty = fr.GetInt32(1);
+                    fr.Close();
+
+                    using var upd = conn.CreateCommand(); upd.Transaction = tx;
+                    upd.CommandText = "UPDATE wh_products SET stock_qty = @sq WHERE id = @pid";
+                    upd.Parameters.AddWithValue("pid", wid);
+                    upd.Parameters.AddWithValue("sq", item.CurrentStock);
+                    upd.ExecuteNonQuery();
+
+                    var delta = item.CurrentStock - oldQty;
                     using var trail = conn.CreateCommand(); trail.Transaction = tx;
-                    trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, qty_change, reference, reference_type) VALUES (@pid, @pn, 0, 'Stock snapshot from POS', 'snapshot')";
-                    trail.Parameters.AddWithValue("pid", item.ProductId);
+                    trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, qty_change, reference, reference_type) VALUES (@pid, @pn, @qc, 'Stock snapshot from POS', 'snapshot')";
+                    trail.Parameters.AddWithValue("pid", wid);
                     trail.Parameters.AddWithValue("pn", item.ProductName);
+                    trail.Parameters.AddWithValue("qc", delta);
                     trail.ExecuteNonQuery();
                 }
                 tx.Commit();
@@ -2878,6 +2915,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         public int ProductId { get; set; }
         public string ProductName { get; set; } = "";
         public int CurrentStock { get; set; }
+        public string Barcode { get; set; } = "";
     }
 
     public class WhWalkinSellRequest

@@ -110,7 +110,7 @@ public class PendingOrdersForm : Form
                     MessageBox.Show($"Stock receiving error: {error}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
 
-            _ = SyncService.SyncStockSnapshotAsync(receivingItems.Select(r => (r.ProductId, r.ProductName, r.StockBefore + r.Qty)).ToList());
+            _ = SyncService.SyncStockSnapshotAsync(receivingItems.Select(r => (r.ProductId, r.ProductName, "", r.StockBefore + r.Qty)).ToList());
 
             var shortageMsg = (result.Shortages != null && result.Shortages.Count > 0)
                 ? $"\n{result.Shortages.Count} item(s) reported as shortage."

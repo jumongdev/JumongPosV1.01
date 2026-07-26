@@ -174,14 +174,14 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
             await SyncService.RetryFailedAsync();
 
             // 3. Push inventory stock snapshot
-            var stocks = new List<(int productId, string productName, int currentStock)>();
+            var stocks = new List<(int productId, string productName, string barcode, int currentStock)>();
             using (var sConn = DatabaseHelper.GetConnection())
             {
                 sConn.Open();
-                using var sCmd = new SQLiteCommand("SELECT Id, Name, StockQty FROM Products WHERE IsActive = 1", sConn);
+                using var sCmd = new SQLiteCommand("SELECT Id, Name, COALESCE(Barcode,''), StockQty FROM Products WHERE IsActive = 1", sConn);
                 using var sRdr = sCmd.ExecuteReader();
                 while (sRdr.Read())
-                    stocks.Add((sRdr.GetInt32(0), sRdr.GetString(1), sRdr.GetInt32(2)));
+                    stocks.Add((sRdr.GetInt32(0), sRdr.GetString(1), sRdr.GetString(2), sRdr.GetInt32(3)));
             }
             if (stocks.Count > 0)
                 await SyncService.SyncStockSnapshotAsync(stocks);
