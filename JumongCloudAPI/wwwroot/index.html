@@ -2206,8 +2206,8 @@ tailwind.config = {
     </div>
 
     <!-- AGENTS -->
-    <div x-show="$store.app.section === 'agents'" x-transition.opacity>
-      <div x-data="agentsPanel" class="space-y-4">
+    <div x-show="$store.app.section === 'agents'" x-transition.opacity class="px-4 py-4">
+      <div x-data="agentsPanel" class="space-y-4 max-w-5xl">
         <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">🖥 Remote Diagnostic Agents</h3>
         
         <!-- Agent Health Cards -->
@@ -2215,7 +2215,7 @@ tailwind.config = {
           <template x-for="a in d" :key="a.storeId">
             <div class="rounded-lg border p-3" :class="a.hasError ? 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/10' : 'border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#181848]'">
               <div class="flex items-center justify-between mb-2">
-                <span class="text-xs font-bold text-gray-700 dark:text-slate-200" x-text="storeMap[a.storeId] || a.storeId"></span>
+                <span class="text-xs font-bold text-gray-700 dark:text-slate-200" x-text="$store.app.storeMap[a.storeId] || a.storeId"></span>
                 <span class="flex items-center gap-1">
                   <span class="w-2 h-2 rounded-full" :class="a.hasError ? 'bg-red-500' : 'bg-green-500'"></span>
                   <span class="text-[10px]" :class="a.hasError ? 'text-red-500' : 'text-green-500'" x-text="a.hasError ? 'ERROR' : 'OK'"></span>
@@ -2238,7 +2238,7 @@ tailwind.config = {
             <select x-model="selectedStore" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
               <option value="">— Select —</option>
               <template x-for="a in d" :key="a.storeId">
-                <option :value="a.storeId" x-text="(storeMap[a.storeId]||a.storeId) + ' [' + a.machine + ']'"></option>
+                <option :value="a.storeId" x-text="($store.app.storeMap[a.storeId]||a.storeId) + ' [' + a.machine + ']'"></option>
               </template>
             </select>
           </div>
