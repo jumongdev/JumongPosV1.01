@@ -2206,8 +2206,8 @@ tailwind.config = {
     </div>
 
     <!-- AGENTS -->
-    <div x-show="$store.app.section === 'agents'" x-transition.opacity class="px-4 py-4">
-      <div x-data="agentsPanel" class="space-y-4 max-w-5xl">
+    <div x-show="$store.app.section === 'agents'" x-transition.opacity>
+      <div x-data="agentsPanel" class="space-y-4 px-4 py-4">
         <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">🖥 Remote Diagnostic Agents</h3>
         
         <!-- Agent Health Cards -->
