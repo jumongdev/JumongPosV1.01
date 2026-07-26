@@ -53,9 +53,7 @@ public class PrinterService
             var printW = pageW - leftMargin - rightMargin;
             var sf = StringFormat.GenericTypographic;
 
-            using var font9 = new Font("Courier New", 9);
             using var font9B = new Font("Courier New", 9, FontStyle.Bold);
-            using var font11 = new Font("Courier New", 11);
 
             var y = 5f;
 
@@ -63,9 +61,9 @@ public class PrinterService
             {
                 Font f;
                 if (entry.Align == TextAlign.Center)
-                    f = font11;
+                    f = font9B;
                 else
-                    f = entry.Bold ? font9B : font9;
+                    f = entry.Bold ? font9B : font9B;
 
                 if (entry.RightText != null)
                 {
@@ -233,9 +231,7 @@ public class PrinterService
             var printW = pageW - leftMargin - rightMargin;
             var sf = StringFormat.GenericTypographic;
 
-            using var font9 = new Font("Courier New", 9);
             using var font9B = new Font("Courier New", 9, FontStyle.Bold);
-            using var font11 = new Font("Courier New", 11);
 
             var y = 5f;
 
@@ -243,9 +239,9 @@ public class PrinterService
             {
                 Font f;
                 if (entry.Align == TextAlign.Center)
-                    f = font11;
+                    f = font9B;
                 else
-                    f = entry.Bold ? font9B : font9;
+                    f = entry.Bold ? font9B : font9B;
 
                 if (entry.RightText != null)
                 {
@@ -366,9 +362,7 @@ public class PrinterService
             var printW = pageW - leftMargin - rightMargin;
             var sf = StringFormat.GenericTypographic;
 
-            using var font9 = new Font("Courier New", 9);
             using var font9B = new Font("Courier New", 9, FontStyle.Bold);
-            using var font11 = new Font("Courier New", 11);
 
             var y = 5f;
 
@@ -376,9 +370,9 @@ public class PrinterService
             {
                 Font f;
                 if (entry.Align == TextAlign.Center)
-                    f = font11;
+                    f = font9B;
                 else
-                    f = entry.Bold ? font9B : font9;
+                    f = entry.Bold ? font9B : font9B;
 
                 if (entry.RightText != null)
                 {
@@ -569,9 +563,7 @@ public class PrinterService
             var printW = pageW - leftMargin - rightMargin;
             var sf = StringFormat.GenericTypographic;
 
-            using var font9 = new Font("Courier New", 9);
             using var font9B = new Font("Courier New", 9, FontStyle.Bold);
-            using var font11 = new Font("Courier New", 11);
 
             var y = 5f;
 
@@ -579,9 +571,9 @@ public class PrinterService
             {
                 Font f;
                 if (entry.Align == TextAlign.Center)
-                    f = font11;
+                    f = font9B;
                 else
-                    f = entry.Bold ? font9B : font9;
+                    f = entry.Bold ? font9B : font9B;
 
                 if (entry.RightText != null)
                 {

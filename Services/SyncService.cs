@@ -409,6 +409,7 @@ public static class SyncService
             }
 
             // Push unsynced StockTrails
+            List<StockTrail> unsyncedTrails = new();
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
@@ -416,7 +417,7 @@ public static class SyncService
                 using var r = cmd.ExecuteReader();
                 while (r.Read())
                 {
-                    var trail = new StockTrail
+                    unsyncedTrails.Add(new StockTrail
                     {
                         Id = r.GetInt32(0),
                         ProductId = Convert.ToInt32(r["ProductId"]),
@@ -431,17 +432,17 @@ public static class SyncService
                         UserId = Convert.ToInt32(r["UserId"]),
                         UserName = r["UserName"].ToString() ?? "",
                         CreatedAt = r["CreatedAt"].ToString() ?? ""
-                    };
-                    if (await SyncStockTrail(trail))
-                    {
-                        using var mark = new SQLiteCommand("UPDATE StockTrail SET Synced = 1 WHERE Id = @id", conn);
-                        mark.Parameters.AddWithValue("@id", trail.Id);
-                        mark.ExecuteNonQuery();
-                    }
+                    });
                 }
+            }
+            foreach (var trail in unsyncedTrails)
+            {
+                if (await SyncStockTrail(trail))
+                    MarkSync("StockTrail", "Id", trail.Id);
             }
 
             // Push unsynced VoidLogs
+            List<(int id, VoidLog log)> unsyncedVoids = new();
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
@@ -464,16 +465,17 @@ public static class SyncService
                         UserName = r["UserName"].ToString() ?? "",
                         CreatedAt = r["CreatedAt"].ToString() ?? ""
                     };
-                    if (await SyncVoidLog(log))
-                    {
-                        using var mark = new SQLiteCommand("UPDATE VoidLog SET Synced = 1 WHERE Id = @id", conn);
-                        mark.Parameters.AddWithValue("@id", log.Id);
-                        mark.ExecuteNonQuery();
-                    }
+                    unsyncedVoids.Add((log.Id, log));
                 }
+            }
+            foreach (var (vid, log) in unsyncedVoids)
+            {
+                if (await SyncVoidLog(log))
+                    MarkSync("VoidLog", "Id", vid);
             }
 
             // Push unsynced CreditTransactions
+            List<(int id, CreditTransaction ct)> unsyncedCts = new();
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
@@ -497,16 +499,17 @@ public static class SyncService
                         ReferenceNo = r["ReferenceNo"].ToString() ?? "",
                         CreatedAt = r["CreatedAt"].ToString() ?? ""
                     };
-                    if (await SyncCreditTransaction(ct))
-                    {
-                        using var mark = new SQLiteCommand("UPDATE CreditTransactions SET Synced = 1 WHERE Id = @id", conn);
-                        mark.Parameters.AddWithValue("@id", ct.Id);
-                        mark.ExecuteNonQuery();
-                    }
+                    unsyncedCts.Add((ct.Id, ct));
                 }
+            }
+            foreach (var (cid, ct) in unsyncedCts)
+            {
+                if (await SyncCreditTransaction(ct))
+                    MarkSync("CreditTransactions", "Id", cid);
             }
 
             // Push unsynced DailyCloses
+            List<(int id, DailyClose dc)> unsyncedDcs = new();
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
@@ -542,16 +545,17 @@ public static class SyncService
                         TotalCostSold = r["TotalCostSold"] != DBNull.Value ? Convert.ToDecimal(r["TotalCostSold"]) : 0,
                         TotalStockReceivedCost = r["TotalStockReceivedCost"] != DBNull.Value ? Convert.ToDecimal(r["TotalStockReceivedCost"]) : 0
                     };
-                    if (await SyncDailyClose(dc))
-                    {
-                        using var mark = new SQLiteCommand("UPDATE DailyClose SET Synced = 1 WHERE Id = @id", conn);
-                        mark.Parameters.AddWithValue("@id", dc.Id);
-                        mark.ExecuteNonQuery();
-                    }
+                    unsyncedDcs.Add((dc.Id, dc));
                 }
+            }
+            foreach (var (did, dc) in unsyncedDcs)
+            {
+                if (await SyncDailyClose(dc))
+                    MarkSync("DailyClose", "Id", did);
             }
 
             // Push unsynced Expenses
+            List<(int id, Expense exp)> unsyncedExps = new();
             using (var conn = DatabaseHelper.GetConnection())
             {
                 conn.Open();
@@ -569,13 +573,13 @@ public static class SyncService
                         ReceiptImage = r["ReceiptImage"] != DBNull.Value ? r["ReceiptImage"].ToString() : null,
                         Timestamp = r["Timestamp"].ToString() ?? ""
                     };
-                    if (await SyncExpense(exp))
-                    {
-                        using var mark = new SQLiteCommand("UPDATE Expenses SET Synced = 1 WHERE Id = @id", conn);
-                        mark.Parameters.AddWithValue("@id", exp.Id);
-                        mark.ExecuteNonQuery();
-                    }
+                    unsyncedExps.Add((exp.Id, exp));
                 }
+            }
+            foreach (var (eid, exp) in unsyncedExps)
+            {
+                if (await SyncExpense(exp))
+                    MarkSync("Expenses", "Id", eid);
             }
         }
         catch (Exception ex) { ErrorLogger.Log("SyncService.PushAllUnsynced", ex); }

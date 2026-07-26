@@ -13,7 +13,7 @@ public class DatabaseHelper
     public static void SetDbPath(string path)
     {
         _dbPath = path;
-        _connectionString = $"Data Source={path};Version=3;";
+        _connectionString = $"Data Source={path};Version=3;busy_timeout=5000;Pooling=True;";
     }
 
     public static void Initialize()
@@ -23,6 +23,10 @@ public class DatabaseHelper
 
         using var conn = GetConnection();
         conn.Open();
+
+        // Enable WAL mode — allows concurrent reads + writes
+        using var pragma = new SQLiteCommand("PRAGMA journal_mode=WAL;", conn);
+        pragma.ExecuteNonQuery();
 
         var sql = @"
             CREATE TABLE IF NOT EXISTS Products (
