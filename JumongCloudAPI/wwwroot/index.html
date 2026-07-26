@@ -2203,65 +2203,64 @@ tailwind.config = {
       </div>
     </div>
 
-    </div>
+      <!-- AGENTS -->
+      <div x-show="$store.app.section === 'agents'" x-transition.opacity>
+        <div x-data="agentsPanel" class="space-y-4">
+          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">🖥 Remote Diagnostic Agents</h3>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <template x-for="a in d" :key="a.storeId">
+              <div class="rounded-lg border p-3" :class="a.hasError ? 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/10' : 'border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#181848]'">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-xs font-bold text-gray-700 dark:text-slate-200" x-text="$store.app.storeMap[a.storeId] || a.storeId"></span>
+                  <span class="flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full" :class="a.hasError ? 'bg-red-500' : 'bg-green-500'"></span>
+                    <span class="text-[10px]" :class="a.hasError ? 'text-red-500' : 'text-green-500'" x-text="a.hasError ? 'ERROR' : 'OK'"></span>
+                  </span>
+                </div>
+                <div class="text-[10px] text-gray-500 dark:text-[#7878aa] space-y-1">
+                  <div>🖥 <span x-text="a.machine"></span></div>
+                  <div>🌐 <span x-text="a.ip || 'N/A'"></span></div>
+                  <div>🕐 <span x-text="new Date(a.lastSeen).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Asia/Manila'})"></span></div>
+                  <div x-show="a.hasError && a.errorSummary" class="text-red-500 text-[9px] mt-1 truncate" :title="a.errorSummary">⚠ <span x-text="a.errorSummary.substring(0,80)"></span></div>
+                </div>
+              </div>
+            </template>
+            <div x-show="d.length === 0" class="col-span-full text-center py-4 text-xs text-gray-400">No agents connected</div>
+          </div>
 
-    <!-- AGENTS -->
-    <div x-show="$store.app.section === 'agents'" x-transition.opacity>
-      <div x-data="agentsPanel" class="space-y-4 px-4 py-4">
-        <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">🖥 Remote Diagnostic Agents</h3>
-        
-        <!-- Agent Health Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <template x-for="a in d" :key="a.storeId">
-            <div class="rounded-lg border p-3" :class="a.hasError ? 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/10' : 'border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#181848]'">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-xs font-bold text-gray-700 dark:text-slate-200" x-text="$store.app.storeMap[a.storeId] || a.storeId"></span>
-                <span class="flex items-center gap-1">
-                  <span class="w-2 h-2 rounded-full" :class="a.hasError ? 'bg-red-500' : 'bg-green-500'"></span>
-                  <span class="text-[10px]" :class="a.hasError ? 'text-red-500' : 'text-green-500'" x-text="a.hasError ? 'ERROR' : 'OK'"></span>
-                </span>
-              </div>
-              <div class="text-[10px] text-gray-500 dark:text-[#7878aa] space-y-1">
-                <div>🖥 <span x-text="a.machine"></span></div>
-                <div>🌐 <span x-text="a.ip || 'N/A'"></span></div>
-                <div>🕐 <span x-text="new Date(a.lastSeen).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Asia/Manila'})"></span></div>
-                <div x-show="a.hasError && a.errorSummary" class="text-red-500 text-[9px] mt-1 truncate" :title="a.errorSummary">⚠ <span x-text="a.errorSummary.substring(0,80)"></span></div>
-              </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Store</label>
+              <select x-model="selectedStore" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                <option value="">— Select —</option>
+                <template x-for="a in d" :key="a.storeId">
+                  <option :value="a.storeId" x-text="($store.app.storeMap[a.storeId]||a.storeId) + ' [' + a.machine + ']'"></option>
+                </template>
+              </select>
             </div>
-          </template>
-          <div x-show="d.length === 0" class="col-span-full text-center py-4 text-xs text-gray-400">No agents connected</div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Store</label>
-            <select x-model="selectedStore" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-              <option value="">— Select —</option>
-              <template x-for="a in d" :key="a.storeId">
-                <option :value="a.storeId" x-text="($store.app.storeMap[a.storeId]||a.storeId) + ' [' + a.machine + ']'"></option>
-              </template>
-            </select>
+            <div>
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Command</label>
+              <select x-model="cmdType" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                <option value="sql">SQL Query</option>
+                <option value="invcheck">Inventory Check</option>
+                <option value="readfile">Read File</option>
+              </select>
+            </div>
           </div>
           <div>
-            <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Command</label>
-            <select x-model="cmdType" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-              <option value="sql">SQL Query</option>
-              <option value="invcheck">Inventory Check</option>
-              <option value="readfile">Read File</option>
-            </select>
+            <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1" x-text="cmdType==='sql'?'SQL Query':cmdType==='invcheck'?'DB Path (or blank)':'File Path'"></label>
+            <textarea x-model="cmdPayload" rows="3" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200 font-mono" placeholder="SELECT * FROM CreditTransactions ORDER BY Id DESC LIMIT 20"></textarea>
           </div>
-        </div>
-        <div>
-          <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1" x-text="cmdType==='sql'?'SQL Query':cmdType==='invcheck'?'DB Path (or blank)':'File Path'"></label>
-          <textarea x-model="cmdPayload" rows="3" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200 font-mono" placeholder="SELECT * FROM CreditTransactions ORDER BY Id DESC LIMIT 20"></textarea>
-        </div>
-        <button @click="send()" :disabled="!selectedStore || sending" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 disabled:opacity-50">EXECUTE</button>
-        <div>
-          <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Result</label>
-          <pre class="w-full text-[10px] bg-gray-100 dark:bg-[#0a0a2e] border border-gray-200 dark:border-[#222255] rounded-lg p-3 text-gray-700 dark:text-slate-200 overflow-auto max-h-80 font-mono whitespace-pre-wrap" x-text="results || 'No results yet'"></pre>
+          <button @click="send()" :disabled="!selectedStore || sending" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 disabled:opacity-50">EXECUTE</button>
+          <div>
+            <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Result</label>
+            <pre class="w-full text-[10px] bg-gray-100 dark:bg-[#0a0a2e] border border-gray-200 dark:border-[#222255] rounded-lg p-3 text-gray-700 dark:text-slate-200 overflow-auto max-h-80 font-mono whitespace-pre-wrap" x-text="results || 'No results yet'"></pre>
+          </div>
         </div>
       </div>
-    </div>
+
+    </main>
 
   </div><!-- /main content -->
 
