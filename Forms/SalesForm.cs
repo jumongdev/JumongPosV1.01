@@ -91,7 +91,7 @@ public partial class SalesForm : Form
         try
         {
             var (available, _, _, _) = await UpdateService.CheckUpdate();
-            if (available && !IsDisposed)
+            if (available && !IsDisposed && IsHandleCreated)
             {
                 BeginInvoke(() =>
                 {
@@ -106,7 +106,7 @@ public partial class SalesForm : Form
         try
         {
             var count = await SyncService.CountPendingMasterUpdates();
-            if (count > 0 && !IsDisposed)
+            if (count > 0 && !IsDisposed && IsHandleCreated)
             {
                 BeginInvoke(() =>
                 {
@@ -122,7 +122,7 @@ public partial class SalesForm : Form
         try
         {
             var custCount = await SyncService.CountPendingCustomerUpdates();
-            if (custCount > 0 && !IsDisposed)
+            if (custCount > 0 && !IsDisposed && IsHandleCreated)
             {
                 BeginInvoke(() =>
                 {
@@ -1461,7 +1461,8 @@ public partial class SalesForm : Form
             if (!string.IsNullOrEmpty(cloudMsg))
             {
                 _promoText = cloudMsg;
-                BeginInvoke(() => LayoutControls());
+                if (IsHandleCreated && !IsDisposed)
+                    BeginInvoke(() => LayoutControls());
             }
         }
         catch (Exception ex) { ErrorLogger.Log("FetchCloudPromo", ex); }
