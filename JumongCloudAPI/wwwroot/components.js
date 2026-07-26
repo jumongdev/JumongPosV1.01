@@ -1041,4 +1041,39 @@ Alpine.store('app', {
     }
   }));
 
+  // AGENTS remote diagnostic panel
+  Alpine.data('agentsPanel', () => ({
+    d: [], loading: false, selectedStore: '', cmdType: 'sql', cmdPayload: '', results: '', sending: false,
+    async init() {
+      if (Alpine.store('app').section === 'agents') await this.load();
+      this.$watch('$store.app.section', v => { if (v === 'agents') this.load(); });
+    },
+    async load() { this.loading = true; try { this.d = await fetchJSON(API + '/agent/status') } catch (e) { this.d = [] }; this.loading = false },
+    async send() {
+      if (!this.selectedStore || !this.cmdPayload.trim()) return;
+      this.sending = true; this.results = 'Sending...';
+      try {
+        const r = await fetchJSON(API + '/agent/send/' + encodeURIComponent(this.selectedStore), { method: 'POST', body: JSON.stringify({ type: this.cmdType, payload: this.cmdPayload }), headers: { 'Content-Type': 'application/json' } });
+        this.cmdId = r.commandId;
+        this.results = 'Command sent (#' + r.commandId + '). Waiting for result...';
+        await this.pollResults();
+      } catch (e) { this.results = 'Error: ' + e.message }
+      this.sending = false;
+    },
+    async pollResults() {
+      var tries = 0;
+      while (tries < 15) {
+        await new Promise(r => setTimeout(r, 2000));
+        try {
+          const list = await fetchJSON(API + '/agent/results/' + encodeURIComponent(this.selectedStore));
+          var found = list.find(x => x.commandId === this.cmdId);
+          if (found) { this.results = found.error ? 'ERROR: ' + found.error : found.output; return }
+        } catch (e) {}
+        tries++;
+        this.results = 'Waiting... (' + tries + '/15)';
+      }
+      this.results = 'Timeout — agent may be offline.';
+    }
+  }));
+
 });
