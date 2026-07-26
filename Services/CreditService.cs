@@ -33,13 +33,16 @@ public class CreditService
         cmd.Parameters.AddWithValue("@uname", userName);
         cmd.ExecuteNonQuery();
 
+        using var idCmd = new SQLiteCommand("SELECT last_insert_rowid()", conn);
+        var ctId = Convert.ToInt32(idCmd.ExecuteScalar());
+
         var upd = new SQLiteCommand("UPDATE Customers SET CreditBalance = @bal WHERE Id = @id", conn);
         upd.Parameters.AddWithValue("@bal", newBalance);
         upd.Parameters.AddWithValue("@id", customerId);
         upd.ExecuteNonQuery();
 
         trans.Commit();
-        _ = SyncService.SyncCreditTransaction(new CreditTransaction { CustomerId = customerId, SaleId = saleId, Type = type, Description = description, Debit = amount > 0 ? amount : 0, Credit = amount < 0 ? Math.Abs(amount) : 0, Balance = newBalance, PaymentMethod = paymentMethod, ReferenceNo = referenceNo, UserId = userId, UserName = userName, CreatedAt = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss") });
+        _ = SyncService.SyncCreditTransaction(new CreditTransaction { Id = ctId, CustomerId = customerId, SaleId = saleId, Type = type, Description = description, Debit = amount > 0 ? amount : 0, Credit = amount < 0 ? Math.Abs(amount) : 0, Balance = newBalance, PaymentMethod = paymentMethod, ReferenceNo = referenceNo, UserId = userId, UserName = userName, CreatedAt = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss") });
     }
 
     public static List<CreditTransaction> GetAll()
