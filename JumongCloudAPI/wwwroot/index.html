@@ -61,6 +61,7 @@ tailwind.config = {
         { id:'wh-sales', icon:'💰', label:'Sales' },
         { id:'wh-onlineorder', icon:'🛒', label:'Online Order' },
         { id:'wh-transfer', icon:'🔄', label:'Transfer' },
+        { id:'agents', icon:'🖥', label:'AGENTS' },
         { id:'customers', icon:'👥', label:'Customers' },
         { id:'users', icon:'⚙️', label:'Users' },
         { id:'settings', icon:'🔧', label:'Settings' },
@@ -2202,6 +2203,47 @@ tailwind.config = {
       </div>
     </div>
 
+    </div>
+
+    <!-- AGENTS -->
+    <div x-show="$store.app.section === 'agents'" x-transition.opacity>
+      <div x-data="agentsPanel" class="space-y-4">
+        <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">🖥 Remote Diagnostic Agents</h3>
+        <div class="text-xs text-gray-500 dark:text-[#7878aa]">
+          <span x-text="d.length || 0"></span> agent(s) online
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Store</label>
+            <select x-model="selectedStore" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+              <option value="">— Select —</option>
+              <template x-for="a in d" :key="a.storeId">
+                <option :value="a.storeId" x-text="(storeMap[a.storeId]||a.storeId) + ' [' + a.machine + '] ' + (new Date(a.lastSeen).toLocaleTimeString())"></option>
+              </template>
+            </select>
+            <div class="mt-1 text-[10px] text-gray-400">Only stores running agent.exe appear here</div>
+          </div>
+          <div>
+            <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Command</label>
+            <select x-model="cmdType" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+              <option value="sql">SQL Query</option>
+              <option value="invcheck">Inventory Check</option>
+              <option value="readfile">Read File</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1" x-text="cmdType==='sql'?'SQL Query':cmdType==='invcheck'?'DB Path (or blank)':'File Path'"></label>
+          <textarea x-model="cmdPayload" rows="3" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200 font-mono" placeholder="SELECT * FROM CreditTransactions ORDER BY Id DESC LIMIT 20"></textarea>
+        </div>
+        <button @click="send()" :disabled="!selectedStore || sending" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 disabled:opacity-50">EXECUTE</button>
+        <div>
+          <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Result</label>
+          <pre class="w-full text-[10px] bg-gray-100 dark:bg-[#0a0a2e] border border-gray-200 dark:border-[#222255] rounded-lg p-3 text-gray-700 dark:text-slate-200 overflow-auto max-h-80 font-mono whitespace-pre-wrap" x-text="results || 'No results yet'"></pre>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /main content -->
 
   <script src="components.js"></script>
@@ -2219,6 +2261,38 @@ tailwind.config = {
           stores.map(s => '<option value="' + esc(s.storeId) + '">' + esc(s.storeName || s.storeId) + '</option>').join('');
       }
     } catch (e) {}
+
+    // ── Agents panel ──
+    Alpine.data('agentsPanel', () => ({
+      d: [], loading: false, selectedStore: '', cmdType: 'sql', cmdPayload: '', results: '', sending: false,
+      async init() { if (appState.section === 'agents') await this.load(); this.$watch('$store.app.section', v => { if (v === 'agents') this.load(); }) },
+      async load() { this.loading = true; try { this.d = await fetchJSON(API + '/agent/status') } catch (e) { this.d = [] }; this.loading = false },
+      async send() {
+        if (!this.selectedStore || !this.cmdPayload.trim()) return;
+        this.sending = true; this.results = 'Sending...';
+        try {
+          const r = await fetchJSON(API + '/agent/send/' + encodeURIComponent(this.selectedStore), { method: 'POST', body: JSON.stringify({ type: this.cmdType, payload: this.cmdPayload }), headers: { 'Content-Type': 'application/json' } });
+          this.cmdId = r.commandId;
+          this.results = 'Command sent (#' + r.commandId + '). Waiting for result...';
+          await this.pollResults();
+        } catch (e) { this.results = 'Error: ' + e.message }
+        this.sending = false;
+      },
+      async pollResults() {
+        var tries = 0;
+        while (tries < 15) {
+          await new Promise(r => setTimeout(r, 2000));
+          try {
+            const list = await fetchJSON(API + '/agent/results/' + encodeURIComponent(this.selectedStore));
+            var found = list.find(x => x.commandId === this.cmdId);
+            if (found) { this.results = found.error ? 'ERROR: ' + found.error : found.output; return }
+          } catch (e) {}
+          tries++;
+          this.results = 'Waiting... (' + tries + '/15)';
+        }
+        this.results = 'Timeout — agent may be offline.';
+      }
+    }));
     document.documentElement.classList.toggle('dark', Alpine.store('app').darkMode);
   })();
   </script>

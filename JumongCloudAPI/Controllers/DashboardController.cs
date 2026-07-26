@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
@@ -2879,6 +2880,60 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         return Ok(new { ok = true });
     }
 
+    // ── Agent (remote diagnostic) ──
+
+    private static readonly ConcurrentDictionary<string, Queue<AgentCommand>> _cmdQueues = new();
+    private static readonly ConcurrentDictionary<string, List<AgentResult>> _results = new();
+    private static readonly ConcurrentDictionary<string, (DateTime lastSeen, string ip, string machine, string version)> _agents = new();
+    private static int _cmdCounter = 0;
+
+    [HttpPost("agent/heartbeat")]
+    public IActionResult AgentHeartbeat([FromBody] AgentHeartbeat hb)
+    {
+        if (string.IsNullOrEmpty(hb.StoreId)) return BadRequest();
+        _agents[hb.StoreId] = (DateTime.UtcNow, hb.LocalIp ?? "", hb.MachineName ?? "", hb.Version ?? "");
+        return Ok(new { ok = true });
+    }
+
+    [HttpGet("agent/status")]
+    public IActionResult AgentStatus()
+    {
+        var list = _agents.Select(a => new { storeId = a.Key, lastSeen = a.Value.lastSeen, ip = a.Value.ip, machine = a.Value.machine, version = a.Value.version }).OrderBy(a => a.storeId);
+        return Ok(list);
+    }
+
+    [HttpPost("agent/send/{storeId}")]
+    public IActionResult AgentSendCommand(string storeId, [FromBody] AgentCommand cmd)
+    {
+        var queue = _cmdQueues.GetOrAdd(storeId, _ => new Queue<AgentCommand>());
+        cmd.Id = Interlocked.Increment(ref _cmdCounter);
+        queue.Enqueue(cmd);
+        return Ok(new { commandId = cmd.Id });
+    }
+
+    [HttpGet("agent/poll/{storeId}")]
+    public IActionResult AgentPoll(string storeId)
+    {
+        if (!_cmdQueues.TryGetValue(storeId, out var queue) || queue.Count == 0) return Ok("{}");
+        if (queue.TryDequeue(out var cmd)) return Ok(cmd);
+        return Ok("{}");
+    }
+
+    [HttpPost("agent/result")]
+    public IActionResult AgentResult([FromBody] AgentResult ar)
+    {
+        var list = _results.GetOrAdd(ar.StoreId, _ => new List<AgentResult>());
+        list.Add(ar);
+        if (list.Count > 50) list.RemoveAt(0);
+        return Ok(new { ok = true });
+    }
+
+    [HttpGet("agent/results/{storeId}")]
+    public IActionResult AgentResults(string storeId)
+    {
+        return Ok(_results.TryGetValue(storeId, out var list) ? list : new List<AgentResult>());
+    }
+
     public class PosPromoRequest { public string Message { get; set; } = ""; }
     }
 
@@ -2964,5 +3019,28 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     {
         public string StoreId { get; set; } = "";
         public string StoreName { get; set; } = "";
+    }
+
+    public class AgentHeartbeat
+    {
+        public string StoreId { get; set; } = "";
+        public string Version { get; set; } = "";
+        public string LocalIp { get; set; } = "";
+        public string MachineName { get; set; } = "";
+    }
+
+    public class AgentCommand
+    {
+        public int Id { get; set; }
+        public string Type { get; set; } = "sql";
+        public string Payload { get; set; } = "";
+    }
+
+    public class AgentResult
+    {
+        public string StoreId { get; set; } = "";
+        public int CommandId { get; set; }
+        public string Output { get; set; } = "";
+        public string Error { get; set; } = "";
     }
 }
