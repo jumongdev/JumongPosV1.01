@@ -2891,7 +2891,8 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         public IActionResult AgentHeartbeat([FromBody] AgentHeartbeat hb)
         {
             if (string.IsNullOrEmpty(hb.StoreId)) return BadRequest();
-            _agents[hb.StoreId] = (DateTime.UtcNow, hb.LocalIp ?? "", hb.MachineName ?? "", hb.AppVersion ?? "", hb.HasError, hb.ErrorSummary ?? "");
+            var ver = !string.IsNullOrEmpty(hb.AppVersion) ? hb.AppVersion : hb.Version;
+            _agents[hb.StoreId] = (DateTime.UtcNow, hb.LocalIp ?? "", hb.MachineName ?? "", ver ?? "", hb.HasError, hb.ErrorSummary ?? "");
             return Ok(new { ok = true });
         }
 
@@ -3026,6 +3027,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     {
         public string StoreId { get; set; } = "";
         public string AppVersion { get; set; } = "";
+        public string Version { get; set; } = "";
         public string LocalIp { get; set; } = "";
         public string MachineName { get; set; } = "";
         public bool HasError { get; set; }
