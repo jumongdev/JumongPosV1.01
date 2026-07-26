@@ -257,6 +257,7 @@ public partial class PaymentForm : Form
                 Change = 0;
                 PaymentMethod = "E-Wallet";
                 ReferenceNo = txtEwRef.Text.Trim();
+                EwPaid = total;
                 break;
 
             case "Split":

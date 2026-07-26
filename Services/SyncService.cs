@@ -581,6 +581,23 @@ public static class SyncService
                 if (await SyncExpense(exp))
                     MarkSync("Expenses", "Id", eid);
             }
+
+            // Push stock snapshot to warehouse (every 30s auto-sync)
+            try
+            {
+                var stocks = new List<(int productId, string productName, string barcode, int currentStock)>();
+                using (var conn = DatabaseHelper.GetConnection())
+                {
+                    conn.Open();
+                    using var cmd = new SQLiteCommand("SELECT Id, Name, COALESCE(Barcode,''), StockQty FROM Products WHERE IsActive = 1", conn);
+                    using var r = cmd.ExecuteReader();
+                    while (r.Read())
+                        stocks.Add((r.GetInt32(0), r.GetString(1), r.GetString(2), r.GetInt32(3)));
+                }
+                if (stocks.Count > 0)
+                    await SyncStockSnapshotAsync(stocks);
+            }
+            catch { }
         }
         catch (Exception ex) { ErrorLogger.Log("SyncService.PushAllUnsynced", ex); }
     }
