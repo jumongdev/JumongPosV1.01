@@ -90,6 +90,12 @@ while (true)
                         output = RunPs(payload);
                     else if (type == "readfile")
                         output = File.Exists(payload) ? File.ReadAllText(payload) : "File not found: " + payload;
+                    else if (type == "writefile")
+                        output = WriteFile(payload, baseDir);
+                    else if (type == "update")
+                        output = await DownloadAndUpdate(payload, baseDir, client);
+                    else if (type == "restart")
+                        output = RestartApp(baseDir);
                 }
                 catch (Exception ex) { error = ex.Message; }
 
@@ -189,4 +195,51 @@ static string? DatabaseHelperGetSetting(SQLiteConnection conn, string key)
     using var cmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = @key", conn);
     cmd.Parameters.AddWithValue("@key", key);
     return cmd.ExecuteScalar()?.ToString();
+}
+
+static string WriteFile(string payload, string baseDir)
+{
+    // Format: PATH|CONTENT  — pipe-separated
+    var sep = payload.IndexOf('|');
+    if (sep < 0) return "Error: format is PATH|CONTENT";
+    var path = payload[..sep].Trim();
+    var content = payload[(sep + 1)..];
+    if (!Path.IsPathRooted(path))
+        path = Path.Combine(baseDir, path);
+    File.WriteAllText(path, content);
+    return "File written: " + path + " (" + content.Length + " bytes)";
+}
+
+static async Task<string> DownloadAndUpdate(string payload, string baseDir, HttpClient client)
+{
+    try
+    {
+        // Format: URL|TARGET_PATH  (target relative to baseDir)
+        var sep = payload.IndexOf('|');
+        var url = sep < 0 ? payload.Trim() : payload[..sep].Trim();
+        var target = sep < 0 ? Path.GetFileName(new Uri(url).AbsolutePath) : payload[(sep + 1)..].Trim();
+        if (!Path.IsPathRooted(target))
+            target = Path.Combine(baseDir, target);
+        
+        var resp = await client.GetAsync(url);
+        if (!resp.IsSuccessStatusCode) return "Download failed: HTTP " + (int)resp.StatusCode;
+        var bytes = await resp.Content.ReadAsByteArrayAsync();
+        File.WriteAllBytes(target, bytes);
+        return "Downloaded " + bytes.Length + " bytes to " + target;
+    }
+    catch (Exception ex) { return "Download error: " + ex.Message; }
+}
+
+static string RestartApp(string baseDir)
+{
+    try
+    {
+        var exe = Path.Combine(baseDir, "..", "JumongPosV1.01.exe");
+        if (!File.Exists(exe)) exe = Path.Combine(baseDir, "JumongPosV1.01.exe");
+        if (!File.Exists(exe)) return "Cannot find JumongPosV1.01.exe";
+        Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true, WorkingDirectory = Path.GetDirectoryName(exe) ?? baseDir });
+        Environment.Exit(0);
+        return "Restarting...";
+    }
+    catch (Exception ex) { return "Restart error: " + ex.Message; }
 }
