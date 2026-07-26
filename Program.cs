@@ -96,6 +96,9 @@ static class Program
 
         ErrorLogger.Log("Startup", $"App v{AppVersion.Current} started by {login.CurrentUser?.Username ?? "unknown"}");
 
+        // Auto-start remote diagnostic agent if present
+        StartAgent();
+
         try
         {
             Application.Run(new MainForm(login.CurrentUser!));
@@ -179,6 +182,29 @@ Stack Trace:
 {(ex.InnerException != null ? $"Inner: {ex.InnerException.Message}\n{ex.InnerException.StackTrace}" : "")}";
 
             svc.SendErrorReport("App Error", body);
+        }
+        catch { }
+    }
+
+    static void StartAgent()
+    {
+        try
+        {
+            var agentPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Agent", "Agent.exe");
+            if (File.Exists(agentPath))
+            {
+                var existing = Process.GetProcessesByName("Agent");
+                if (existing.Length == 0)
+                {
+                    var psi = new ProcessStartInfo(agentPath)
+                    {
+                        WorkingDirectory = Path.GetDirectoryName(agentPath),
+                        UseShellExecute = true,
+                        CreateNoWindow = false
+                    };
+                    Process.Start(psi);
+                }
+            }
         }
         catch { }
     }

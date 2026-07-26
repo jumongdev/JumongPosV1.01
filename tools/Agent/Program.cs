@@ -60,7 +60,7 @@ while (true)
         // Send heartbeat
         try
         {
-            var hb = new StringContent(JsonSerializer.Serialize(new { storeId, version = "1.0", localIp = GetLocalIp(), machineName = Environment.MachineName }), Encoding.UTF8, "application/json");
+            var hb = new StringContent(JsonSerializer.Serialize(new { storeId, version = "1.0", localIp = GetLocalIp(), machineName = Environment.MachineName, hasError = HasRecentErrors(dbPath), errorSummary = GetErrorSummary(baseDir) }), Encoding.UTF8, "application/json");
             await client.PostAsync(apiUrl + "/dashboard/agent/heartbeat", hb);
         }
         catch { }
@@ -190,7 +190,32 @@ static string GetLocalIp()
     catch { return ""; }
 }
 
-static string? DatabaseHelperGetSetting(SQLiteConnection conn, string key)
+static bool HasRecentErrors(string dbPath)
+{
+    try
+    {
+        using var conn = new SQLiteConnection($"Data Source={dbPath}");
+        conn.Open();
+        using var cmd = new SQLiteCommand("SELECT COUNT(*) FROM SyncLog WHERE Status != 'OK' AND CreatedAt > datetime('now', '-1 hour')", conn);
+        var count = Convert.ToInt32(cmd.ExecuteScalar());
+        return count > 0;
+    }
+    catch { return false; }
+}
+
+static string GetErrorSummary(string baseDir)
+{
+    try
+    {
+        var logPath = Path.Combine(baseDir, "..", "error.log");
+        if (!File.Exists(logPath)) logPath = Path.Combine(baseDir, "error.log");
+        if (!File.Exists(logPath)) return "";
+        var lines = File.ReadAllLines(logPath);
+        var recent = lines.Where(l => l.Contains("[ERROR]") || l.Contains("Exception")).TakeLast(3).ToList();
+        return string.Join(" | ", recent);
+    }
+    catch { return ""; }
+}
 {
     using var cmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = @key", conn);
     cmd.Parameters.AddWithValue("@key", key);
