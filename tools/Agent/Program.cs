@@ -51,7 +51,7 @@ Console.WriteLine($"API: {apiUrl}");
 Console.WriteLine($"DB: {dbPath}");
 Console.WriteLine();
 
-using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(15) };
 
 while (true)
 {

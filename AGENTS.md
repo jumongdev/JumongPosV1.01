@@ -1008,3 +1008,62 @@ Restart-Service JumongCloudAPI
 | `tools/InvVarianceCheck/` | New standalone diagnostic tool (Console app). Checks inventory reconciliation, cost mismatches, receiving recompute, zero-cost products. Self-contained publish to `invcheck.exe`. |
 
 **Impact:** POS reads now instant from SQLite — zero PG timeout, fully offline. Wholesale sales now have invoice numbers (visible on dashboard and receipts). Inventory Cost Report Previous column fixed for multi-store scenarios. INV CHECK button on Products page provides in-POS inventory reconciliation. Transfer stock movements now logged to warehouse stock trails (backfilled 515 records). Warehouse products/inventory show master catalog images. Master editor category field has "+" button for adding new categories with duplicate validation. Update system now uses batch copy instead of File.Move — no more update loops. btnReprint was missing from void popup — now visible.
+
+### Remote Diagnostic Agent (`tools/Agent/`)
+
+A console app that runs on each POS client machine, connecting outbound to the cloud API. Enables the AI agent to remotely query the local SQLite database, run diagnostic commands, and update files — no port forwarding, no remote desktop needed.
+
+#### Agent Files
+| File | Purpose |
+|---|---|
+| `tools/Agent/Agent.csproj` | Project — self-contained, win-x64, PublishReadyToRun |
+| `tools/Agent/Program.cs` | Agent logic — heartbeat, command polling, file ops |
+
+#### Agent Commands
+| Type | Payload | What it does |
+|---|---|---|
+| `sql` | SQL query text | Runs against local `JumongPos.db`, returns tab-separated output (max 500 rows) |
+| `invcheck` | DB path (or blank) | Runs invcheck.exe on the local DB |
+| `ps` | PowerShell script | Runs `powershell.exe -NoProfile -Command "..."` |
+| `readfile` | File path | Returns file contents as text |
+| `writefile` | `PATH|CONTENT` | Writes content to a file (relative to agent folder or absolute) |
+| `update` | `URL|TARGET_PATH` | Downloads a file from URL to target path |
+| `restart` | (none) | Restarts `JumongPosV1.01.exe` in parent folder |
+
+#### How to build and deploy
+```powershell
+Set-Location tools\Agent
+dotnet publish -c Release -r win-x64 --self-contained true
+Compress-Archive -Force -Path "bin\Release\net8.0-windows\win-x64\publish\*" -DestinationPath "C:\JumongAPI\wwwroot\agent.zip"
+```
+
+#### How to install on POS machine
+1. Download `https://admin.jumongdev.com/agent.zip`
+2. Extract ALL files to `Agent\` subfolder inside POS folder
+3. Double-click `Agent\Agent.exe`
+4. It auto-finds `..\JumongPos.db` (parent folder) and `CloudApiUrl` from Settings
+
+#### Cloud API Endpoints (in DashboardController)
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/dashboard/agent/heartbeat` | POST | Agent sends heartbeat every 3 seconds |
+| `/api/dashboard/agent/status` | GET | Returns all connected agents |
+| `/api/dashboard/agent/poll/{storeId}` | GET | Agent polls for pending commands |
+| `/api/dashboard/agent/send/{storeId}` | POST | Dashboard sends command to agent |
+| `/api/dashboard/agent/result` | POST | Agent posts command result |
+| `/api/dashboard/agent/results/{storeId}` | GET | Dashboard fetches results |
+
+#### Dashboard UI
+- Sidebar: **AGENTS** tab
+- Shows all connected agents (store, machine, IP, last seen)
+- SQL Query / Inventory Check / Read File commands
+- Execute button → polls result (up to 15 tries × 2s)
+
+#### Important Notes
+- Agent is a **console app** (runs in window, shows status)
+- Self-contained publish extracts to temp folder — **NOT single-file** (needs native SQLite DLL)
+- Agent checks **parent folder** for `JumongPos.db` if not found in current folder
+- All commands execute locally on the POS machine
+- Agent timeout: 15 minutes (for large file downloads)
+- No GUI required — works fully over CLI/API
+
