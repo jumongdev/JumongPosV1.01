@@ -6,7 +6,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 
-var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+var baseDir = Path.GetDirectoryName(Environment.ProcessPath) ?? AppDomain.CurrentDomain.BaseDirectory;
 var dbPath = Path.Combine(baseDir, "JumongPos.db");
 var apiUrl = "https://admin.jumongdev.com/api";
 var storeId = "";
