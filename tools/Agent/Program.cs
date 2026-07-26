@@ -19,17 +19,26 @@ if (!File.Exists(dbPath))
 }
 var apiUrl = "https://admin.jumongdev.com/api";
 var storeId = "";
-var version = "1.0";
+var appVersion = "";
 
-// Read storeId from local DB
+// Read storeId + appVersion from local DB
 try
 {
     using var conn = new SQLiteConnection($"Data Source={dbPath}");
     conn.Open();
     using var cmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'StoreId'", conn);
     storeId = cmd.ExecuteScalar()?.ToString() ?? "";
+    appVersion = DatabaseHelperGetSetting(conn, "AppVersion") ?? "";
     apiUrl = DatabaseHelperGetSetting(conn, "CloudApiUrl") ?? apiUrl;
     if (!apiUrl.EndsWith("/api")) apiUrl = apiUrl.TrimEnd('/') + "/api";
+    
+    if (string.IsNullOrEmpty(appVersion))
+    {
+        var exePath = Path.Combine(baseDir, "JumongPosV1.01.exe");
+        if (!File.Exists(exePath)) exePath = Path.Combine(baseDir, "..", "JumongPosV1.01.exe");
+        if (File.Exists(exePath))
+            appVersion = System.Diagnostics.FileVersionInfo.GetVersionInfo(exePath).FileVersion ?? "";
+    }
 }
 catch (Exception ex)
 {
@@ -46,7 +55,7 @@ if (string.IsNullOrEmpty(storeId) || storeId == "STORE-DEV-0001")
     return;
 }
 
-Console.WriteLine($"Agent v{version} | Store: {storeId}");
+Console.WriteLine($"Agent v1.0 | Store: {storeId} | POS: v{appVersion}");
 Console.WriteLine($"API: {apiUrl}");
 Console.WriteLine($"DB: {dbPath}");
 Console.WriteLine();
@@ -60,7 +69,7 @@ while (true)
         // Send heartbeat
         try
         {
-            var hb = new StringContent(JsonSerializer.Serialize(new { storeId, version = "1.0", localIp = GetLocalIp(), machineName = Environment.MachineName, hasError = HasRecentErrors(dbPath), errorSummary = GetErrorSummary(baseDir) }), Encoding.UTF8, "application/json");
+            var hb = new StringContent(JsonSerializer.Serialize(new { storeId, appVersion, localIp = GetLocalIp(), machineName = Environment.MachineName, hasError = HasRecentErrors(dbPath), errorSummary = GetErrorSummary(baseDir) }), Encoding.UTF8, "application/json");
             await client.PostAsync(apiUrl + "/dashboard/agent/heartbeat", hb);
         }
         catch { }
@@ -216,6 +225,8 @@ static string GetErrorSummary(string baseDir)
     }
     catch { return ""; }
 }
+
+static string? DatabaseHelperGetSetting(SQLiteConnection conn, string key)
 {
     using var cmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = @key", conn);
     cmd.Parameters.AddWithValue("@key", key);

@@ -96,6 +96,15 @@ static class Program
 
         ErrorLogger.Log("Startup", $"App v{AppVersion.Current} started by {login.CurrentUser?.Username ?? "unknown"}");
 
+        // Save app version for agent heartbeat
+        using (var vConn = DatabaseHelper.GetConnection())
+        {
+            vConn.Open();
+            using var vCmd = new System.Data.SQLite.SQLiteCommand("INSERT OR REPLACE INTO Settings (Key, Value) VALUES ('AppVersion', @v)", vConn);
+            vCmd.Parameters.AddWithValue("@v", AppVersion.Current);
+            vCmd.ExecuteNonQuery();
+        }
+
         // Auto-start remote diagnostic agent if present
         StartAgent();
 

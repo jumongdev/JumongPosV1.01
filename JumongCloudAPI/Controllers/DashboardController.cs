@@ -2884,21 +2884,22 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
 
     private static readonly ConcurrentDictionary<string, Queue<AgentCommand>> _cmdQueues = new();
     private static readonly ConcurrentDictionary<string, List<AgentResult>> _results = new();
-    private static readonly ConcurrentDictionary<string, (DateTime lastSeen, string ip, string machine, string version, bool hasError, string errorSummary)> _agents = new();
+    private static readonly ConcurrentDictionary<string, (DateTime lastSeen, string ip, string machine, string appVersion, bool hasError, string errorSummary)> _agents = new();
     private static int _cmdCounter = 0;
 
         [HttpPost("agent/heartbeat")]
         public IActionResult AgentHeartbeat([FromBody] AgentHeartbeat hb)
         {
             if (string.IsNullOrEmpty(hb.StoreId)) return BadRequest();
-            _agents[hb.StoreId] = (DateTime.UtcNow, hb.LocalIp ?? "", hb.MachineName ?? "", hb.Version ?? "", hb.HasError, hb.ErrorSummary ?? "");
+            _agents[hb.StoreId] = (DateTime.UtcNow, hb.LocalIp ?? "", hb.MachineName ?? "", hb.AppVersion ?? "", hb.HasError, hb.ErrorSummary ?? "");
             return Ok(new { ok = true });
         }
 
         [HttpGet("agent/status")]
         public IActionResult AgentStatus()
         {
-            var list = _agents.Select(a => new { storeId = a.Key, lastSeen = a.Value.lastSeen, ip = a.Value.ip, machine = a.Value.machine, version = a.Value.version, hasError = a.Value.hasError, errorSummary = a.Value.errorSummary }).OrderBy(a => a.storeId);
+            var latestVer = "1.1.11";
+            var list = _agents.Select(a => new { storeId = a.Key, lastSeen = a.Value.lastSeen, ip = a.Value.ip, machine = a.Value.machine, appVersion = a.Value.appVersion, outdated = string.Compare(latestVer, a.Value.appVersion ?? "", StringComparison.Ordinal) > 0, hasError = a.Value.hasError, errorSummary = a.Value.errorSummary }).OrderBy(a => a.storeId);
             return Ok(list);
         }
 
@@ -3024,7 +3025,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     public class AgentHeartbeat
     {
         public string StoreId { get; set; } = "";
-        public string Version { get; set; } = "";
+        public string AppVersion { get; set; } = "";
         public string LocalIp { get; set; } = "";
         public string MachineName { get; set; } = "";
         public bool HasError { get; set; }
