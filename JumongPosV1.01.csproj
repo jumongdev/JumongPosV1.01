@@ -55,4 +55,11 @@
     <Copy SourceFiles="@(_AssetsFiles)" DestinationFolder="$(PublishDir)\assets\%(RecursiveDir)" />
   </Target>
 
+  <Target Name="CopyAgentAfterPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <_AgentFiles Include="tools\Agent\bin\Release\net8.0-windows\win-x64\publish\**" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_AgentFiles)" DestinationFolder="$(PublishDir)\Agent\%(RecursiveDir)" />
+  </Target>
+
 </Project>
