@@ -17,6 +17,27 @@ public static class SyncService
     private static string? _storeId;
     private static string? _storeName;
     private static bool _storeNameSynced;
+    private static System.Windows.Forms.Timer? _snapshotDebounce;
+    private static readonly object _snapshotLock = new();
+
+    /// <summary>Call after any stock-changing transaction. Batches multiple rapid changes.</summary>
+    public static void ScheduleSnapshotPush()
+    {
+        lock (_snapshotLock)
+        {
+            if (_snapshotDebounce == null)
+            {
+                _snapshotDebounce = new System.Windows.Forms.Timer { Interval = 5000 };
+                _snapshotDebounce.Tick += (_, _) =>
+                {
+                    _snapshotDebounce?.Stop();
+                    _ = PushStockSnapshotAsync();
+                };
+            }
+            _snapshotDebounce.Stop();
+            _snapshotDebounce.Start();
+        }
+    }
 
     public static string StoreId
     {
@@ -600,6 +621,51 @@ public static class SyncService
             catch { }
         }
         catch (Exception ex) { ErrorLogger.Log("SyncService.PushAllUnsynced", ex); }
+    }
+
+    public static async Task PushStockSnapshotAsync()
+    {
+        try
+        {
+            var stocks = new List<(int productId, string productName, string barcode, int currentStock)>();
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                using var cmd = new SQLiteCommand("SELECT Id, Name, COALESCE(Barcode,''), StockQty FROM Products WHERE IsActive = 1 AND Barcode != ''", conn);
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                    stocks.Add((r.GetInt32(0), r.GetString(1), r.GetString(2), r.GetInt32(3)));
+            }
+            if (stocks.Count == 0) return;
+
+            // Compare with last snapshot to only push changes
+            var lastJson = DatabaseHelper.GetSetting("LastStockSnapshot", "{}");
+            Dictionary<int, int> lastSnapshot = new();
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(lastJson);
+                if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object)
+                {
+                    foreach (var kv in doc.RootElement.EnumerateObject())
+                    {
+                        if (int.TryParse(kv.Name, out var pid) && kv.Value.TryGetInt32(out var qty))
+                            lastSnapshot[pid] = qty;
+                    }
+                }
+            }
+            catch { }
+
+            var changed = stocks.Where(s => !lastSnapshot.TryGetValue(s.productId, out var lastQty) || lastQty != s.currentStock).ToList();
+            if (changed.Count == 0) return;
+
+            await SyncStockSnapshotAsync(changed);
+
+            // Save new snapshot for next comparison
+            var newJson = System.Text.Json.JsonSerializer.Serialize(
+                stocks.ToDictionary(s => s.productId.ToString(), s => s.currentStock));
+            DatabaseHelper.SaveSetting("LastStockSnapshot", newJson);
+        }
+        catch { }
     }
 
     private static string ToUtcString(string? localTime)

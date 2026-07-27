@@ -2311,31 +2311,31 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                         cmd.ExecuteNonQuery();
 
                         var change = item.CurrentStock - oldQty2;
-                        using var trail2 = conn.CreateCommand(); trail2.Transaction = tx;
-                        trail2.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, qty_change, reference, reference_type) VALUES (@pid, @pn, @qc, 'Stock snapshot from POS', 'snapshot')";
-                        trail2.Parameters.AddWithValue("pid", wid2);
-                        trail2.Parameters.AddWithValue("pn", item.ProductName);
-                        trail2.Parameters.AddWithValue("qc", change);
-                        trail2.ExecuteNonQuery();
+                        if (change != 0)
+                        {
+                            using var trail2 = conn.CreateCommand(); trail2.Transaction = tx;
+                            trail2.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, qty_change, reference, reference_type) VALUES (@pid, @pn, @qc, 'Stock snapshot from POS', 'snapshot')";
+                            trail2.Parameters.AddWithValue("pid", wid2);
+                            trail2.Parameters.AddWithValue("pn", item.ProductName);
+                            trail2.Parameters.AddWithValue("qc", change);
+                            trail2.ExecuteNonQuery();
+                        }
                         continue;
                     }
                     var wid = fr.GetInt32(0);
                     var oldQty = fr.GetInt32(1);
                     fr.Close();
 
-                    using var upd = conn.CreateCommand(); upd.Transaction = tx;
-                    upd.CommandText = "UPDATE wh_products SET stock_qty = @sq WHERE id = @pid";
-                    upd.Parameters.AddWithValue("pid", wid);
-                    upd.Parameters.AddWithValue("sq", item.CurrentStock);
-                    upd.ExecuteNonQuery();
-
                     var delta = item.CurrentStock - oldQty;
-                    using var trail = conn.CreateCommand(); trail.Transaction = tx;
-                    trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, qty_change, reference, reference_type) VALUES (@pid, @pn, @qc, 'Stock snapshot from POS', 'snapshot')";
-                    trail.Parameters.AddWithValue("pid", wid);
-                    trail.Parameters.AddWithValue("pn", item.ProductName);
-                    trail.Parameters.AddWithValue("qc", delta);
-                    trail.ExecuteNonQuery();
+                    if (delta != 0)
+                    {
+                        using var trail = conn.CreateCommand(); trail.Transaction = tx;
+                        trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, qty_change, reference, reference_type) VALUES (@pid, @pn, @qc, 'Stock snapshot from POS', 'snapshot')";
+                        trail.Parameters.AddWithValue("pid", wid);
+                        trail.Parameters.AddWithValue("pn", item.ProductName);
+                        trail.Parameters.AddWithValue("qc", delta);
+                        trail.ExecuteNonQuery();
+                    }
                 }
                 tx.Commit();
                 return Ok(new { ok = true });
