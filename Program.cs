@@ -118,6 +118,10 @@ static class Program
             LogCrash(ex);
             MessageBox.Show($"Application error:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+        finally
+        {
+            StopAgent();
+        }
     }
 
     static void LogCrash(Exception ex)
@@ -214,6 +218,16 @@ Stack Trace:
                     Process.Start(psi);
                 }
             }
+        }
+        catch { }
+    }
+
+    static void StopAgent()
+    {
+        try
+        {
+            foreach (var proc in Process.GetProcessesByName("Agent"))
+                proc.Kill();
         }
         catch { }
     }
