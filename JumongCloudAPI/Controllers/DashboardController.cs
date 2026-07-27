@@ -2063,27 +2063,16 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
 
                     foreach (var item in merged)
                     {
-                        // Deduct stock from warehouse immediately (prevents overselling)
-                        using var deductCmd = new NpgsqlCommand(
-                            "UPDATE wh_products SET stock_qty = stock_qty - @qty WHERE id = @pid AND stock_qty >= @qty", conn, tx);
-                        deductCmd.Parameters.AddWithValue("pid", item.ProductId);
-                        deductCmd.Parameters.AddWithValue("qty", item.Qty);
-                        var affected = deductCmd.ExecuteNonQuery();
-                        if (affected == 0)
+                        // Validate stock exists (but don't deduct — held in pending until POS accepts)
+                        using var checkCmd = new NpgsqlCommand(
+                            "SELECT stock_qty FROM wh_products WHERE id = @pid AND is_active = true", conn, tx);
+                        checkCmd.Parameters.AddWithValue("pid", item.ProductId);
+                        var available = checkCmd.ExecuteScalar();
+                        if (available == null)
                         {
                             tx.Rollback();
-                            return BadRequest(new { error = $"Not enough stock for {item.ProductName}" });
+                            return BadRequest(new { error = $"Product not found: {item.ProductName}" });
                         }
-
-                        // Log stock trail
-                        using var trail = new NpgsqlCommand(
-                            "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) VALUES (@pid, @pn, @bc, @qc, @ref, 'transfer_out')", conn, tx);
-                        trail.Parameters.AddWithValue("pid", item.ProductId);
-                        trail.Parameters.AddWithValue("pn", item.ProductName);
-                        trail.Parameters.AddWithValue("bc", item.Barcode ?? "");
-                        trail.Parameters.AddWithValue("qc", -item.Qty);
-                        trail.Parameters.AddWithValue("ref", $"Transfer #{transferId} -> {t.ClientName}");
-                        trail.ExecuteNonQuery();
 
                         using var icmd = new NpgsqlCommand(
                             "INSERT INTO wh_transfer_items (transfer_id, product_id, product_name, barcode, qty) VALUES (@ti, @pi, @pn, @bc, @q)", conn, tx);
@@ -2175,27 +2164,26 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
 
                     if (accepted)
                     {
-                        // Stock already deducted on transfer creation
-                    }
-                    else
-                    {
-                        // Restock shortages back to warehouse
-                        using var restock = conn.CreateCommand(); restock.Transaction = tx;
-                        restock.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @bq WHERE id = @pid";
-                        restock.Parameters.AddWithValue("bq", baseQty);
-                        restock.Parameters.AddWithValue("pid", productId);
-                        restock.ExecuteNonQuery();
+                        // Deduct stock from warehouse NOW (was held pending until POS accepts)
+                        using var deduct = conn.CreateCommand(); deduct.Transaction = tx;
+                        deduct.CommandText = "UPDATE wh_products SET stock_qty = stock_qty - @bq WHERE id = @pid AND stock_qty >= @bq";
+                        deduct.Parameters.AddWithValue("bq", baseQty);
+                        deduct.Parameters.AddWithValue("pid", productId);
+                        deduct.ExecuteNonQuery();
 
-                        // Log trail
+                        // Log transfer_out trail
                         using var trail = conn.CreateCommand(); trail.Transaction = tx;
-                        trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) VALUES (@pid, @pn, @bc, @qty, @ref, 'shortage_return')";
+                        trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) VALUES (@pid, @pn, @bc, @qty, @ref, 'transfer_out')";
                         trail.Parameters.AddWithValue("pid", productId);
                         trail.Parameters.AddWithValue("pn", productName);
                         trail.Parameters.AddWithValue("bc", barcode);
-                        trail.Parameters.AddWithValue("qty", baseQty);
-                        trail.Parameters.AddWithValue("ref", $"Transfer #{id}{(clientName != null ? " → " + clientName : "")}");
+                        trail.Parameters.AddWithValue("qty", -baseQty);
+                        trail.Parameters.AddWithValue("ref", $"Transfer #{id} → {clientName}");
                         trail.ExecuteNonQuery();
-
+                    }
+                    else
+                    {
+                        // Shortage: stock was never deducted, stays in warehouse
                         shortages.Add(new { productId, productName, baseQty });
                     }
                 }
@@ -2303,12 +2291,6 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                         var wid2 = fr2.GetInt32(0);
                         var oldQty2 = fr2.GetInt32(1);
                         fr2.Close();
-
-                        using var cmd = conn.CreateCommand(); cmd.Transaction = tx;
-                        cmd.CommandText = "UPDATE wh_products SET stock_qty = @sq WHERE id = @pid";
-                        cmd.Parameters.AddWithValue("pid", wid2);
-                        cmd.Parameters.AddWithValue("sq", item.CurrentStock);
-                        cmd.ExecuteNonQuery();
 
                         var change = item.CurrentStock - oldQty2;
                         if (change != 0)
