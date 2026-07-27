@@ -677,8 +677,6 @@ public class PrinterService
             var printW = pageW - leftMargin - rightMargin;
             var sf = StringFormat.GenericTypographic;
 
-            using var font8 = new Font("Courier New", 8);
-            using var font8B = new Font("Courier New", 8, FontStyle.Bold);
             using var font9B = new Font("Courier New", 9, FontStyle.Bold);
 
             var y = 5f;
@@ -689,7 +687,7 @@ public class PrinterService
                 if (entry.Align == TextAlign.Center)
                     f = font9B;
                 else
-                    f = entry.Bold ? font8B : font8;
+                    f = font9B;
 
                 if (entry.RightText != null)
                 {
@@ -786,8 +784,6 @@ public class PrinterService
             var printW = pageW - leftMargin - rightMargin;
             var sf = StringFormat.GenericTypographic;
 
-            using var font8 = new Font("Courier New", 8);
-            using var font8B = new Font("Courier New", 8, FontStyle.Bold);
             using var font9B = new Font("Courier New", 9, FontStyle.Bold);
 
             var y = 5f;
@@ -798,7 +794,7 @@ public class PrinterService
                 if (entry.Align == TextAlign.Center)
                     f = font9B;
                 else
-                    f = entry.Bold ? font8B : font8;
+                    f = font9B;
 
                 if (entry.RightText != null)
                 {
@@ -951,7 +947,7 @@ public class PrinterService
         }
         AddLine("");
 
-        var font = new Font("Courier New", 9F);
+        var font = new Font("Courier New", 9F, FontStyle.Bold);
         var fontBold = new Font("Courier New", 9F, FontStyle.Bold);
         var lineHeight = font.Height + 3;
 
