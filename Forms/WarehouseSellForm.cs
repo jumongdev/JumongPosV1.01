@@ -545,6 +545,15 @@ public class WarehouseSellForm : Form
         };
         btnEndShiftWh.Click += async (_, _) => await DoWholesaleEndShiftAsync();
 
+        var btnViewStock = new Button
+        {
+            Text = "\uD83D\uDCCA VIEW STOCK",
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 },
+            BackColor = Color.FromArgb(0, 150, 136), ForeColor = Color.White, Cursor = Cursors.Hand
+        };
+        btnViewStock.Click += async (_, _) => await ShowWhInventoryAsync();
+
         btnVoid = new Button
         {
             Text = "\u2716 VOID RECEIPT",
@@ -557,7 +566,7 @@ public class WarehouseSellForm : Form
         _pnlTotals.Controls.AddRange(new Control[] {
             lblTotalDueHint, lblGrandTotal, sep1,
             lblSubTotalLbl, lblSubTotal,
-            sep2, btnSell, btnEndShiftWh, btnVoid
+            sep2, btnSell, btnViewStock, btnEndShiftWh, btnVoid
         });
 
         Controls.AddRange(new Control[] { _pnlTopbar, _pnlCustomerBar, _pnlSearch, _pnlCart, _pnlTotals });
@@ -1203,6 +1212,131 @@ public class WarehouseSellForm : Form
         catch { dgv.Rows.Add(0, "", "Failed to load", "", "", ""); }
 
         popup.ShowDialog(this);
+    }
+
+    private async Task ShowWhInventoryAsync()
+    {
+        try
+        {
+            var url = SyncService.ApiUrl.TrimEnd('/') + "/dashboard/warehouse/products";
+            var json = await _http.GetStringAsync(url);
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var allItems = new List<(int id, string name, string barcode, string category, decimal price, decimal cost, int stock)>();
+            foreach (var p in doc.RootElement.EnumerateArray())
+            {
+                allItems.Add((
+                    p.GetProperty("id").GetInt32(),
+                    p.GetProperty("name").GetString() ?? "",
+                    p.TryGetProperty("barcode", out var bc) ? bc.GetString() ?? "" : "",
+                    p.TryGetProperty("category", out var cg) ? cg.GetString() ?? "" : "",
+                    p.TryGetProperty("piecePrice", out var pp) ? pp.GetDecimal() : 0,
+                    p.TryGetProperty("cost", out var ct) ? ct.GetDecimal() : 0,
+                    p.TryGetProperty("stockQty", out var sq) ? sq.GetInt32() : 0
+                ));
+            }
+
+            var categories = allItems.Where(x => !string.IsNullOrEmpty(x.category)).Select(x => x.category).Distinct().OrderBy(c => c).ToList();
+
+            var popup = new Form
+            {
+                Text = "Warehouse Inventory",
+                Size = new Size(900, 580),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.Sizable,
+                MaximizeBox = true, MinimizeBox = true,
+                BackColor = CSurface
+            };
+
+            var pnlTop = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = CCard };
+            var txtSearch = new TextBox { Location = new Point(12, 8), Size = new Size(200, 26), Font = new Font("Segoe UI", 10F), BorderStyle = BorderStyle.FixedSingle, BackColor = CInputBg, ForeColor = CInputFg };
+            var cmbCategory = new ComboBox { Location = new Point(220, 8), Size = new Size(150, 26), DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, BackColor = CInputBg, ForeColor = CInputFg };
+            cmbCategory.Items.Add("All");
+            foreach (var c in categories) cmbCategory.Items.Add(c);
+            cmbCategory.SelectedIndex = 0;
+
+            var chkLowStock = new CheckBox { Text = "Low Stock Only", Location = new Point(380, 8), Size = new Size(120, 26), ForeColor = CText, Font = new Font("Segoe UI", 9F) };
+
+            var lblTotal = new Label { Text = "", Location = new Point(520, 12), Size = new Size(300, 20), ForeColor = CBlueLight, Font = new Font("Segoe UI", 10F, FontStyle.Bold), TextAlign = ContentAlignment.MiddleRight };
+
+            var dgv = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false,
+                BackgroundColor = CSurface, Font = new Font("Segoe UI", 9F),
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                ColumnHeadersHeight = 28, EnableHeadersVisualStyles = false
+            };
+            dgv.Columns.Add("Name", "Product"); dgv.Columns[0].FillWeight = 40;
+            dgv.Columns.Add("Category", "Category"); dgv.Columns[1].FillWeight = 15;
+            dgv.Columns.Add("Stock", "Stock"); dgv.Columns[2].FillWeight = 10; dgv.Columns[2].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            dgv.Columns.Add("Cost", "Cost"); dgv.Columns[3].FillWeight = 10; dgv.Columns[3].DefaultCellStyle.Format = "N2"; dgv.Columns[3].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            dgv.Columns.Add("Value", "Value"); dgv.Columns[4].FillWeight = 12; dgv.Columns[4].DefaultCellStyle.Format = "N2"; dgv.Columns[4].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            dgv.Columns.Add("Price", "Price"); dgv.Columns[5].FillWeight = 10; dgv.Columns[5].DefaultCellStyle.Format = "N2"; dgv.Columns[5].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+
+            var pnlBottom = new Panel { Dock = DockStyle.Bottom, Height = 36, BackColor = CCard };
+            var btnPrint = new Button { Text = "\uD83D\uDDA8 PRINT", Location = new Point(12, 4), Size = new Size(100, 28), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(0, 150, 136), ForeColor = Color.White, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand };
+            var btnPrintCat = new Button { Text = "BY CATEGORY", Location = new Point(118, 4), Size = new Size(120, 28), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(100, 80, 180), ForeColor = Color.White, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand };
+            var btnClose = new Button { Text = "CLOSE", Location = new Point(popup.ClientSize.Width - 100, 4), Size = new Size(80, 28), Anchor = AnchorStyles.Right, FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = CCard, ForeColor = CTextMuted, Cursor = Cursors.Hand };
+            btnClose.Click += (_, _) => popup.Close();
+
+            void RefreshGrid()
+            {
+                var search = txtSearch.Text.Trim().ToLower();
+                var cat = cmbCategory.SelectedItem?.ToString() ?? "All";
+                var lowStockOnly = chkLowStock.Checked;
+                var filtered = allItems.Where(x =>
+                    (string.IsNullOrEmpty(search) || x.name.ToLower().Contains(search) || x.barcode.ToLower().Contains(search)) &&
+                    (cat == "All" || x.category == cat) &&
+                    (!lowStockOnly || x.stock > 0 && x.stock <= 50)
+                ).ToList();
+
+                dgv.Rows.Clear();
+                decimal totalValue = 0;
+                foreach (var item in filtered)
+                {
+                    var value = item.stock * item.cost;
+                    totalValue += value;
+                    dgv.Rows.Add(item.name, item.category, item.stock, item.cost, value, item.price);
+                }
+                lblTotal.Text = $"Items: {filtered.Count} | Total Value: \u20b1{totalValue:N2}";
+                lblTotal.Size = new Size(popup.ClientSize.Width - 540, 20);
+            }
+
+            txtSearch.TextChanged += (_, _) => RefreshGrid();
+            cmbCategory.SelectedIndexChanged += (_, _) => RefreshGrid();
+            chkLowStock.CheckedChanged += (_, _) => RefreshGrid();
+
+            btnPrint.Click += (_, _) =>
+            {
+                var cat = cmbCategory.SelectedItem?.ToString() ?? "All";
+                var search = txtSearch.Text.Trim().ToLower();
+                var lowStockOnly = chkLowStock.Checked;
+                var data = allItems.Where(x =>
+                    (string.IsNullOrEmpty(search) || x.name.ToLower().Contains(search) || x.barcode.ToLower().Contains(search)) &&
+                    (cat == "All" || x.category == cat) &&
+                    (!lowStockOnly || x.stock > 0 && x.stock <= 50)
+                ).Select(x => (x.name, x.stock, x.cost, value: x.stock * x.cost)).ToList();
+                if (data.Count == 0) { MessageBox.Show("No items to print.", "Empty", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+                PrinterService.PrintWarehouseInventory(data, cat, chkLowStock.Checked ? "LOW STOCK" : cat);
+            };
+
+            btnPrintCat.Click += (_, _) =>
+            {
+                var cat = cmbCategory.SelectedItem?.ToString() ?? "All";
+                var data = allItems.Where(x => cat == "All" || x.category == cat)
+                    .Select(x => (x.name, x.stock, x.cost, value: x.stock * x.cost)).ToList();
+                if (data.Count == 0) { MessageBox.Show("No items to print.", "Empty", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+                PrinterService.PrintWarehouseInventory(data, cat, cat);
+            };
+
+            pnlTop.Controls.AddRange(new Control[] { txtSearch, cmbCategory, chkLowStock, lblTotal });
+            pnlBottom.Controls.AddRange(new Control[] { btnPrint, btnPrintCat, btnClose });
+            popup.Controls.AddRange(new Control[] { dgv, pnlTop, pnlBottom });
+
+            popup.Shown += (_, _) => RefreshGrid();
+            popup.ShowDialog(this);
+        }
+        catch (Exception ex) { MessageBox.Show("Failed to load warehouse inventory: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
     }
 
     private Button btnEndShiftWh = null!;

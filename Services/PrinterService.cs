@@ -972,6 +972,67 @@ public class PrinterService
         try { doc.Print(); }
         catch (Exception ex) { MessageBox.Show("Print error: " + ex.Message, "Print Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
     }
+
+    public static void PrintWarehouseInventory(List<(string Name, int Stock, decimal Cost, decimal Value)> items, string category, string title)
+    {
+        var printer = GetSetting("PrinterName");
+        if (string.IsNullOrEmpty(printer)) { MessageBox.Show("No printer configured.", "Printer Not Set", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+
+        var paperWidth = int.TryParse(GetSetting("PaperWidth"), out var pw) ? pw : 315;
+        var marginLeft = int.TryParse(GetSetting("PrinterMarginLeft"), out var ml) ? ml : 0;
+        var marginRight = int.TryParse(GetSetting("PrinterMarginRight"), out var mr) ? mr : 0;
+        var chars = Math.Max(24, (paperWidth - marginLeft - marginRight) / 10);
+
+        var doc = new PrintDocument();
+        doc.PrinterSettings.PrinterName = printer;
+        doc.DefaultPageSettings.PaperSize = new PaperSize("Custom", paperWidth, 3000);
+        doc.DefaultPageSettings.Margins = new Margins(marginLeft, marginRight, 0, 0);
+
+        var totalItems = items.Count;
+        var totalValue = items.Sum(x => x.Value);
+
+        doc.PrintPage += (sender, e) =>
+        {
+            var sf = StringFormat.GenericTypographic;
+            using var font9B = new Font("Courier New", 9, FontStyle.Bold);
+            var brush = Brushes.Black;
+            var y = 5f;
+            var x = e.PageBounds.X + 5;
+            var pw2 = e.PageBounds.Width - 10;
+
+            void Draw(string text)
+            {
+                var sz = e.Graphics.MeasureString(text, font9B);
+                e.Graphics.DrawString(text, font9B, brush, x, y, sf);
+                y += sz.Height + 2;
+            }
+
+            string Pad(string a, string b, string c, string d)
+            {
+                var line = a.PadRight(chars - 22) + b.PadLeft(6) + c.PadLeft(8) + d.PadLeft(8);
+                return line.Length > chars - 2 ? line[..(chars - 2)] : line;
+            }
+
+            Draw("=== WAREHOUSE INVENTORY ===");
+            Draw("Category: " + title);
+            Draw(new string('-', chars));
+            Draw(Pad("Product", "Qty", "Cost", "Value"));
+            Draw(new string('-', chars));
+
+            foreach (var item in items)
+            {
+                var name = item.Name.Length > chars - 24 ? item.Name[..(chars - 24)] : item.Name;
+                Draw(Pad(name, item.Stock.ToString("N0"), item.Cost.ToString("N2"), item.Value.ToString("N2")));
+            }
+
+            Draw(new string('-', chars));
+            Draw($"Total Items: {totalItems}");
+            Draw($"Total Value: \u20b1{totalValue:N2}");
+        };
+
+        try { doc.Print(); }
+        catch (Exception ex) { MessageBox.Show("Print failed: " + ex.Message, "Print Error", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+    }
 }
 
 
