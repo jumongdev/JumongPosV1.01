@@ -1067,3 +1067,33 @@ Compress-Archive -Force -Path "bin\Release\net8.0-windows\win-x64\publish\*" -De
 - Agent timeout: 15 minutes (for large file downloads)
 - No GUI required — works fully over CLI/API
 
+### v1.1.08–v1.1.15 — Bidirectional Sync, Inventory Fixes, Transfer Rework, Agent Dashboard, Warehouse Viewer
+
+| File | Change |
+|---|---|
+| `Services/SyncService.cs` | Added `PushAllUnsyncedAsync()` — background push for Sales, StockTrail, VoidLog, CreditTxn, DailyClose, Expenses. Added `ScheduleSnapshotPush()` with 5s debounce (event-driven, not timer). Added `PushStockSnapshotAsync()` with delta comparison — only pushes changed products. Changed sync order to `ORDER BY Id DESC` (newest first). Added debounce mechanism for batched snapshot pushes. |
+| `Data/DatabaseHelper.cs` | Added `PRAGMA journal_mode=WAL` for concurrent reads+writes. Added `busy_timeout=5000` to secondary connection string. Added Synced column migrations for VoidLog, CreditTransaction, DailyClose, Expenses. |
+| `Forms/MainForm.cs` | Added 30s auto-push timer (`PushAllUnsyncedAsync`). Added 5-min auto-pull timer (master catalog + customers + settings). Removed snapshot from timer — moved to event-driven `ScheduleSnapshotPush()`. |
+| `Forms/SalesForm.cs` | Fixed `IsHandleCreated` check before `BeginInvoke` in `CheckForUpdatesAsync` and `FetchCloudPromoAsync`. Changed banner text to "APP UPDATE". |
+| `Forms/EndShiftForm.cs` | Stock snapshot pushed on end shift with barcode matching. |
+| `Forms/ProductsForm.cs` | Added "INV CHECK" button — shows inventory reconciliation with cost mismatch detection. |
+| `Forms/WarehouseSellForm.cs` | Fixed `btnVoid` null ref (local variable → field). Added `btnReprint` to void popup controls. Added **📊 WH-INVENTORY** button (HQ only) — opens warehouse inventory viewer popup with DataGridView, category filter, search, low stock toggle, total value display, **PRINT** and **PRINT BY CATEGORY** buttons. |
+| `Forms/PaymentForm.cs` | Fixed `EwPaid` not set for pure E-Wallet payments (was always 0). |
+| `Forms/CreditManagementForm.cs` | Credit payment flow — "total exceeds balance" check uses `_selectedCustomer.CreditBalance`. |
+| `Services/CreditService.cs` | Fixed `AddTransaction` not getting `Id` from `last_insert_rowid()` (was syncing with Id=0). Fixed `CreditBalance` recalculation from `SUM(Debit - Credit)`. |
+| `Services/CustomerService.cs` | Removed `store_id` filter from PG queries (`UpdateCreditBalance`, `UpdateLoyaltyPoints`, `Delete`) — customers are universal. |
+| `Services/PrinterService.cs` | Unified all receipts to **Courier New 9pt Bold** (was mixed regular/bold/8pt/9pt/11pt). Added `PrintWarehouseInventory()` method for printing warehouse stock lists. |
+| `Services/UpdateService.cs` | Rewrote `DownloadAndUpdate` — downloads to `%TEMP%\JumongPosV1.01_update.exe`, batch copies over old exe after process kill. `Process.Kill()` instead of `Environment.Exit`. |
+| `Services/AppVersion.cs` | Bumped to `"1.1.15"`. |
+| `Program.cs` | POS saves `AppVersion` to Settings on startup. `StartAgent()` auto-starts `Agent\Agent.exe` on POS launch. `StopAgent()` kills agent on POS exit. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **Transfer rework:** removed stock deduction on `WhCreateTransfer` (stock held pending). Added stock deduction on `WhReceiveTransfer` (deducts when POS accepts). Added agent endpoints: `agent/heartbeat`, `agent/status`, `agent/send/{storeId}`, `agent/poll/{storeId}`, `agent/result`, `agent/results/{storeId}`. Added `AgentHeartbeat`, `AgentCommand`, `AgentResult` model classes. **Snapshot fix:** removed `UPDATE wh_products SET stock_qty` from `WhStockSnapshot` — snapshot now informational only, no longer corrupts warehouse stock. Added delta=0 check to skip creating snapshot trails when no stock change. Added `cost` column to `WhGetProducts` response (from `master_products.cost`). |
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs` | Added `wh_invoice_counter` table for wholesale invoice sequence. Added `invoice_no` column to `wh_walkin_sales`. |
+| `JumongCloudAPI/wwwroot/index.html` | Added **AGENTS** sidebar item with health cards (🟢/🔴 status, version, outdated badge, error summary). Moved agents panel inside main content div. |
+| `JumongCloudAPI/wwwroot/components.js` | Added `agentsPanel` Alpine component with SQL query, inventory check, file read, store selector, execute button, result viewer, poll results (15s timeout). |
+| `tools/Agent/` | Remote diagnostic agent — heartbeat, command polling, SQL execution, PowerShell, invcheck, file operations. Auto-starts with POS. Added `writefile`, `update` (download), `restart` commands. Reads POS version from Settings table. Self-update capability via batch file. |
+| `tools/InvVarianceCheck/` | Standalone inventory variance diagnostic tool. |
+| `JumongPosV1.01.csproj` | Added `tools\**` exclusion. Added `CopyAgentAfterPublish` target — includes Agent folder in POS publish output. |
+| **PostgreSQL data** | Deleted 46,069+46,649+19,631+3,512 = ~115,000 useless 0-change snapshot trails. Deleted 1,152 duplicate transfer_out trails. Recalculated all `wh_products.stock_qty` from legitimate trails (46,073 units, 0 negative). Reset 5 negative stock products to 0. Fixed Yosi Me Green (320→1000), Yosi Me Red (0→200), Marlboro Ice Blast Blue (0→30), Mighty Green Menthol (0→600). |
+
+**Impact:** Bidirectional sync auto-pushes every 30s (newest first), auto-pulls master data every 5 min. Transfer stock held pending until POS accepts (no more double deduction). Snapshot no longer corrupts `wh_products` stock — informational trails only. Event-driven snapshot with 5s debounce replaces timer flooding (~3,000 trails/hour → maybe 50). WAL mode prevents "database is locked" errors. Agent auto-starts/auto-closes with POS — dashboard shows health, version, outdated flag. Warehouse inventory viewer in HQ Wholesale page with print by category. All receipts Courier New 9pt Bold. E-Wallet EwPaid correctly recorded. Credit sync sends correct Id. Version bumps required for every change (no re-uploading to same tag).
+
