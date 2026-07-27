@@ -545,9 +545,9 @@ public class WarehouseSellForm : Form
         };
         btnEndShiftWh.Click += async (_, _) => await DoWholesaleEndShiftAsync();
 
-        var btnViewStock = new Button
+        btnViewStock = new Button
         {
-            Text = "\uD83D\uDCCA VIEW STOCK",
+            Text = "\uD83D\uDCCA WH-INVENTORY",
             Font = new Font("Segoe UI", 10F, FontStyle.Bold),
             FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 },
             BackColor = Color.FromArgb(0, 150, 136), ForeColor = Color.White, Cursor = Cursors.Hand
@@ -566,7 +566,7 @@ public class WarehouseSellForm : Form
         _pnlTotals.Controls.AddRange(new Control[] {
             lblTotalDueHint, lblGrandTotal, sep1,
             lblSubTotalLbl, lblSubTotal,
-            sep2, btnSell, btnViewStock, btnEndShiftWh, btnVoid
+            sep2, btnSell, btnEndShiftWh, btnVoid, btnViewStock
         });
 
         Controls.AddRange(new Control[] { _pnlTopbar, _pnlCustomerBar, _pnlSearch, _pnlCart, _pnlTotals });
@@ -646,7 +646,8 @@ public class WarehouseSellForm : Form
         sep2.Location = new Point(m, ry); sep2.Width = pw; ry += 14;
         btnSell.Location = new Point(m, ry); btnSell.Size = new Size(pw, 52); ry += 58;
         btnEndShiftWh.Location = new Point(m, ry); btnEndShiftWh.Size = new Size(pw, 40); ry += 46;
-        btnVoid.Location = new Point(m, ry); btnVoid.Size = new Size(pw, 36);
+        btnVoid.Location = new Point(m, ry); btnVoid.Size = new Size(pw, 36); ry += 42;
+        btnViewStock.Location = new Point(m, ry); btnViewStock.Size = new Size(pw, 36);
     }
 
     private async Task ShowCustomerPickerAsync()
@@ -1341,6 +1342,7 @@ public class WarehouseSellForm : Form
 
     private Button btnEndShiftWh = null!;
     private Button btnVoid = null!;
+    private Button btnViewStock = null!;
 }
 
 public class WhCartItem : INotifyPropertyChanged
