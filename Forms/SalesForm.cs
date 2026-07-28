@@ -829,11 +829,20 @@ public partial class SalesForm : Form
         };
         _lblUpdateBanner.Click += async (_, _) =>
         {
-            var (available, version, _, downloadUrl) = await UpdateService.CheckUpdate();
-            if (!available || string.IsNullOrEmpty(downloadUrl)) return;
-            var result = MessageBox.Show($"New version {version} available!\n\nDownload and install update?", "Update Available", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (result == DialogResult.Yes)
-                SettingsForm.ShowUpdateProgress(version ?? "", downloadUrl);
+            try
+            {
+                var (available, version, _, downloadUrl) = await UpdateService.CheckUpdate();
+                if (!available)
+                {
+                    MessageBox.Show("You're on the latest version, or cannot check right now.", "Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                if (string.IsNullOrEmpty(downloadUrl)) return;
+                var result = MessageBox.Show($"New version {version} available!\n\nDownload and install update?", "Update Available", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (result == DialogResult.Yes)
+                    SettingsForm.ShowUpdateProgress(version ?? "", downloadUrl);
+            }
+            catch { }
         };
 
         _lblMasterBanner = new Label
