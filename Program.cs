@@ -212,8 +212,7 @@ Stack Trace:
                     var psi = new ProcessStartInfo(agentPath)
                     {
                         WorkingDirectory = Path.GetDirectoryName(agentPath),
-                        UseShellExecute = true,
-                        CreateNoWindow = false
+                        CreateNoWindow = true
                     };
                     Process.Start(psi);
                 }

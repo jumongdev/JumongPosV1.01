@@ -3,8 +3,18 @@ using System.Data.SQLite;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+
+// Hide console window — cashiers can't accidentally close it
+[DllImport("user32.dll")]
+static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+[DllImport("kernel32.dll")]
+static extern IntPtr GetConsoleWindow();
+const int SW_HIDE = 0;
+var handle = GetConsoleWindow();
+if (handle != IntPtr.Zero) ShowWindow(handle, SW_HIDE);
 
 var baseDir = Path.GetDirectoryName(Environment.ProcessPath) ?? AppDomain.CurrentDomain.BaseDirectory;
 var dbPath = Path.Combine(baseDir, "JumongPos.db");
