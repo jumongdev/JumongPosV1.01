@@ -1097,3 +1097,18 @@ Compress-Archive -Force -Path "bin\Release\net8.0-windows\win-x64\publish\*" -De
 
 **Impact:** Bidirectional sync auto-pushes every 30s (newest first), auto-pulls master data every 5 min. Transfer stock held pending until POS accepts (no more double deduction). Snapshot no longer corrupts `wh_products` stock — informational trails only. Event-driven snapshot with 5s debounce replaces timer flooding (~3,000 trails/hour → maybe 50). WAL mode prevents "database is locked" errors. Agent auto-starts/auto-closes with POS — dashboard shows health, version, outdated flag. Warehouse inventory viewer in HQ Wholesale page with print by category. All receipts Courier New 9pt Bold. E-Wallet EwPaid correctly recorded. Credit sync sends correct Id. Version bumps required for every change (no re-uploading to same tag).
 
+### v1.1.22 — Credit Balance Sync Fix
+
+| File | Change |
+|---|---|
+| `Services/CreditService.cs:47` | After `AddTransaction` (payment/credit-sale), calls `SyncService.SyncCustomer()` to push updated CreditBalance to cloud via REST API. |
+| `Services/SaleService.cs:538` | After `VoidSale`, calls `SyncCustomer()` to push credit balance after void reversal. |
+| `Services/SaleService.cs:675` | After `VoidItem`, calls `SyncCustomer()` to push credit balance after void reversal. |
+| `Services/SyncService.cs:1179-1232` | `DownloadCustomersAsync` — removed unused `creditBalance` variable read and all 3 `@cb` parameter bindings (name match UPDATE, phone match UPDATE, INSERT). Download never touches `CreditBalance` column. |
+| `Forms/SalesForm.cs:830-845` | APP UPDATE banner click now shows error message if check fails instead of silent return. |
+| `Forms/MainForm.cs:541` | Restored `DownloadCustomersAsync` in 5-min auto-pull timer (was accidentally removed then restored). |
+| `Services/AppVersion.cs` | Current bumped to `"1.1.22"`. |
+| `Services/SaleService.cs:670` | Fixed `GetItems(saleId)` call — removed (was missing `conn` parameter causing build failure). Uses `updatedSale.Items` instead. |
+
+**Impact:** Credit balance changes (payment, credit sale, void) now sync to cloud via REST API. The 5-min customer download from cloud no longer has any path to touch local `CreditBalance`. Cloud PG `credit_balance` zeroed for all 334 customers. Only EMZ ABAYON (₱1,278) has active debt. Build cache issue fixed: always run `dotnet clean` before `dotnet publish` to prevent stale exe.
+
