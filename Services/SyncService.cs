@@ -1193,7 +1193,7 @@ public static class SyncService
 
                 if (existingId != null)
                 {
-                    using var upd = new SQLiteCommand("UPDATE Customers SET Phone=@p, Email=@e, LoyaltyPoints=@pts, IsActive=1, CreditBalance=@cb, Address=@a WHERE Id=@id", conn);
+                    using var upd = new SQLiteCommand("UPDATE Customers SET Phone=@p, Email=@e, LoyaltyPoints=@pts, IsActive=1, Address=@a WHERE Id=@id", conn);
                     upd.Parameters.AddWithValue("id", Convert.ToInt32(existingId));
                     upd.Parameters.AddWithValue("p", phone);
                     upd.Parameters.AddWithValue("e", email);
@@ -1211,7 +1211,7 @@ public static class SyncService
 
                     if (phoneId != null)
                     {
-                        using var upd = new SQLiteCommand("UPDATE Customers SET Name=@n, Email=@e, LoyaltyPoints=@pts, IsActive=1, CreditBalance=@cb, Address=@a WHERE Id=@id", conn);
+                        using var upd = new SQLiteCommand("UPDATE Customers SET Name=@n, Email=@e, LoyaltyPoints=@pts, IsActive=1, Address=@a WHERE Id=@id", conn);
                         upd.Parameters.AddWithValue("id", Convert.ToInt32(phoneId));
                         upd.Parameters.AddWithValue("n", name);
                         upd.Parameters.AddWithValue("e", email);
@@ -1223,7 +1223,7 @@ public static class SyncService
                     else
                     {
                         // 3) INSERT new
-                        using var ins = new SQLiteCommand("INSERT INTO Customers (Name, Phone, Email, LoyaltyPoints, IsActive, CreditBalance, Address, CreatedAt) VALUES (@n, @p, @e, @pts, 1, @cb, @a, datetime('now','localtime'))", conn);
+                        using var ins = new SQLiteCommand("INSERT INTO Customers (Name, Phone, Email, LoyaltyPoints, IsActive, Address, CreatedAt) VALUES (@n, @p, @e, @pts, 1, @a, datetime('now','localtime'))", conn);
                         ins.Parameters.AddWithValue("n", name);
                         ins.Parameters.AddWithValue("p", phone);
                         ins.Parameters.AddWithValue("e", email);
