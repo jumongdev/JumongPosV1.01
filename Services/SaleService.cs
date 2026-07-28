@@ -667,8 +667,7 @@ public class SaleService
             try
             {
                 var updatedSale = GetById(saleId);
-                var updatedItems = GetItems(saleId);
-                _ = SyncService.SyncSale(updatedSale, updatedItems);
+                _ = SyncService.SyncSale(updatedSale, updatedSale.Items);
                 // Sync updated customer credit balance to cloud
                 if (customerId.HasValue)
                 {
