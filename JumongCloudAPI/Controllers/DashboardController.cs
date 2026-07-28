@@ -2217,33 +2217,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 var status = checkCmd.ExecuteScalar()?.ToString();
                 if (status != "pending") return BadRequest(new { error = "Only pending transfers can be cancelled" });
 
-                // Restore stock to warehouse
-                using var itemsCmd = conn.CreateCommand(); itemsCmd.Transaction = tx;
-                itemsCmd.CommandText = "SELECT product_id, qty FROM wh_transfer_items WHERE transfer_id = @tid";
-                itemsCmd.Parameters.AddWithValue("tid", id);
-                using var r = itemsCmd.ExecuteReader();
-                var restoreList = new List<(int pid, int qty)>();
-                while (r.Read()) restoreList.Add((r.GetInt32(0), r.GetInt32(1)));
-                r.Close();
-
-                foreach (var (pid, qty) in restoreList)
-                {
-                    using var upd = conn.CreateCommand(); upd.Transaction = tx;
-                    upd.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @qty WHERE id = @pid";
-                    upd.Parameters.AddWithValue("pid", pid);
-                    upd.Parameters.AddWithValue("qty", qty);
-                    upd.ExecuteNonQuery();
-
-                    // Log stock trail
-                    using var trail = conn.CreateCommand(); trail.Transaction = tx;
-                    trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, qty_change, reference, reference_type) " +
-                        "SELECT @pid, name, @qty, 'Transfer #' || @tid || ' cancelled', 'transfer_cancel' FROM wh_products WHERE id = @pid";
-                    trail.Parameters.AddWithValue("pid", pid);
-                    trail.Parameters.AddWithValue("qty", qty);
-                    trail.Parameters.AddWithValue("tid", id);
-                    trail.ExecuteNonQuery();
-                }
-
+                // Just mark as cancelled — stock was never deducted (held pending until POS receives)
                 using var updateCmd = conn.CreateCommand(); updateCmd.Transaction = tx;
                 updateCmd.CommandText = "UPDATE wh_transfers SET status = 'cancelled', updated_at = NOW() WHERE id = @id";
                 updateCmd.Parameters.AddWithValue("id", id);
