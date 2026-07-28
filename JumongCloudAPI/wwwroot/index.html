@@ -2260,6 +2260,22 @@ tailwind.config = {
             <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Result</label>
             <pre class="w-full text-[10px] bg-gray-100 dark:bg-[#0a0a2e] border border-gray-200 dark:border-[#222255] rounded-lg p-3 text-gray-700 dark:text-slate-200 overflow-auto max-h-80 font-mono whitespace-pre-wrap" x-text="results || 'No results yet'"></pre>
           </div>
+
+          <!-- Push File to POS -->
+          <div class="border-t border-gray-200 dark:border-[#222255] pt-4">
+            <h4 class="text-xs font-bold text-gray-700 dark:text-slate-200 mb-2">📤 Push File to POS</h4>
+            <div class="flex gap-2 items-end">
+              <div class="flex-1">
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Select Image/File</label>
+                <input type="file" @change="handleUpload($event)" accept="image/*,.zip,.sql,.txt" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg p-2 text-gray-700 dark:text-slate-200">
+              </div>
+              <div>
+                <button @click="pushToPos()" :disabled="!uploadedUrl || !selectedStore || pushing" class="text-xs px-3 py-2 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-700 disabled:opacity-50">📤 PUSH</button>
+              </div>
+            </div>
+            <div x-show="uploadedUrl" class="mt-1 text-[10px] text-green-500">Uploaded: <span x-text="uploadedUrl"></span></div>
+            <div x-show="pushStatus" class="mt-1 text-[10px] text-gray-400" x-text="pushStatus"></div>
+          </div>
         </div>
       </div>
 

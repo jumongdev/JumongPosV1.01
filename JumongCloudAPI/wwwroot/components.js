@@ -1073,6 +1073,42 @@ Alpine.store('app', {
         this.results = 'Waiting... (' + tries + '/15)';
       }
       this.results = 'Timeout — agent may be offline.';
+    },
+    uploadedUrl: '', pushing: false, pushStatus: '',
+    async handleUpload(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      this.pushStatus = 'Uploading to cloud...';
+      try {
+        var fd = new FormData();
+        fd.append('file', file);
+        var r = await fetch(API + '/agent/upload-file', { method: 'POST', body: fd });
+        if (!r.ok) throw new Error('Upload failed');
+        var data = await r.json();
+        this.uploadedUrl = data.url;
+        this.pushStatus = 'Uploaded! Select a store and click PUSH.';
+      } catch (ex) { this.pushStatus = 'Upload error: ' + ex.message }
+    },
+    async pushToPos() {
+      if (!this.selectedStore || !this.uploadedUrl) return;
+      this.pushing = true;
+      this.pushStatus = 'Pushing to ' + this.selectedStore + '...';
+      try {
+        var fullUrl = 'https://admin.jumongdev.com' + this.uploadedUrl;
+        var fileName = this.uploadedUrl.split('/').pop();
+        var r = await fetchJSON(API + '/agent/send/' + encodeURIComponent(this.selectedStore), { method: 'POST', body: JSON.stringify({ type: 'update', payload: fullUrl + '|assets/' + fileName }), headers: { 'Content-Type': 'application/json' } });
+        var cmdId = r.commandId;
+        var tries = 0;
+        while (tries < 10) {
+          await new Promise(r => setTimeout(r, 3000));
+          var list = await fetchJSON(API + '/agent/results/' + encodeURIComponent(this.selectedStore));
+          var found = list.find(x => x.commandId === cmdId);
+          if (found) { this.pushStatus = found.error ? 'ERROR: ' + found.error : 'Pushed! ' + fileName; this.pushing = false; return }
+          tries++;
+        }
+        this.pushStatus = 'Timeout — agent may be offline.';
+      } catch (ex) { this.pushStatus = 'Push error: ' + ex.message }
+      this.pushing = false;
     }
   }));
 

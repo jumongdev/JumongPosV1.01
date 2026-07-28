@@ -2915,10 +2915,22 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         return Ok(new { ok = true });
     }
 
-    [HttpGet("agent/results/{storeId}")]
-    public IActionResult AgentResults(string storeId)
-    {
-        return Ok(_results.TryGetValue(storeId, out var list) ? list : new List<AgentResult>());
+        [HttpGet("agent/results/{storeId}")]
+        public IActionResult AgentResults(string storeId)
+        {
+            return Ok(_results.TryGetValue(storeId, out var list) ? list : new List<AgentResult>());
+        }
+
+        [HttpPost("agent/upload-file")]
+        public async Task<IActionResult> AgentUploadFile(IFormFile file)
+        {
+            if (file == null || file.Length == 0) return BadRequest("No file");
+            var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "assets", file.FileName);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            using var stream = new FileStream(path, FileMode.Create);
+            await file.CopyToAsync(stream);
+            return Ok(new { url = "/assets/" + file.FileName, fullUrl = "https://admin.jumongdev.com/assets/" + file.FileName });
+        }
     }
 
     public class PosPromoRequest { public string Message { get; set; } = ""; }
@@ -3033,4 +3045,4 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         public string Output { get; set; } = "";
         public string Error { get; set; } = "";
     }
-}
+
