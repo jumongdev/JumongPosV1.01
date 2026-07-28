@@ -2111,7 +2111,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             while (r.Read())
                 items.Add(new {
                     productId = r.GetInt32(0), productName = r.GetString(1),
-                    barcode = r.GetString(2), baseQty = r.GetInt32(3),
+                    barcode = r.GetString(2), qty = r.GetInt32(3),
                     receivedQty = r.GetInt32(4), currentStock = r.GetInt32(5)
                 });
             return Ok(items);
@@ -2262,13 +2262,14 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             SELECT qty_change, reference, reference_type, created_at,
-                   SUM(qty_change) OVER (PARTITION BY product_id ORDER BY created_at ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_balance
+                   SUM(qty_change) OVER (PARTITION BY product_id ORDER BY created_at) - qty_change AS stock_before,
+                   SUM(qty_change) OVER (PARTITION BY product_id ORDER BY created_at) AS stock_after
             FROM wh_stock_trails WHERE product_id = @pid ORDER BY created_at DESC LIMIT 200";
         cmd.Parameters.AddWithValue("pid", productId);
         var list = new List<object>();
         using var r = cmd.ExecuteReader();
         while (r.Read())
-            list.Add(new { qtyChange = r.GetInt32(0), reference = r.GetString(1), type = r.GetString(2), createdAt = r.GetDateTime(3), runningBalance = r.GetInt32(4) });
+            list.Add(new { qtyChange = r.GetInt32(0), reference = r.GetString(1), type = r.GetString(2), createdAt = r.GetDateTime(3), stockBefore = r.GetInt32(4), stockAfter = r.GetInt32(5) });
         return Ok(list);
     }
 
