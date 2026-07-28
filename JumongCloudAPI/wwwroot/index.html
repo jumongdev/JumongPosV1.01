@@ -1754,10 +1754,8 @@ tailwind.config = {
                     <td class="px-2 py-2 text-right font-bold" :class="x.qtyChange < 0 ? 'text-red-400' : 'text-emerald-400'" x-text="(x.qtyChange > 0 ? '+' : '') + x.qtyChange"></td>
                     <td class="px-2 py-2 text-right text-gray-500" x-text="x.stockAfter"></td>
                     <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa]">
-                      <template x-if="x.type==='transfer_out'">
-                        <button @click="viewTransfer(parseInt(x.reference.match(/#(\d+)/)[1]))" class="text-cyan-400 hover:underline text-left" x-text="x.reference || ''"></button>
-                      </template>
-                      <template x-if="x.type!=='transfer_out'" x-text="x.reference || ''"></template>
+                      <button x-show="x.type==='transfer_out'" @click="viewTransfer(parseInt(x.reference.match(/#(\d+)/)[1]))" class="text-cyan-400 hover:underline text-left" x-text="x.reference || ''"></button>
+                      <span x-show="x.type!=='transfer_out'" x-text="x.reference || ''"></span>
                     </td>
                     <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Manila'})"></td>
                   </tr>
