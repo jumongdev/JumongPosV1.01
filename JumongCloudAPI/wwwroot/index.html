@@ -1740,7 +1740,9 @@ tailwind.config = {
             <table class="w-full text-xs">
               <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
                 <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Type</th>
+                <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Before</th>
                 <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Qty Change</th>
+                <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">After</th>
                 <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Reference</th>
                 <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Date</th>
               </tr></thead>
@@ -1748,7 +1750,9 @@ tailwind.config = {
                 <template x-for="(x,i) in trailItems" :key="i">
                   <tr class="border-b border-gray-50 dark:border-[#222255]/40">
                     <td class="px-2 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded" :class="x.type==='transfer_out' ? 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300' : x.type==='manual_receive' || x.type==='manual_set' ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' : x.type==='manual_return' || x.type==='shortage_return' || x.type==='walkin_sale' ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300' : 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300'" x-text="formatType(x.type||'').toUpperCase()"></span></td>
+                    <td class="px-2 py-2 text-right text-gray-500" x-text="x.stockBefore"></td>
                     <td class="px-2 py-2 text-right font-bold" :class="x.qtyChange < 0 ? 'text-red-400' : 'text-emerald-400'" x-text="(x.qtyChange > 0 ? '+' : '') + x.qtyChange"></td>
+                    <td class="px-2 py-2 text-right text-gray-500" x-text="x.stockAfter"></td>
                     <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.reference || ''"></td>
                     <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Manila'})"></td>
                   </tr>
