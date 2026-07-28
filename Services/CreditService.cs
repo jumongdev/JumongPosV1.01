@@ -43,6 +43,9 @@ public class CreditService
 
         trans.Commit();
         _ = SyncService.SyncCreditTransaction(new CreditTransaction { Id = ctId, CustomerId = customerId, SaleId = saleId, Type = type, Description = description, Debit = amount > 0 ? amount : 0, Credit = amount < 0 ? Math.Abs(amount) : 0, Balance = newBalance, PaymentMethod = paymentMethod, ReferenceNo = referenceNo, UserId = userId, UserName = userName, CreatedAt = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss") });
+        // Push updated credit balance to cloud via REST (not direct PG — POS machines have no PG access)
+        customer.CreditBalance = newBalance;
+        _ = SyncService.SyncCustomer(customer);
     }
 
     public static List<CreditTransaction> GetAll()

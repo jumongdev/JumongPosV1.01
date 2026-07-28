@@ -536,6 +536,16 @@ public class SaleService
                             CreatedAt = ctRdr["CreatedAt"]?.ToString() ?? ""
                         });
                     }
+                    // Sync updated customer credit balance to cloud
+                    if (sale.CustomerId.HasValue)
+                    {
+                        try
+                        {
+                            var cust = CustomerService.GetById(sale.CustomerId.Value);
+                            if (cust != null) _ = SyncService.SyncCustomer(cust);
+                        }
+                        catch { }
+                    }
                 }
                 catch (Exception ex) { ErrorLogger.Log("SaleService.VoidSale(syncCloud)", ex); }
             }
@@ -657,8 +667,18 @@ public class SaleService
             try
             {
                 var updatedSale = GetById(saleId);
-                if (updatedSale != null && updatedSale.Items.Count > 0)
-                    _ = SyncService.SyncSale(updatedSale, updatedSale.Items);
+                var updatedItems = GetItems(saleId);
+                _ = SyncService.SyncSale(updatedSale, updatedItems);
+                // Sync updated customer credit balance to cloud
+                if (customerId.HasValue)
+                {
+                    try
+                    {
+                        var cust = CustomerService.GetById(customerId.Value);
+                        if (cust != null) _ = SyncService.SyncCustomer(cust);
+                    }
+                    catch { }
+                }
             }
             catch (Exception ex) { ErrorLogger.Log("SaleService.VoidItem(syncSale)", ex); }
             try
