@@ -161,16 +161,6 @@ public partial class StockReceivingForm : Form
                 picker.Close();
                 RefreshPendingGrid();
                 txtReference.Text = "WH-Transfer #" + orderId;
-
-                // Auto-confirm: add stock to POS immediately
-                var confirmItems = _pending.Where(p => p.Qty > 0).Select(p => (p.ProductId, p.ProductName, p.Barcode, p.StockBefore, p.Qty)).ToList();
-                if (confirmItems.Count > 0)
-                {
-                    var err = StockService.ConfirmReceiving(confirmItems, _currentUser?.Id ?? 0, _currentUser?.FullName ?? _currentUser?.Username ?? "", txtReference.Text.Trim());
-                    _pending.Clear();
-                    RefreshPendingGrid();
-                }
-
                 var shortageMsg = (result.Shortages != null && result.Shortages.Count > 0)
                     ? $"\n{result.Shortages.Count} item(s) reported as shortage."
                     : "";
