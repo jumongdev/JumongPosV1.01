@@ -160,12 +160,8 @@ public partial class StockReceivingForm : Form
                 picker.Close();
                 RefreshPendingGrid();
                 txtReference.Text = "WH-Transfer #" + orderId;
-                var shortageMsg = (result.Shortages != null && result.Shortages.Count > 0)
-                    ? $"\n{result.Shortages.Count} item(s) reported as shortage."
-                    : "";
-                MessageBox.Show($"{matched} of {checkedItems.Count} item(s) received from transfer #{orderId}.{shortageMsg}", "Transfer Received", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show($"{matched} of {checkedItems.Count} item(s) added to receiving list. Click CONFIRM RECEIVING to complete.", "Transfer Received", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                _ = SyncService.SyncStockSnapshotAsync(_pending.Select(p => (p.ProductId, p.ProductName, "", p.StockBefore + p.Qty)).ToList());
             };
 
             pnl.Controls.AddRange(new Control[] { lbl, dgv, btnReceive });
@@ -250,7 +246,7 @@ public partial class StockReceivingForm : Form
         lblCount.Text = $"Items: {_pending.Count}";
     }
 
-    private void ConfirmReceiving()
+    private async void ConfirmReceiving()
     {
         if (_pending.Count == 0) { MessageBox.Show("No items to confirm.", "Receiving", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
         var reference = txtReference.Text.Trim();
