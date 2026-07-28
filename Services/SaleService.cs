@@ -162,7 +162,6 @@ public class SaleService
                     _ = SyncService.SyncProduct(ProductService.GetById(item.ProductId));
 
             _ = SyncService.SyncSale(sale, sale.Items);
-            SyncService.ScheduleSnapshotPush();
             return saleId;
         }
         catch
@@ -546,7 +545,6 @@ public class SaleService
             trans.Rollback();
             throw;
         }
-        SyncService.ScheduleSnapshotPush();
     }
 
     public static void VoidItem(int itemId, string reason, int voidedByUserId, string voidedByUserName)
@@ -698,8 +696,7 @@ public class SaleService
             trans.Rollback();
             throw;
         }
-        SyncService.ScheduleSnapshotPush();
-    }
+            }
 
     public static List<VoidLog> GetVoidLogs()
     {

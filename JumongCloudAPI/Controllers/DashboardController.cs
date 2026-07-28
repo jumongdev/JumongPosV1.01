@@ -2260,72 +2260,22 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     {
         using var conn = Data.PgDatabaseHelper.GetConnection();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT qty_change, reference, reference_type, created_at FROM wh_stock_trails WHERE product_id = @pid ORDER BY created_at DESC LIMIT 200";
+        cmd.CommandText = @"
+            SELECT qty_change, reference, reference_type, created_at,
+                   SUM(qty_change) OVER (PARTITION BY product_id ORDER BY created_at ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_balance
+            FROM wh_stock_trails WHERE product_id = @pid ORDER BY created_at DESC LIMIT 200";
         cmd.Parameters.AddWithValue("pid", productId);
         var list = new List<object>();
         using var r = cmd.ExecuteReader();
         while (r.Read())
-            list.Add(new { qtyChange = r.GetInt32(0), reference = r.GetString(1), type = r.GetString(2), createdAt = r.GetDateTime(3) });
+            list.Add(new { qtyChange = r.GetInt32(0), reference = r.GetString(1), type = r.GetString(2), createdAt = r.GetDateTime(3), runningBalance = r.GetInt32(4) });
         return Ok(list);
     }
 
         [HttpPost("warehouse/stock-snapshot")]
         public IActionResult WhStockSnapshot([FromBody] WhStockSnapshotRequest req)
         {
-            if (req?.Items == null) return Ok(new { ok = true });
-            using var conn = Data.PgDatabaseHelper.GetConnection();
-            using var tx = conn.BeginTransaction();
-            try
-            {
-                foreach (var item in req.Items)
-                {
-                    // Match by barcode first, then by name
-                    using var find = conn.CreateCommand(); find.Transaction = tx;
-                    find.CommandText = "SELECT id, stock_qty FROM wh_products WHERE barcode = @bc AND barcode != '' AND is_active = true LIMIT 1";
-                    find.Parameters.AddWithValue("bc", (object?)item.Barcode ?? "");
-                    using var fr = find.ExecuteReader();
-                    if (!fr.Read())
-                    {
-                        fr.Close();
-                        find.CommandText = "SELECT id, stock_qty FROM wh_products WHERE name = @pn AND is_active = true LIMIT 1";
-                        find.Parameters.AddWithValue("pn", item.ProductName);
-                        using var fr2 = find.ExecuteReader();
-                        if (!fr2.Read()) continue;
-                        var wid2 = fr2.GetInt32(0);
-                        var oldQty2 = fr2.GetInt32(1);
-                        fr2.Close();
-
-                        var change = item.CurrentStock - oldQty2;
-                        if (change != 0)
-                        {
-                            using var trail2 = conn.CreateCommand(); trail2.Transaction = tx;
-                            trail2.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, qty_change, reference, reference_type) VALUES (@pid, @pn, @qc, 'Stock snapshot from POS', 'snapshot')";
-                            trail2.Parameters.AddWithValue("pid", wid2);
-                            trail2.Parameters.AddWithValue("pn", item.ProductName);
-                            trail2.Parameters.AddWithValue("qc", change);
-                            trail2.ExecuteNonQuery();
-                        }
-                        continue;
-                    }
-                    var wid = fr.GetInt32(0);
-                    var oldQty = fr.GetInt32(1);
-                    fr.Close();
-
-                    var delta = item.CurrentStock - oldQty;
-                    if (delta != 0)
-                    {
-                        using var trail = conn.CreateCommand(); trail.Transaction = tx;
-                        trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, qty_change, reference, reference_type) VALUES (@pid, @pn, @qc, 'Stock snapshot from POS', 'snapshot')";
-                        trail.Parameters.AddWithValue("pid", wid);
-                        trail.Parameters.AddWithValue("pn", item.ProductName);
-                        trail.Parameters.AddWithValue("qc", delta);
-                        trail.ExecuteNonQuery();
-                    }
-                }
-                tx.Commit();
-                return Ok(new { ok = true });
-            }
-            catch { tx.Rollback(); return Ok(new { ok = false }); }
+            return Ok(new { ok = true });
         }
 
         [HttpGet("warehouse/inventory-activity")]
@@ -2337,7 +2287,9 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
 
-            var sql = "SELECT product_name, barcode, qty_change, reference, reference_type, created_at FROM wh_stock_trails WHERE 1=1";
+            var sql = "SELECT product_name, barcode, qty_change, reference, reference_type, created_at, " +
+                       "SUM(qty_change) OVER (PARTITION BY product_id ORDER BY created_at ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_balance " +
+                       "FROM wh_stock_trails WHERE 1=1";
 
             if (!string.IsNullOrEmpty(search))
             {
@@ -2372,7 +2324,8 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     qtyChange = r.GetInt32(2),
                     reference = r.IsDBNull(3) ? "" : r.GetString(3),
                     referenceType = r.IsDBNull(4) ? "" : r.GetString(4),
-                    createdAt = r.GetDateTime(5)
+                    createdAt = r.GetDateTime(5),
+                    runningBalance = r.IsDBNull(6) ? 0 : r.GetInt32(6)
                 });
             return Ok(list);
         }

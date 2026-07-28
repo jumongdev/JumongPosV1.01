@@ -23,20 +23,7 @@ public static class SyncService
     /// <summary>Call after any stock-changing transaction. Batches multiple rapid changes.</summary>
     public static void ScheduleSnapshotPush()
     {
-        lock (_snapshotLock)
-        {
-            if (_snapshotDebounce == null)
-            {
-                _snapshotDebounce = new System.Windows.Forms.Timer { Interval = 5000 };
-                _snapshotDebounce.Tick += (_, _) =>
-                {
-                    _snapshotDebounce?.Stop();
-                    _ = PushStockSnapshotAsync();
-                };
-            }
-            _snapshotDebounce.Stop();
-            _snapshotDebounce.Start();
-        }
+        // Removed — snapshot disabled. Stock trails show real movements only.
     }
 
     public static string StoreId

@@ -103,7 +103,6 @@ public class StockService
             }
 
             tx.Commit();
-            SyncService.ScheduleSnapshotPush();
             return null;
         }
         catch (Exception ex)
