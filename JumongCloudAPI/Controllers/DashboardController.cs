@@ -1395,7 +1395,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             cmd.CommandText = $@"
                 SELECT wp.id, wp.name, wp.barcode, wp.category, wp.box_price, wp.box_cost, wp.box_qty, wp.piece_price, wp.stock_qty,
                        CASE WHEN wp.master_product_id IS NOT NULL THEN
-                           (SELECT COALESCE(json_agg(json_build_object('unitName', mpu.unit_name, 'price', mpu.price, 'cost', mpu.cost, 'qtyPerUnit', mpu.qty_per_unit, 'isDefault', mpu.is_default) ORDER BY mpu.is_default DESC, mpu.unit_name), '[]'::json)
+                           (SELECT COALESCE(json_agg(json_build_object('unitName', mpu.unit_name, 'price', mpu.price, 'cost', mpu.cost, 'qtyPerUnit', mpu.qty_per_unit, 'isDefault', mpu.is_default) ORDER BY mpu.is_default DESC, mpu.id), '[]'::json)
                             FROM master_product_units mpu WHERE mpu.product_id = wp.master_product_id)
                        ELSE '[]'::json END AS units,
                        COALESCE(mp.image_data, '') AS imageData,
@@ -2237,13 +2237,14 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         cmd.CommandText = @"
             SELECT qty_change, reference, reference_type, created_at,
                    SUM(qty_change) OVER (PARTITION BY product_id ORDER BY created_at) - qty_change AS stock_before,
-                   SUM(qty_change) OVER (PARTITION BY product_id ORDER BY created_at) AS stock_after
+                   SUM(qty_change) OVER (PARTITION BY product_id ORDER BY created_at) AS stock_after,
+                   COALESCE(invoice_no,'')
             FROM wh_stock_trails WHERE product_id = @pid ORDER BY created_at DESC LIMIT 200";
         cmd.Parameters.AddWithValue("pid", productId);
         var list = new List<object>();
         using var r = cmd.ExecuteReader();
         while (r.Read())
-            list.Add(new { qtyChange = r.GetInt32(0), reference = r.GetString(1), type = r.GetString(2), createdAt = r.GetDateTime(3), stockBefore = r.GetInt32(4), stockAfter = r.GetInt32(5) });
+            list.Add(new { qtyChange = r.GetInt32(0), reference = r.GetString(1), type = r.GetString(2), createdAt = r.GetDateTime(3), stockBefore = r.GetInt32(4), stockAfter = r.GetInt32(5), invoiceNo = r.IsDBNull(6) ? "" : r.GetString(6) });
         return Ok(list);
     }
 
@@ -2498,7 +2499,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 trail.Parameters.AddWithValue("pn", productName);
                 trail.Parameters.AddWithValue("bc", barcode);
                 trail.Parameters.AddWithValue("qc", -stockDeduction);
-                trail.Parameters.AddWithValue("ref", $"Walk-in: {req.CustomerName.Trim()} | {unitName} x {item.Qty}");
+                trail.Parameters.AddWithValue("ref", $"{invoiceNo} | {req.CustomerName.Trim()} | {unitName} x {item.Qty}");
                 trail.ExecuteNonQuery();
 
                 // Insert sale item
