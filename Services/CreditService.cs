@@ -214,7 +214,7 @@ public class CreditService
         var list = new List<Customer>();
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var sql = "SELECT * FROM Customers WHERE CreditBalance > 0 ORDER BY CreditBalance DESC";
+        var sql = "SELECT * FROM Customers WHERE CreditBalance > 0 AND IsActive = 1 ORDER BY CreditBalance DESC";
         using var cmd = new SQLiteCommand(sql, conn);
         using var rdr = cmd.ExecuteReader();
         while (rdr.Read()) list.Add(MapCustomer(rdr));
