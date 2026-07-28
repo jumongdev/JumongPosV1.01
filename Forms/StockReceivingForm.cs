@@ -9,6 +9,8 @@ public partial class StockReceivingForm : Form
 {
     private readonly User _currentUser;
     private readonly List<(int ProductId, string ProductName, string Barcode, int StockBefore, int Qty)> _pending = new();
+    private int _pendingTransferId;
+    private List<TransferItem>? _pendingTransferItems;
     private Product? _currentProduct;
 
     public StockReceivingForm(User user)
@@ -136,14 +138,11 @@ public partial class StockReceivingForm : Form
                 }
 
                 btnReceive.Text = "Receiving...";
-                var result = await SyncService.MarkTransferReceivedAsync(orderId, checkedItems);
-                if (result == null || !result.Success)
-                {
-                    MessageBox.Show("Failed to confirm transfer on cloud.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    btnReceive.Enabled = true;
-                    btnReceive.Text = "RECEIVE SELECTED";
-                    return;
-                }
+
+                // Don't mark complete on cloud yet — wait for CONFIRM RECEIVING
+                // Save transfer info for later confirmation
+                _pendingTransferId = orderId;
+                _pendingTransferItems = checkedItems;
 
                 var matched = 0;
                 foreach (var item in checkedItems)
@@ -256,6 +255,19 @@ public partial class StockReceivingForm : Form
         if (_pending.Count == 0) { MessageBox.Show("No items to confirm.", "Receiving", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
         var reference = txtReference.Text.Trim();
         var userName = string.IsNullOrEmpty(_currentUser.FullName) ? _currentUser.Username : _currentUser.FullName;
+
+        // If this is a transfer, mark it as completed on cloud (only for actually received items)
+        if (_pendingTransferId > 0 && _pendingTransferItems != null)
+        {
+            var matchedItems = _pendingTransferItems.Where(ti => _pending.Any(p => p.Barcode == ti.Barcode || p.ProductName == ti.ProductName)).ToList();
+            if (matchedItems.Count > 0)
+            {
+                await SyncService.MarkTransferReceivedAsync(_pendingTransferId, matchedItems);
+            }
+            _pendingTransferId = 0;
+            _pendingTransferItems = null;
+        }
+
         var result = StockService.ConfirmReceiving(_pending, _currentUser.Id, userName, reference);
         if (result != null) { MessageBox.Show($"Error: {result}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
 
