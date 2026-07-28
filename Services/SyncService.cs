@@ -1181,7 +1181,6 @@ public static class SyncService
                 var email = c.TryGetProperty("email", out var e) ? e.GetString() ?? "" : "";
                 var points = c.TryGetProperty("points", out var pt) ? pt.GetInt32() : 0;
                 var address = c.TryGetProperty("address", out var a) ? a.GetString() ?? "" : "";
-                var creditBalance = c.TryGetProperty("creditBalance", out var cb) ? cb.GetDecimal() : 0;
 
                 using var conn = DatabaseHelper.GetConnection();
                 conn.Open();
@@ -1198,7 +1197,6 @@ public static class SyncService
                     upd.Parameters.AddWithValue("p", phone);
                     upd.Parameters.AddWithValue("e", email);
                     upd.Parameters.AddWithValue("pts", points);
-                    upd.Parameters.AddWithValue("cb", creditBalance);
                     upd.Parameters.AddWithValue("a", address);
                     upd.ExecuteNonQuery();
                 }
@@ -1216,7 +1214,6 @@ public static class SyncService
                         upd.Parameters.AddWithValue("n", name);
                         upd.Parameters.AddWithValue("e", email);
                         upd.Parameters.AddWithValue("pts", points);
-                        upd.Parameters.AddWithValue("cb", creditBalance);
                         upd.Parameters.AddWithValue("a", address);
                         upd.ExecuteNonQuery();
                     }
@@ -1228,7 +1225,6 @@ public static class SyncService
                         ins.Parameters.AddWithValue("p", phone);
                         ins.Parameters.AddWithValue("e", email);
                         ins.Parameters.AddWithValue("pts", points);
-                        ins.Parameters.AddWithValue("cb", creditBalance);
                         ins.Parameters.AddWithValue("a", address);
                         ins.ExecuteNonQuery();
                     }
