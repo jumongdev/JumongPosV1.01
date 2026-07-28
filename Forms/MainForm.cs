@@ -538,6 +538,7 @@ public partial class MainForm : Form
                 var storeId = SyncService.StoreId;
                 if (string.IsNullOrEmpty(storeId) || storeId == "STORE-DEV-0001") { masterPullTimer.Start(); return; }
                 await SyncService.DownloadUpdatedMasterCatalog(new Progress<string>());
+                await SyncService.DownloadCustomersAsync();
                 await SyncService.SyncStoreSettingsAsync();
             }
             catch { }
