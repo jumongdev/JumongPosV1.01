@@ -182,7 +182,7 @@ public partial class ProductsForm : Form
             var ms = new MemoryStream(bytes);
             return Image.FromStream(ms);
         }
-        catch (Exception ex) { ErrorLogger.Log("ProductsForm.Base64ToImage", ex); return null; }
+        catch { return null; }
     }
 
     private void btnNew_Click(object? sender, EventArgs e)
