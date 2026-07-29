@@ -1124,7 +1124,7 @@ public static class SyncService
         {
             var url = ApiUrl.TrimEnd('/') + $"/dashboard/warehouse/transfers/{orderId}/receive";
             var body = receivedItems != null
-                ? JsonSerializer.Serialize(new { items = receivedItems.Select(i => new { i.ProductId, i.BaseQty, i.ProductName, i.Barcode }) })
+                ? JsonSerializer.Serialize(new { items = receivedItems.Select(i => new { i.ProductId, i.Qty, i.ProductName, i.Barcode }) })
                 : "{}";
             var content = new StringContent(body, Encoding.UTF8, "application/json");
             var response = await _client.PutAsync(url, content);

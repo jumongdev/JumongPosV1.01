@@ -152,8 +152,8 @@ public partial class StockReceivingForm : Form
                     if (product == null) continue;
 
                     var existingIdx = _pending.FindIndex(p => p.ProductId == product.Id);
-                    if (existingIdx >= 0) { var old = _pending[existingIdx]; _pending[existingIdx] = (old.ProductId, old.ProductName, old.Barcode, old.StockBefore, old.Qty + item.BaseQty); }
-                    else _pending.Add((product.Id, product.Name, product.Barcode, product.StockQty, item.BaseQty));
+                    if (existingIdx >= 0) { var old = _pending[existingIdx]; _pending[existingIdx] = (old.ProductId, old.ProductName, old.Barcode, old.StockBefore, old.Qty + item.Qty); }
+                    else _pending.Add((product.Id, product.Name, product.Barcode, product.StockQty, item.Qty));
                     matched++;
                 }
 
@@ -197,7 +197,7 @@ public partial class StockReceivingForm : Form
                 panel.Controls.Add(new Label { Text = $"\u26A0 {item.ProductName} (not found in POS)", Location = new Point(8, y), Size = new Size(570, 24), Font = new Font("Segoe UI", 9F), ForeColor = ThemeManager.Current.AccentRed });
                 y += 28; continue;
             }
-            var cb = new CheckBox { Text = $"{item.ProductName} \u2014 {item.BaseQty} pcs", Location = new Point(5, y), Size = new Size(580, 24), Font = new Font("Segoe UI", 9F), ForeColor = ThemeManager.Current.TextPrimary, Checked = true, Tag = item };
+            var cb = new CheckBox { Text = $"{item.ProductName} \u2014 {item.Qty} pcs", Location = new Point(5, y), Size = new Size(580, 24), Font = new Font("Segoe UI", 9F), ForeColor = ThemeManager.Current.TextPrimary, Checked = true, Tag = item };
             panel.Controls.Add(cb);
             checkboxes[item.ProductId] = cb;
             y += 28;

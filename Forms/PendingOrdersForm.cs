@@ -100,7 +100,7 @@ public class PendingOrdersForm : Form
                          ?? ProductService.GetAll().FirstOrDefault(p =>
                             p.Name.Equals(ci.ProductName, StringComparison.OrdinalIgnoreCase));
                 if (found != null)
-                    receivingItems.Add((found.Id, found.Name, found.Barcode ?? "", found.StockQty, ci.BaseQty));
+                    receivingItems.Add((found.Id, found.Name, found.Barcode ?? "", found.StockQty, ci.Qty));
             }
 
             if (receivingItems.Count > 0)
@@ -173,7 +173,7 @@ public class PendingOrdersForm : Form
                 hasUnmatched = true;
                 var lblUnmatched = new Label
                 {
-                    Text = $"\u26A0 {item.ProductName} — {item.BaseQty} {item.BaseUnitName} (not found in POS)",
+                    Text = $"\u26A0 {item.ProductName} — {item.Qty} {item.BaseUnitName} (not found in POS)",
                     Location = new Point(8, y),
                     Size = new Size(570, 24),
                     Font = new Font("Segoe UI", 9F),
@@ -186,7 +186,7 @@ public class PendingOrdersForm : Form
 
             var cb = new CheckBox
             {
-                Text = $"{item.ProductName} — {item.BaseQty} {item.BaseUnitName} (barcode: {item.Barcode})",
+                Text = $"{item.ProductName} — {item.Qty} {item.BaseUnitName} (barcode: {item.Barcode})",
                 Location = new Point(5, y),
                 Size = new Size(580, 24),
                 Font = new Font("Segoe UI", 9F),

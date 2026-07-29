@@ -14,7 +14,7 @@ public class TransferItem
 {
     public int ProductId { get; set; }
     public string ProductName { get; set; } = "";
-    public int BaseQty { get; set; }
+    public int Qty { get; set; }
     public string BaseUnitName { get; set; } = "Piece";
     public string Barcode { get; set; } = "";
     public int MasterProductId { get; set; }
