@@ -1283,6 +1283,30 @@ public static class SyncService
         }
         catch { }
     }
+
+    public static async Task PushSuspect1PcAsync(Sale sale, List<SaleItem> suspectItems)
+    {
+        try
+        {
+            var payload = new
+            {
+                storeId = StoreId,
+                storeName = StoreName,
+                invoiceNo = sale.InvoiceNo,
+                saleDate = new DateTimeOffset(sale.SaleDate.Ticks, TimeSpan.FromMinutes(TimeHelper.GetTimezoneOffset())).UtcDateTime,
+                cashier = sale.CashierName ?? "",
+                items = suspectItems.Select(i => new
+                {
+                    productName = i.ProductName,
+                    unitName = i.UnitName,
+                    price = i.Price,
+                    quantity = i.Quantity
+                }).ToList()
+            };
+            await PostAsync("/dashboard/suspect-1pc", payload);
+        }
+        catch { }
+    }
 }
 
 public class ReceiveResult

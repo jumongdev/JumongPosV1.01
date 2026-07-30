@@ -1393,40 +1393,44 @@ public partial class SalesForm : Form
         rcs[8].Location = new Point(m, ry);        rcs[8].Size = new Size(pw / 2, 22);
         rcs[9].Location = new Point(m + pw / 2, ry); rcs[9].Size = new Size(pw / 2, 22); ry += 28;
         rcs[10].Location = new Point(m, ry);       rcs[10].Size = new Size(pw, 1); ry += 14;
-        btnPay.Location = new Point(m, ry);       btnPay.Size = new Size(pw, 52); ry += 60;
+        btnPay.Location = new Point(m, ry);       btnPay.Size = new Size(pw, 52); ry += 54;
 
-        var promoH = string.IsNullOrEmpty(_promoText) ? 0 : 38;
         if (_qrVisible)
         {
-            var qrH = _pnlTotals.Height - ry - 4 - promoH - 6;
-            if (qrH > 80)
-            {
-                _lblQrHeader.Location = new Point(m, ry);
-                _lblQrHeader.Size = new Size(pw, 16);
-                _lblQrHeader.Visible = !string.IsNullOrEmpty(_lblQrHeader.Text);
-                ry += 14;
+            _lblQrHeader.Location = new Point(m, ry);
+            _lblQrHeader.Size = new Size(pw, 14);
+            _lblQrHeader.Visible = !string.IsNullOrEmpty(_lblQrHeader.Text);
+            ry += 16;
 
-                var navW = 22;
-                _btnQrPrev.Location = new Point(m, ry);
-                _btnQrPrev.Size = new Size(navW, qrH);
-                _btnQrPrev.Visible = _qrEntries.Count > 1;
+            var navW = 22;
+            var qrH = Math.Max(50, Math.Min(110, _pnlTotals.Height - ry - 46));
+            _btnQrPrev.Location = new Point(m, ry);
+            _btnQrPrev.Size = new Size(navW, qrH);
+            _btnQrPrev.Visible = _qrEntries.Count > 1;
 
-                _pbQr.Location = new Point(m + navW, ry);
-                _pbQr.Size = new Size(pw - navW * 2, qrH);
-                _pbQr.Visible = true;
+            _pbQr.Location = new Point(m + navW, ry);
+            _pbQr.Size = new Size(pw - navW * 2, qrH);
+            _pbQr.Visible = true;
 
-                _btnQrNext.Location = new Point(m + pw - navW, ry);
-                _btnQrNext.Size = new Size(navW, qrH);
-                _btnQrNext.Visible = _qrEntries.Count > 1;
+            _btnQrNext.Location = new Point(m + pw - navW, ry);
+            _btnQrNext.Size = new Size(navW, qrH);
+            _btnQrNext.Visible = _qrEntries.Count > 1;
 
-                ry += qrH + 4;
-            }
+            ry += qrH + 2;
         }
+        else
+        {
+            _lblQrHeader.Visible = false;
+            _pbQr.Visible = false;
+            _btnQrPrev.Visible = false;
+            _btnQrNext.Visible = false;
+        }
+
         if (!string.IsNullOrEmpty(_promoText))
         {
             _lblPromo.Text = _promoText;
             _lblPromo.Location = new Point(m, ry);
-            _lblPromo.Size = new Size(pw, promoH);
+            _lblPromo.Size = new Size(pw, 36);
             _lblPromo.Visible = true;
         }
         else _lblPromo.Visible = false;

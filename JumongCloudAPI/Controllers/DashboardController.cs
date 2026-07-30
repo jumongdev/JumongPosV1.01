@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
+using NpgsqlTypes;
 using System.Data;
 
 namespace JumongCloudAPI.Controllers
@@ -2455,9 +2456,11 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                         WHERE wp.id = @pid ORDER BY mu.is_default DESC, mu.id LIMIT 20";
                     get.Parameters.AddWithValue("pid", item.ProductId);
                     var units = new List<(string name, decimal price, int qty, int pts)>();
-                    using var r = get.ExecuteReader();
-                    while (r.Read())
-                        units.Add((r.GetString(0), r.GetDecimal(1), r.GetInt32(2), r.GetInt32(3)));
+                    {
+                        using var r = get.ExecuteReader();
+                        while (r.Read())
+                            units.Add((r.GetString(0), r.GetDecimal(1), r.GetInt32(2), r.GetInt32(3)));
+                    }
 
                     if (units.Count > 0)
                     {
@@ -2469,7 +2472,6 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     }
                     else
                     {
-                        // Fallback: use wh_products.box_qty and piece_price
                         qtyPerUnit = boxQty;
                         using var fp = conn.CreateCommand(); fp.Transaction = tx;
                         fp.CommandText = "SELECT piece_price FROM wh_products WHERE id = @pid";
@@ -2860,9 +2862,88 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             await file.CopyToAsync(stream);
             return Ok(new { url = "/assets/" + file.FileName, fullUrl = "https://admin.jumongdev.com/assets/" + file.FileName });
         }
+
+        [HttpPost("suspect-1pc")]
+        public IActionResult PushSuspect1Pc([FromBody] Suspect1PcRequest req)
+        {
+            if (string.IsNullOrEmpty(req.InvoiceNo)) return BadRequest("InvoiceNo required");
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"INSERT INTO suspect_1pc_sales (store_id, store_name, invoice_no, sale_date, cashier, items_json)
+                VALUES (@sid, @sn, @inv, CAST(@dt AS TIMESTAMPTZ), @csh, @items::json)
+                RETURNING id";
+            cmd.Parameters.AddWithValue("sid", req.StoreId ?? "");
+            cmd.Parameters.AddWithValue("sn", req.StoreName ?? "");
+            cmd.Parameters.AddWithValue("inv", req.InvoiceNo);
+            cmd.Parameters.AddWithValue("dt", string.IsNullOrEmpty(req.SaleDate) ? DateTimeOffset.UtcNow : DateTimeOffset.Parse(req.SaleDate));
+            cmd.Parameters.AddWithValue("csh", req.Cashier ?? "");
+            cmd.Parameters.AddWithValue("items", NpgsqlTypes.NpgsqlDbType.Jsonb, System.Text.Json.JsonSerializer.Serialize(req.Items ?? new List<Suspect1PcItem>()));
+            var id = cmd.ExecuteScalar();
+            return Ok(new { id });
+        }
+
+        [HttpGet("suspect-1pc")]
+        public IActionResult GetSuspect1Pc([FromQuery] string? store, [FromQuery] string? status)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            var where = new List<string>();
+            if (!string.IsNullOrEmpty(store)) { where.Add("store_id = @store"); cmd.Parameters.AddWithValue("store", store); }
+            if (!string.IsNullOrEmpty(status)) { where.Add("status = @status"); cmd.Parameters.AddWithValue("status", status); }
+            var filter = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
+            cmd.CommandText = $"SELECT id, store_id, store_name, invoice_no, sale_date, cashier, items_json, status, checker, notes, created_at FROM suspect_1pc_sales {filter} ORDER BY created_at DESC LIMIT 200";
+            using var rdr = cmd.ExecuteReader();
+            var list = new List<object>();
+            while (rdr.Read())
+            {
+                list.Add(new
+                {
+                    Id = rdr.GetInt32(0),
+                    StoreId = rdr.GetString(1),
+                    StoreName = rdr.GetString(2),
+                    InvoiceNo = rdr.GetString(3),
+                    SaleDate = rdr.GetDateTime(4),
+                    Cashier = rdr.GetString(5),
+                    Items = rdr.GetString(6),
+                    Status = rdr.GetString(7),
+                    Checker = rdr.GetString(8),
+                    Notes = rdr.GetString(9),
+                    CreatedAt = rdr.GetDateTime(10)
+                });
+            }
+            return Ok(list);
+        }
+
+        [HttpPut("suspect-1pc/{id}/assign")]
+        public IActionResult AssignSuspect1Pc(int id, [FromBody] Suspect1PcAssignRequest req)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "UPDATE suspect_1pc_sales SET checker = @c, status = 'checking' WHERE id = @id";
+            cmd.Parameters.AddWithValue("c", req.Checker ?? "");
+            cmd.Parameters.AddWithValue("id", id);
+            var rows = cmd.ExecuteNonQuery();
+            return rows > 0 ? Ok(new { ok = true }) : NotFound();
+        }
+
+        [HttpPut("suspect-1pc/{id}/resolve")]
+        public IActionResult ResolveSuspect1Pc(int id, [FromBody] Suspect1PcResolveRequest req)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "UPDATE suspect_1pc_sales SET status = 'resolved', notes = @n WHERE id = @id";
+            cmd.Parameters.AddWithValue("n", req.Notes ?? "");
+            cmd.Parameters.AddWithValue("id", id);
+            var rows = cmd.ExecuteNonQuery();
+            return rows > 0 ? Ok(new { ok = true }) : NotFound();
+        }
     }
 
     public class PosPromoRequest { public string Message { get; set; } = ""; }
+    public class Suspect1PcRequest { public string? StoreId { get; set; } public string? StoreName { get; set; } public string InvoiceNo { get; set; } = ""; public string? Cashier { get; set; } public string? SaleDate { get; set; } public List<Suspect1PcItem>? Items { get; set; } }
+    public class Suspect1PcItem { public string ProductName { get; set; } = ""; public string UnitName { get; set; } = ""; public decimal Price { get; set; } public int Quantity { get; set; } }
+    public class Suspect1PcAssignRequest { public string Checker { get; set; } = ""; }
+    public class Suspect1PcResolveRequest { public string Notes { get; set; } = ""; }
     }
 
     public class WhProductDto { public string Name { get; set; } = ""; public string? Barcode { get; set; } public string? Category { get; set; } public decimal BoxPrice { get; set; } public decimal BoxCost { get; set; } public int BoxQty { get; set; } = 1; public decimal PiecePrice { get; set; } }

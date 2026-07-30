@@ -86,6 +86,7 @@ Alpine.store('app', {
       if (section === 'products') dispatchEvent(new CustomEvent('load-products'));
       if (section === 'stock') { this.stockSubpage = 'receiving'; dispatchEvent(new CustomEvent('load-stock')); }
       if (section === 'analytics') dispatchEvent(new CustomEvent('load-analytics'));
+      if (section === 'suspect1pc') dispatchEvent(new CustomEvent('load-suspect1pc'));
     },
     switchWhSubpage(subpage) {
       this.whSubpage = subpage;
@@ -754,15 +755,17 @@ Alpine.store('app', {
     // ════════════════════════════════════════════════════
     // TRANSFER methods (warehouse → POS stock transfers)
     // ════════════════════════════════════════════════════
-    transferModal: false, transferForm: { clientId: '', clientName: '', notes: '', storeId: '' }, transferFormItems: [],
+    transferModal: false, transferSaving: false, transferForm: { clientId: '', clientName: '', notes: '', storeId: '' }, transferFormItems: [],
     openNewTransfer() { this.transferModal = true; this.transferForm = { clientId: '', clientName: '', notes: '', storeId: '' }; this.transferFormItems = [] },
     closeTransfer() { this.transferModal = false; this.transferFormItems = [] },
     addTransferItem(pid, pname, barcode, qty) { this.transferFormItems.push({ productId: pid, productName: pname, barcode: barcode || '', qty: parseInt(qty) || 1 }) },
     removeTransferItem(i) { this.transferFormItems.splice(i, 1) },
     get transferTotalQty() { return this.transferFormItems.reduce((s, x) => s + x.qty, 0) },
     async saveTransfer() {
+      if (this.transferSaving) return;
       if (!this.transferForm.clientId) { toast('Select a POS client', 'error'); return }
       if (!this.transferFormItems.length) { toast('Add at least one product', 'error'); return }
+      this.transferSaving = true;
       try {
         const r = await fetch(API + '/warehouse/transfers', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -778,6 +781,7 @@ Alpine.store('app', {
         if (j.id) { toast('Transfer #' + j.id + ' created', 'success'); this.transferModal = false; this.load(); this.updateBadge() }
         else throw new Error('Failed');
       } catch (e) { toast('Error: ' + e.message, 'error') }
+      finally { this.transferSaving = false; }
     },
     async receiveTransfer(id) {
       if (!confirm('Receive transfer #' + id + '? This will add stock to the POS client.')) return;
@@ -1109,6 +1113,51 @@ Alpine.store('app', {
         this.pushStatus = 'Timeout — agent may be offline.';
       } catch (ex) { this.pushStatus = 'Push error: ' + ex.message }
       this.pushing = false;
+    }
+  }));
+
+  Alpine.data('suspect1pcPanel', () => ({
+    data: [],
+    filterStore: '',
+    filterStatus: 'pending',
+    itemModalOpen: false,
+    itemViewList: [],
+    itemViewInvoice: '',
+
+    async init() {
+      window.addEventListener('load-suspect1pc', () => this.load());
+      if (Alpine.store('app').section === 'suspect1pc') await this.load();
+      this.$watch('$store.app.section', v => { if (v === 'suspect1pc') this.load(); });
+    },
+
+    async load() {
+      try {
+        var qs = [];
+        if (this.filterStore) qs.push('store=' + encodeURIComponent(this.filterStore));
+        if (this.filterStatus) qs.push('status=' + encodeURIComponent(this.filterStatus));
+        var url = API + '/suspect-1pc' + (qs.length ? '?' + qs.join('&') : '');
+        this.data = await fetchJSON(url);
+      } catch (e) { this.data = []; }
+    },
+
+    async assign(id) {
+      try {
+        await fetchJSON(API + '/suspect-1pc/' + id + '/assign', { method: 'PUT', body: JSON.stringify({ checker: 'Admin' }), headers: { 'Content-Type': 'application/json' } });
+        await this.load();
+      } catch (e) {}
+    },
+
+    async resolve(id) {
+      try {
+        await fetchJSON(API + '/suspect-1pc/' + id + '/resolve', { method: 'PUT', body: JSON.stringify({ notes: '' }), headers: { 'Content-Type': 'application/json' } });
+        await this.load();
+      } catch (e) {}
+    },
+
+    showItems(r) {
+      this.itemViewInvoice = r.invoiceNo;
+      try { this.itemViewList = JSON.parse(r.items || '[]'); } catch (e) { this.itemViewList = []; }
+      this.itemModalOpen = true;
     }
   }));
 

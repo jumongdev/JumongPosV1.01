@@ -616,5 +616,22 @@ public static class PgDatabaseHelper
                 last_seq INTEGER NOT NULL DEFAULT 0
             )";
         try { icMig.ExecuteNonQuery(); } catch { }
+
+        using var susMig = conn.CreateCommand();
+        susMig.CommandText = @"
+            CREATE TABLE IF NOT EXISTS suspect_1pc_sales (
+                id SERIAL PRIMARY KEY,
+                store_id TEXT NOT NULL DEFAULT '',
+                store_name TEXT NOT NULL DEFAULT '',
+                invoice_no TEXT NOT NULL DEFAULT '',
+                sale_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                cashier TEXT NOT NULL DEFAULT '',
+                items_json TEXT NOT NULL DEFAULT '[]',
+                status TEXT NOT NULL DEFAULT 'pending',
+                checker TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )";
+        try { susMig.ExecuteNonQuery(); } catch { }
     }
 }

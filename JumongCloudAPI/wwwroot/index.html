@@ -66,6 +66,7 @@ tailwind.config = {
         { id:'users', icon:'⚙️', label:'Users' },
         { id:'settings', icon:'🔧', label:'Settings' },
         { id:'pospromo', icon:'📢', label:'POS Promo' },
+        { id:'suspect1pc', icon:'⚠️', label:'1PC CHECK' },
         { id:'analytics', icon:'📈', label:'Analytics' }
       ]" :key="item.id">
         <div>
@@ -1686,7 +1687,7 @@ tailwind.config = {
           <div class="flex justify-end gap-2 pt-3 border-t border-gray-200 dark:border-[#222255]">
             <span class="text-sm font-bold mr-auto pt-1">Total Items: <span x-text="transferTotalQty"></span></span>
             <button @click="closeTransfer()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500">CANCEL</button>
-            <button @click="saveTransfer()" class="text-xs px-4 py-2 rounded-lg bg-emerald-600 text-white font-medium">CREATE TRANSFER</button>
+            <button @click="saveTransfer()" :disabled="transferSaving" class="text-xs px-4 py-2 rounded-lg bg-emerald-600 text-white font-medium disabled:opacity-50"><span x-text="transferSaving ? 'SAVING...' : 'CREATE TRANSFER'"></span></button>
           </div>
         </div>
       </div>
@@ -2282,6 +2283,103 @@ tailwind.config = {
             </div>
             <div x-show="uploadedUrl" class="mt-1 text-[10px] text-green-500">Uploaded: <span x-text="uploadedUrl"></span></div>
             <div x-show="pushStatus" class="mt-1 text-[10px] text-gray-400" x-text="pushStatus"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUSPECT 1PC CHECK -->
+      <div x-show="$store.app.section === 'suspect1pc'" x-transition.opacity>
+        <div x-data="suspect1pcPanel" class="space-y-4">
+          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">⚠️ Suspected 1PC Sales</h3>
+          <p class="text-[11px] text-gray-500 dark:text-[#7878aa]">Sales where cashier selected "pc" unit but the product normally sells in packs.</p>
+
+          <div class="flex gap-2 flex-wrap">
+            <select x-model="filterStore" @change="load()" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+              <option value="">All Stores</option>
+              <template x-for="s in $store.app.stores" :key="s.storeId">
+                <option :value="s.storeId" x-text="s.storeName || s.storeId"></option>
+              </template>
+            </select>
+            <select x-model="filterStatus" @change="load()" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+              <option value="">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="checking">Checking</option>
+              <option value="resolved">Resolved</option>
+            </select>
+            <span class="text-xs text-gray-400 dark:text-[#7878aa] self-center" x-text="'Total: ' + data.length"></span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead>
+                <tr class="border-b border-gray-200 dark:border-[#222255] text-left text-[10px] text-gray-500 dark:text-[#7878aa] uppercase tracking-wider">
+                  <th class="px-2 py-2">Store</th>
+                  <th class="px-2 py-2">Invoice</th>
+                  <th class="px-2 py-2">Cashier</th>
+                  <th class="px-2 py-2">Date</th>
+                  <th class="px-2 py-2">Suspect Items</th>
+                  <th class="px-2 py-2">Status</th>
+                  <th class="px-2 py-2">Checker</th>
+                  <th class="px-2 py-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="(r, i) in data" :key="i">
+                  <tr class="border-b border-gray-100 dark:border-[#1a1a44] hover:bg-gray-50 dark:hover:bg-[#181848]/50">
+                    <td class="px-2 py-2 font-medium text-gray-700 dark:text-slate-200" x-text="$store.app.storeMap[r.storeId] || r.storeId"></td>
+                    <td class="px-2 py-2 text-cyan-600 dark:text-cyan-400 font-mono" x-text="r.invoiceNo"></td>
+                    <td class="px-2 py-2 text-gray-600 dark:text-slate-300" x-text="r.cashier"></td>
+                    <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(r.saleDate).toLocaleDateString('en-PH',{timeZone:'Asia/Manila'})"></td>
+                    <td class="px-2 py-2">
+                      <span class="text-amber-600 dark:text-amber-400 cursor-pointer hover:underline"
+                        @click="showItems(r)" x-text="JSON.parse(r.items || '[]').length + ' item(s)'"></span>
+                    </td>
+                    <td class="px-2 py-2">
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-medium"
+                        :class="r.status === 'pending' ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : r.status === 'checking' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'"
+                        x-text="r.status"></span>
+                    </td>
+                    <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa]" x-text="r.checker || '—'"></td>
+                    <td class="px-2 py-2 whitespace-nowrap">
+                      <button x-show="r.status === 'pending'" @click="assign(r.id)" class="text-[10px] px-2 py-1 rounded bg-cyan-600 text-white hover:bg-cyan-700">ASSIGN TO ME</button>
+                      <button x-show="r.status === 'checking'" @click="resolve(r.id)" class="text-[10px] px-2 py-1 rounded bg-green-600 text-white hover:bg-green-700">RESOLVE</button>
+                      <span x-show="r.status === 'resolved'" class="text-[10px] text-gray-400">✓</span>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="data.length === 0">
+                  <td colspan="8" class="px-2 py-6 text-center text-gray-400 text-xs">No suspected 1pc sales found</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Items Modal -->
+          <div x-show="itemModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="itemModalOpen=false">
+            <div class="bg-white dark:bg-[#10102a] rounded-xl border border-gray-200 dark:border-[#222255] p-4 max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto">
+              <h4 class="text-sm font-bold text-gray-700 dark:text-slate-200 mb-3">Suspect Items — <span x-text="itemViewInvoice" class="text-cyan-400 font-mono"></span></h4>
+              <table class="w-full text-xs">
+                <thead>
+                  <tr class="border-b border-gray-200 dark:border-[#222255] text-left text-[10px] text-gray-500 dark:text-[#7878aa] uppercase">
+                    <th class="px-2 py-2">Product</th>
+                    <th class="px-2 py-2">Unit</th>
+                    <th class="px-2 py-2">Qty</th>
+                    <th class="px-2 py-2">Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="(it, j) in itemViewList" :key="j">
+                    <tr class="border-b border-gray-100 dark:border-[#1a1a44]">
+                      <td class="px-2 py-2 text-gray-700 dark:text-slate-200" x-text="it.productName"></td>
+                      <td class="px-2 py-2 text-amber-600 dark:text-amber-400 font-bold" x-text="it.unitName"></td>
+                      <td class="px-2 py-2" x-text="it.quantity"></td>
+                      <td class="px-2 py-2" x-text="'₱' + it.price.toFixed(2)"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+              <button @click="itemModalOpen=false" class="mt-3 text-xs px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-[#181848] text-gray-700 dark:text-slate-200 hover:bg-gray-300 dark:hover:bg-[#222266]">Close</button>
+            </div>
           </div>
         </div>
       </div>

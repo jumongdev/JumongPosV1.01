@@ -162,6 +162,16 @@ public class SaleService
                     _ = SyncService.SyncProduct(ProductService.GetById(item.ProductId));
 
             _ = SyncService.SyncSale(sale, sale.Items);
+
+            var suspectPids = sale.Items.Where(i => i.QtyPerUnit == 1).Select(i => i.ProductId).Distinct().ToList();
+            if (suspectPids.Count > 0)
+            {
+                var defs = ProductUnitService.GetDefaultsByProductIds(suspectPids);
+                var suspectItems = sale.Items.Where(i => i.QtyPerUnit == 1 && defs.TryGetValue(i.ProductId, out var du) && du.QtyPerUnit > 1).ToList();
+                if (suspectItems.Count > 0)
+                    _ = SyncService.PushSuspect1PcAsync(sale, suspectItems);
+            }
+
             return saleId;
         }
         catch
