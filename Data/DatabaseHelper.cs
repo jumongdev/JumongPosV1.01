@@ -295,6 +295,15 @@ public class DatabaseHelper
             alter.ExecuteNonQuery();
         }
 
+        using var checkCtCustName = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('CreditTransactions') WHERE name = 'CustomerName'", conn);
+        if (Convert.ToInt32(checkCtCustName.ExecuteScalar()) == 0)
+        {
+            using var alter = new SQLiteCommand("ALTER TABLE CreditTransactions ADD COLUMN CustomerName TEXT NOT NULL DEFAULT ''", conn);
+            alter.ExecuteNonQuery();
+            alter.CommandText = "ALTER TABLE CreditTransactions ADD COLUMN InvoiceNo TEXT NOT NULL DEFAULT ''";
+            alter.ExecuteNonQuery();
+        }
+
         var heldCartsTable = "CREATE TABLE IF NOT EXISTS HeldCarts (" +
             "Id INTEGER PRIMARY KEY AUTOINCREMENT," +
             "OrderType TEXT NOT NULL DEFAULT 'Walk-in'," +

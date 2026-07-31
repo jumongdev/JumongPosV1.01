@@ -1386,7 +1386,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
 
         // ── Warehouse API ──
         [HttpGet("warehouse/products")]
-        public IActionResult WhGetProducts([FromQuery] bool activeOnly = true, [FromQuery] string? search = null)
+        public IActionResult WhGetProducts([FromQuery] bool activeOnly = true, [FromQuery] string? search = null, [FromQuery] bool noImage = false)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
@@ -1424,8 +1424,8 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     piecePrice = r.GetDecimal(7),
                     stockQty = r.GetInt32(8),
                     units = unitsJson != "[]" ? System.Text.Json.JsonSerializer.Deserialize<object>(unitsJson) : null,
-                    imageData = imageData,
-                    cost = cost
+                    imageData = noImage ? "" : (r.IsDBNull(10) ? "" : r.GetString(10)),
+                    cost = r.IsDBNull(11) ? 0m : r.GetDecimal(11)
                 });
             }
             return Ok(data);

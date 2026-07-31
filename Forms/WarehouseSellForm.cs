@@ -11,7 +11,7 @@ namespace JumongPosV1._01.Forms;
 
 public class WarehouseSellForm : Form
 {
-    private static readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(10) };
+    private static readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(60) };
 
     private static Color CTopbar => ThemeManager.Current.TopbarBg;
     private static Color CTopbarChip => ThemeManager.Current.TopbarChip;
@@ -826,7 +826,7 @@ public class WarehouseSellForm : Form
         {
             try
             {
-                var url = SyncService.ApiUrl.TrimEnd('/') + "/dashboard/warehouse/products?search=" + Uri.EscapeDataString(search);
+                var url = SyncService.ApiUrl.TrimEnd('/') + "/dashboard/warehouse/products?search=" + Uri.EscapeDataString(search) + "&noImage=true";
                 var json = await _http.GetStringAsync(url);
                 _prodDoc?.Dispose();
                 _prodDoc = JsonDocument.Parse(json);
