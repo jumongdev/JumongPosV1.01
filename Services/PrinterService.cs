@@ -618,8 +618,8 @@ public class PrinterService
         doc.PrinterSettings.PrinterName = printerName;
 
         var paperW = int.TryParse(GetSetting("PaperWidth"), out var pw) ? pw : 315;
-        var marginL = 2;
-        var marginR = 2;
+        var marginL = int.TryParse(GetSetting("PrinterMarginLeft"), out var ml) ? ml : 2;
+        var marginR = int.TryParse(GetSetting("PrinterMarginRight"), out var mr) ? mr : 2;
 
         var lineChars = (int)((paperW - marginL - marginR) * 13 / 100);
         if (lineChars < 24) lineChars = 24;
@@ -732,8 +732,8 @@ public class PrinterService
         doc.PrinterSettings.PrinterName = printerName;
 
         var paperW = int.TryParse(GetSetting("PaperWidth"), out var pw) ? pw : 315;
-        var marginL = 2;
-        var marginR = 2;
+        var marginL = int.TryParse(GetSetting("PrinterMarginLeft"), out var ml) ? ml : 2;
+        var marginR = int.TryParse(GetSetting("PrinterMarginRight"), out var mr) ? mr : 2;
 
         var lineChars = (int)((paperW - marginL - marginR) * 13 / 100);
         if (lineChars < 24) lineChars = 24;
@@ -888,8 +888,8 @@ public class PrinterService
         if (string.IsNullOrEmpty(printer)) { MessageBox.Show("No printer configured. Go to Settings to set a printer.", "Printer Not Set", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
 
         var paperWidth = int.TryParse(GetSetting("PaperWidth"), out var pw) ? pw : 280;
-        var marginLeft = int.TryParse(GetSetting("MarginLeft"), out var ml) ? ml : 0;
-        var marginRight = int.TryParse(GetSetting("MarginRight"), out var mr) ? mr : 0;
+        var marginLeft = int.TryParse(GetSetting("PrinterMarginLeft"), out var ml) ? ml : 0;
+        var marginRight = int.TryParse(GetSetting("PrinterMarginRight"), out var mr) ? mr : 0;
         var chars = (paperWidth - marginLeft - marginRight) / 9;
 
         var doc = new PrintDocument();
@@ -955,15 +955,19 @@ public class PrinterService
 
         doc.PrintPage += (_, e) =>
         {
+            var pageW = e.PageBounds.Width;
+            var lm = pageW * marginLeft / paperWidth;
+            var rm = pageW * marginRight / paperWidth;
+
             var y = 0;
             foreach (var line in lines)
             {
                 var f = line[2] == "1" ? fontBold : font;
-                e.Graphics.DrawString(line[0], f, Brushes.Black, 0, y);
+                e.Graphics.DrawString(line[0], f, Brushes.Black, lm, y);
                 if (!string.IsNullOrEmpty(line[1]))
                 {
                     var rw = e.Graphics.MeasureString(line[1], f).Width;
-                    e.Graphics.DrawString(line[1], f, Brushes.Black, e.PageBounds.Width - marginRight - rw, y);
+                    e.Graphics.DrawString(line[1], f, Brushes.Black, pageW - rm - rw, y);
                 }
                 y += lineHeight;
             }
@@ -996,14 +1000,16 @@ public class PrinterService
             var sf = StringFormat.GenericTypographic;
             using var font9B = new Font("Courier New", 9, FontStyle.Bold);
             var brush = Brushes.Black;
+            var pageW = e.PageBounds.Width;
+            var lm = pageW * marginLeft / paperWidth;
+            var rm = pageW * marginRight / paperWidth;
+            var pw2 = pageW - lm - rm;
             var y = 5f;
-            var x = e.PageBounds.X + 5;
-            var pw2 = e.PageBounds.Width - 10;
 
             void Draw(string text)
             {
                 var sz = e.Graphics.MeasureString(text, font9B);
-                e.Graphics.DrawString(text, font9B, brush, x, y, sf);
+                e.Graphics.DrawString(text, font9B, brush, lm, y, sf);
                 y += sz.Height + 2;
             }
 
