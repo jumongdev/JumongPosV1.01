@@ -815,6 +815,103 @@ Alpine.store('app', {
         this.load(); this.updateBadge();
       } catch (e) { toast('Error: ' + e.message, 'error') }
     },
+    verifyDate: new Date().toISOString().slice(0, 10),
+    verifying: false,
+    verifyStatus: '',
+    verifyModalOpen: false,
+    verifyResults: [],
+    async verifyDailyTransfers() {
+      this.verifyModalOpen = false;
+      this.verifyResults = [];
+      this.verifying = true;
+      this.verifyStatus = 'Fetching transfers...';
+      try {
+        const transfers = await fetchJSON(API + '/warehouse/transfers');
+        const check = transfers.filter(t => {
+          if (t.status === 'pending') return false;
+          if (!t.storeId) return false;
+          const dt = new Date(t.createdAt).toISOString().slice(0, 10);
+          return dt === this.verifyDate;
+        });
+
+        if (check.length === 0) {
+          this.verifyStatus = '';
+          this.verifying = false;
+          this.verifyModalOpen = true;
+          return;
+        }
+
+        const cmdMap = {};
+        this.verifyStatus = 'Fetching items...';
+        for (const t of check) {
+          try {
+            t._items = await fetchJSON(API + '/warehouse/transfers/' + t.id + '/items');
+          } catch (e) { t._items = []; }
+        }
+
+        this.verifyStatus = 'Sending verify commands...';
+        for (const t of check) {
+          const sql = `SELECT Barcode, ProductName, QuantityAdded FROM StockTrail WHERE Reference LIKE '%WH-Transfer #${t.id}%' OR Reference LIKE '%Transfer #${t.id}%'`;
+          try {
+            const r = await fetch(API + '/agent/send/' + encodeURIComponent(t.storeId), {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'sql', payload: sql })
+            });
+            const j = await r.json();
+            if (j.commandId) cmdMap[j.commandId] = t;
+          } catch (e) {}
+        }
+
+        this.verifyStatus = 'Waiting for results...';
+        const maxTries = 15;
+        const resultsFound = {};
+        for (let attempt = 0; attempt < maxTries; attempt++) {
+          this.verifyStatus = 'Polling... (' + (attempt+1) + '/' + maxTries + ')';
+          await new Promise(r => setTimeout(r, 4000));
+          for (const t of check) {
+            if (resultsFound[t.id]) continue;
+            try {
+              const results = await fetchJSON(API + '/agent/results/' + encodeURIComponent(t.storeId));
+              for (const res of results) {
+                const mapped = cmdMap[res.commandId];
+                if (!mapped || mapped.id !== t.id) continue;
+                if (res.error) { t._localData = []; } else {
+                  try {
+                    t._localData = res.output.split('\r\n').filter(l => l && !l.startsWith('Barcode\t')).map(l => {
+                      const parts = l.split('\t');
+                      return { barcode: parts[0] || '', name: parts[1] || '', qty: parseInt(parts[2]) || 0 };
+                    });
+                  } catch (e) { t._localData = []; }
+                }
+                resultsFound[t.id] = true;
+              }
+            } catch (e) {}
+          }
+          if (Object.values(resultsFound).filter(Boolean).length >= check.length) break;
+        }
+
+        this.verifyStatus = 'Comparing...';
+        for (const t of check) {
+          const local = t._localData || [];
+          const items = [];
+          let allOk = true, anyOk = false;
+          for (const ci of (t._items || [])) {
+            const barcode = (ci.barcode || '').trim();
+            const expected = ci.receivedQty || 0;
+            const found = local.filter(l => (l.barcode || '').trim() === barcode).reduce((s, l) => s + l.qty, 0);
+            const status = found >= expected ? 'ok' : found > 0 ? 'partial' : 'missing';
+            if (status === 'ok') anyOk = true;
+            if (status !== 'ok') allOk = false;
+            items.push({ productName: ci.productName || '', barcode, expected, found, status });
+          }
+          const overall = !t._localData ? 'error' : allOk ? 'ok' : anyOk ? 'partial' : 'missing';
+          this.verifyResults.push({ transferId: t.id, storeName: t.clientName || t.storeId, items, overall });
+        }
+        this.verifyModalOpen = true;
+      } catch (e) { toast('Verify error: ' + e.message, 'error'); }
+      this.verifying = false;
+      this.verifyStatus = '';
+    },
 
     get filteredMaster() {
       const list = (this.masterImportList || []).filter(x => !this.importedMasterIds.includes(x.id));

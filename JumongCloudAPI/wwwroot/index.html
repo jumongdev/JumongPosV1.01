@@ -1293,6 +1293,14 @@ tailwind.config = {
 
             <!-- ═══ Transfer subpage ═══ -->
             <div x-show="!loading && $store.app.whSubpage==='transfer'">
+              <div class="flex items-center gap-2 px-4 py-2 border-b border-gray-100 dark:border-[#222255]/50">
+                <input type="date" x-model="verifyDate" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5">
+                <button @click="verifyDailyTransfers()" :disabled="verifying" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 disabled:opacity-50">
+                  <span x-show="!verifying">✔ VERIFY CREDIT</span>
+                  <span x-show="verifying">⏳ VERIFYING...</span>
+                </button>
+                <span x-show="verifying" class="text-[10px] text-gray-400" x-text="verifyStatus"></span>
+              </div>
               <template x-if="filtered.length===0"><div class="text-center py-6 text-gray-400">No transfers</div></template>
               <template x-if="filtered.length > 0">
                 <table class="w-full text-xs">
@@ -1327,7 +1335,44 @@ tailwind.config = {
                 </table>
               </template>
             </div>
-          </div>
+            </div>
+
+            <!-- Verify Credit Results Modal -->
+            <div x-show="verifyModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="verifyModalOpen=false">
+              <div class="bg-white dark:bg-[#10102a] rounded-xl border border-gray-200 dark:border-[#222255] p-4 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+                <h4 class="text-sm font-bold text-gray-700 dark:text-slate-200 mb-3">✔ Transfer Credit Verification — <span x-text="verifyDate"></span></h4>
+                <div x-show="verifyResults.length === 0 && !verifying" class="text-center py-4 text-gray-400 text-xs">No transfers to check for this date.</div>
+                <table x-show="verifyResults.length > 0" class="w-full text-xs">
+                  <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px] border-b border-gray-200 dark:border-[#222255]">
+                    <th class="text-left px-2 py-2">Transfer</th>
+                    <th class="text-left px-2 py-2">Store</th>
+                    <th class="text-left px-2 py-2">Items</th>
+                    <th class="text-left px-2 py-2">Status</th>
+                  </tr></thead>
+                  <tbody>
+                    <template x-for="r in verifyResults" :key="r.transferId">
+                      <tr class="border-b border-gray-100 dark:border-[#1a1a44]">
+                        <td class="px-2 py-2 font-mono text-cyan-400" x-text="'#'+r.transferId"></td>
+                        <td class="px-2 py-2 text-gray-700 dark:text-slate-200" x-text="r.storeName"></td>
+                        <td class="px-2 py-2">
+                          <template x-for="it in r.items" :key="it.barcode">
+                            <div class="text-[10px] leading-relaxed">
+                              <span x-text="it.productName+': '"></span>
+                              <span :class="it.status==='ok'?'text-emerald-400':it.status==='missing'?'text-red-400':'text-amber-400'" x-text="it.found+'/'+it.expected"></span>
+                              <span x-show="it.status==='missing'" class="text-red-400 font-bold ml-1">✗</span>
+                            </div>
+                          </template>
+                        </td>
+                        <td class="px-2 py-2">
+                          <span class="px-2 py-0.5 rounded-full text-[10px] font-medium" :class="r.overall==='ok'?'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400':r.overall==='partial'?'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400':r.overall==='error'?'bg-gray-100 dark:bg-gray-900/30 text-gray-500':'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'" x-text="r.overall==='ok'?'CREDITED':r.overall==='partial'?'PARTIAL':r.overall==='error'?'AGENT OFFLINE':'MISSING'"></span>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+                <button @click="verifyModalOpen=false" class="mt-3 text-xs px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-[#181848] text-gray-700 dark:text-slate-200 hover:bg-gray-300 dark:hover:bg-[#222266]">Close</button>
+              </div>
+            </div>
 
             <!-- ═══ Sales subpage ═══ -->
             <div x-show="!loading && $store.app.whSubpage==='sales'">
