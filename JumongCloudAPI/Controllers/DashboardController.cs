@@ -2414,11 +2414,12 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             // Create sale header
             int saleId;
             using (var hdr = conn.CreateCommand()) { hdr.Transaction = tx;
-                hdr.CommandText = "INSERT INTO wh_walkin_sales (customer_id, customer_name, total_amount, item_count, invoice_no) VALUES (@cid, @cn, 0, @ic, @inv) RETURNING id";
+                hdr.CommandText = "INSERT INTO wh_walkin_sales (customer_id, customer_name, total_amount, item_count, invoice_no, payment_method) VALUES (@cid, @cn, 0, @ic, @inv, @pm) RETURNING id";
                 hdr.Parameters.AddWithValue("cid", req.CustomerId > 0 ? req.CustomerId : 0);
                 hdr.Parameters.AddWithValue("cn", req.CustomerName.Trim());
                 hdr.Parameters.AddWithValue("ic", req.Items.Count);
                 hdr.Parameters.AddWithValue("inv", invoiceNo);
+                hdr.Parameters.AddWithValue("pm", req.PaymentMethod ?? "Cash");
                 saleId = Convert.ToInt32(hdr.ExecuteScalar());
             }
 
@@ -2540,6 +2541,26 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 pts.ExecuteNonQuery();
             }
 
+            if (req.PaymentMethod == "Credit" && req.CustomerId > 0)
+            {
+                using var ct = conn.CreateCommand(); ct.Transaction = tx;
+                ct.CommandText = @"INSERT INTO credit_transactions (pos_id, store_id, customer_id, sale_id, type, description, debit, balance, payment_method, user_name, created_at, synced_at)
+                    VALUES (@pos, '', @cid, @sid, 'Sale', @desc, @amt, (SELECT COALESCE(credit_balance, 0) FROM customers WHERE id = @cid) + @amt, 'Credit', @un, NOW(), NOW())";
+                ct.Parameters.AddWithValue("pos", saleId);
+                ct.Parameters.AddWithValue("cid", req.CustomerId);
+                ct.Parameters.AddWithValue("sid", saleId);
+                ct.Parameters.AddWithValue("desc", $"Invoice {invoiceNo} - {req.Items.Count} item(s)");
+                ct.Parameters.AddWithValue("amt", grandTotal);
+                ct.Parameters.AddWithValue("un", req.CustomerName ?? "");
+                ct.ExecuteNonQuery();
+
+                using var cb = conn.CreateCommand(); cb.Transaction = tx;
+                cb.CommandText = "UPDATE customers SET credit_balance = COALESCE(credit_balance, 0) + @amt WHERE id = @cid";
+                cb.Parameters.AddWithValue("amt", grandTotal);
+                cb.Parameters.AddWithValue("cid", req.CustomerId);
+                cb.ExecuteNonQuery();
+            }
+
             tx.Commit();
 
             // Return receipt data
@@ -2573,12 +2594,12 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     {
         using var conn = Data.PgDatabaseHelper.GetConnection();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT product_name, unit_name, qty, price, subtotal, points_earned FROM wh_walkin_sale_items WHERE sale_id = @sid ORDER BY id";
+        cmd.CommandText = "SELECT id, product_name, unit_name, qty, price, subtotal, points_earned, COALESCE(is_voided, FALSE) FROM wh_walkin_sale_items WHERE sale_id = @sid ORDER BY id";
         cmd.Parameters.AddWithValue("sid", id);
         var list = new List<object>();
         using var r = cmd.ExecuteReader();
         while (r.Read())
-            list.Add(new { productName = r.GetString(0), unitName = r.GetString(1), qty = r.GetInt32(2), price = r.GetDecimal(3), subtotal = r.GetDecimal(4), points = r.GetInt32(5) });
+            list.Add(new { id = r.GetInt32(0), productName = r.GetString(1), unitName = r.GetString(2), qty = r.GetInt32(3), price = r.GetDecimal(4), subtotal = r.GetDecimal(5), points = r.GetInt32(6), isVoided = r.GetBoolean(7) });
         return Ok(list);
     }
 
@@ -2589,46 +2610,85 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         using var tx = conn.BeginTransaction();
         try
         {
+            string invoiceNo = "";
             using var chk = conn.CreateCommand(); chk.Transaction = tx;
-            chk.CommandText = "SELECT is_voided FROM wh_walkin_sales WHERE id = @id";
+            chk.CommandText = "SELECT is_voided, COALESCE(invoice_no, ''), customer_name, total_amount FROM wh_walkin_sales WHERE id = @id";
             chk.Parameters.AddWithValue("id", id);
-            var existing = chk.ExecuteScalar();
-            if (existing == null) return NotFound(new { error = "Sale not found" });
-            if (existing is bool b && b) return BadRequest(new { error = "Sale already voided" });
+            using var cr = chk.ExecuteReader();
+            if (!cr.Read()) return NotFound(new { error = "Sale not found" });
+            if (cr.GetBoolean(0)) return BadRequest(new { error = "Sale already voided" });
+            invoiceNo = cr.GetString(1);
+            var custName = cr.IsDBNull(2) ? "" : cr.GetString(2);
+            var totalAmt = cr.GetDecimal(3);
+            cr.Close();
 
-            // Restore stock
+            var isPartial = req?.Items != null && req.Items.Count > 0;
+            var voidItemIds = new HashSet<int>();
+            if (isPartial)
+                foreach (var vi in req!.Items!)
+                    if (vi.ItemId > 0) voidItemIds.Add(vi.ItemId);
+
             using var items = conn.CreateCommand(); items.Transaction = tx;
-            items.CommandText = "SELECT product_id, stock_deduction FROM wh_walkin_sale_items WHERE sale_id = @sid";
+            items.CommandText = "SELECT id, product_id, product_name, stock_deduction, qty, price FROM wh_walkin_sale_items WHERE sale_id = @sid AND COALESCE(is_voided, FALSE) = FALSE";
             items.Parameters.AddWithValue("sid", id);
             using var r = items.ExecuteReader();
-            var restores = new List<(int pid, int qty)>();
-            while (r.Read()) restores.Add((r.GetInt32(0), r.GetInt32(1)));
+            var allItems = new List<(int itemId, int pid, string pname, int dedQty, int qty, decimal price)>();
+            while (r.Read())
+                allItems.Add((r.GetInt32(0), r.GetInt32(1), r.GetString(2), r.GetInt32(3), r.GetInt32(4), r.GetDecimal(5)));
             r.Close();
 
-            foreach (var (pid, qty) in restores)
+            int voidedCount = 0;
+            decimal voidedAmt = 0;
+            foreach (var (itemId, pid, pname, dedQty, qty, price) in allItems)
             {
+                if (isPartial && !voidItemIds.Contains(itemId)) continue;
+
                 using var upd = conn.CreateCommand(); upd.Transaction = tx;
                 upd.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @qty WHERE id = @pid";
                 upd.Parameters.AddWithValue("pid", pid);
-                upd.Parameters.AddWithValue("qty", qty);
+                upd.Parameters.AddWithValue("qty", dedQty);
                 upd.ExecuteNonQuery();
 
                 using var trail = conn.CreateCommand(); trail.Transaction = tx;
-                trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, qty_change, reference, reference_type) " +
-                    "SELECT @pid, name, @qty, 'Wholesale Void #' || @sid, 'void_return' FROM wh_products WHERE id = @pid";
+                trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, qty_change, reference, reference_type) VALUES (@pid, @pn, @qty, @ref, 'void_return')";
                 trail.Parameters.AddWithValue("pid", pid);
-                trail.Parameters.AddWithValue("qty", qty);
-                trail.Parameters.AddWithValue("sid", id);
+                trail.Parameters.AddWithValue("pn", pname);
+                trail.Parameters.AddWithValue("qty", dedQty);
+                trail.Parameters.AddWithValue("ref", isPartial ? $"Wholesale Partial Void #{id}" : $"Wholesale Void #{id}");
                 trail.ExecuteNonQuery();
+
+                using var mi = conn.CreateCommand(); mi.Transaction = tx;
+                mi.CommandText = "UPDATE wh_walkin_sale_items SET is_voided = TRUE WHERE id = @iid";
+                mi.Parameters.AddWithValue("iid", itemId);
+                mi.ExecuteNonQuery();
+
+                var action = isPartial ? "VoidItem" : "VoidSale";
+                using var vl = conn.CreateCommand(); vl.Transaction = tx;
+                vl.CommandText = "INSERT INTO wh_void_logs (sale_id, invoice_no, action, reason, product_name, quantity, amount, user_name) VALUES (@sid, @inv, @act, @rsn, @pn, @qty, @amt, @un)";
+                vl.Parameters.AddWithValue("sid", id);
+                vl.Parameters.AddWithValue("inv", invoiceNo);
+                vl.Parameters.AddWithValue("act", action);
+                vl.Parameters.AddWithValue("rsn", req?.Reason ?? "");
+                vl.Parameters.AddWithValue("pn", pname);
+                vl.Parameters.AddWithValue("qty", qty);
+                vl.Parameters.AddWithValue("amt", price * qty);
+                vl.Parameters.AddWithValue("un", req?.UserName ?? "");
+                vl.ExecuteNonQuery();
+
+                voidedCount++;
+                voidedAmt += price * qty;
             }
 
-            using var mark = conn.CreateCommand(); mark.Transaction = tx;
-            mark.CommandText = "UPDATE wh_walkin_sales SET is_voided = TRUE WHERE id = @id";
-            mark.Parameters.AddWithValue("id", id);
-            mark.ExecuteNonQuery();
+            if (!isPartial)
+            {
+                using var mark = conn.CreateCommand(); mark.Transaction = tx;
+                mark.CommandText = "UPDATE wh_walkin_sales SET is_voided = TRUE WHERE id = @id";
+                mark.Parameters.AddWithValue("id", id);
+                mark.ExecuteNonQuery();
+            }
 
             tx.Commit();
-            return Ok(new { ok = true });
+            return Ok(new { ok = true, voidedCount, voidedAmt, isPartial });
         }
         catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
     }
@@ -2719,6 +2779,88 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             return Ok(new { ok = true, grandTotal });
         }
         catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
+    }
+
+    [HttpGet("warehouse/void-logs")]
+    public IActionResult WhGetVoidLogs([FromQuery] int limit = 200)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT id, sale_id, invoice_no, action, reason, product_name, quantity, amount, user_name, created_at FROM wh_void_logs ORDER BY created_at DESC LIMIT @lmt";
+        cmd.Parameters.AddWithValue("lmt", limit);
+        var list = new List<object>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+            list.Add(new { id = r.GetInt32(0), saleId = r.IsDBNull(1) ? 0 : r.GetInt32(1), invoiceNo = r.IsDBNull(2) ? "" : r.GetString(2), action = r.GetString(3), reason = r.IsDBNull(4) ? "" : r.GetString(4), productName = r.IsDBNull(5) ? "" : r.GetString(5), qty = r.GetInt32(6), amount = r.GetDecimal(7), userName = r.IsDBNull(8) ? "" : r.GetString(8), createdAt = r.GetDateTime(9) });
+        return Ok(list);
+    }
+
+    [HttpPost("warehouse/end-shift")]
+    public IActionResult WhEndShift([FromBody] WhEndShiftRequest req)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var tx = conn.BeginTransaction();
+        try
+        {
+            var sinceSql = "1=1";
+            if (!string.IsNullOrEmpty(req.Since))
+            {
+                sinceSql = "created_at > @since";
+                using var p = conn.CreateCommand(); p.Transaction = tx;
+                p.CommandText = "SELECT 1"; p.Parameters.AddWithValue("since", ""); // dummy
+            }
+
+            using var totals = conn.CreateCommand(); totals.Transaction = tx;
+            totals.CommandText = $@"SELECT
+                COALESCE(SUM(CASE WHEN COALESCE(is_voided, FALSE) = FALSE THEN total_amount ELSE 0 END), 0) AS total_sales,
+                COALESCE(SUM(CASE WHEN COALESCE(is_voided, FALSE) = FALSE AND payment_method = 'Cash' THEN total_amount ELSE 0 END), 0) AS total_cash,
+                COALESCE(SUM(CASE WHEN COALESCE(is_voided, FALSE) = FALSE AND payment_method = 'E-Wallet' THEN total_amount ELSE 0 END), 0) AS total_ewallet,
+                COALESCE(SUM(CASE WHEN COALESCE(is_voided, FALSE) = FALSE AND payment_method = 'Credit' THEN total_amount ELSE 0 END), 0) AS total_credit,
+                COALESCE(SUM(CASE WHEN COALESCE(is_voided, FALSE) = TRUE THEN total_amount ELSE 0 END), 0) AS total_voided,
+                COUNT(*) FILTER (WHERE COALESCE(is_voided, FALSE) = FALSE) AS sale_count
+                FROM wh_walkin_sales WHERE {sinceSql}";
+            if (!string.IsNullOrEmpty(req.Since))
+                totals.Parameters.AddWithValue("since", req.Since);
+
+            using var tr = totals.ExecuteReader();
+            tr.Read();
+            var totalSales = tr.GetDecimal(0); var totalCash = tr.GetDecimal(1); var totalEw = tr.GetDecimal(2);
+            var totalCredit = tr.GetDecimal(3); var totalVoided = tr.GetDecimal(4); var saleCount = tr.GetInt32(5);
+            tr.Close();
+
+            var diff = req.CashOnHand - totalCash;
+            using var ins = conn.CreateCommand(); ins.Transaction = tx;
+            ins.CommandText = @"INSERT INTO wh_daily_closes (close_date, total_sales, total_cash, total_ewallet, total_credit, total_voided, cash_on_hand, difference, expenses, cashier_name)
+                VALUES (NOW(), @ts, @tc, @te, @tcr, @tv, @ch, @d, @ex, @cn) RETURNING id";
+            ins.Parameters.AddWithValue("ts", totalSales);
+            ins.Parameters.AddWithValue("tc", totalCash);
+            ins.Parameters.AddWithValue("te", totalEw);
+            ins.Parameters.AddWithValue("tcr", totalCredit);
+            ins.Parameters.AddWithValue("tv", totalVoided);
+            ins.Parameters.AddWithValue("ch", req.CashOnHand);
+            ins.Parameters.AddWithValue("d", diff);
+            ins.Parameters.AddWithValue("ex", req.Expenses ?? 0);
+            ins.Parameters.AddWithValue("cn", req.CashierName ?? "");
+            var dcId = Convert.ToInt32(ins.ExecuteScalar());
+
+            tx.Commit();
+            return Ok(new { id = dcId, totalSales, totalCash, totalEw, totalCredit, totalVoided, saleCount, difference = diff });
+        }
+        catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
+    }
+
+    [HttpGet("warehouse/shifts")]
+    public IActionResult WhGetShifts([FromQuery] int limit = 50)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT id, close_date, total_sales, total_cash, total_ewallet, total_credit, total_voided, cash_on_hand, difference, expenses, cashier_name, created_at FROM wh_daily_closes ORDER BY close_date DESC LIMIT @lmt";
+        cmd.Parameters.AddWithValue("lmt", limit);
+        var list = new List<object>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+            list.Add(new { id = r.GetInt32(0), closeDate = r.GetDateTime(1), totalSales = r.GetDecimal(2), totalCash = r.GetDecimal(3), totalEw = r.GetDecimal(4), totalCredit = r.GetDecimal(5), totalVoided = r.GetDecimal(6), cashOnHand = r.GetDecimal(7), difference = r.GetDecimal(8), expenses = r.GetDecimal(9), cashierName = r.IsDBNull(10) ? "" : r.GetString(10), createdAt = r.GetDateTime(11) });
+        return Ok(list);
     }
 
     [HttpGet("warehouse/transfers/pending-count")]
@@ -2990,7 +3132,9 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         public decimal CashReceived { get; set; }
         public List<WhWalkinSellItem> Items { get; set; } = new();
     }
-    public class WhVoidRequest { public string Reason { get; set; } = ""; }
+    public class WhVoidRequest { public string Reason { get; set; } = ""; public string? UserName { get; set; } public List<WhVoidItemDto>? Items { get; set; } }
+    public class WhVoidItemDto { public int ItemId { get; set; } }
+    public class WhEndShiftRequest { public string? Since { get; set; } public decimal CashOnHand { get; set; } public decimal? Expenses { get; set; } public string? CashierName { get; set; } }
     public class WhWalkinSellItem
     {
         public int ProductId { get; set; }

@@ -633,5 +633,47 @@ public static class PgDatabaseHelper
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )";
         try { susMig.ExecuteNonQuery(); } catch { }
+
+        using var wvItemMig = conn.CreateCommand();
+        wvItemMig.CommandText = "ALTER TABLE wh_walkin_sale_items ADD COLUMN IF NOT EXISTS is_voided BOOLEAN NOT NULL DEFAULT FALSE";
+        try { wvItemMig.ExecuteNonQuery(); } catch { }
+
+        using var wvPmMig = conn.CreateCommand();
+        wvPmMig.CommandText = "ALTER TABLE wh_walkin_sales ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'Cash'";
+        try { wvPmMig.ExecuteNonQuery(); } catch { }
+
+        using var whVoidLogMig = conn.CreateCommand();
+        whVoidLogMig.CommandText = @"
+            CREATE TABLE IF NOT EXISTS wh_void_logs (
+                id SERIAL PRIMARY KEY,
+                sale_id INTEGER,
+                invoice_no TEXT DEFAULT '',
+                action TEXT NOT NULL DEFAULT 'VoidSale',
+                reason TEXT DEFAULT '',
+                product_name TEXT DEFAULT '',
+                quantity INTEGER NOT NULL DEFAULT 0,
+                amount NUMERIC NOT NULL DEFAULT 0,
+                user_name TEXT DEFAULT '',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )";
+        try { whVoidLogMig.ExecuteNonQuery(); } catch { }
+
+        using var whDcMig = conn.CreateCommand();
+        whDcMig.CommandText = @"
+            CREATE TABLE IF NOT EXISTS wh_daily_closes (
+                id SERIAL PRIMARY KEY,
+                close_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                total_sales NUMERIC NOT NULL DEFAULT 0,
+                total_cash NUMERIC NOT NULL DEFAULT 0,
+                total_ewallet NUMERIC NOT NULL DEFAULT 0,
+                total_credit NUMERIC NOT NULL DEFAULT 0,
+                total_voided NUMERIC NOT NULL DEFAULT 0,
+                cash_on_hand NUMERIC NOT NULL DEFAULT 0,
+                difference NUMERIC NOT NULL DEFAULT 0,
+                expenses NUMERIC NOT NULL DEFAULT 0,
+                cashier_name TEXT DEFAULT '',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )";
+        try { whDcMig.ExecuteNonQuery(); } catch { }
     }
 }

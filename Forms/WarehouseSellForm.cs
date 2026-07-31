@@ -54,8 +54,11 @@ public class WarehouseSellForm : Form
     private Label lblOrderChip = null!;
     private Label lblCartMeta = null!;
     private TextBox txtSearch = null!;
+    private TextBox txtBarcode = null!;
     private Button btnSearch = null!;
     private Button btnCustomer = null!;
+    private Button btnHold = null!;
+    private Button btnRetrieve = null!;
     private DataGridView dgvCart = null!;
     private Label lblTotalDueHint = null!;
     private Label lblSubTotal = null!;
@@ -390,20 +393,37 @@ public class WarehouseSellForm : Form
             e.Graphics.DrawLine(pen, 0, _pnlSearch.Height - 1, _pnlSearch.Width, _pnlSearch.Height - 1);
         };
 
-        var lblSearchHint = new Label
+        var lblBarcodeHint = new Label
         {
-            Text = "Search product",
-            Font = new Font("Segoe UI", 8F, FontStyle.Bold),
-            ForeColor = CTextHint,
-            Location = new Point(12, 4), Size = new Size(120, 14)
+            Text = "Barcode", Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+            ForeColor = CTextHint, Location = new Point(12, 4), Size = new Size(120, 14)
+        };
+        txtBarcode = new TextBox
+        {
+            Font = new Font("Segoe UI", 16F, FontStyle.Bold),
+            BorderStyle = BorderStyle.FixedSingle,
+            BackColor = CInputBg, ForeColor = CInputFg,
+            Location = new Point(12, 18), Size = new Size(200, 28)
+        };
+        txtBarcode.KeyDown += (_, e) =>
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.SuppressKeyPress = true;
+                ProcessBarcodeInput();
+            }
         };
 
+        var lblSearchHint = new Label
+        {
+            Text = "Search product", Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+            ForeColor = CTextHint, Location = new Point(12, 4), Size = new Size(120, 14)
+        };
         txtSearch = new TextBox
         {
             Font = new Font("Segoe UI", 16F, FontStyle.Bold),
             BorderStyle = BorderStyle.FixedSingle,
-            BackColor = CInputBg,
-            ForeColor = CInputFg,
+            BackColor = CInputBg, ForeColor = CInputFg,
             Location = new Point(12, 18), Size = new Size(200, 28)
         };
         txtSearch.KeyDown += (_, e) =>
@@ -417,19 +437,14 @@ public class WarehouseSellForm : Form
 
         btnSearch = new Button
         {
-            Text = "Search  (F2)",
-            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-            FlatStyle = FlatStyle.Flat,
-            FlatAppearance = { BorderSize = 1, BorderColor = CBorder },
-            BackColor = CBlueLight,
-            ForeColor = CBlueDark,
-            Cursor = Cursors.Hand,
-            Size = new Size(130, 32),
-            Location = new Point(220, 16)
+            Text = "Search  (F2)", Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 1, BorderColor = CBorder },
+            BackColor = CBlueLight, ForeColor = CBlueDark, Cursor = Cursors.Hand,
+            Size = new Size(130, 32), Location = new Point(220, 16)
         };
         btnSearch.Click += (_, _) => ShowSearchPopup("");
 
-        _pnlSearch.Controls.AddRange(new Control[] { lblSearchHint, txtSearch, btnSearch });
+        _pnlSearch.Controls.AddRange(new Control[] { lblBarcodeHint, txtBarcode, lblSearchHint, txtSearch, btnSearch });
 
         // ── Cart ──
         _pnlCart = new Panel { Dock = DockStyle.None, BackColor = CSurface };
@@ -475,16 +490,39 @@ public class WarehouseSellForm : Form
         btnClear.Click += (_, _) => { _cart.Clear(); RefreshCart(); };
         pnlActions.Controls.Add(btnClear);
 
+        btnHold = new Button
+        {
+            Text = "Hold", Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 1, BorderColor = CBorder },
+            BackColor = CCard, ForeColor = CAmberDark, Cursor = Cursors.Hand,
+            Size = new Size(70, 28), Location = new Point(110, 5)
+        };
+        btnHold.Click += (_, _) =>
+        {
+            if (_cart.Count == 0) { MessageBox.Show("Cart is empty.", "Hold Cart", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            HoldCart();
+        };
+        pnlActions.Controls.Add(btnHold);
+
+        btnRetrieve = new Button
+        {
+            Text = "Retrieve", Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 1, BorderColor = CBorder },
+            BackColor = CCard, ForeColor = CBlueDark, Cursor = Cursors.Hand,
+            Size = new Size(80, 28), Location = new Point(188, 5)
+        };
+        btnRetrieve.Click += (_, _) => RetrieveCart();
+        pnlActions.Controls.Add(btnRetrieve);
+
         var pnlShortcuts = new Panel { Height = 24, Dock = DockStyle.Bottom, BackColor = CSurface };
-        var shortcutKeys = new[] { "F1  Search", "F2  Customer", "F3  Clear", "F5  Focus" };
+        var shortcutKeys = new[] { "F1  Scan", "F2  Search", "F3  Customer", "F4  Clear", "F5  Focus" };
         for (var i = 0; i < shortcutKeys.Length; i++)
         {
             var s = new Label
             {
-                Text = shortcutKeys[i],
-                Font = new Font("Segoe UI", 8F), ForeColor = CTextHint,
+                Text = shortcutKeys[i], Font = new Font("Segoe UI", 8F), ForeColor = CTextHint,
                 BorderStyle = BorderStyle.FixedSingle,
-                Location = new Point(12 + i * 94, 3), Size = new Size(90, 18),
+                Location = new Point(12 + i * 78, 3), Size = new Size(74, 18),
                 TextAlign = ContentAlignment.MiddleCenter
             };
             pnlShortcuts.Controls.Add(s);
@@ -577,9 +615,10 @@ public class WarehouseSellForm : Form
         {
             switch (e.KeyCode)
             {
-                case Keys.F1: ShowSearchPopup(""); break;
-                case Keys.F2: _ = ShowCustomerPickerAsync(); break;
-                case Keys.F3: btnClear.PerformClick(); break;
+                case Keys.F1: txtBarcode.Focus(); txtBarcode.SelectAll(); break;
+                case Keys.F2: ShowSearchPopup(""); break;
+                case Keys.F3: _ = ShowCustomerPickerAsync(); break;
+                case Keys.F4: btnClear.PerformClick(); break;
                 case Keys.F5: txtSearch.Focus(); txtSearch.SelectAll(); break;
                 case Keys.Escape: Close(); break;
             }
@@ -620,9 +659,12 @@ public class WarehouseSellForm : Form
         _pnlSearch.Width = leftW;
 
         var half = leftW / 2;
+        txtBarcode.Size = new Size(half - 24, 28);
+        txtBarcode.Location = new Point(12, 18);
         txtSearch.Size = new Size(half - 24, 28);
-        btnSearch.Location = new Point(half + 12, 16);
-        btnSearch.Size = new Size(half - 24, 32);
+        txtSearch.Location = new Point(half + 12, 18);
+        btnSearch.Location = new Point(half + 12 + half - 24 + 8, 16);
+        btnSearch.Size = new Size(Math.Min(80, leftW - half - 36), 32);
 
         _pnlCart.Location = new Point(0, cartTop);
         _pnlCart.Width = leftW;
@@ -731,7 +773,9 @@ public class WarehouseSellForm : Form
         var cust = (JsonElement)dgv.SelectedRows[0].Tag;
         _selectedCustomer = cust;
         _customerName = cust.GetProperty("name").GetString() ?? "";
-        lblCustomerInfo.Text = _customerName;
+        var credit = cust.TryGetProperty("creditBalance", out var cb) ? cb.GetDecimal() : 0;
+        var creditStr = credit > 0 ? $"  ·  Credit: \u20b1{credit:N2}" : "";
+        lblCustomerInfo.Text = _customerName + creditStr;
         lblCustomerInfo.ForeColor = CBlueMid;
     }
 
@@ -928,6 +972,79 @@ public class WarehouseSellForm : Form
         return p.GetProperty("piecePrice").GetDecimal();
     }
 
+    private void ProcessBarcodeInput()
+    {
+        var input = txtBarcode.Text.Trim();
+        if (string.IsNullOrEmpty(input)) return;
+        var qty = 1;
+        var barcode = input;
+        var star = input.IndexOf('*');
+        if (star > 0 && int.TryParse(input[..star], out var parsed) && parsed > 0)
+        {
+            qty = parsed;
+            barcode = input[(star + 1)..];
+        }
+        if (barcode.Length > 30 || barcode.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        {
+            txtBarcode.Clear(); txtBarcode.Focus(); return;
+        }
+        _ = AddByBarcodeAsync(barcode, qty);
+        txtBarcode.Clear();
+    }
+
+    private async Task AddByBarcodeAsync(string barcode, int qty)
+    {
+        try
+        {
+            var url = SyncService.ApiUrl.TrimEnd('/') + "/dashboard/warehouse/products?search=" + Uri.EscapeDataString(barcode);
+            var json = await _http.GetStringAsync(url);
+            using var doc = JsonDocument.Parse(json);
+            var products = doc.RootElement.EnumerateArray().Where(p =>
+            {
+                if (p.GetProperty("stockQty").GetInt32() <= 0) return false;
+                var pBarcode = p.TryGetProperty("barcode", out var bc) ? bc.GetString() ?? "" : "";
+                return pBarcode == barcode;
+            }).ToList();
+            if (products.Count == 0)
+            {
+                MessageBox.Show($"Product with barcode '{barcode}' not found.", "Not Found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            var prod = products[0];
+            decimal unitPrice;
+            string unitName = "Piece";
+            int unitIndex = 0;
+            var units = GetUnits(prod);
+            if (units.Count > 0)
+            {
+                unitPrice = units[0].GetProperty("price").GetDecimal();
+                unitName = units[0].GetProperty("unitName").GetString() ?? "Piece";
+            }
+            else
+            {
+                unitPrice = prod.GetProperty("piecePrice").GetDecimal();
+            }
+            var existing = _cart.FirstOrDefault(x => x.ProductId == prod.GetProperty("id").GetInt32() && x.UnitName == unitName);
+            if (existing != null)
+            {
+                existing.Quantity += qty;
+                existing.TotalPrice = existing.Price * existing.Quantity;
+            }
+            else
+            {
+                _cart.Add(new WhCartItem
+                {
+                    ProductId = prod.GetProperty("id").GetInt32(),
+                    ProductName = prod.GetProperty("name").GetString() ?? "",
+                    UnitName = unitName, UnitIndex = unitIndex,
+                    Quantity = qty, Price = unitPrice, TotalPrice = qty * unitPrice
+                });
+            }
+            RefreshCart();
+        }
+        catch (Exception ex) { ErrorLogger.Log("WhSell.Barcode", ex); MessageBox.Show("Scan error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+    }
+
     private List<JsonElement> GetUnits(JsonElement p)
     {
         if (p.TryGetProperty("units", out var u) && u.ValueKind == JsonValueKind.Array)
@@ -1090,6 +1207,71 @@ public class WarehouseSellForm : Form
             btnSell.Text = "SELL  " + (_cart.Count > 0 ? "\u20b1" + _cart.Sum(x => x.TotalPrice).ToString("N2") : "\u20b10.00");
         }
     }
+
+    private void HoldCart()
+    {
+        try
+        {
+            var items = new List<WhHoldItem>();
+            foreach (var c in _cart)
+                items.Add(new WhHoldItem { ProductId = c.ProductId, ProductName = c.ProductName, UnitName = c.UnitName, UnitIndex = c.UnitIndex, Quantity = c.Quantity, Price = c.Price, TotalPrice = c.TotalPrice });
+            var json = JsonSerializer.Serialize(items);
+            using var conn = DatabaseHelper.GetConnection();
+            conn.Open();
+            using var cmd = new SQLiteCommand("INSERT INTO HeldCarts (OrderType, CustomerName, ItemsJson) VALUES ('Wholesale', @cn, @json)", conn);
+            cmd.Parameters.AddWithValue("@cn", _customerName);
+            cmd.Parameters.AddWithValue("@json", json);
+            cmd.ExecuteNonQuery();
+            _cart.Clear(); RefreshCart();
+            MessageBox.Show("Cart held successfully!", "Hold Cart", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex) { ErrorLogger.Log("WhHold", ex); MessageBox.Show("Hold failed: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+    }
+
+    private void RetrieveCart()
+    {
+        try
+        {
+            using var conn = DatabaseHelper.GetConnection();
+            conn.Open();
+            using var cmd = new SQLiteCommand("SELECT Id, ItemsJson, CustomerName FROM HeldCarts WHERE OrderType = 'Wholesale' ORDER BY Id DESC LIMIT 20", conn);
+            using var rdr = cmd.ExecuteReader();
+            var list = new List<(int Id, string ItemsJson, string CustomerName)>();
+            while (rdr.Read()) list.Add((rdr.GetInt32(0), rdr.GetString(1), rdr.GetString(2)));
+            if (list.Count == 0) { MessageBox.Show("No held carts.", "Retrieve", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+
+            using var picker = new Form { Text = "Retrieve Held Cart", Size = new Size(400, 400), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, BackColor = CCard };
+            var dgv = new DataGridView { AllowUserToAddRows = false, ReadOnly = true, RowHeadersVisible = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, BackgroundColor = CCard, ForeColor = CText, Font = new Font("Segoe UI", 10F), Dock = DockStyle.Fill, GridColor = CBorder, ColumnHeadersHeight = 28 };
+            dgv.Columns.Add("Id", "Id"); dgv.Columns[0].Visible = false;
+            dgv.Columns.Add("Items", "Items"); dgv.Columns.Add("Customer", "Customer");
+            foreach (var h in list)
+            {
+                var items = JsonSerializer.Deserialize<List<WhHoldItem>>(h.ItemsJson) ?? new();
+                dgv.Rows.Add(h.Id, items.Count + " item(s)", h.CustomerName);
+            }
+            var btnOk = new Button { Text = "RETRIEVE", Font = new Font("Segoe UI", 10F, FontStyle.Bold), BackColor = CGreenMid, ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Dock = DockStyle.Bottom, Height = 36, Cursor = Cursors.Hand };
+            int selectedId = 0;
+            btnOk.Click += (_, _) => { if (dgv.SelectedRows.Count > 0) { selectedId = (int)dgv.SelectedRows[0].Cells[0].Value!; picker.DialogResult = DialogResult.OK; picker.Close(); } };
+            picker.Controls.AddRange(new Control[] { dgv, btnOk });
+            if (picker.ShowDialog() != DialogResult.OK || selectedId == 0) return;
+
+            var held = list.First(h => h.Id == selectedId);
+            var heldItems = JsonSerializer.Deserialize<List<WhHoldItem>>(held.ItemsJson) ?? new();
+            if (heldItems.Count == 0) { MessageBox.Show("Held cart has no items.", "Retrieve", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            _cart.Clear();
+            foreach (var h in heldItems)
+                _cart.Add(new WhCartItem { ProductId = h.ProductId, ProductName = h.ProductName, UnitName = h.UnitName, UnitIndex = h.UnitIndex, Quantity = h.Quantity, Price = h.Price, TotalPrice = h.TotalPrice });
+            if (!string.IsNullOrEmpty(held.CustomerName)) _customerName = held.CustomerName;
+            RefreshCart();
+            using var del = new SQLiteCommand("DELETE FROM HeldCarts WHERE Id = @id", conn);
+            del.Parameters.AddWithValue("@id", held.Id);
+            del.ExecuteNonQuery();
+            MessageBox.Show($"Cart restored: {heldItems.Count} item(s)\nCustomer: {held.CustomerName}", "Retrieve", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex) { ErrorLogger.Log("WhRetrieve", ex); MessageBox.Show("Retrieve failed: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+    }
+
+    private class WhHoldItem { public int ProductId { get; set; } public string ProductName { get; set; } = ""; public string UnitName { get; set; } = "Piece"; public int UnitIndex { get; set; } public int Quantity { get; set; } public decimal Price { get; set; } public decimal TotalPrice { get; set; } }
 
     private async Task DoWholesaleEndShiftAsync()
     {
