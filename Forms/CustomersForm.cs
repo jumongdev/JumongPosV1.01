@@ -632,7 +632,7 @@ public partial class CustomersForm : Form
         dgv.DefaultCellStyle.BackColor = ThemeManager.Current.DgvRowNormal;
         dgv.DefaultCellStyle.ForeColor = t.TextPrimary;
 
-        dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "CreatedAt", HeaderText = "DATE", Width = 130 });
+        dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "CreatedAt", HeaderText = "DATE/TIME", Width = 140, DefaultCellStyle = new DataGridViewCellStyle { Format = "yyyy-MM-dd HH:mm" } });
         dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Type", HeaderText = "TYPE", Width = 75 });
         dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "InvoiceNo", HeaderText = "INVOICE", Width = 95 });
         dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Description", HeaderText = "DESCRIPTION", Width = 260 });

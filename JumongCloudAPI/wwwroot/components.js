@@ -1253,7 +1253,12 @@ Alpine.store('app', {
 
     showItems(r) {
       this.itemViewInvoice = r.invoiceNo;
-      try { this.itemViewList = JSON.parse(r.items || '[]'); } catch (e) { this.itemViewList = []; }
+      try { this.itemViewList = (JSON.parse(r.items || '[]') || []).map(x => ({
+        productName: x.productName || x.ProductName || '',
+        unitName: x.unitName || x.UnitName || '',
+        quantity: x.quantity || x.Quantity || 0,
+        price: x.price || x.Price || 0
+      })); } catch (e) { this.itemViewList = []; }
       this.itemModalOpen = true;
     }
   }));

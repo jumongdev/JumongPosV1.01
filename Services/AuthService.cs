@@ -21,6 +21,7 @@ public static class AuthService
             {
                 Id = Convert.ToInt32(rdr["Id"]),
                 Username = rdr["Username"].ToString() ?? "",
+                FullName = rdr["FullName"].ToString() ?? "",
                 PasswordHash = rdr["PasswordHash"].ToString() ?? "",
                 Role = rdr["Role"].ToString() ?? "Cashier",
                 IsActive = Convert.ToBoolean(rdr["IsActive"])
