@@ -57,7 +57,7 @@ static class Program
             var themeLoad = perfSw.ElapsedMilliseconds;
 
             perfSw.Restart();
-            AutoBackup();
+            Task.Run(() => AutoBackup());
             var backupTime = perfSw.ElapsedMilliseconds;
 
             ErrorLogger.TrimLog();
