@@ -216,6 +216,16 @@ Stack Trace:
                     };
                     Process.Start(psi);
                 }
+
+                // Register agent to auto-start with Windows (on first run or if missing)
+                try
+                {
+                    using var reg = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                        @"Software\Microsoft\Windows\CurrentVersion\Run", writable: true);
+                    if (reg != null && reg.GetValue("JumongPosAgent") == null)
+                        reg.SetValue("JumongPosAgent", $"\"{agentPath}\"");
+                }
+                catch { }
             }
         }
         catch { }
@@ -223,11 +233,6 @@ Stack Trace:
 
     static void StopAgent()
     {
-        try
-        {
-            foreach (var proc in Process.GetProcessesByName("Agent"))
-                proc.Kill();
-        }
-        catch { }
+        // Agent now runs independently — no longer killed on POS app exit
     }
 }
