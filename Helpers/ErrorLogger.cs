@@ -28,31 +28,39 @@ public static class ErrorLogger
 
     public static void Log(string source, Exception ex)
     {
-        lock (_lock)
+        try
         {
-            TrimLog();
-            var sb = new StringBuilder();
-            sb.AppendLine($"[{TimeHelper.Now:yyyy-MM-dd HH:mm:ss}] {source}");
-            sb.AppendLine($"  Type: {ex.GetType().FullName}");
-            sb.AppendLine($"  Message: {ex.Message}");
-            sb.AppendLine($"  Stack: {ex.StackTrace}");
-            if (ex.InnerException != null)
+            lock (_lock)
             {
-                sb.AppendLine($"  Inner: {ex.InnerException.GetType().FullName}: {ex.InnerException.Message}");
-                sb.AppendLine($"  Inner Stack: {ex.InnerException.StackTrace}");
+                TrimLog();
+                var sb = new StringBuilder();
+                sb.AppendLine($"[{TimeHelper.Now:yyyy-MM-dd HH:mm:ss}] {source}");
+                sb.AppendLine($"  Type: {ex.GetType().FullName}");
+                sb.AppendLine($"  Message: {ex.Message}");
+                sb.AppendLine($"  Stack: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    sb.AppendLine($"  Inner: {ex.InnerException.GetType().FullName}: {ex.InnerException.Message}");
+                    sb.AppendLine($"  Inner Stack: {ex.InnerException.StackTrace}");
+                }
+                sb.AppendLine();
+                File.AppendAllText(LogPath, sb.ToString());
             }
-            sb.AppendLine();
-            File.AppendAllText(LogPath, sb.ToString());
         }
+        catch { }
     }
 
     public static void Log(string source, string message)
     {
-        lock (_lock)
+        try
         {
-            TrimLog();
-            var line = $"[{TimeHelper.Now:yyyy-MM-dd HH:mm:ss}] {source}: {message}{Environment.NewLine}";
-            File.AppendAllText(LogPath, line);
+            lock (_lock)
+            {
+                TrimLog();
+                var line = $"[{TimeHelper.Now:yyyy-MM-dd HH:mm:ss}] {source}: {message}{Environment.NewLine}";
+                File.AppendAllText(LogPath, line);
+            }
         }
+        catch { }
     }
 }
