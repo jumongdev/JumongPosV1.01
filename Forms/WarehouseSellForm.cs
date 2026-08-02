@@ -6,6 +6,7 @@ using JumongPosV1._01.Data;
 using JumongPosV1._01.Helpers;
 using JumongPosV1._01.Models;
 using JumongPosV1._01.Services;
+using Microsoft.VisualBasic;
 
 namespace JumongPosV1._01.Forms;
 
@@ -1321,12 +1322,68 @@ public class WarehouseSellForm : Form
         dgv.Columns.Add("Id", "#"); dgv.Columns.Add("Invoice", "Invoice"); dgv.Columns.Add("Customer", "Customer"); dgv.Columns.Add("Total", "Total"); dgv.Columns.Add("Date", "Date"); dgv.Columns.Add("Voided", "V");
         dgv.Columns[0].Width = 45; dgv.Columns[1].Width = 120; dgv.Columns[3].Width = 80; dgv.Columns[4].Width = 130; dgv.Columns[5].Width = 25;
 
-        var btnDoVoid = new Button { Text = "✖ VOID", Font = new Font("Segoe UI", 9F, FontStyle.Bold), BackColor = Color.FromArgb(255, 60, 60), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, Cursor = Cursors.Hand, Enabled = false, Location = new Point(12, 352), Size = new Size(130, 36) };
-        var btnReprint = new Button { Text = "🖨 REPRINT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), BackColor = Color.FromArgb(0, 150, 200), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, Cursor = Cursors.Hand, Enabled = false, Location = new Point(150, 352), Size = new Size(130, 36) };
+        var btnDoVoid = new Button { Text = "✖ VOID", Font = new Font("Segoe UI", 9F, FontStyle.Bold), BackColor = Color.FromArgb(255, 60, 60), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, Cursor = Cursors.Hand, Enabled = false, Location = new Point(12, 352), Size = new Size(100, 36) };
+        var btnVoidItem = new Button { Text = "✖ VOID ITEM", Font = new Font("Segoe UI", 9F, FontStyle.Bold), BackColor = Color.FromArgb(255, 140, 0), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, Cursor = Cursors.Hand, Enabled = false, Location = new Point(118, 352), Size = new Size(110, 36) };
+        var btnReprint = new Button { Text = "🖨 REPRINT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), BackColor = Color.FromArgb(0, 150, 200), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, Cursor = Cursors.Hand, Enabled = false, Location = new Point(234, 352), Size = new Size(110, 36) };
         var btnClose = new Button { Text = "CLOSE", Location = new Point(440, 352), Size = new Size(130, 36), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = ThemeManager.Current.CardBg, ForeColor = ThemeManager.Current.TextSecondary, Cursor = Cursors.Hand };
         btnClose.Click += (_, _) => popup.Close();
 
-        dgv.SelectionChanged += (_, _) => { var en = dgv.SelectedRows.Count > 0; btnDoVoid.Enabled = en; btnReprint.Enabled = en; };
+        dgv.SelectionChanged += (_, _) => { var en = dgv.SelectedRows.Count > 0; btnDoVoid.Enabled = en; btnVoidItem.Enabled = en; btnReprint.Enabled = en; };
+
+        btnVoidItem.Click += async (_, _) =>
+        {
+            if (dgv.SelectedRows.Count == 0) return;
+            var saleId = (int)dgv.SelectedRows[0].Cells[0].Value;
+            var invNo = dgv.SelectedRows[0].Cells[1].Value?.ToString() ?? "";
+            var isVoided = dgv.SelectedRows[0].Cells[5].Value?.ToString() == "Y";
+            if (isVoided) { MessageBox.Show("Sale is already voided.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+
+            try
+            {
+                var itemsUrl = SyncService.ApiUrl.TrimEnd('/') + "/dashboard/warehouse/sales/" + saleId + "/items";
+                var itemsJson = await _http.GetStringAsync(itemsUrl);
+                using var itemsDoc = JsonDocument.Parse(itemsJson);
+                var saleItems = new List<(int id, string name, string unit, int qty, decimal price, bool isVoided)>();
+                foreach (var it in itemsDoc.RootElement.EnumerateArray())
+                {
+                    var iid = it.TryGetProperty("id", out var ip) ? ip.GetInt32() : 0;
+                    var iv = it.TryGetProperty("isVoided", out var ivo) && ivo.GetBoolean();
+                    saleItems.Add((iid, it.GetProperty("productName").GetString() ?? "", it.GetProperty("unitName").GetString() ?? "", it.GetProperty("qty").GetInt32(), it.GetProperty("price").GetDecimal(), iv));
+                }
+
+                var picker = new Form { Text = "Select Items to Void — " + invNo, Size = new Size(480, 420), StartPosition = FormStartPosition.CenterParent, FormBorderStyle = FormBorderStyle.FixedDialog, MaximizeBox = false, MinimizeBox = false, BackColor = ThemeManager.Current.SurfaceBg };
+                var pnl = new Panel { Location = new Point(12, 12), Size = new Size(440, 290), AutoScroll = true, BackColor = ThemeManager.Current.CardBg };
+                var checks = new List<CheckBox>();
+                var y = 10;
+                foreach (var si in saleItems)
+                {
+                    var cb = new CheckBox { Text = $"{si.name} ({si.unit}) x{si.qty} — ₱{si.price * si.qty:N2}", Location = new Point(10, y), Size = new Size(400, 22), Font = new Font("Segoe UI", 9F), ForeColor = si.isVoided ? ThemeManager.Current.TextHint : ThemeManager.Current.TextPrimary, Enabled = !si.isVoided, Tag = si.id };
+                    if (si.isVoided) cb.Text += " [VOIDED]";
+                    pnl.Controls.Add(cb);
+                    checks.Add(cb);
+                    y += 24;
+                }
+                var lblReason = new Label { Text = "Reason:", Location = new Point(12, 310), Size = new Size(60, 22), Font = new Font("Segoe UI", 9F), ForeColor = ThemeManager.Current.TextPrimary };
+                var txtReason = new TextBox { Location = new Point(75, 308), Size = new Size(260, 24), Font = new Font("Segoe UI", 9F), BorderStyle = BorderStyle.FixedSingle, BackColor = ThemeManager.Current.InputBg, ForeColor = ThemeManager.Current.InputFg };
+                var btnOk = new Button { Text = "VOID SELECTED", Font = new Font("Segoe UI", 10F, FontStyle.Bold), BackColor = Color.FromArgb(255, 140, 0), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, Location = new Point(340, 307), Size = new Size(112, 28), Cursor = Cursors.Hand, DialogResult = DialogResult.OK };
+                var btnCancel = new Button { Text = "Cancel", Location = new Point(12, 340), Size = new Size(80, 28), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = ThemeManager.Current.CardBg, ForeColor = ThemeManager.Current.TextSecondary, Cursor = Cursors.Hand, DialogResult = DialogResult.Cancel };
+                picker.Controls.AddRange(new Control[] { pnl, lblReason, txtReason, btnOk, btnCancel });
+
+                if (picker.ShowDialog() != DialogResult.OK) return;
+                var selectedIds = checks.Where(c => c.Checked).Select(c => (int)c.Tag!).ToList();
+                if (selectedIds.Count == 0) return;
+                var reason = txtReason.Text.Trim();
+                if (string.IsNullOrEmpty(reason)) { MessageBox.Show("Please enter a reason.", "Reason Required", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+                if (MessageBox.Show($"Void {selectedIds.Count} item(s) from sale #{saleId}?\nReason: {reason}", "Confirm Partial Void", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+
+                var voidUrl = SyncService.ApiUrl.TrimEnd('/') + "/dashboard/warehouse/sales/" + saleId + "/void";
+                var body = JsonSerializer.Serialize(new { reason, userName = _currentUser?.FullName ?? "", items = selectedIds.Select(id => new { itemId = id }).ToList() });
+                var response = await _http.PostAsync(voidUrl, new StringContent(body, Encoding.UTF8, "application/json"));
+                if (response.IsSuccessStatusCode) { MessageBox.Show($"{selectedIds.Count} item(s) voided. Stock restored.", "Partial Void", MessageBoxButtons.OK, MessageBoxIcon.Information); popup.Close(); }
+                else { var err = await response.Content.ReadAsStringAsync(); MessageBox.Show("Failed: " + err, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            }
+            catch (Exception ex) { MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+        };
 
         btnReprint.Click += async (_, _) =>
         {
@@ -1366,14 +1423,17 @@ public class WarehouseSellForm : Form
             try
             {
                 var url = SyncService.ApiUrl.TrimEnd('/') + "/dashboard/warehouse/sales/" + saleId + "/void";
-                var response = await _http.PostAsync(url, new StringContent("{}", Encoding.UTF8, "application/json"));
+                var reason = Microsoft.VisualBasic.Interaction.InputBox("Reason for void:", "Void Reason", "");
+                if (string.IsNullOrEmpty(reason)) return;
+                var body = JsonSerializer.Serialize(new { reason, userName = _currentUser?.FullName ?? "" });
+                var response = await _http.PostAsync(url, new StringContent(body, Encoding.UTF8, "application/json"));
                 if (response.IsSuccessStatusCode) { MessageBox.Show("Sale #" + saleId + " voided. Stock restored.", "Voided", MessageBoxButtons.OK, MessageBoxIcon.Information); popup.Close(); }
                 else { var err = await response.Content.ReadAsStringAsync(); MessageBox.Show("Failed: " + err, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
             }
             catch (Exception ex) { MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
         };
 
-        popup.Controls.AddRange(new Control[] { lbl, dgv, btnDoVoid, btnReprint, btnClose });
+        popup.Controls.AddRange(new Control[] { lbl, dgv, btnDoVoid, btnVoidItem, btnReprint, btnClose });
 
         // Load recent sales
         try
