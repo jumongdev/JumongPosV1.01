@@ -564,14 +564,15 @@ public partial class SalesForm : Form
     private void UpdateTotals()
     {
         var subTotal = _cart.Sum(x => x.TotalPrice);
-        var discountAmt = subTotal * _discountPercent / 100;
-        var afterDiscount = subTotal - discountAmt;
+        _discountPercent = 0; // discount disabled — prices locked to master catalog
+        var discountAmt = 0m;
+        var afterDiscount = subTotal;
         var taxAmt = afterDiscount * _taxRate / 100;
         var grandTotal = afterDiscount + taxAmt;
         var totalQty = _cart.Sum(x => x.Quantity);
         lblSubTotal.Text = $"\u20b1{subTotal:N2}";
-        lblDiscountVal.Text = _discountPercent > 0 ? $"-{discountAmt:N2} ({_discountPercent}%)" : "—";
-        lblDiscountVal.ForeColor = _discountPercent > 0 ? Color.FromArgb(231, 76, 60) : CTextHint;
+        lblDiscountVal.Text = "—";
+        lblDiscountVal.ForeColor = CTextHint;
         lblTaxVal.Text = _taxRate > 0 ? $"\u20b1{taxAmt:N2}" : "—";
         lblTaxVal.ForeColor = _taxRate > 0 ? Color.FromArgb(243, 156, 18) : CTextHint;
         lblGrandTotal.Text = $"\u20b1{grandTotal:N2}";
@@ -686,8 +687,9 @@ public partial class SalesForm : Form
         }
 
         var subTotal = _cart.Sum(x => x.TotalPrice);
-        var discountAmt = subTotal * _discountPercent / 100;
-        var afterDiscount = subTotal - discountAmt;
+        _discountPercent = 0; // discount disabled — prices locked to master catalog
+        var discountAmt = 0m;
+        var afterDiscount = subTotal;
         var taxAmt = afterDiscount * _taxRate / 100;
         var grandTotal = afterDiscount + taxAmt;
         using var payForm = new PaymentForm(grandTotal, _selectedCustomer);
@@ -1119,35 +1121,17 @@ public partial class SalesForm : Form
         {
             Text = "Discount",
             Font = new Font("Segoe UI", 10F),
-            ForeColor = CTextMuted,
-            Cursor = Cursors.Hand
+            ForeColor = CTextMuted
         };
-        lblDiscountLbl.Click += (_, _) =>
-        {
-            var input = Microsoft.VisualBasic.Interaction.InputBox("Enter discount percentage:", "Discount", _discountPercent > 0 ? _discountPercent.ToString("0.#") : "0", -1, -1);
-            if (decimal.TryParse(input, out var p) && p >= 0 && p <= 100)
-            {
-                _discountPercent = p;
-                UpdateTotals();
-            }
-        };
+        lblDiscountLbl.Click += (_, _) => { }; // discount disabled — prices locked to master catalog
         lblDiscountVal = new Label
         {
             Text = "—",
             Font = new Font("Segoe UI", 10F),
             ForeColor = CTextHint,
-            TextAlign = ContentAlignment.MiddleRight,
-            Cursor = Cursors.Hand
+            TextAlign = ContentAlignment.MiddleRight
         };
-        lblDiscountVal.Click += (_, _) =>
-        {
-            var input = Microsoft.VisualBasic.Interaction.InputBox("Enter discount percentage:", "Discount", _discountPercent > 0 ? _discountPercent.ToString("0.#") : "0", -1, -1);
-            if (decimal.TryParse(input, out var p) && p >= 0 && p <= 100)
-            {
-                _discountPercent = p;
-                UpdateTotals();
-            }
-        };
+        lblDiscountVal.Click += (_, _) => { }; // discount disabled — prices locked to master catalog
 
         var lblTaxLbl = new Label
         {

@@ -88,6 +88,9 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
 
     LoadTotals();
 
+    // Receipt Audit — detect deleted/missing receipts + voids since last close
+    var receiptAudit = ComputeReceiptAudit();
+
     var expenses = ExpenseService.GetExpensesForCurrentShift();
     var gcashTxns = DailyCloseService.GetGcashTransactionsSinceLastClose();
     var creditCustomers = DailyCloseService.GetCreditCustomersSinceLastClose();
@@ -143,6 +146,9 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
     }
     
     ShiftSessionService.EndSession();
+
+    // Push receipt audit to cloud (fire-and-forget)
+    try { _ = SyncService.PushReceiptAuditAsync(receiptAudit.TotalReceipts, receiptAudit.VoidedCount, receiptAudit.DeletedCount, receiptAudit.LostValue, receiptAudit.VoidedInvoices, receiptAudit.MissingInvoices); } catch { }
 
     // Show sync progress popup (blocks user until done or failed)
     var syncForm = new Form
@@ -200,7 +206,8 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
     {
         PrinterService.PrintAuditEndShiftReport(cashOnHand, diff, cashierName, now, txtNotes.Text.Trim(), _totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, expenses, gcashTxns, creditCustomers, creditPayments,
             (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value,
-            totalInvCost, _totalCostSold, _totalStockReceivedCost, prevInv);
+            totalInvCost, _totalCostSold, _totalStockReceivedCost, prevInv,
+            (receiptAudit.TotalReceipts, receiptAudit.VoidedCount, receiptAudit.DeletedCount, receiptAudit.LostValue, receiptAudit.VoidedInvoices, receiptAudit.MissingInvoices));
     }
     catch (Exception printEx)
     {
@@ -235,10 +242,118 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
     Recalc();
 }
 
+    public class ReceiptAuditData
+    {
+        public int TotalReceipts { get; set; }
+        public int VoidedCount { get; set; }
+        public int DeletedCount { get; set; }
+        public decimal LostValue { get; set; }
+        public List<string> VoidedInvoices { get; set; } = new();
+        public List<string> MissingInvoices { get; set; } = new();
+    }
+
+    private ReceiptAuditData ComputeReceiptAudit()
+    {
+        var audit = new ReceiptAuditData();
+        try
+        {
+            var since = DailyCloseService.GetLastCloseTime();
+            using var conn = DatabaseHelper.GetConnection();
+            conn.Open();
+
+            // 1. Total receipts since last close
+            using (var cmd = new SQLiteCommand("SELECT COUNT(*) FROM Sales WHERE SaleDate > @since", conn))
+            {
+                cmd.Parameters.AddWithValue("@since", since);
+                audit.TotalReceipts = Convert.ToInt32(cmd.ExecuteScalar());
+            }
+
+            // 2. Voided invoices
+            using (var vCmd = new SQLiteCommand("SELECT InvoiceNo FROM Sales WHERE IsVoided = 1 AND SaleDate > @since ORDER BY InvoiceNo", conn))
+            {
+                vCmd.Parameters.AddWithValue("@since", since);
+                using var r = vCmd.ExecuteReader();
+                while (r.Read()) audit.VoidedInvoices.Add(r.GetString(0));
+            }
+            audit.VoidedCount = audit.VoidedInvoices.Count;
+
+            // 3. Deleted/missing receipts: StockTrail references an INV- invoice that has no Sales record
+            var missing = new HashSet<string>();
+            using (var tCmd = new SQLiteCommand(@"
+                SELECT DISTINCT st.Reference
+                FROM StockTrail st
+                WHERE st.Reference LIKE 'INV-%'
+                  AND st.CreatedAt > @since
+                  AND NOT EXISTS (SELECT 1 FROM Sales s WHERE s.InvoiceNo = st.Reference)", conn))
+            {
+                tCmd.Parameters.AddWithValue("@since", since);
+                using var r = tCmd.ExecuteReader();
+                while (r.Read())
+                {
+                    var refNo = r.GetString(0);
+                    // Exclude void-restock references like "INV-xxx - void (...)"
+                    if (refNo.Contains(" - void") || refNo.Contains("- void")) continue;
+                    missing.Add(refNo);
+                }
+            }
+
+            // 4. Gap detection: invoice numbers in Sales are sequential per day
+            using (var gCmd = new SQLiteCommand(@"
+                SELECT InvoiceNo FROM Sales
+                WHERE SaleDate > @since AND IsVoided = 0
+                ORDER BY InvoiceNo", conn))
+            {
+                gCmd.Parameters.AddWithValue("@since", since);
+                var invs = new List<string>();
+                using var r = gCmd.ExecuteReader();
+                while (r.Read()) invs.Add(r.GetString(0));
+
+                // Group by date prefix and check for gaps in trailing number
+                var byDate = invs.GroupBy(x => x.Length >= 13 ? x.Substring(0, x.Length - 4) : x);
+                foreach (var grp in byDate)
+                {
+                    var nums = grp.Select(x => { var ok = int.TryParse(x[^4..], out var n); return ok ? n : 0; })
+                                  .Where(n => n > 0).Distinct().OrderBy(n => n).ToList();
+                    if (nums.Count < 2) continue;
+                    for (var i = 0; i < nums.Count - 1; i++)
+                    {
+                        var gap = nums[i + 1] - nums[i];
+                        if (gap > 1)
+                        {
+                            for (var g = nums[i] + 1; g < nums[i + 1]; g++)
+                                missing.Add(grp.Key + g.ToString("D4"));
+                        }
+                    }
+                }
+            }
+
+            audit.MissingInvoices = missing.OrderBy(x => x).ToList();
+            audit.DeletedCount = audit.MissingInvoices.Count;
+
+            // 5. Lost value: sum GrandTotal of deleted invoices if recoverable from StockTrail cost (approx via products)
+            //    Use the missing invoices that have matching stock trail lines; value = qty x cost
+            var lost = 0m;
+            foreach (var mi in audit.MissingInvoices)
+            {
+                using (var lCmd = new SQLiteCommand(@"
+                    SELECT COALESCE(SUM(st.QuantityAdded * -1 * p.Cost), 0)
+                    FROM StockTrail st
+                    LEFT JOIN Products p ON p.Id = st.ProductId
+                    WHERE st.Reference = @ref", conn))
+                {
+                    lCmd.Parameters.AddWithValue("@ref", mi);
+                    lost += Convert.ToDecimal(lCmd.ExecuteScalar());
+                }
+            }
+            audit.LostValue = lost;
+        }
+        catch { }
+        return audit;
+    }
+
     private void btnPrintReport_Click(object? sender, EventArgs e)
 {
-    var cashierName = string.IsNullOrEmpty(_currentUser.FullName) ? _currentUser.Username : _currentUser.FullName;
-    var cashOnHand = (int)num1000.Value * 1000m + (int)num500.Value * 500m + (int)num200.Value * 200m + (int)num100.Value * 100m + (int)num50.Value * 50m + (int)num20.Value * 20m + txtCoins.Value;
+    var cashierName = string.IsNullOrEmpty(_currentUser.FullName) ? _currentUser.Username : _currentUser.FullName;    var cashOnHand = (int)num1000.Value * 1000m + (int)num500.Value * 500m + (int)num200.Value * 200m + (int)num100.Value * 100m + (int)num50.Value * 50m + (int)num20.Value * 20m + txtCoins.Value;
     
     LoadTotals();
     

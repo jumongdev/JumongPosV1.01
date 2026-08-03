@@ -2018,21 +2018,42 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         // ══════════════════════════════════════════════════════════════
 
         [HttpGet("warehouse/transfers")]
-        public IActionResult WhGetTransfers()
+        public IActionResult WhGetTransfers([FromQuery] string? search = null, [FromQuery] string? date = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 30)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
+            var where = new List<string>();
+            if (!string.IsNullOrEmpty(date))
+            {
+                where.Add("t.created_at::date = @date");
+                cmd.Parameters.AddWithValue("date", date);
+            }
+            if (!string.IsNullOrEmpty(search))
+            {
+                where.Add("(t.id::text ILIKE @s OR t.client_name ILIKE @s OR t.notes ILIKE @s)");
+                cmd.Parameters.AddWithValue("s", $"%{search}%");
+            }
+            var whereSql = where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "";
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 200) pageSize = 30;
+            var offset = (page - 1) * pageSize;
+            cmd.CommandText = $@"
                 SELECT t.id, t.client_id, t.client_name, t.status, t.notes, t.store_id,
                        t.created_at, t.updated_at,
-                       COALESCE(SUM(CASE WHEN ti.received_qty < ti.qty THEN 1 ELSE 0 END), 0) > 0 AS has_shortage
+                       COALESCE(SUM(CASE WHEN ti.received_qty < ti.qty THEN 1 ELSE 0 END), 0) > 0 AS has_shortage,
+                       COUNT(*) OVER() AS total_count
                 FROM wh_transfers t
                 LEFT JOIN wh_transfer_items ti ON ti.transfer_id = t.id
+                {whereSql}
                 GROUP BY t.id
-                ORDER BY t.created_at DESC LIMIT 200";
+                ORDER BY t.created_at DESC
+                LIMIT {pageSize} OFFSET {offset}";
             var data = new List<object>();
+            int total = 0;
             using var r = cmd.ExecuteReader();
             while (r.Read())
+            {
+                if (total == 0) total = r.GetInt32(9);
                 data.Add(new {
                     id = r.GetInt32(0), clientId = r.GetInt32(1), clientName = r.GetString(2),
                     status = r.GetString(3), notes = r.IsDBNull(4) ? "" : r.GetString(4),
@@ -2040,7 +2061,8 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     createdAt = r.GetDateTime(6), updatedAt = r.GetDateTime(7),
                     hasShortage = r.GetBoolean(8)
                 });
-            return Ok(data);
+            }
+            return Ok(new { items = data, total });
         }
 
         [HttpPost("warehouse/transfers")]
@@ -2795,6 +2817,50 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         return Ok(list);
     }
 
+    [HttpPost("receipt-audit")]
+    public IActionResult PostReceiptAudit([FromBody] ReceiptAuditRequest req)
+    {
+        try
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"INSERT INTO receipt_audits (store_id, store_name, shift_date, total_receipts, voided_count, deleted_count, lost_value, voided_invoices, missing_invoices)
+                VALUES (@sid, @sn, @sd, @tr, @vc, @dc, @lv, @vi::json, @mi::json) RETURNING id";
+            cmd.Parameters.AddWithValue("sid", req.StoreId ?? "");
+            cmd.Parameters.AddWithValue("sn", req.StoreName ?? "");
+            cmd.Parameters.AddWithValue("sd", string.IsNullOrEmpty(req.ShiftDate) ? DateTimeOffset.UtcNow : DateTimeOffset.Parse(req.ShiftDate));
+            cmd.Parameters.AddWithValue("tr", req.TotalReceipts);
+            cmd.Parameters.AddWithValue("vc", req.VoidedCount);
+            cmd.Parameters.AddWithValue("dc", req.DeletedCount);
+            cmd.Parameters.AddWithValue("lv", req.LostValue);
+            cmd.Parameters.AddWithValue("vi", NpgsqlTypes.NpgsqlDbType.Jsonb, System.Text.Json.JsonSerializer.Serialize(req.VoidedInvoices ?? new List<string>()));
+            cmd.Parameters.AddWithValue("mi", NpgsqlTypes.NpgsqlDbType.Jsonb, System.Text.Json.JsonSerializer.Serialize(req.MissingInvoices ?? new List<string>()));
+            var id = cmd.ExecuteScalar();
+            return Ok(new { id });
+        }
+        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+    }
+
+    [HttpGet("receipt-audit")]
+    public IActionResult GetReceiptAudits([FromQuery] int limit = 50)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT id, store_id, store_name, shift_date, total_receipts, voided_count, deleted_count, lost_value, voided_invoices, missing_invoices, created_at FROM receipt_audits ORDER BY shift_date DESC LIMIT @lmt";
+        cmd.Parameters.AddWithValue("lmt", limit);
+        var list = new List<object>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+            list.Add(new {
+                id = r.GetInt32(0), storeId = r.GetString(1), storeName = r.GetString(2),
+                shiftDate = r.GetDateTime(3), totalReceipts = r.GetInt32(4), voidedCount = r.GetInt32(5),
+                deletedCount = r.GetInt32(6), lostValue = r.GetDecimal(7),
+                voidedInvoices = r.GetString(8), missingInvoices = r.GetString(9),
+                createdAt = r.GetDateTime(10)
+            });
+        return Ok(list);
+    }
+
     [HttpPost("warehouse/end-shift")]
     public IActionResult WhEndShift([FromBody] WhEndShiftRequest req)
     {
@@ -3135,6 +3201,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     public class WhVoidRequest { public string Reason { get; set; } = ""; public string? UserName { get; set; } public List<WhVoidItemDto>? Items { get; set; } }
     public class WhVoidItemDto { public int ItemId { get; set; } }
     public class WhEndShiftRequest { public string? Since { get; set; } public decimal CashOnHand { get; set; } public decimal? Expenses { get; set; } public string? CashierName { get; set; } }
+    public class ReceiptAuditRequest { public string? StoreId { get; set; } public string? StoreName { get; set; } public string? ShiftDate { get; set; } public int TotalReceipts { get; set; } public int VoidedCount { get; set; } public int DeletedCount { get; set; } public decimal LostValue { get; set; } public List<string>? VoidedInvoices { get; set; } public List<string>? MissingInvoices { get; set; } }
     public class WhWalkinSellItem
     {
         public int ProductId { get; set; }

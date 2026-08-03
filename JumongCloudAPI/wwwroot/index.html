@@ -722,6 +722,81 @@ tailwind.config = {
       </div>
 
       <!-- ═══════════════════════════════════════════════ -->
+      <!-- REPORTS - RECEIPT AUDIT (anti-theft)           -->
+      <!-- ═══════════════════════════════════════════════ -->
+      <div x-show="$store.app.section === 'rpt-invcost'" x-transition.opacity>
+        <div x-data="receiptAuditPanel" class="mt-4">
+          <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#222255]">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400 flex items-center gap-2">
+                📋 RECEIPT AUDIT
+                <span x-show="alertsCount > 0" class="text-[10px] px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-bold" x-text="alertsCount + ' alert(s)'"></span>
+              </h3>
+              <button @click="load()" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">↻ Refresh</button>
+            </div>
+            <div class="p-4">
+              <template x-if="loading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
+              <template x-if="!loading && d.length===0"><div class="text-center py-6 text-gray-400 text-sm">No receipt audits yet — run end shift on POS to generate</div></template>
+              <template x-if="d.length > 0">
+                <div class="overflow-x-auto">
+                  <table class="w-full text-xs">
+                    <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                      <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Store</th>
+                      <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Shift</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Receipts</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Voided</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Deleted</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Lost ₱</th>
+                      <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Details</th>
+                    </tr></thead>
+                    <tbody>
+                      <template x-for="(x, i) in d" :key="i">
+                        <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                          <td class="px-2 py-2"><span class="text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded" x-text="shortStore(x.storeId, $store.app.storeMap[x.storeId])"></span></td>
+                          <td class="px-2 py-2 whitespace-nowrap text-gray-500 dark:text-[#7878aa]" x-text="new Date(x.shiftDate).toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Manila'})"></td>
+                          <td class="px-2 py-2 text-right" x-text="x.totalReceipts"></td>
+                          <td class="px-2 py-2 text-right" :class="x.voidedCount>0 ? 'text-amber-500' : ''" x-text="x.voidedCount"></td>
+                          <td class="px-2 py-2 text-right font-bold" :class="x.deletedCount>0 ? 'text-red-500' : 'text-emerald-500'" x-text="x.deletedCount"></td>
+                          <td class="px-2 py-2 text-right font-bold" :class="x.lostValue>0 ? 'text-red-500' : 'text-emerald-500'" x-text="'₱'+Number(x.lostValue).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})"></td>
+                          <td class="px-2 py-2">
+                            <button @click="toggleDetails(i)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]" x-text="detailsOpen[i] ? 'HIDE' : 'SHOW'"></button>
+                          </td>
+                        </tr>
+                        <tr x-show="detailsOpen[i]">
+                          <td colspan="7" class="px-3 py-2 bg-gray-50 dark:bg-[#181848]/50">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div>
+                                <div class="text-[10px] uppercase tracking-wider text-gray-400 dark:text-[#7878aa] mb-1">Voided Receipts</div>
+                                <div class="text-[10px] text-gray-600 dark:text-slate-300 max-h-24 overflow-y-auto">
+                                  <template x-if="(x.voidedInvoices||'').length===0"><span class="text-gray-400">None</span></template>
+                                  <template x-for="(v, vi) in safeParse(x.voidedInvoices)" :key="vi">
+                                    <div class="font-mono text-amber-600 dark:text-amber-400" x-text="v"></div>
+                                  </template>
+                                </div>
+                              </div>
+                              <div>
+                                <div class="text-[10px] uppercase tracking-wider text-gray-400 dark:text-[#7878aa] mb-1">Deleted/Missing Receipts</div>
+                                <div class="text-[10px] text-gray-600 dark:text-slate-300 max-h-24 overflow-y-auto">
+                                  <template x-if="(x.missingInvoices||'').length===0"><span class="text-gray-400">None</span></template>
+                                  <template x-for="(m, mi) in safeParse(x.missingInvoices)" :key="mi">
+                                    <div class="font-mono text-red-500 font-bold" x-text="m"></div>
+                                  </template>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════ -->
       <!-- REPORTS - SHIFT HISTORY                        -->
       <!-- ═══════════════════════════════════════════════ -->
       <div x-show="$store.app.section === 'rpt-shifts'" x-transition.opacity>
@@ -1293,46 +1368,110 @@ tailwind.config = {
 
             <!-- ═══ Transfer subpage ═══ -->
             <div x-show="!loading && $store.app.whSubpage==='transfer'">
-              <div class="flex items-center gap-2 px-4 py-2 border-b border-gray-100 dark:border-[#222255]/50">
-                <input type="date" x-model="verifyDate" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5">
-                <button @click="verifyDailyTransfers()" :disabled="verifying" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 disabled:opacity-50">
-                  <span x-show="!verifying">✔ VERIFY CREDIT</span>
+              <!-- Summary Cards -->
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 px-4 py-3 border-b border-gray-100 dark:border-[#222255]/50">
+                <div class="rounded-xl border border-gray-200 dark:border-[#222255] bg-white dark:bg-[#16163a] p-3">
+                  <div class="text-2xl font-bold text-cyan-600 dark:text-cyan-400" x-text="transferSummary.total"></div>
+                  <div class="text-[10px] uppercase tracking-wider text-gray-400 dark:text-[#7878aa]">Total Transfers</div>
+                </div>
+                <div class="rounded-xl border border-gray-200 dark:border-[#222255] bg-white dark:bg-[#16163a] p-3">
+                  <div class="text-2xl font-bold text-amber-500" x-text="transfers.filter(x=>x.status==='pending').length"></div>
+                  <div class="text-[10px] uppercase tracking-wider text-gray-400 dark:text-[#7878aa]">Pending</div>
+                </div>
+                <div class="rounded-xl border border-gray-200 dark:border-[#222255] bg-white dark:bg-[#16163a] p-3">
+                  <div class="text-2xl font-bold text-emerald-500" x-text="transfers.filter(x=>x.status==='completed').length"></div>
+                  <div class="text-[10px] uppercase tracking-wider text-gray-400 dark:text-[#7878aa]">Completed</div>
+                </div>
+                <div class="rounded-xl border border-gray-200 dark:border-[#222255] bg-white dark:bg-[#16163a] p-3">
+                  <div class="text-2xl font-bold text-red-500" x-text="transfers.filter(x=>x.status==='partial' || x.hasShortage).length"></div>
+                  <div class="text-[10px] uppercase tracking-wider text-gray-400 dark:text-[#7878aa]">Needs Verify</div>
+                </div>
+              </div>
+
+              <!-- Toolbar -->
+              <div class="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-gray-100 dark:border-[#222255]/50">
+                <div class="relative">
+                  <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">🔍</span>
+                  <input type="text" x-model="transferFilterSearch" @keydown.enter="applyTransferFilter()" placeholder="Search transfer # or client..." class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg pl-7 pr-2 py-1.5 w-56 text-gray-700 dark:text-slate-200 placeholder-gray-400 dark:placeholder-[#4a4a7a]">
+                </div>
+                <input type="date" x-model="transferFilterDate" @change="applyTransferFilter()" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1.5 text-gray-700 dark:text-slate-200">
+                <button @click="applyTransferFilter()" class="text-xs px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 transition-colors">FILTER</button>
+                <button @click="clearTransferFilter()" x-show="transferFilterDate || transferFilterSearch" class="text-xs px-2 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">✕</button>
+                <span class="flex-1"></span>
+                <button @click="verifyDailyTransfers()" :disabled="verifying" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+                  <span x-show="!verifying">✔ VERIFY TRANSFERS</span>
                   <span x-show="verifying">⏳ VERIFYING...</span>
                 </button>
-                <span x-show="verifying" class="text-[10px] text-gray-400" x-text="verifyStatus"></span>
+                <button @click="openNewTransfer()" class="text-xs px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 transition-colors">+ NEW TRANSFER</button>
+                <button @click="exportCSV('wh-transfer')" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CSV</button>
+                <button @click="window.print()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">PRINT</button>
               </div>
-              <template x-if="filtered.length===0"><div class="text-center py-6 text-gray-400">No transfers</div></template>
+              <div x-show="verifying" class="px-4 py-1 text-[10px] text-gray-400" x-text="verifyStatus"></div>
+
+              <template x-if="filtered.length===0">
+                <div class="text-center py-12">
+                  <div class="text-3xl mb-2">📦</div>
+                  <div class="text-gray-400 text-sm">No transfers found</div>
+                  <div class="text-gray-500 dark:text-[#7878aa] text-xs mt-1">Try a different date or search term</div>
+                </div>
+              </template>
               <template x-if="filtered.length > 0">
-                <table class="w-full text-xs">
-                  <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">ID</th>
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">POS Client</th>
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Status</th>
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Notes</th>
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
-                  </tr></thead>
-                  <tbody>
-                    <template x-for="(x,i) in filtered" :key="i">
-                      <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                        <td class="px-3 py-2" x-text="x.id"></td>
-                        <td class="px-3 py-2" x-text="x.clientName"></td>
-                        <td class="px-3 py-2 font-semibold" :style="'color:'+(x.status==='pending'?'#f39c12':x.status==='completed'?'#2ecc71':x.status==='partial'?'#e67e22':'red')">
-                          <span x-text="(x.status || '').toUpperCase()"></span>
-                          <span x-show="x.hasShortage" class="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">PARTIAL</span>
-                        </td>
-                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.notes || ''"></td>
-                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Manila'})"></td>
-                        <td class="px-3 py-2">
-                          <button @click="viewTransfer(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">VIEW</button>
-                          <template x-if="x.status==='pending'">
-                            <button @click="cancelTransfer(x.id)" class="text-[10px] px-2 py-1 rounded border border-red-300 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">CANCEL</button>
-                          </template>
-                        </td>
-                      </tr>
-                    </template>
-                  </tbody>
-                </table>
+                <div>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                      <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                        <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">ID</th>
+                        <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">POS Client</th>
+                        <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Status</th>
+                        <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Notes</th>
+                        <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
+                        <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
+                      </tr></thead>
+                      <tbody>
+                        <template x-for="(x,i) in filtered" :key="i">
+                          <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
+                            <td class="px-3 py-2 font-mono text-cyan-600 dark:text-cyan-400" x-text="'#'+x.id"></td>
+                            <td class="px-3 py-2 text-gray-700 dark:text-slate-200" x-text="x.clientName"></td>
+                            <td class="px-3 py-2">
+                              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+                                :class="x.status==='pending' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400' : x.status==='completed' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : x.status==='partial' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400' : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'">
+                                <span x-text="x.status==='pending' ? '🕐' : x.status==='completed' ? '✅' : x.status==='partial' ? '⏳' : '🚫'"></span>
+                                <span x-text="(x.status || '').toUpperCase()"></span>
+                              </span>
+                              <span x-show="x.hasShortage" class="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">PARTIAL</span>
+                            </td>
+                            <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] max-w-[140px] truncate" :title="x.notes || ''" x-text="x.notes || '—'"></td>
+                            <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Manila'})"></td>
+                            <td class="px-3 py-2 whitespace-nowrap">
+                              <button @click="viewTransfer(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] transition-colors">VIEW</button>
+                              <template x-if="x.status==='pending'">
+                                <button @click="cancelTransfer(x.id)" class="text-[10px] px-2 py-1 rounded border border-red-300 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">CANCEL</button>
+                              </template>
+                            </td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                  <!-- Pagination -->
+                  <div class="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-[#222255]/50 flex-wrap gap-2">
+                    <span class="text-[11px] text-gray-500 dark:text-[#7878aa]" x-text="'Showing ' + transferPageStart + '-' + transferPageEnd + ' of ' + transferTotal"></span>
+                    <div class="flex items-center gap-1">
+                      <button @click="prevTransferPage()" :disabled="transferPage<=1" class="text-[11px] px-2.5 py-1 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">‹ Prev</button>
+                      <template x-for="(p, pi) in transferPageNumbers" :key="pi">
+                        <template x-if="p === '...'">
+                          <span class="text-[11px] text-gray-400 px-1">...</span>
+                        </template>
+                        <template x-if="p !== '...'">
+                          <button @click="gotoTransferPage(p)" class="text-[11px] w-7 h-7 rounded-lg transition-colors"
+                            :class="transferPage===p ? 'bg-cyan-600 text-white font-bold' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'"
+                            x-text="p"></button>
+                        </template>
+                      </template>
+                      <button @click="nextTransferPage()" :disabled="transferPage>=transferTotalPages" class="text-[11px] px-2.5 py-1 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">Next ›</button>
+                    </div>
+                  </div>
+                </div>
               </template>
             </div>
             </div>

@@ -466,6 +466,7 @@ Alpine.store('app', {
     salesData: [], saleFrom: '', saleTo: '', saleViewOpen: false, saleViewItems: [],
     invActivity: [], invSearch: '', invFrom: '', invTo: '', invExpanded: true, invActivityLoading: false,
     inventorySummary: null,
+    transferPage: 1, transferPageSize: 30, transferTotal: 0, transferFilterDate: '', transferFilterSearch: '',
     async init() { window.addEventListener('load-warehouse', () => this.load()); await this.load(); this.startPoll() },
     async load() {
       this.loading = true;
@@ -473,11 +474,48 @@ Alpine.store('app', {
         const sp = Alpine.store('app').whSubpage;
         if (sp === 'product' || sp === 'inventory') { this.products = await fetchJSON(API + '/warehouse/products'); if (sp === 'inventory') await this.loadInvActivity() }
         else if (sp === 'onlineorder') { this.clientsData = await fetchJSON(API + '/warehouse/clients'); this.orders = await fetchJSON(API + '/warehouse/orders') }
-        else if (sp === 'transfer') this.transfers = await fetchJSON(API + '/warehouse/transfers');
+        else if (sp === 'transfer') await this.loadTransfers();
         else if (sp === 'sales') await this.loadSales();
         if (sp === 'inventory') await this.loadInventorySummary();
       } catch (e) { this.products = []; this.clientsData = []; this.orders = []; this.transfers = [] }
       this.loading = false;
+    },
+    async loadTransfers() {
+      try {
+        const q = [];
+        if (this.transferFilterDate) q.push('date=' + this.transferFilterDate);
+        if (this.transferFilterSearch) q.push('search=' + encodeURIComponent(this.transferFilterSearch));
+        q.push('page=' + this.transferPage);
+        q.push('pageSize=' + this.transferPageSize);
+        const d = await fetchJSON(API + '/warehouse/transfers?' + q.join('&'));
+        this.transfers = d.items || [];
+        this.transferTotal = d.total || 0;
+      } catch (e) { this.transfers = []; this.transferTotal = 0 }
+    },
+    applyTransferFilter() { this.transferPage = 1; this.loadTransfers() },
+    clearTransferFilter() { this.transferFilterDate = ''; this.transferFilterSearch = ''; this.transferPage = 1; this.loadTransfers() },
+    prevTransferPage() { if (this.transferPage > 1) { this.transferPage--; this.loadTransfers() } },
+    nextTransferPage() { if (this.transferPage < this.transferTotalPages) { this.transferPage++; this.loadTransfers() } },
+    gotoTransferPage(p) { this.transferPage = p; this.loadTransfers() },
+    get transferTotalPages() { return Math.max(1, Math.ceil(this.transferTotal / this.transferPageSize)) },
+    get transferPageStart() { return this.transfers.length === 0 ? 0 : (this.transferPage - 1) * this.transferPageSize + 1 },
+    get transferPageEnd() { return (this.transferPage - 1) * this.transferPageSize + this.transfers.length },
+    get transferPageNumbers() {
+      const total = this.transferTotalPages, cur = this.transferPage, out = [];
+      if (total <= 7) { for (let i = 1; i <= total; i++) out.push(i); return out }
+      out.push(1);
+      if (cur > 3) out.push('...');
+      for (let i = Math.max(2, cur - 1); i <= Math.min(total - 1, cur + 1); i++) out.push(i);
+      if (cur < total - 2) out.push('...');
+      out.push(total);
+      return out;
+    },
+    get transferSummary() {
+      const all = this.transfers;
+      return {
+        total: this.transferTotal,
+        pending: 0, completed: 0, partial: 0, cancelled: 0
+      };
     },
     async loadInvActivity() {
       this.invActivityLoading = true;
@@ -505,7 +543,7 @@ Alpine.store('app', {
     get filtered() {
       let items = this.sp === 'product' || this.sp === 'inventory' ? this.products : this.sp === 'onlineorder' ? this.orders : this.transfers;
       if (this.catFilter && (this.sp === 'product' || this.sp === 'inventory')) items = items.filter(x => x.category === this.catFilter);
-      if (this.search) { const q = this.search.toLowerCase(); items = items.filter(x => JSON.stringify(x).toLowerCase().includes(q)) }
+      if (this.search && this.sp !== 'transfer') { const q = this.search.toLowerCase(); items = items.filter(x => JSON.stringify(x).toLowerCase().includes(q)) }
       return items;
     },
     setFilter(cat) { this.catFilter = cat },
@@ -826,7 +864,8 @@ Alpine.store('app', {
       this.verifying = true;
       this.verifyStatus = 'Fetching transfers...';
       try {
-        const transfers = await fetchJSON(API + '/warehouse/transfers');
+        const d = await fetchJSON(API + '/warehouse/transfers?pageSize=200');
+        const transfers = d.items || [];
         const check = transfers.filter(t => {
           if (t.status === 'pending') return false;
           if (!t.storeId) return false;
@@ -1115,6 +1154,25 @@ Alpine.store('app', {
         // Sort back to descending for display
         this.d = sorted.sort((a, b) => new Date(b.closeDate) - new Date(a.closeDate));
       } catch (e) { this.d = [] }
+      this.loading = false;
+    }
+  }));
+
+  // RECEIPT AUDIT panel (anti-theft)
+  Alpine.data('receiptAuditPanel', () => ({
+    d: [], loading: true, detailsOpen: {},
+    async init() {
+      window.addEventListener('refresh-data', () => this.load());
+      window.addEventListener('load-receipt-audit', () => this.load());
+      if (Alpine.store('app').section === 'rpt-invcost') await this.load();
+      this.$watch('$store.app.section', v => { if (v === 'rpt-invcost') this.load(); });
+    },
+    get alertsCount() { return this.d.filter(x => x.deletedCount > 0).length },
+    safeParse(s) { try { const a = JSON.parse(s || '[]'); return Array.isArray(a) ? a : [] } catch (e) { return [] } },
+    toggleDetails(i) { this.detailsOpen[i] = !this.detailsOpen[i] },
+    async load() {
+      this.loading = true;
+      try { this.d = await fetchJSON(API + '/receipt-audit?limit=100'); } catch (e) { this.d = [] }
       this.loading = false;
     }
   }));

@@ -1307,6 +1307,30 @@ public static class SyncService
         }
         catch { }
     }
+
+    public static async Task PushReceiptAuditAsync(int totalReceipts, int voidedCount, int deletedCount, decimal lostValue, List<string> voidedInvoices, List<string> missingInvoices)
+    {
+        try
+        {
+            var payload = new
+            {
+                storeId = StoreId,
+                storeName = StoreName,
+                shiftDate = new DateTimeOffset(TimeHelper.Now.Ticks, TimeSpan.FromMinutes(TimeHelper.GetTimezoneOffset())).UtcDateTime,
+                totalReceipts,
+                voidedCount,
+                deletedCount,
+                lostValue,
+                voidedInvoices,
+                missingInvoices
+            };
+            var url = ApiUrl.TrimEnd('/') + "/dashboard/receipt-audit" + "?store_id=" + StoreId + "&store_name=" + Uri.EscapeDataString(StoreName);
+            var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            await _client.PostAsync(url, content);
+        }
+        catch { }
+    }
 }
 
 public class ReceiveResult

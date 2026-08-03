@@ -330,7 +330,8 @@ public class PrinterService
         List<Expense> expenses, List<(string InvoiceNo, string SaleDate, decimal Amount, string ReferenceNo)> gcashTxns,
         List<(string Name, decimal Amount)> creditCustomers, List<(string CustomerName, string PaymentMethod, decimal Amount, string Timestamp)> creditPayments,
         int denom1000, int denom500, int denom200, int denom100, int denom50, int denom20, decimal denomCoins,
-        decimal totalInventoryCost = 0, decimal totalCostSold = 0, decimal totalStockReceivedCost = 0, decimal previousInventory = 0)
+        decimal totalInventoryCost = 0, decimal totalCostSold = 0, decimal totalStockReceivedCost = 0, decimal previousInventory = 0,
+        (int Total, int Voided, int Deleted, decimal Lost, List<string> VoidedInvs, List<string> MissingInvs)? receiptAudit = null)
     {
         var printerName = GetSetting("PrinterName");
         if (string.IsNullOrEmpty(printerName))
@@ -351,7 +352,7 @@ public class PrinterService
         if (lineChars < 20) lineChars = 20;
         if (lineChars > 48) lineChars = 48;
 
-        var lines = BuildAuditEndShiftReportLines(cashOnHand, difference, cashierName, timestamp, notes, totalSales, totalCash, totalEWallet, totalCredit, totalVoided, expenses, gcashTxns, creditCustomers, creditPayments, lineChars, denom1000, denom500, denom200, denom100, denom50, denom20, denomCoins, totalInventoryCost, totalCostSold, totalStockReceivedCost, previousInventory);
+        var lines = BuildAuditEndShiftReportLines(cashOnHand, difference, cashierName, timestamp, notes, totalSales, totalCash, totalEWallet, totalCredit, totalVoided, expenses, gcashTxns, creditCustomers, creditPayments, lineChars, denom1000, denom500, denom200, denom100, denom50, denom20, denomCoins, totalInventoryCost, totalCostSold, totalStockReceivedCost, previousInventory, receiptAudit);
         ExtendPaperIfNeeded(doc, lines.Count, 16);
 
         doc.PrintPage += (sender, e) =>
@@ -408,7 +409,8 @@ public class PrinterService
         List<Expense> expenses, List<(string InvoiceNo, string SaleDate, decimal Amount, string ReferenceNo)> gcashTxns,
         List<(string Name, decimal Amount)> creditCustomers, List<(string CustomerName, string PaymentMethod, decimal Amount, string Timestamp)> creditPayments, int lineChars,
         int denom1000, int denom500, int denom200, int denom100, int denom50, int denom20, decimal denomCoins,
-        decimal totalInventoryCost = 0, decimal totalCostSold = 0, decimal totalStockReceivedCost = 0, decimal previousInventory = 0)
+        decimal totalInventoryCost = 0, decimal totalCostSold = 0, decimal totalStockReceivedCost = 0, decimal previousInventory = 0,
+        (int Total, int Voided, int Deleted, decimal Lost, List<string> VoidedInvs, List<string> MissingInvs)? receiptAudit = null)
     {
         var lines = new List<LineEntry>();
         var company = GetSetting("CompanyName");
@@ -522,6 +524,32 @@ public class PrinterService
             lines.Add(new LineEntry { Text = $"Notes: {notes}", Spacing = 14 });
             lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Align = TextAlign.Center, Spacing = 12 });
         }
+
+        // RECEIPT AUDIT — anti-theft check
+        if (receiptAudit.HasValue)
+        {
+            var ra = receiptAudit.Value;
+            lines.Add(new LineEntry { Text = "RECEIPT AUDIT", Align = TextAlign.Center, Bold = true, Spacing = 16 });
+            lines.Add(new LineEntry { Text = "Total Receipts", RightText = ra.Total.ToString(), Spacing = 14 });
+            lines.Add(new LineEntry { Text = "Voided", RightText = ra.Voided.ToString(), Spacing = 14 });
+            lines.Add(new LineEntry { Text = "Deleted/Missing", RightText = ra.Deleted.ToString(), Spacing = 14 });
+            lines.Add(new LineEntry { Text = "Lost Value", RightText = "Php " + ra.Lost.ToString("N2"), Spacing = 14 });
+
+            if (ra.Deleted > 0)
+            {
+                lines.Add(new LineEntry { Text = "⚠ DELETED RECEIPTS DETECTED!", Align = TextAlign.Center, Bold = true, Spacing = 14 });
+                foreach (var mi in ra.MissingInvs.Take(10))
+                    lines.Add(new LineEntry { Text = mi, Align = TextAlign.Center, Spacing = 12 });
+                if (ra.MissingInvs.Count > 10)
+                    lines.Add(new LineEntry { Text = $"+{ra.MissingInvs.Count - 10} more...", Align = TextAlign.Center, Spacing = 12 });
+            }
+            else
+            {
+                lines.Add(new LineEntry { Text = "✓ ALL RECEIPTS COUNTED", Align = TextAlign.Center, Bold = true, Spacing = 14 });
+            }
+            lines.Add(new LineEntry { Text = new string('=', lineChars), Align = TextAlign.Center, Spacing = 14 });
+        }
+
         lines.Add(new LineEntry { Text = "", Spacing = 30 });
         lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Align = TextAlign.Center, Spacing = 12 });
         lines.Add(new LineEntry { Text = "Cashier Signature Over Printed Name", Align = TextAlign.Center, Bold = true, Spacing = 30 });

@@ -675,5 +675,22 @@ public static class PgDatabaseHelper
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )";
         try { whDcMig.ExecuteNonQuery(); } catch { }
+
+        using var raMig = conn.CreateCommand();
+        raMig.CommandText = @"
+            CREATE TABLE IF NOT EXISTS receipt_audits (
+                id SERIAL PRIMARY KEY,
+                store_id TEXT NOT NULL DEFAULT '',
+                store_name TEXT NOT NULL DEFAULT '',
+                shift_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                total_receipts INTEGER NOT NULL DEFAULT 0,
+                voided_count INTEGER NOT NULL DEFAULT 0,
+                deleted_count INTEGER NOT NULL DEFAULT 0,
+                lost_value NUMERIC NOT NULL DEFAULT 0,
+                voided_invoices TEXT NOT NULL DEFAULT '[]',
+                missing_invoices TEXT NOT NULL DEFAULT '[]',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )";
+        try { raMig.ExecuteNonQuery(); } catch { }
     }
 }
