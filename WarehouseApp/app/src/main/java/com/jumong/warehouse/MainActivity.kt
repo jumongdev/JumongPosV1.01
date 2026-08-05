@@ -249,6 +249,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
+        fun getPaperWidth(): Int {
+            return getSharedPreferences("wh_prefs", MODE_PRIVATE).getInt("paper_width", 80)
+        }
+
+        @JavascriptInterface
+        fun setPaperWidth(w: Int) {
+            getSharedPreferences("wh_prefs", MODE_PRIVATE)
+                .edit().putInt("paper_width", if (w <= 50) 50 else 80).apply()
+        }
+
+        @JavascriptInterface
         fun openSettings() {
             startActivity(Intent(Settings.ACTION_SETTINGS))
         }

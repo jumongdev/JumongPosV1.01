@@ -1,6 +1,6 @@
 {
     "apkUrl":  "https://admin.jumongdev.com/updates/JumongWarehouse.apk",
-    "changelog":  "v1.0.4: New signing certificate (uninstall old Jumong Pos first, then install this update).",
-    "version":  "1.0.4",
+    "changelog":  "v1.0.5: Added Paper Width selector (50mm/80mm) in SETUP tab. Receipts auto-fit selected width. Same signing cert - updates install without uninstalling.",
+    "version":  "1.0.5",
     "released":  "2026-08-05"
 }

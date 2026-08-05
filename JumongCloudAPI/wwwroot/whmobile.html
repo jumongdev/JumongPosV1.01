@@ -151,6 +151,14 @@
         <!-- SETUP TAB -->
         <div id="tabSetup" class="hidden">
           <div class="card mb-3">
+            <p class="text-white text-xs font-bold uppercase tracking-wider mb-3">📄 Paper Width</p>
+            <div class="flex gap-2">
+              <button id="paper50Btn" class="btn-ghost flex-1" onclick="setPaperWidth(50)">50mm</button>
+              <button id="paper80Btn" class="btn-ghost flex-1" onclick="setPaperWidth(80)">80mm</button>
+            </div>
+            <p class="text-gray-500 text-[11px] mt-2">Choose the width of your thermal paper. Receipts are formatted to fit (58mm ≈ 50mm paper).</p>
+          </div>
+          <div class="card mb-3">
             <p class="text-white text-xs font-bold uppercase tracking-wider mb-3">🖨️ Bluetooth Printer</p>
             <button class="btn-ghost w-full mb-3" onclick="refreshPrinters()">🔄 REFRESH PAIRED PRINTERS</button>
             <div id="printerList"></div>
@@ -231,6 +239,7 @@
     let currentProduct = null;
     let selectedUnitIndex = 0;
     let pendingPay = null;
+    let paperWidth = 80;
 
     function toast(msg, type) {
       const t = document.createElement('div');
@@ -312,6 +321,7 @@
       const savedTab = localStorage.getItem('wh_tab');
       switchTab(savedTab === 'inventory' || savedTab === 'setup' ? savedTab : 'sell');
       document.getElementById('appInfo').textContent = IN_APP ? 'App version: ' + AndroidApp.getVersion() + ' (native APK with Bluetooth)' : 'Browser mode (no Bluetooth print)';
+      loadPaperWidth();
       if (IN_APP) { refreshPrinters(); if (AndroidPrinter.isConnected()) updatePrinterStatus(true); }
       else updatePrinterStatus(false, 'Browser mode');
       checkAppUpdate(false);
@@ -373,7 +383,7 @@
       document.getElementById('navSetup').classList.remove('active');
       if (tab === 'sell') { show(document.getElementById('tabSell')); document.getElementById('navSell').classList.add('active'); }
       if (tab === 'inventory') { show(document.getElementById('tabInventory')); document.getElementById('navInventory').classList.add('active'); document.getElementById('invSearch').focus(); }
-      if (tab === 'setup') { show(document.getElementById('tabSetup')); document.getElementById('navSetup').classList.add('active'); refreshPrinters(); }
+      if (tab === 'setup') { show(document.getElementById('tabSetup')); document.getElementById('navSetup').classList.add('active'); refreshPrinters(); loadPaperWidth(); }
     }
 
     // ─── MODERN PULL-TO-REFRESH (called by native app) ───────
@@ -393,6 +403,31 @@
     }
 
     // ─── PRINTER ─────────────────────────────────────────────
+    function loadPaperWidth() {
+      paperWidth = IN_APP ? (AndroidApp.getPaperWidth() || 80) : (parseInt(localStorage.getItem('wh_paper_width')) || 80);
+      highlightPaperWidth();
+    }
+
+    function setPaperWidth(w) {
+      paperWidth = (w <= 50) ? 50 : 80;
+      if (IN_APP) AndroidApp.setPaperWidth(paperWidth);
+      else localStorage.setItem('wh_paper_width', String(paperWidth));
+      highlightPaperWidth();
+      toast('Paper width set to ' + paperWidth + 'mm');
+    }
+
+    function highlightPaperWidth() {
+      const b50 = document.getElementById('paper50Btn');
+      const b80 = document.getElementById('paper80Btn');
+      if (!b50 || !b80) return;
+      const is50 = paperWidth <= 50;
+      b50.className = 'btn-green flex-1' + (is50 ? '' : '');
+      b50.classList.toggle('btn-green', is50);
+      b50.classList.toggle('btn-ghost', !is50);
+      b80.classList.toggle('btn-green', !is50);
+      b80.classList.toggle('btn-ghost', is50);
+    }
+
     function updatePrinterStatus(connected, label) {
       const b = document.getElementById('printerStatusBadge');
       b.textContent = connected ? '🖨️ CONNECTED' : ('🖨️ ' + (label || 'NOT CONNECTED'));
@@ -595,18 +630,24 @@
     }
 
     function buildReceiptText(j, items, method) {
+      const W = paperWidth <= 50 ? 32 : 48;
+      const dash = '------------------------------------------------'.slice(0, W);
+      const fit = s => {
+        const str = String(s);
+        return str.length > W ? str.slice(0, W - 1) + '~' : str;
+      };
       let t = '';
       t += '<<CENTER>>JUMONG POS\n';
-      t += '<<CENTER>>' + (session.storeName || '') + '\n';
+      t += '<<CENTER>>' + fit(session.storeName || '') + '\n';
       t += '<<CENTER>>Invoice: ' + (j.invoiceNo || j.saleId) + '\n';
-      t += '<<CENTER>>Cashier: ' + (session.fullName || session.username) + '\n';
+      t += '<<CENTER>>Cashier: ' + fit((session.fullName || session.username)) + '\n';
       t += '<<CENTER>>' + new Date().toLocaleString('en-PH') + '\n';
-      t += '--------------------------------\n';
+      t += dash + '\n';
       cart.forEach(c => {
-        t += c.productName + '\n';
-        t += '  ' + c.unitName + ' x' + c.qty + '  ' + (c.price * c.qty).toFixed(2) + '\n';
+        t += fit(c.productName) + '\n';
+        t += fit('  ' + c.unitName + ' x' + c.qty + '  ' + (c.price * c.qty).toFixed(2)) + '\n';
       });
-      t += '--------------------------------\n';
+      t += dash + '\n';
       t += 'TOTAL: ' + j.grandTotal.toFixed(2) + '\n';
       t += 'PAYMENT: ' + method + '\n';
       t += '<<CENTER>>THANK YOU!\n';
