@@ -999,7 +999,7 @@ Alpine.store('app', {
 
     openAdd() {
       this.editingId = null;
-      this.form = { username: '', fullName: '', role: 'Cashier', passwordHash: '12345', storeIds: [], isActive: true };
+      this.form = { username: '', fullName: '', role: 'Cashier', passwordHash: '12345', storeIds: [], isActive: true, mobileAccess: false };
       this.modalTitle = 'NEW USER';
       this.modalOpen = true;
     },
@@ -1012,7 +1012,8 @@ Alpine.store('app', {
         role: x.role || 'Cashier',
         passwordHash: '',
         storeIds: (x.storeIds || []).slice(),
-        isActive: x.isActive !== false
+        isActive: x.isActive !== false,
+        mobileAccess: !!x.mobileAccess
       };
       this.modalTitle = 'EDIT: ' + x.username;
       this.modalOpen = true;
@@ -1037,7 +1038,8 @@ Alpine.store('app', {
           fullName: this.form.fullName,
           role: this.form.role,
           storeIds: this.form.storeIds,
-          isActive: this.form.isActive
+          isActive: this.form.isActive,
+          mobileAccess: !!this.form.mobileAccess
         };
         if (this.form.passwordHash) body.passwordHash = this.form.passwordHash;
         const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });

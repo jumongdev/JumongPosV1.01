@@ -2080,6 +2080,7 @@ tailwind.config = {
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Full Name</th>
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Role</th>
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Active</th>
+                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Mobile</th>
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Stores</th>
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
                 </tr></thead>
@@ -2090,6 +2091,10 @@ tailwind.config = {
                       <td class="px-3 py-2" x-text="x.fullName || ''"></td>
                       <td class="px-3 py-2"><span :class="x.role==='Admin'?'text-purple-500':'text-cyan-500'" x-text="x.role"></span></td>
                       <td class="px-3 py-2"><span :class="x.isActive ? 'text-emerald-500' : 'text-red-500'" x-text="x.isActive ? 'Active' : 'Inactive'"></span></td>
+                      <td class="px-3 py-2">
+                        <span x-show="x.mobileAccess" class="text-[10px] bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded font-medium">MOBILE APP</span>
+                        <span x-show="!x.mobileAccess" class="text-gray-400">—</span>
+                      </td>
                       <td class="px-3 py-2">
                         <template x-for="sid in (x.storeIds || [])" :key="sid">
                           <span class="inline-block text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded mr-1 mb-0.5" x-text="shortStore(sid, $store.app.storeMap[sid])"></span>
@@ -2136,6 +2141,7 @@ tailwind.config = {
                   </div>
                 </div>
                 <div class="flex items-center"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] flex items-center gap-2"><input type="checkbox" x-model="form.isActive" class="rounded"> Active</label></div>
+                <div class="flex items-center"><label class="text-[11px] text-purple-500 dark:text-purple-400 flex items-center gap-2"><input type="checkbox" x-model="form.mobileAccess" class="rounded"> Mobile App Access</label></div>
               </div>
               <div class="flex justify-end gap-2 pt-3 mt-3 border-t border-gray-200 dark:border-[#222255]">
                 <button @click="closeModal()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa]">CANCEL</button>
@@ -2584,7 +2590,7 @@ tailwind.config = {
       const sel = document.getElementById('storeSelect');
       if (sel) {
         sel.innerHTML = '<option value="">All Stores</option>' +
-          stores.map(s => '<option value="' + esc(s.storeId) + '">' + esc(s.storeName || s.storeId) + '</option>').join('');
+          stores.filter(s => s.storeId !== 'STORE-WAREHOUSE').map(s => '<option value="' + esc(s.storeId) + '">' + esc(s.storeName || s.storeId) + '</option>').join('');
       }
     } catch (e) {}
 

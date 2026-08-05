@@ -1,4 +1,5 @@
 using JumongCloudAPI.Data;
+using Microsoft.AspNetCore.StaticFiles;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,8 +43,12 @@ app.Use(async (ctx, next) =>
 });
 
 app.UseDefaultFiles();
+var staticProvider = new FileExtensionContentTypeProvider();
+staticProvider.Mappings[".apk"] = "application/vnd.android.package-archive";
+staticProvider.Mappings[".aab"] = "application/octet-stream";
 app.UseStaticFiles(new StaticFileOptions
 {
+    ContentTypeProvider = staticProvider,
     OnPrepareResponse = ctx =>
     {
         ctx.Context.Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate";

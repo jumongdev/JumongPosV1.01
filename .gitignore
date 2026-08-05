@@ -23,3 +23,14 @@ server_log.txt
 do_dump.sql
 do_schema.txt
 local_schema.txt
+
+# Android app (WarehouseApp)
+WarehouseApp/build/
+WarehouseApp/app/build/
+WarehouseApp/.gradle/
+WarehouseApp/.kotlin/
+WarehouseApp/*.log
+WarehouseApp/*.keystore
+WarehouseApp/local.properties
+WarehouseApp/.idea/
+

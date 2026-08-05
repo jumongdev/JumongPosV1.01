@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#10102a">
+<title>Jumong Pos</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  * { -webkit-tap-highlight-color: transparent; }
+  html, body { padding: 0; margin: 0; }
+  body { background: #10102a; font-family: 'Segoe UI', system-ui, sans-serif; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  .input-field {
+    width: 100%; background: #181848; border: 1px solid #222255;
+    border-radius: 12px; padding: 14px 16px; color: #e2e8f0; font-size: 15px; outline: none;
+  }
+  .input-field:focus { border-color: #06b6d4; box-shadow: 0 0 0 3px rgba(6,182,212,0.15); }
+  .btn-primary { width: 100%; background: #06b6d4; color: white; font-weight: 700; border-radius: 12px; padding: 15px; font-size: 15px; letter-spacing: 0.5px; }
+  .btn-primary:active { background: #0891b2; }
+  .btn-primary:disabled { opacity: 0.5; }
+  .btn-ghost { background: #181848; border: 1px solid #222255; color: #e2e8f0; font-weight: 600; border-radius: 12px; padding: 12px; font-size: 14px; }
+  .btn-ghost:active { background: #1e1e52; }
+  .btn-danger { background: #7f1d1d; color: #fecaca; font-weight: 600; border-radius: 12px; padding: 12px; font-size: 14px; }
+  .btn-green { background: #059669; color: white; font-weight: 700; border-radius: 12px; padding: 14px; font-size: 15px; }
+  .btn-green:active { background: #047857; }
+  .store-chip { display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: #181848; border: 1px solid #222255; border-radius: 12px; cursor: pointer; transition: all 0.15s; }
+  .store-chip.active { border-color: #06b6d4; background: rgba(6,182,212,0.1); }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1e293b; color: #f8fafc; padding: 12px 20px; border-radius: 10px; font-size: 13px; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.4); max-width: 90%; text-align: center; }
+  .toast.error { background: #7f1d1d; }
+  .card { background: #181848; border: 1px solid #222255; border-radius: 14px; padding: 14px; }
+  .tab-btn { flex: 1; padding: 12px 4px; font-size: 13px; font-weight: 700; color: #7878aa; border-radius: 10px; text-align: center; }
+  .tab-btn.active { background: #06b6d4; color: white; }
+  .printer-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: #14143a; border: 1px solid #222255; border-radius: 10px; margin-bottom: 8px; }
+  .printer-row.connected { border-color: #059669; }
+  .qty-btn { width: 40px; height: 40px; border-radius: 10px; background: #181848; border: 1px solid #222255; color: white; font-size: 18px; font-weight: 700; }
+  .qty-btn:active { background: #26265e; }
+  .cart-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: #14143a; border: 1px solid #222255; border-radius: 10px; margin-bottom: 8px; }
+  .unit-chip { display: inline-block; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; border: 1px solid #222255; color: #a5a5d0; margin: 3px; }
+  .unit-chip.selected { background: #06b6d4; color: white; border-color: #06b6d4; }
+  .nav-bottom { position: fixed; bottom: 0; left: 0; right: 0; background: #16163a; border-top: 1px solid #222255; display: flex; padding: 8px 12px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 50; }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; color: #7878aa; font-weight: 600; padding: 6px 0; }
+  .nav-item.active { color: #06b6d4; }
+  .nav-item span.icon { font-size: 20px; }
+  .main-content { padding-bottom: 80px; }
+</style>
+</head>
+<body class="min-h-screen flex flex-col">
+  <div id="app" class="flex-1 flex flex-col">
+
+    <!-- LOADING SCREEN -->
+    <div id="loadingScreen" class="flex-1 flex flex-col items-center justify-center px-6">
+      <div class="text-5xl mb-4 animate-pulse">📦</div>
+      <h1 class="text-xl font-bold text-cyan-400 tracking-wide mb-2">JUMONG POS</h1>
+      <p class="text-gray-500 text-sm">Validating session...</p>
+    </div>
+
+    <!-- LOGIN SCREEN -->
+    <div id="loginScreen" class="flex-1 flex flex-col items-center justify-center px-6">
+      <div class="w-full max-w-sm">
+        <div class="text-center mb-8">
+          <div class="text-5xl mb-3">📦</div>
+          <h1 class="text-2xl font-bold text-cyan-400 tracking-wide">JUMONG POS</h1>
+          <p class="text-gray-500 text-sm mt-1">Mobile Access</p>
+        </div>
+        <div class="space-y-4">
+          <div>
+            <label class="text-[11px] text-[#7878aa] uppercase tracking-wider block mb-1.5">Username</label>
+            <input id="usernameInput" class="input-field" type="text" placeholder="Enter username" autocomplete="username">
+          </div>
+          <div>
+            <label class="text-[11px] text-[#7878aa] uppercase tracking-wider block mb-1.5">Password</label>
+            <input id="passwordInput" class="input-field" type="password" placeholder="Enter password" autocomplete="current-password">
+          </div>
+          <button id="loginBtn" class="btn-primary" onclick="doLogin()">SIGN IN</button>
+          <p id="loginError" class="text-center text-red-400 text-xs hidden"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- STORE SELECT SCREEN -->
+    <div id="storeScreen" class="flex-1 flex-col items-center justify-center px-6 hidden">
+      <div class="w-full max-w-sm">
+        <div class="text-center mb-6">
+          <h2 class="text-xl font-bold text-cyan-400">SELECT STORE</h2>
+          <p class="text-gray-500 text-sm mt-1" id="storeScreenUser"></p>
+        </div>
+        <div id="storeList" class="space-y-3"></div>
+      </div>
+    </div>
+
+    <!-- MAIN SCREEN -->
+    <div id="mainScreen" class="flex-1 hidden flex-col">
+      <div class="bg-[#16163a] px-5 py-3 flex items-center justify-between border-b border-[#222255]">
+        <div>
+          <p class="text-white font-bold text-base" id="mainUser"></p>
+          <button id="mainStoreBtn" onclick="openStoreSwitcher()" class="text-cyan-400 text-xs flex items-center gap-1 hover:text-cyan-300">
+            <span id="mainStore"></span><span id="storeSwitcherChevron" class="hidden">▼</span>
+          </button>
+          <p class="text-[10px] text-[#5a5a8a] mt-0.5">v<span id="currentVerLabel"></span></p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="printerStatusBadge" class="text-[10px] px-2 py-1 rounded-full bg-red-950/50 text-red-400 border border-red-900/40 font-medium">🖨️ NOT CONNECTED</span>
+          <button onclick="doLogout()" class="text-xs text-red-400 bg-red-950/40 border border-red-900/40 rounded-lg px-3 py-2 font-medium">LOGOUT</button>
+        </div>
+      </div>
+
+      <div class="main-content flex-1 p-4 space-y-4">
+        <!-- SELL TAB -->
+        <div id="tabSell">
+          <div class="flex gap-2 mb-3">
+            <input id="sellSearch" class="input-field flex-1" type="text" placeholder="🔍 Search product or scan barcode (F1)">
+            <button class="btn-ghost px-4" onclick="searchProducts()">SEARCH</button>
+          </div>
+          <div id="productResults" class="space-y-2"></div>
+          <div id="unitPicker" class="hidden">
+            <div class="card mb-3">
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-white text-sm font-bold" id="pickProductName"></p>
+                <button class="text-red-400 text-xs font-bold" onclick="closeUnitPicker()">✕</button>
+              </div>
+              <div id="unitOptions"></div>
+              <button class="btn-primary mt-3" onclick="addToCart()">ADD TO CART</button>
+            </div>
+          </div>
+
+          <div class="card mb-3">
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-white text-xs font-bold uppercase tracking-wider">Cart</p>
+              <p class="text-cyan-400 text-xs font-bold" id="cartCount">0 items</p>
+            </div>
+            <div id="cartList" class="space-y-2"></div>
+            <div id="cartEmpty" class="text-center text-gray-500 text-sm py-4">Cart is empty</div>
+            <div class="border-t border-[#222255] mt-3 pt-3 flex items-center justify-between">
+              <p class="text-gray-400 text-sm">TOTAL</p>
+              <p class="text-white text-xl font-bold" id="cartTotal">₱0.00</p>
+            </div>
+          </div>
+
+          <button class="btn-green" onclick="checkout()">SELL NOW</button>
+        </div>
+
+        <!-- INVENTORY TAB -->
+        <div id="tabInventory" class="hidden">
+          <div class="flex gap-2 mb-3">
+            <input id="invSearch" class="input-field flex-1" type="text" placeholder="🔍 Search product">
+            <button class="btn-ghost px-4" onclick="searchInventory()">SEARCH</button>
+          </div>
+          <div id="invResults" class="space-y-2"></div>
+        </div>
+
+        <!-- SETUP TAB -->
+        <div id="tabSetup" class="hidden">
+          <div class="card mb-3">
+            <p class="text-white text-xs font-bold uppercase tracking-wider mb-3">🖨️ Bluetooth Printer</p>
+            <button class="btn-ghost w-full mb-3" onclick="refreshPrinters()">🔄 REFRESH PAIRED PRINTERS</button>
+            <div id="printerList"></div>
+            <p id="printerHint" class="text-gray-500 text-[11px] mt-2">Pair your Xprinter first: Phone Settings → Bluetooth → pair device (once only)</p>
+            <button class="btn-primary mt-3" onclick="printTest()">🧪 PRINT TEST</button>
+          </div>
+          <div class="card">
+            <p class="text-white text-xs font-bold uppercase tracking-wider mb-2">📱 App Info</p>
+            <p class="text-gray-400 text-xs" id="appInfo"></p>
+            <button class="btn-ghost w-full mt-3" onclick="checkAppUpdate(true)">🔍 CHECK FOR UPDATE</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom nav -->
+      <div class="nav-bottom">
+        <div class="nav-item active" id="navSell" onclick="switchTab('sell')"><span class="icon">🛒</span>SELL</div>
+        <div class="nav-item" id="navInventory" onclick="switchTab('inventory')"><span class="icon">📦</span>INVENTORY</div>
+        <div class="nav-item" id="navSetup" onclick="switchTab('setup')"><span class="icon">🖨️</span>SETUP</div>
+      </div>
+    </div>
+
+    <!-- STORE SWITCHER MODAL -->
+    <div id="storeSwitcherModal" class="hidden fixed inset-0 z-50 flex items-end justify-center bg-black/70" onclick="if(event.target===this)closeStoreSwitcher()">
+      <div class="bg-[#16163a] w-full max-w-sm rounded-t-2xl p-5 border-t border-[#222255] pb-8">
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-white font-bold text-base">SELECT STORE</p>
+          <button onclick="closeStoreSwitcher()" class="text-red-400 text-lg font-bold">✕</button>
+        </div>
+        <div id="storeSwitcherList" class="space-y-2 max-h-[60vh] overflow-y-auto"></div>
+      </div>
+    </div>
+
+    <!-- UPDATE MODAL -->
+    <div id="updateModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6">
+      <div class="bg-[#16163a] w-full max-w-sm rounded-2xl p-5 border border-[#222255] text-center">
+        <div class="text-5xl mb-3">📲</div>
+        <h3 class="text-white font-bold text-lg mb-1">UPDATE AVAILABLE</h3>
+        <p class="text-gray-400 text-sm mb-2">New version <span id="updateNewVer" class="text-cyan-400 font-bold"></span> is ready (current: <span id="updateCurVer" class="text-gray-500"></span>)</p>
+        <p id="updateChangelog" class="text-gray-500 text-xs mb-4 bg-[#14143a] border border-[#222255] rounded-lg p-3 text-left"></p>
+        <div class="flex gap-2">
+          <button id="updateLaterBtn" class="btn-ghost flex-1" onclick="closeUpdate()">LATER</button>
+          <button class="btn-green flex-1" onclick="doAppUpdate()">UPDATE NOW</button>
+        </div>
+        <button id="manualDlBtn" class="btn-ghost w-full mt-2 hidden" onclick="manualDownload()">⬇️ MANUAL DOWNLOAD (if install does not start)</button>
+        <p id="updateStatus" class="text-gray-500 text-xs mt-3 hidden">Downloading...</p>
+      </div>
+    </div>
+
+    <!-- PAYMENT MODAL -->
+    <div id="payModal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70">
+      <div class="bg-[#16163a] w-full max-w-sm rounded-t-2xl sm:rounded-2xl p-5 border border-[#222255]">
+        <p class="text-white text-lg font-bold mb-1">Payment</p>
+        <p class="text-cyan-400 font-bold text-2xl mb-4" id="payTotal">₱0.00</p>
+        <div class="space-y-3 mb-4">
+          <select id="payMethod" class="input-field">
+            <option value="Cash">Cash</option>
+            <option value="E-Wallet">E-Wallet</option>
+            <option value="Credit">Credit</option>
+          </select>
+          <input id="payCash" class="input-field" type="number" placeholder="Cash received">
+          <p id="payChange" class="text-emerald-400 text-sm font-bold text-center">Change: ₱0.00</p>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn-ghost flex-1" onclick="closePay()">CANCEL</button>
+          <button class="btn-green flex-1" onclick="confirmPay()">CONFIRM</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
+    const IN_APP = typeof AndroidPrinter !== 'undefined';
+    let session = null;
+    let cart = [];
+    let currentProduct = null;
+    let selectedUnitIndex = 0;
+    let pendingPay = null;
+
+    function toast(msg, type) {
+      const t = document.createElement('div');
+      t.className = 'toast' + (type === 'error' ? ' error' : '');
+      t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 3000);
+    }
+    function show(el) { el.classList.remove('hidden'); }
+    function hide(el) { el.classList.add('hidden'); }
+
+    function setScreen(name) {
+      hide(document.getElementById('loadingScreen'));
+      hide(document.getElementById('loginScreen'));
+      hide(document.getElementById('storeScreen'));
+      hide(document.getElementById('mainScreen'));
+      const map = { loading: 'loadingScreen', login: 'loginScreen', store: 'storeScreen', main: 'mainScreen' };
+      const target = document.getElementById(map[name]);
+      if (name === 'store' || name === 'loading') target.classList.add('flex');
+      if (name === 'main') { target.classList.remove('hidden'); target.classList.add('flex'); }
+      show(target);
+    }
+
+    // ─── AUTH ─────────────────────────────────────────────────
+    async function doLogin() {
+      const username = document.getElementById('usernameInput').value.trim();
+      const password = document.getElementById('passwordInput').value;
+      const btn = document.getElementById('loginBtn');
+      const errEl = document.getElementById('loginError');
+      if (!username || !password) { errEl.textContent = 'Enter username and password'; errEl.classList.remove('hidden'); return; }
+      btn.disabled = true; btn.textContent = 'SIGNING IN...'; errEl.classList.add('hidden');
+      try {
+        const r = await fetch(API + '/dashboard/whapp/login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const j = await r.json();
+        if (!r.ok || !j.success) { errEl.textContent = j.error || 'Login failed'; errEl.classList.remove('hidden'); return; }
+        session = j;
+        localStorage.setItem('wh_session', JSON.stringify(j));
+        const stores = j.stores || [];
+        if (stores.length > 1) { renderStores(stores); setScreen('store'); }
+        else { if (stores.length === 1) session.storeId = stores[0].storeId; enterMain(); }
+      } catch (e) {
+        errEl.textContent = 'Connection error: ' + e.message; errEl.classList.remove('hidden');
+      } finally { btn.disabled = false; btn.textContent = 'SIGN IN'; }
+    }
+
+    function pickDefaultStore(stores) {
+      const saved = localStorage.getItem('wh_last_store');
+      if (saved && stores.find(s => s.storeId === saved)) return saved;
+      const wh = stores.find(s => s.storeId === 'STORE-WAREHOUSE');
+      return wh ? wh.storeId : (stores[0] ? stores[0].storeId : '');
+    }
+
+    function renderStores(stores) {
+      const list = document.getElementById('storeList');
+      list.innerHTML = '';
+      document.getElementById('storeScreenUser').textContent = (session.fullName || session.username) + ' — select your store';
+      const defaultId = pickDefaultStore(stores);
+      stores.forEach(s => {
+        const chip = document.createElement('div');
+        chip.className = 'store-chip' + (s.storeId === defaultId ? ' active' : '');
+        const isWh = s.storeId === 'STORE-WAREHOUSE';
+        chip.innerHTML = '<span class="text-xl">' + (isWh ? '🏭' : '🏬') + '</span><div class="flex-1"><p class="text-white text-sm font-medium">' + s.storeName + '</p><p class="text-gray-500 text-[11px]">' + s.storeId + '</p></div>';
+        chip.onclick = () => { session.storeId = s.storeId; session.storeName = s.storeName; localStorage.setItem('wh_last_store', s.storeId); enterMain(); };
+        list.appendChild(chip);
+      });
+    }
+
+    function enterMain() {
+      document.getElementById('mainUser').textContent = session.fullName || session.username;
+      const isWh = session.storeId === 'STORE-WAREHOUSE';
+      document.getElementById('mainStore').textContent = (isWh ? '🏭 ' : '🏬 ') + (session.storeName || session.storeId || '');
+      const multi = (session.stores || []).length > 1;
+      document.getElementById('storeSwitcherChevron').classList.toggle('hidden', !multi);
+      document.getElementById('currentVerLabel').textContent = IN_APP ? (AndroidApp.getVersion() || '?') : 'web';
+      setScreen('main');
+      const savedTab = localStorage.getItem('wh_tab');
+      switchTab(savedTab === 'inventory' || savedTab === 'setup' ? savedTab : 'sell');
+      document.getElementById('appInfo').textContent = IN_APP ? 'App version: ' + AndroidApp.getVersion() + ' (native APK with Bluetooth)' : 'Browser mode (no Bluetooth print)';
+      if (IN_APP) { refreshPrinters(); if (AndroidPrinter.isConnected()) updatePrinterStatus(true); }
+      else updatePrinterStatus(false, 'Browser mode');
+      checkAppUpdate(false);
+    }
+
+    function openStoreSwitcher() {
+      const stores = session.stores || [];
+      if (stores.length <= 1) return;
+      const list = document.getElementById('storeSwitcherList');
+      list.innerHTML = '';
+      stores.forEach(s => {
+        const isWh = s.storeId === 'STORE-WAREHOUSE';
+        const current = s.storeId === session.storeId;
+        const row = document.createElement('div');
+        row.className = 'store-chip' + (current ? ' active' : '');
+        row.innerHTML = '<span class="text-xl">' + (isWh ? '🏭' : '🏬') + '</span><div class="flex-1"><p class="text-white text-sm font-medium">' + s.storeName + '</p><p class="text-gray-500 text-[11px]">' + s.storeId + '</p></div>' +
+          (current ? '<span class="text-cyan-400 text-xs font-bold">✓ CURRENT</span>' : '');
+        row.onclick = () => {
+          if (current) { closeStoreSwitcher(); return; }
+          session.storeId = s.storeId; session.storeName = s.storeName;
+          localStorage.setItem('wh_last_store', s.storeId);
+          cart = [];
+          renderCart();
+          closeStoreSwitcher();
+          enterMain();
+          toast('Switched to ' + s.storeName);
+        };
+        list.appendChild(row);
+      });
+      show(document.getElementById('storeSwitcherModal'));
+    }
+
+    function closeStoreSwitcher() { hide(document.getElementById('storeSwitcherModal')); }
+
+    function doLogout() {
+      const token = session ? session.token : '';
+      const username = session ? session.username : '';
+      session = null; cart = [];
+      localStorage.removeItem('wh_session');
+      localStorage.removeItem('wh_tab');
+      if (token && username) {
+        fetch(API + '/dashboard/whapp/logout', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, token })
+        }).catch(() => {});
+      }
+      document.getElementById('passwordInput').value = '';
+      setScreen('login');
+      document.getElementById('usernameInput').focus();
+    }
+
+    function switchTab(tab) {
+      localStorage.setItem('wh_tab', tab);
+      hide(document.getElementById('tabSell'));
+      hide(document.getElementById('tabInventory'));
+      hide(document.getElementById('tabSetup'));
+      document.getElementById('navSell').classList.remove('active');
+      document.getElementById('navInventory').classList.remove('active');
+      document.getElementById('navSetup').classList.remove('active');
+      if (tab === 'sell') { show(document.getElementById('tabSell')); document.getElementById('navSell').classList.add('active'); }
+      if (tab === 'inventory') { show(document.getElementById('tabInventory')); document.getElementById('navInventory').classList.add('active'); document.getElementById('invSearch').focus(); }
+      if (tab === 'setup') { show(document.getElementById('tabSetup')); document.getElementById('navSetup').classList.add('active'); refreshPrinters(); }
+    }
+
+    // ─── MODERN PULL-TO-REFRESH (called by native app) ───────
+    function refreshCurrentTab() {
+      const tab = localStorage.getItem('wh_tab') || 'sell';
+      if (tab === 'inventory') {
+        searchInventory();
+      } else if (tab === 'setup') {
+        refreshPrinters();
+      } else {
+        if (IN_APP) refreshPrinters();
+        const q = document.getElementById('sellSearch').value.trim();
+        if (q) searchProducts();
+      }
+      toast('Data refreshed ✓');
+      return 'done';
+    }
+
+    // ─── PRINTER ─────────────────────────────────────────────
+    function updatePrinterStatus(connected, label) {
+      const b = document.getElementById('printerStatusBadge');
+      b.textContent = connected ? '🖨️ CONNECTED' : ('🖨️ ' + (label || 'NOT CONNECTED'));
+      b.className = connected
+        ? 'text-[10px] px-2 py-1 rounded-full bg-emerald-950/50 text-emerald-400 border border-emerald-900/40 font-medium'
+        : 'text-[10px] px-2 py-1 rounded-full bg-red-950/50 text-red-400 border border-red-900/40 font-medium';
+    }
+
+    function refreshPrinters() {
+      const list = document.getElementById('printerList');
+      if (!IN_APP) {
+        list.innerHTML = '<p class="text-gray-500 text-xs py-2">Bluetooth printing available only in the installed app (APK). Open the app instead of browser.</p>';
+        return;
+      }
+      let printers = [];
+      try { printers = JSON.parse(AndroidPrinter.getPrinters()); } catch (e) { printers = []; }
+      list.innerHTML = '';
+      document.getElementById('printerHint').classList.toggle('hidden', printers.length > 0);
+      if (!printers.length) {
+        list.innerHTML = '<p class="text-gray-500 text-xs py-2">No printer found. Make sure your Xprinter is paired in Phone Settings → Bluetooth.</p>';
+        updatePrinterStatus(false);
+        return;
+      }
+      printers.forEach(p => {
+        const row = document.createElement('div');
+        row.className = 'printer-row';
+        row.innerHTML = '<div><p class="text-white text-sm font-medium">🖨️ ' + p.name + '</p><p class="text-gray-500 text-[11px]">' + p.address + '</p></div>' +
+          '<button class="text-xs px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium" onclick="connectPrinter(\'' + p.address + '\')">CONNECT</button>';
+        list.appendChild(row);
+      });
+    }
+
+    function connectPrinter(address) {
+      if (!IN_APP) { toast('Open the app (APK) to use Bluetooth', 'error'); return; }
+      const result = AndroidPrinter.connect(address);
+      if (result === 'OK') {
+        updatePrinterStatus(true);
+        localStorage.setItem('wh_printer', address);
+        toast('Printer connected!');
+      } else {
+        updatePrinterStatus(false);
+        toast(result.replace('ERR:', ''), 'error');
+      }
+    }
+
+    function printTest() {
+      if (!IN_APP) { toast('Open the app (APK) to use Bluetooth', 'error'); return; }
+      const result = AndroidPrinter.printTest();
+      if (result === 'OK') toast('Test print sent to printer!');
+      else { updatePrinterStatus(false); toast(result.replace('ERR:', ''), 'error'); }
+    }
+
+    // ─── PRODUCT SEARCH ──────────────────────────────────────
+    async function searchProducts() {
+      const q = document.getElementById('sellSearch').value.trim();
+      if (!q) return;
+      const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true';
+      try {
+        const r = await fetch(url);
+        const data = await r.json();
+        const box = document.getElementById('productResults');
+        box.innerHTML = '';
+        (data || []).filter(p => p.isActive !== false).slice(0, 20).forEach(p => {
+          const div = document.createElement('div');
+          div.className = 'card';
+          div.innerHTML = '<div class="flex items-center justify-between"><div><p class="text-white text-sm font-bold">' + p.name + '</p>' +
+            '<p class="text-gray-500 text-[11px]">Stock: ' + p.stockQty + ' • ' + (p.barcode || 'no barcode') + '</p></div>' +
+            '<button class="text-xs px-3 py-2 rounded-lg bg-cyan-600 text-white font-bold" onclick="openUnitPicker(' + p.id + ')">+ ADD</button></div>';
+          box.appendChild(div);
+        });
+        if (!data || !data.length) box.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No products found</p>';
+      } catch (e) { toast('Search failed: ' + e.message, 'error'); }
+    }
+
+    async function openUnitPicker(productId) {
+      const url = API + '/dashboard/warehouse/products?search=' + productId + '&noImage=true';
+      try {
+        const r = await fetch(url);
+        const data = await r.json();
+        const p = (data || []).find(x => x.id === productId);
+        if (!p) { toast('Product not found', 'error'); return; }
+        currentProduct = p;
+        document.getElementById('pickProductName').textContent = p.name;
+        const units = p.units || [];
+        const box = document.getElementById('unitOptions');
+        box.innerHTML = '';
+        if (units.length === 0) {
+          box.innerHTML = '<div class="unit-chip selected" onclick="selectUnit(0)">Piece</div>';
+          selectedUnitIndex = 0;
+        } else {
+          units.forEach((u, i) => {
+            const chip = document.createElement('span');
+            chip.className = 'unit-chip';
+            chip.textContent = u.unitName + ' — ₱' + u.price + (u.qtyPerUnit > 1 ? ' (' + u.qtyPerUnit + ' pcs)' : '');
+            chip.onclick = () => selectUnit(i);
+            box.appendChild(chip);
+          });
+          const defIdx = units.findIndex(u => u.qtyPerUnit > 1);
+          selectUnit(defIdx >= 0 ? defIdx : 0);
+        }
+        show(document.getElementById('unitPicker'));
+      } catch (e) { toast('Failed: ' + e.message, 'error'); }
+    }
+
+    function selectUnit(idx) {
+      selectedUnitIndex = idx;
+      document.querySelectorAll('#unitOptions .unit-chip').forEach((c, i) => {
+        c.className = 'unit-chip' + (i === idx ? ' selected' : '');
+      });
+    }
+
+    function closeUnitPicker() {
+      hide(document.getElementById('unitPicker'));
+      currentProduct = null;
+    }
+
+    function addToCart() {
+      if (!currentProduct) return;
+      const units = currentProduct.units || [];
+      const unit = units.length > 0 ? units[selectedUnitIndex] : { unitName: 'Piece', price: currentProduct.piecePrice, qtyPerUnit: 1 };
+      const existing = cart.find(c => c.productId === currentProduct.id && c.unitIndex === selectedUnitIndex);
+      if (existing) existing.qty += 1;
+      else cart.push({ productId: currentProduct.id, productName: currentProduct.name, unitIndex: selectedUnitIndex, unitName: unit.unitName || 'Piece', price: unit.price || 0, qtyPerUnit: unit.qtyPerUnit || 1, qty: 1 });
+      renderCart();
+      closeUnitPicker();
+      toast('Added: ' + currentProduct.name);
+    }
+
+    function renderCart() {
+      const list = document.getElementById('cartList');
+      list.innerHTML = '';
+      document.getElementById('cartEmpty').style.display = cart.length ? 'none' : 'block';
+      document.getElementById('cartCount').textContent = cart.length + ' item(s)';
+      let total = 0;
+      cart.forEach((c, i) => {
+        total += c.price * c.qty;
+        const div = document.createElement('div');
+        div.className = 'cart-item';
+        div.innerHTML = '<div class="flex-1"><p class="text-white text-xs font-bold">' + c.productName + '</p>' +
+          '<p class="text-gray-500 text-[10px]">' + c.unitName + ' @ ₱' + c.price.toFixed(2) + (c.qtyPerUnit > 1 ? ' (×' + c.qtyPerUnit + 'pcs)' : '') + '</p></div>' +
+          '<div class="flex items-center gap-2"><button class="qty-btn" onclick="changeQty(' + i + ',-1)">−</button>' +
+          '<span class="text-white text-sm font-bold w-6 text-center">' + c.qty + '</span>' +
+          '<button class="qty-btn" onclick="changeQty(' + i + ',1)">+</button>' +
+          '<span class="text-cyan-400 text-xs font-bold w-16 text-right">₱' + (c.price * c.qty).toFixed(2) + '</span></div>';
+        list.appendChild(div);
+      });
+      document.getElementById('cartTotal').textContent = '₱' + total.toFixed(2);
+    }
+
+    function changeQty(i, delta) {
+      cart[i].qty += delta;
+      if (cart[i].qty <= 0) cart.splice(i, 1);
+      renderCart();
+    }
+
+    // ─── CHECKOUT ────────────────────────────────────────────
+    function checkout() {
+      if (!cart.length) { toast('Cart is empty', 'error'); return; }
+      const total = cart.reduce((s, c) => s + c.price * c.qty, 0);
+      document.getElementById('payTotal').textContent = '₱' + total.toFixed(2);
+      document.getElementById('payCash').value = total.toFixed(2);
+      document.getElementById('payMethod').value = 'Cash';
+      document.getElementById('payChange').textContent = 'Change: ₱0.00';
+      pendingPay = total;
+      show(document.getElementById('payModal'));
+    }
+
+    function closePay() { hide(document.getElementById('payModal')); pendingPay = null; }
+
+    async function confirmPay() {
+      const method = document.getElementById('payMethod').value;
+      const cash = parseFloat(document.getElementById('payCash').value) || 0;
+      if (method === 'Cash' && cash < pendingPay) { toast('Cash must cover the total', 'error'); return; }
+      const items = cart.map(c => ({ productId: c.productId, productName: c.productName, unitIndex: c.unitIndex, qty: c.qty }));
+      const body = {
+        customerId: 0,
+        customerName: 'Walk-in Customer',
+        paymentMethod: method,
+        cashReceived: cash,
+        items
+      };
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/sell', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const j = await r.json();
+        if (!r.ok) { toast(j.error || 'Sale failed', 'error'); return; }
+        const invoiceNo = j.invoiceNo || ('#' + j.saleId);
+        if (IN_APP && AndroidPrinter.isConnected()) {
+          const receipt = buildReceiptText(j, items, method);
+          const pr = AndroidPrinter.print(receipt);
+          if (pr !== 'OK') toast('Sale OK but print failed: ' + pr, 'error');
+        }
+        toast('Sale complete! ' + invoiceNo);
+        cart = [];
+        renderCart();
+        closePay();
+      } catch (e) { toast('Sale failed: ' + e.message, 'error'); }
+    }
+
+    function buildReceiptText(j, items, method) {
+      let t = '';
+      t += '<<CENTER>>JUMONG POS\n';
+      t += '<<CENTER>>' + (session.storeName || '') + '\n';
+      t += '<<CENTER>>Invoice: ' + (j.invoiceNo || j.saleId) + '\n';
+      t += '<<CENTER>>Cashier: ' + (session.fullName || session.username) + '\n';
+      t += '<<CENTER>>' + new Date().toLocaleString('en-PH') + '\n';
+      t += '--------------------------------\n';
+      cart.forEach(c => {
+        t += c.productName + '\n';
+        t += '  ' + c.unitName + ' x' + c.qty + '  ' + (c.price * c.qty).toFixed(2) + '\n';
+      });
+      t += '--------------------------------\n';
+      t += 'TOTAL: ' + j.grandTotal.toFixed(2) + '\n';
+      t += 'PAYMENT: ' + method + '\n';
+      t += '<<CENTER>>THANK YOU!\n';
+      return t;
+    }
+
+    // ─── INVENTORY ───────────────────────────────────────────
+    async function searchInventory() {
+      const q = document.getElementById('invSearch').value.trim();
+      const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true';
+      try {
+        const r = await fetch(url);
+        const data = await r.json();
+        const box = document.getElementById('invResults');
+        box.innerHTML = '';
+        (data || []).filter(p => p.isActive !== false).slice(0, 50).forEach(p => {
+          const low = p.stockQty <= 10;
+          const div = document.createElement('div');
+          div.className = 'card';
+          div.innerHTML = '<div class="flex items-center justify-between"><div><p class="text-white text-sm font-bold">' + p.name + '</p>' +
+            '<p class="text-gray-500 text-[11px]">' + (p.barcode || 'no barcode') + '</p></div>' +
+            '<p class="text-lg font-bold ' + (p.stockQty === 0 ? 'text-red-400' : low ? 'text-orange-400' : 'text-emerald-400') + '">' + p.stockQty + '</p></div>';
+          box.appendChild(div);
+        });
+        if (!data || !data.length) box.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No products found</p>';
+      } catch (e) { toast('Failed: ' + e.message, 'error'); }
+    }
+
+    // ─── APP UPDATE ──────────────────────────────────────────
+    function compareVersions(a, b) {
+      const pa = String(a).split('.').map(Number);
+      const pb = String(b).split('.').map(Number);
+      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const x = pa[i] || 0, y = pb[i] || 0;
+        if (x > y) return 1;
+        if (x < y) return -1;
+      }
+      return 0;
+    }
+
+    function checkAppUpdate(force) {
+      if (!IN_APP) return;
+      try {
+        const current = AndroidApp.getVersion() || '0.0.0';
+        const txt = AndroidApp.checkForUpdate('https://admin.jumongdev.com/updates/warehouse-version.json');
+        if (txt.startsWith('ERR:')) {
+          if (force) toast('Update check failed: ' + txt.replace('ERR:', ''), 'error');
+          return;
+        }
+        const j = JSON.parse(txt);
+        if (j && j.version && compareVersions(j.version, current) > 0) {
+          const lockKey = 'wh_update_prompted_' + j.version;
+          localStorage.removeItem('wh_update_prompted');
+          if (!force && localStorage.getItem(lockKey) === '1') return;
+          document.getElementById('updateNewVer').textContent = j.version;
+          document.getElementById('updateCurVer').textContent = current;
+          document.getElementById('updateChangelog').textContent = (j.changelog || 'Bug fixes and improvements.') + '\n\nTap UPDATE NOW - no uninstall needed.';
+          localStorage.setItem(lockKey, '1');
+          document.getElementById('manualDlBtn').classList.remove('hidden');
+          show(document.getElementById('updateModal'));
+        } else {
+          if (force) toast('You are up to date (v' + current + ')');
+        }
+      } catch (e) {
+        if (force) toast('Update check error: ' + e.message, 'error');
+      }
+    }
+
+    function closeUpdate() {
+      hide(document.getElementById('updateModal'));
+      document.getElementById('updateStatus').classList.add('hidden');
+    }
+
+    function doAppUpdate() {
+      const btn = document.getElementById('updateModal').querySelector('.btn-green');
+      btn.disabled = true;
+      btn.textContent = 'DOWNLOADING...';
+      document.getElementById('updateStatus').classList.remove('hidden');
+      document.getElementById('updateStatus').textContent = 'Downloading update... You will be asked to confirm install once.';
+      document.getElementById('manualDlBtn').classList.remove('hidden');
+      AndroidApp.downloadAndInstall('https://admin.jumongdev.com/updates/JumongWarehouse.apk');
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = 'UPDATE NOW';
+        document.getElementById('updateStatus').textContent = 'Download started. If the install prompt does not appear, tap MANUAL DOWNLOAD below.';
+      }, 3000);
+    }
+
+    function manualDownload() {
+      // Opens APK in browser - most reliable install path
+      window.open('https://admin.jumongdev.com/updates/JumongWarehouse.apk', '_system');
+    }
+
+    // ─── INIT: validate session on every open ────────────────
+    (function init() {
+      setScreen('loading');
+      const saved = localStorage.getItem('wh_session');
+      if (saved) {
+        try {
+          const s = JSON.parse(saved);
+          if (s && s.success) {
+            if (!s.token) {
+              session = s;
+              const stores = s.stores || [];
+              if (stores.length > 1 && !session.storeId) { renderStores(stores); setScreen('store'); }
+              else { if (stores.length === 1) session.storeId = stores[0].storeId; enterMain(); }
+              return;
+            }
+            fetch(API + '/dashboard/whapp/validate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username: s.username, token: s.token, storeId: s.storeId })
+            }).then(r => r.json()).then(j => {
+              if (j.success) {
+                session = j;
+                localStorage.setItem('wh_session', JSON.stringify(j));
+                const stores = j.stores || [];
+                if (stores.length > 1 && !j.storeId) { renderStores(stores); setScreen('store'); }
+                else { if (stores.length === 1) session.storeId = stores[0].storeId; enterMain(); }
+              } else {
+                localStorage.removeItem('wh_session');
+                setScreen('login');
+                document.getElementById('usernameInput').focus();
+                toast(j.error || 'Session expired. Please log in again.', 'error');
+              }
+            }).catch(() => {
+              session = s;
+              const stores = s.stores || [];
+              if (stores.length > 1 && !session.storeId) { renderStores(stores); setScreen('store'); }
+              else { if (stores.length === 1) session.storeId = stores[0].storeId; enterMain(); }
+            });
+            return;
+          }
+        } catch (e) { localStorage.removeItem('wh_session'); }
+      }
+      setScreen('login');
+      document.getElementById('usernameInput').focus();
+    })();
+
+    // Enter key submits
+    document.getElementById('usernameInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+    document.getElementById('passwordInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+    document.getElementById('sellSearch').addEventListener('keydown', e => { if (e.key === 'Enter') searchProducts(); });
+    document.getElementById('invSearch').addEventListener('keydown', e => { if (e.key === 'Enter') searchInventory(); });
+  </script>
+</body>
+</html>

@@ -71,6 +71,7 @@ public static class PgDatabaseHelper
                 role TEXT NOT NULL DEFAULT 'Cashier',
                 full_name TEXT DEFAULT '',
                 is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                mobile_access BOOLEAN NOT NULL DEFAULT FALSE,
                 synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 UNIQUE(store_id, pos_id)
             );
@@ -276,6 +277,11 @@ public static class PgDatabaseHelper
         using var pwMig = conn.CreateCommand();
         pwMig.CommandText = "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT '12345'";
         try { pwMig.ExecuteNonQuery(); } catch { }
+
+        // Migration: add mobile_access to users for warehouse mobile app login
+        using var mobMig = conn.CreateCommand();
+        mobMig.CommandText = "ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile_access BOOLEAN NOT NULL DEFAULT FALSE";
+        try { mobMig.ExecuteNonQuery(); } catch { }
 
         // Migration: create user_stores junction table for multi-store user access
         using var usMig = conn.CreateCommand();
@@ -692,5 +698,16 @@ public static class PgDatabaseHelper
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )";
         try { raMig.ExecuteNonQuery(); } catch { }
+
+        // Migration: whapp_tokens for warehouse mobile app session validation
+        using var whTokMig = conn.CreateCommand();
+        whTokMig.CommandText = @"
+            CREATE TABLE IF NOT EXISTS whapp_tokens (
+                id SERIAL PRIMARY KEY,
+                user_pos_id INTEGER NOT NULL,
+                token TEXT NOT NULL UNIQUE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )";
+        try { whTokMig.ExecuteNonQuery(); } catch { }
     }
 }

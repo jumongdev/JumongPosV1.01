@@ -52,8 +52,12 @@ public class DashboardController : ControllerBase
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"SELECT s.store_id, COALESCE(st.store_name, '') AS store_name
-                FROM (SELECT DISTINCT store_id FROM sales WHERE store_id != '') s
+            cmd.CommandText = @"SELECT DISTINCT s.store_id, COALESCE(st.store_name, '') AS store_name
+                FROM (
+                    SELECT store_id FROM sales WHERE store_id != ''
+                    UNION
+                    SELECT store_id FROM stores
+                ) s
                 LEFT JOIN stores st ON s.store_id = st.store_id
                 ORDER BY s.store_id";
             var stores = new List<object>();
@@ -268,19 +272,19 @@ public class DashboardController : ControllerBase
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = $@"
-                SELECT u.pos_id, u.username, u.role, u.full_name, u.is_active, u.password_hash,
+                SELECT u.pos_id, u.username, u.role, u.full_name, u.is_active, u.password_hash, u.mobile_access,
                        COALESCE((SELECT json_agg(us.store_id) FROM user_stores us WHERE us.user_pos_id = u.pos_id), '[]'::json) AS store_ids
                 FROM users u
                 WHERE u.is_active = true {StoreFilter(storeId, "u")}
-                GROUP BY u.pos_id, u.username, u.role, u.full_name, u.is_active, u.password_hash
+                GROUP BY u.pos_id, u.username, u.role, u.full_name, u.is_active, u.password_hash, u.mobile_access
                 ORDER BY u.username LIMIT 500";
             if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
             var data = new List<object>();
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
-                var storeIds = r.IsDBNull(6) ? new List<string>() : System.Text.Json.JsonSerializer.Deserialize<List<string>>(r.GetString(6)) ?? new();
-                data.Add(new { posId = r.GetInt32(0), username = r.GetString(1), role = r.GetString(2), fullName = r.IsDBNull(3) ? "" : r.GetString(3), isActive = r.GetBoolean(4), passwordHash = r.IsDBNull(5) ? "12345" : r.GetString(5), storeIds });
+                var storeIds = r.IsDBNull(7) ? new List<string>() : System.Text.Json.JsonSerializer.Deserialize<List<string>>(r.GetString(7)) ?? new();
+                data.Add(new { posId = r.GetInt32(0), username = r.GetString(1), role = r.GetString(2), fullName = r.IsDBNull(3) ? "" : r.GetString(3), isActive = r.GetBoolean(4), passwordHash = r.IsDBNull(5) ? "12345" : r.GetString(5), mobileAccess = r.GetBoolean(6), storeIds });
             }
             return Ok(data);
         }
@@ -292,6 +296,7 @@ public class DashboardController : ControllerBase
             var fullName = body.TryGetProperty("fullName", out var fn) ? fn.GetString() ?? "" : "";
             var role = body.TryGetProperty("role", out var rl) ? rl.GetString() ?? "Cashier" : "Cashier";
             var passwordHash = body.TryGetProperty("passwordHash", out var ph) ? ph.GetString() ?? "12345" : "12345";
+            var mobileAccess = body.TryGetProperty("mobileAccess", out var ma) ? ma.GetBoolean() : false;
             var storeIds = body.TryGetProperty("storeIds", out var si) && si.ValueKind == JsonValueKind.Array
                 ? si.EnumerateArray().Select(x => x.GetString()).Where(s => !string.IsNullOrEmpty(s)).ToList()
                 : new List<string?>();
@@ -315,13 +320,14 @@ public class DashboardController : ControllerBase
 
             // Insert user (store_id = '' for cloud-managed users)
             using var insCmd = conn.CreateCommand();
-            insCmd.CommandText = @"INSERT INTO users (pos_id, store_id, username, role, full_name, is_active, password_hash, synced_at)
-                VALUES (@p, '', @u, @r, @fn, true, @ph, NOW()) RETURNING id";
+            insCmd.CommandText = @"INSERT INTO users (pos_id, store_id, username, role, full_name, is_active, password_hash, mobile_access, synced_at)
+                VALUES (@p, '', @u, @r, @fn, true, @ph, @ma, NOW()) RETURNING id";
             insCmd.Parameters.AddWithValue("p", newPosId);
             insCmd.Parameters.AddWithValue("u", username);
             insCmd.Parameters.AddWithValue("r", role);
             insCmd.Parameters.AddWithValue("fn", fullName);
             insCmd.Parameters.AddWithValue("ph", passwordHash);
+            insCmd.Parameters.AddWithValue("ma", mobileAccess);
             insCmd.ExecuteNonQuery();
 
             // Insert user_stores entries
@@ -346,6 +352,7 @@ public class DashboardController : ControllerBase
             var role = body.TryGetProperty("role", out var rl) ? rl.GetString() ?? "Cashier" : "Cashier";
             var isActive = body.TryGetProperty("isActive", out var ia) ? ia.GetBoolean() : true;
             var passwordHash = body.TryGetProperty("passwordHash", out var ph) ? ph.GetString() : null;
+            var mobileAccess = body.TryGetProperty("mobileAccess", out var ma) ? ma.GetBoolean() : false;
             var storeIds = body.TryGetProperty("storeIds", out var si) && si.ValueKind == JsonValueKind.Array
                 ? si.EnumerateArray().Select(x => x.GetString()).Where(s => !string.IsNullOrEmpty(s)).ToList()
                 : new List<string?>();
@@ -355,7 +362,7 @@ public class DashboardController : ControllerBase
             using var conn = Data.PgDatabaseHelper.GetConnection();
 
             using var cmd = conn.CreateCommand();
-            var setClause = "username = @u, role = @r, full_name = @fn, is_active = @ia, synced_at = NOW()";
+            var setClause = "username = @u, role = @r, full_name = @fn, is_active = @ia, mobile_access = @ma, synced_at = NOW()";
             if (passwordHash != null) setClause += ", password_hash = @ph";
 
             cmd.CommandText = $"UPDATE users SET {setClause} WHERE pos_id = @pid";
@@ -364,6 +371,7 @@ public class DashboardController : ControllerBase
             cmd.Parameters.AddWithValue("r", role);
             cmd.Parameters.AddWithValue("fn", fullName);
             cmd.Parameters.AddWithValue("ia", isActive);
+            cmd.Parameters.AddWithValue("ma", mobileAccess);
             if (passwordHash != null) cmd.Parameters.AddWithValue("ph", passwordHash);
 
             var rows = cmd.ExecuteNonQuery();
@@ -440,7 +448,7 @@ public class DashboardController : ControllerBase
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                SELECT DISTINCT u.pos_id, u.username, u.role, u.full_name, u.is_active, u.password_hash
+                SELECT DISTINCT u.pos_id, u.username, u.role, u.full_name, u.is_active, u.password_hash, u.mobile_access
                 FROM users u
                 WHERE u.is_active = true
                 AND (
@@ -452,8 +460,211 @@ public class DashboardController : ControllerBase
             var data = new List<object>();
             using var r = cmd.ExecuteReader();
             while (r.Read())
-                data.Add(new { posId = r.GetInt32(0), username = r.GetString(1), role = r.GetString(2), fullName = r.IsDBNull(3) ? "" : r.GetString(3), isActive = r.GetBoolean(4), passwordHash = r.IsDBNull(5) ? "12345" : r.GetString(5) });
+                data.Add(new { posId = r.GetInt32(0), username = r.GetString(1), role = r.GetString(2), fullName = r.IsDBNull(3) ? "" : r.GetString(3), isActive = r.GetBoolean(4), passwordHash = r.IsDBNull(5) ? "12345" : r.GetString(5), mobileAccess = r.IsDBNull(6) ? false : r.GetBoolean(6) });
             return Ok(data);
+        }
+
+        [HttpPost("whapp/login")]
+        public IActionResult WhAppLogin([FromBody] JsonElement body)
+        {
+            var username = body.TryGetProperty("username", out var u) ? u.GetString() ?? "" : "";
+            var password = body.TryGetProperty("password", out var p) ? p.GetString() ?? "" : "";
+            var storeId = body.TryGetProperty("storeId", out var sid) ? sid.GetString() ?? "" : "";
+
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+                return BadRequest(new { success = false, error = "Username and password are required" });
+
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT u.pos_id, u.username, u.role, u.full_name, u.mobile_access, u.store_id,
+                       COALESCE((SELECT json_agg(us.store_id) FROM user_stores us WHERE us.user_pos_id = u.pos_id), '[]'::json) AS store_ids
+                FROM users u
+                WHERE LOWER(u.username) = LOWER(@u) AND u.password_hash = @p AND u.is_active = true
+                LIMIT 1";
+            cmd.Parameters.AddWithValue("u", username);
+            cmd.Parameters.AddWithValue("p", password);
+
+            int posId = 0;
+            string uname = "", role = "Cashier", fullName = "";
+            bool mobileAccess = false;
+            string baseStoreId = "";
+            List<string> storeIds = new();
+            bool found = false;
+
+            using (var r = cmd.ExecuteReader())
+            {
+                if (r.Read())
+                {
+                    found = true;
+                    posId = r.GetInt32(0);
+                    uname = r.GetString(1);
+                    role = r.GetString(2);
+                    fullName = r.IsDBNull(3) ? "" : r.GetString(3);
+                    mobileAccess = r.GetBoolean(4);
+                    baseStoreId = r.IsDBNull(5) ? "" : r.GetString(5);
+                    storeIds = r.IsDBNull(6) ? new List<string>() : System.Text.Json.JsonSerializer.Deserialize<List<string>>(r.GetString(6)) ?? new();
+                }
+            }
+
+            if (!found)
+                return Unauthorized(new { success = false, error = "Invalid username or password" });
+
+            if (!mobileAccess)
+                return Unauthorized(new { success = false, error = "No mobile access granted. Ask the admin to enable Mobile Access for this user." });
+
+            var allStores = storeIds.Count > 0 ? storeIds : (baseStoreId == "" ? new List<string>() : new List<string> { baseStoreId });
+
+            // Resolve store names (reader closed, safe to run new command)
+            var storeNames = new Dictionary<string, string>();
+            if (allStores.Count > 0)
+            {
+                using var scmd = conn.CreateCommand();
+                scmd.CommandText = "SELECT store_id, store_name FROM stores WHERE store_id = ANY(@ids)";
+                scmd.Parameters.AddWithValue("ids", allStores.ToArray());
+                using var sr = scmd.ExecuteReader();
+                while (sr.Read()) storeNames[sr.GetString(0)] = sr.GetString(1);
+            }
+
+            var userStoreId = !string.IsNullOrEmpty(storeId) && allStores.Contains(storeId) ? storeId
+                : allStores.Contains("STORE-WAREHOUSE") ? "STORE-WAREHOUSE"
+                : allStores.Contains("STORE-20260602-7159") ? "STORE-20260602-7159"
+                : allStores.FirstOrDefault() ?? "";
+
+            // Generate session token for subsequent validation (multi-device: keep last 5)
+            var token = Guid.NewGuid().ToString("N");
+            using (var insTok = conn.CreateCommand())
+            {
+                insTok.CommandText = "INSERT INTO whapp_tokens (user_pos_id, token) VALUES (@pid, @tok)";
+                insTok.Parameters.AddWithValue("pid", posId);
+                insTok.Parameters.AddWithValue("tok", token);
+                insTok.ExecuteNonQuery();
+            }
+            using (var cleanTok = conn.CreateCommand())
+            {
+                cleanTok.CommandText = @"
+                    DELETE FROM whapp_tokens WHERE id IN (
+                        SELECT id FROM whapp_tokens WHERE user_pos_id = @pid
+                        ORDER BY created_at DESC OFFSET 5
+                    )";
+                cleanTok.Parameters.AddWithValue("pid", posId);
+                cleanTok.ExecuteNonQuery();
+            }
+
+            return Ok(new
+            {
+                success = true,
+                posId,
+                username = uname,
+                role,
+                fullName,
+                token,
+                storeId = userStoreId,
+                storeName = userStoreId != "" && storeNames.TryGetValue(userStoreId, out var sn) ? sn : "",
+                stores = allStores.Select(s => new { storeId = s, storeName = storeNames.TryGetValue(s, out var sn2) ? sn2 : s })
+            });
+        }
+
+        [HttpPost("whapp/validate")]
+        public IActionResult WhAppValidate([FromBody] JsonElement body)
+        {
+            var username = body.TryGetProperty("username", out var u) ? u.GetString() ?? "" : "";
+            var token = body.TryGetProperty("token", out var t) ? t.GetString() ?? "" : "";
+            var storeId = body.TryGetProperty("storeId", out var sid) ? sid.GetString() ?? "" : "";
+
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(token))
+                return BadRequest(new { success = false, error = "Username and token are required" });
+
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+
+            // Check token is valid and user is still active + has mobile access
+            int posId = 0;
+            string uname = "", role = "Cashier", fullName = "";
+            bool mobileAccess = false;
+            string baseStoreId = "";
+            List<string> storeIds = new();
+            bool found = false;
+
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    SELECT u.pos_id, u.username, u.role, u.full_name, u.mobile_access, u.store_id,
+                           COALESCE((SELECT json_agg(us.store_id) FROM user_stores us WHERE us.user_pos_id = u.pos_id), '[]'::json) AS store_ids
+                    FROM users u
+                    JOIN whapp_tokens wt ON wt.user_pos_id = u.pos_id AND wt.token = @tok
+                    WHERE LOWER(u.username) = LOWER(@u) AND u.is_active = true
+                    LIMIT 1";
+                cmd.Parameters.AddWithValue("u", username);
+                cmd.Parameters.AddWithValue("tok", token);
+                using var r = cmd.ExecuteReader();
+                if (r.Read())
+                {
+                    found = true;
+                    posId = r.GetInt32(0);
+                    uname = r.GetString(1);
+                    role = r.GetString(2);
+                    fullName = r.IsDBNull(3) ? "" : r.GetString(3);
+                    mobileAccess = r.GetBoolean(4);
+                    baseStoreId = r.IsDBNull(5) ? "" : r.GetString(5);
+                    storeIds = r.IsDBNull(6) ? new List<string>() : System.Text.Json.JsonSerializer.Deserialize<List<string>>(r.GetString(6)) ?? new();
+                }
+            }
+
+            if (!found)
+                return Unauthorized(new { success = false, error = "Session expired. Please log in again." });
+
+            if (!mobileAccess)
+                return Unauthorized(new { success = false, error = "Mobile access revoked. Please contact the admin." });
+
+            var allStores = storeIds.Count > 0 ? storeIds : (baseStoreId == "" ? new List<string>() : new List<string> { baseStoreId });
+            if (allStores.Count == 0)
+                return Unauthorized(new { success = false, error = "No store access. Please contact the admin." });
+
+            // Resolve store names (reader closed, safe to run new command)
+            var storeNames = new Dictionary<string, string>();
+            using (var scmd = conn.CreateCommand())
+            {
+                scmd.CommandText = "SELECT store_id, store_name FROM stores WHERE store_id = ANY(@ids)";
+                scmd.Parameters.AddWithValue("ids", allStores.ToArray());
+                using var sr = scmd.ExecuteReader();
+                while (sr.Read()) storeNames[sr.GetString(0)] = sr.GetString(1);
+            }
+
+            var userStoreId = !string.IsNullOrEmpty(storeId) && allStores.Contains(storeId) ? storeId
+                : allStores.Contains("STORE-WAREHOUSE") ? "STORE-WAREHOUSE"
+                : allStores.Contains("STORE-20260602-7159") ? "STORE-20260602-7159"
+                : allStores.FirstOrDefault() ?? "";
+
+            return Ok(new
+            {
+                success = true,
+                posId,
+                username = uname,
+                role,
+                fullName,
+                storeId = userStoreId,
+                storeName = userStoreId != "" && storeNames.TryGetValue(userStoreId, out var sn) ? sn : "",
+                stores = allStores.Select(s => new { storeId = s, storeName = storeNames.TryGetValue(s, out var sn2) ? sn2 : s })
+            });
+        }
+
+        [HttpPost("whapp/logout")]
+        public IActionResult WhAppLogout([FromBody] JsonElement body)
+        {
+            var username = body.TryGetProperty("username", out var u) ? u.GetString() ?? "" : "";
+            var token = body.TryGetProperty("token", out var t) ? t.GetString() ?? "" : "";
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(token))
+                return BadRequest(new { success = false });
+
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"DELETE FROM whapp_tokens wt
+                USING users u
+                WHERE wt.token = @tok AND wt.user_pos_id = u.pos_id AND LOWER(u.username) = LOWER(@u)";
+            cmd.Parameters.AddWithValue("tok", token);
+            cmd.Parameters.AddWithValue("u", username);
+            cmd.ExecuteNonQuery();
+            return Ok(new { success = true });
         }
 
         [HttpGet("expenses-summary")]
@@ -951,7 +1162,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.0.9" });
+            return Ok(new { version = "1.1.0" });
     }
 
         [HttpGet("fix-hvr-times")]

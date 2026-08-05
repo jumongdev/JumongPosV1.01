@@ -1,0 +1,6 @@
+{
+    "apkUrl":  "https://admin.jumongdev.com/updates/JumongWarehouse.apk",
+    "changelog":  "v1.0.3: Fixed in-app update install (FileProvider). App renamed to Jumong Pos.",
+    "version":  "1.0.3",
+    "released":  "2026-08-05"
+}
