@@ -1112,3 +1112,75 @@ Compress-Archive -Force -Path "bin\Release\net8.0-windows\win-x64\publish\*" -De
 
 **Impact:** Credit balance changes (payment, credit sale, void) now sync to cloud via REST API. The 5-min customer download from cloud no longer has any path to touch local `CreditBalance`. Cloud PG `credit_balance` zeroed for all 334 customers. Only EMZ ABAYON (₱1,278) has active debt. Build cache issue fixed: always run `dotnet clean` before `dotnet publish` to prevent stale exe.
 
+
+## Warehouse Mobile App (Android, WarehouseApp/)
+
+WebView wrapper app that loads https://admin.jumongdev.com/whmobile.html (login via whapp API, SELL/INVENTORY/SETUP tabs, Bluetooth thermal printing, in-app update). Source: Kotlin, no gradle wrapper — use system Gradle 8.14.3 from C:\Users\ADMIN\.gradle\wrapper\dists\gradle-8.14.3-bin\ with Android Studio JBR 21.
+
+### Build & Sign
+`powershell
+Set-Location "C:\Users\ADMIN\Desktop\JumongPosV1.01\WarehouseApp"
+# local.properties must use FORWARD SLASHES (backslashes = invalid path in Java properties):
+#   sdk.dir=C:/Users/ADMIN/AppData/Local/Android/Sdk
+\C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot = "C:\Program Files\Android\Android Studio\jbr"
+& "C:\Users\ADMIN\.gradle\wrapper\dists\gradle-8.14.3-bin\cv11ve7ro1n3o1j4so8xd9n66\gradle-8.14.3\bin\gradle.bat" :app:assembleRelease --no-daemon
+# Sign (keystore: jumong_sign.keystore, alias jumong, pass jumong2026)
+& "C:\Users\ADMIN\AppData\Local\Android\Sdk\build-tools\37.0.0\apksigner.bat" sign --ks jumong_sign.keystore --ks-key-alias jumong --ks-pass "pass:jumong2026" --key-pass "pass:jumong2026" --out JumongWarehouse.apk app\build\outputs\apk\release\app-release-unsigned.apk
+`
+Copy JumongWarehouse.apk to JumongCloudAPI\wwwroot\updates\ AND JumongCloudAPI\bin\Release\net8.0\win-x64\publish\wwwroot\updates\. Bump warehouse-version.json (version + changelog). Old warehouse.keystore password lost — v1.0.4 uses the NEW jumong_sign.keystore cert, so existing installs MUST uninstall first (changelog says so). Gradle OOM risk on this PC: only ~2.8GB free RAM; heap capped at 1536m in gradle.properties.
+
+### v1.1.0 (Cloud API) — Warehouse Mobile App (Android WebView) + whmobile.html
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs` | Added `PostWhappLogin`, `PostWhappValidate`, `PostWhappLogout` endpoints. `GET /stores` response now includes `STORE-WAREHOUSE`. `Login` app checks `IsActive` + `mobileAccess`. Dashboard version bumped to `"1.1.0"`. |
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs` | Added `mobile_access BOOLEAN NOT NULL DEFAULT false` to `users`. Added `whapp_tokens` table (id, user_id, token, created_at, expires_at). |
+| `JumongCloudAPI/Controllers/DashboardController.cs:803-805` | User CRUD reads/writes `mobileAccess`; persisting user keeps token-session rows (whapp_tokens) valid if mobileAccess stays true. |
+| `JumongCloudAPI/Program.cs` | Added static-file endpoint `/updates/*` serving `wwwroot/updates/*.apk` + version JSON. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:391-430` | New `/api/dashboard/whapp/login` (username+password → token, session window 5 tokens/user), `/whapp/validate`, `/whapp/logout`. |
+| `JumongCloudAPI/wwwroot/index.html` | User Manager → **MOBILE ACCESS** checkbox on Add/Edit User modal; Mobile column on users table. Added **MOBILE APP** sidebar button linking `whmobile.html`. |
+| `JumongCloudAPI/wwwroot/components.js` | User editor reads/writes `mobileAccess` to/from table; `@click` on MOBILE APP shows alert. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | **New file** — Warehouse mobile web app (login via whapp API, SELL/INVENTORY/SETUP tabs, Bluetooth thermal printing via Android bridge, in-app update via updates/warehouse-version.json). Hosted at `admin.jumongdev.com/whmobile.html`. |
+| `WarehouseApp/` | **New folder** — Kotlin Android WebView wrapper app (MainActivity, BluetoothPrinter.kt, JavaScript bridge). `build.gradle` versionCode 4, versionName `"1.0.3"`. |
+| `README` / `AGENTS.md` | Documented build & sign steps and local.properties gotcha (must use forward slashes). |
+
+### v1.0.4 (APK rebuild) — New signing keystore, memory fix, OOM crash resolved
+
+| File | Change |
+|---|---|
+| `WarehouseApp/build.gradle` | versionCode bumped to `5`, versionName `"1.0.4"`. |
+| `WarehouseApp/gradle.properties` | `org.gradle.jvmargs=-Xmx1536m -XX:MaxMetaspaceSize=512m` (capped heap — PC only ~2.8GB free RAM). |
+| `JumongCloudAPI/wwwroot/updates/JumongWarehouse.apk` | Rebuilt APK (was stale v1.0.3 with versionCode 4). Signed with NEW keystore. |
+| `JumongCloudAPI/wwwroot/updates/warehouse-version.json` | version `"1.0.4"` — changelog: new signing cert, must uninstall old first. |
+| `.gitignore` | Added rules for `WarehouseApp/build/`, `.gradle/`, `*.apk` artifacts, keystores, `local.properties`. |
+| `AGENTS.md` | Documented build/sign steps and the "must uninstall first" upgrade note. |
+
+**Impact:** Warehouse APK now installs and updates correctly. Gradle is capped at 1536MB to avoid OOM on this PC. Existing v1.0.3 installs MUST uninstall before downloading v1.0.4 (different signing key). Signed keystore `jumong_sign.keystore` (alias `jumong`, pass `jumong2026`) — keep safe, future updates need it.
+
+### v1.0.5 (APK) — Paper Width Selector (50mm/80mm) + Width-Aware Receipts
+
+| File | Change |
+|---|---|
+| `WarehouseApp/MainActivity.kt` | Added `@JavascriptInterface getPaperWidth()` / `setPaperWidth()` using SharedPreferences `wh_prefs` key `paper_width`, default 80. |
+| `WarehouseApp/app/src/main/java/com/jumong/warehouse/MainActivity.kt` | Paper width bridge implemented + forward-slashes fix. |
+| `WarehouseApp/build.gradle` | versionCode bumped to 6, versionName `"1.0.5"`. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | Added PAPER WIDTH card + 50mm/80mm buttons, paperWidth state + loadPaperWidth/setPaperWidth; `buildReceiptText()` width-aware (32ch vs 48ch); both called on load/tab switch. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | **Hardened `loadPaperWidth`/`setPaperWidth`** — feature-detects `AndroidApp.setPaperWidth` before calling (prevents crash on old APKs), always persists to localStorage + toast + highlight even without native bridge. |
+| `JumongCloudAPI/wwwroot/updates/JumongWarehouse.apk` | **v1.0.5** — signed with `jumong_sign.keystore` (same cert as v1.0.4). |
+| `JumongCloudAPI/wwwroot/updates/warehouse-version.json` | version `"1.0.5"` — changelog: adds Paper Width selector (50mm/80mm) in SETUP, same signing cert so updates install without uninstalling. |
+| `AGENTS.md` | Updated with new build/sign/kill commands. |
+
+**Impact:** Warehouse app now lets you pick 50mm or 80mm paper. Receipts auto-fit the selected width. The hardening means even a phone still on v1.0.4 can tap 50mm/80mm and get visual feedback + localStorage persistence (native save only works after updating to v1.0.5). The web-only parts (whmobile.html) deploy instantly with `Copy-Item` to `C:\JumongAPI\wwwroot\` — no APK rebuild needed for web-only fixes.
+
+### Mobile app nav redesign — burger menu, sales report, inventory modes
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/whmobile.html` | Top bar simplified to brand + main store chip only; removed user chip/chevron/store-switcher/printer badge/LOGOUT from top bar. Bottom nav = SELL, INVENTORY, **MENU ☰** (burger) — SETUP removed from bottom nav. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | Added overlay **MENU drawer** (`#burgerMenu`) with: user name + role, version ("Jumong Pos v1.1.0"), logout button, store-switcher chip (opens store modal), INVENTORY sections (Stock / Out of Stock / Low Stock), REPORT section (Sales), SETTINGS section (Setup → opens `switchTab('setup')`). |
+| `JumongCloudAPI/wwwroot/whmobile.html` | Added **SALES REPORT** page (`tabSales`) with backend list, click → sale items modal (items shown; voided struck through). |
+| `JumongCloudAPI/wwwroot/whmobile.html` | Inventory modes (`invMode`) — Stock/Out of Stock/Low Stock filters in drawer; searchInventory() applies modal filter (stockQty===0 / ≤10 / all) and limits. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | Printer status moved to SETUP card instead of top-bar badge; `updatePrinterStatus` now targets ap. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | `savedTab` still supports legacy 'setup' — drawer Menu routes to it. |
+
+**Impact:** Warehouse app is now a full-featured mobile POS with a drawer menu, per-mode inventory views, and sales reports — all in `whmobile.html` (no APK rebuild needed). The nav redesign shipped as a web-only deployment to `admin.jumongdev.com`.
