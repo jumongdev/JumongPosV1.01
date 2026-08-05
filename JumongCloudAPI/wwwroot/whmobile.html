@@ -508,14 +508,22 @@
 
     // ─── PRINTER ─────────────────────────────────────────────
     function loadPaperWidth() {
-      paperWidth = IN_APP ? (AndroidApp.getPaperWidth() || 80) : (parseInt(localStorage.getItem('wh_paper_width')) || 80);
+      try {
+        if (IN_APP && typeof AndroidApp.getPaperWidth === 'function')
+          paperWidth = AndroidApp.getPaperWidth() || 80;
+        else
+          paperWidth = parseInt(localStorage.getItem('wh_paper_width')) || 80;
+      } catch (e) { paperWidth = 80; }
       highlightPaperWidth();
     }
 
     function setPaperWidth(w) {
       paperWidth = (w <= 50) ? 50 : 80;
-      if (IN_APP) AndroidApp.setPaperWidth(paperWidth);
-      else localStorage.setItem('wh_paper_width', String(paperWidth));
+      try {
+        if (IN_APP && typeof AndroidApp.setPaperWidth === 'function')
+          AndroidApp.setPaperWidth(paperWidth);
+      } catch (e) {}
+      localStorage.setItem('wh_paper_width', String(paperWidth));
       highlightPaperWidth();
       toast('Paper width set to ' + paperWidth + 'mm');
     }
