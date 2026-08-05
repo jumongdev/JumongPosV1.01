@@ -31,6 +31,8 @@ WarehouseApp/.gradle/
 WarehouseApp/.kotlin/
 WarehouseApp/*.log
 WarehouseApp/*.keystore
+WarehouseApp/*.idsig
+WarehouseApp/JumongWarehouse-*.apk
 WarehouseApp/local.properties
 WarehouseApp/.idea/
 
