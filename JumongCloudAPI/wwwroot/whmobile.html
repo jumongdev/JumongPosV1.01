@@ -42,6 +42,9 @@
   .nav-item.active { color: #06b6d4; }
   .nav-item span.icon { font-size: 20px; }
   .main-content { padding-bottom: 80px; }
+  .menu-row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; background: #181848; border: 1px solid #222255; border-radius: 10px; color: #e2e8f0; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .menu-row:active { background: #1e1e52; }
+  .menu-row span { font-size: 16px; }
 </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -92,15 +95,8 @@
     <div id="mainScreen" class="flex-1 hidden flex-col">
       <div class="bg-[#16163a] px-5 py-3 flex items-center justify-between border-b border-[#222255]">
         <div>
-          <p class="text-white font-bold text-base" id="mainUser"></p>
-          <button id="mainStoreBtn" onclick="openStoreSwitcher()" class="text-cyan-400 text-xs flex items-center gap-1 hover:text-cyan-300">
-            <span id="mainStore"></span><span id="storeSwitcherChevron" class="hidden">▼</span>
-          </button>
-          <p class="text-[10px] text-[#5a5a8a] mt-0.5">v<span id="currentVerLabel"></span></p>
-        </div>
-        <div class="flex items-center gap-2">
-          <span id="printerStatusBadge" class="text-[10px] px-2 py-1 rounded-full bg-red-950/50 text-red-400 border border-red-900/40 font-medium">🖨️ NOT CONNECTED</span>
-          <button onclick="doLogout()" class="text-xs text-red-400 bg-red-950/40 border border-red-900/40 rounded-lg px-3 py-2 font-medium">LOGOUT</button>
+          <p class="text-white font-bold text-base">JUMONG POS</p>
+          <p class="text-cyan-400 text-xs" id="mainStore"></p>
         </div>
       </div>
 
@@ -141,11 +137,25 @@
 
         <!-- INVENTORY TAB -->
         <div id="tabInventory" class="hidden">
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-white text-sm font-bold" id="invTitle">STOCK</p>
+            <p class="text-gray-500 text-[11px]">warehouse inventory</p>
+          </div>
           <div class="flex gap-2 mb-3">
             <input id="invSearch" class="input-field flex-1" type="text" placeholder="🔍 Search product">
             <button class="btn-ghost px-4" onclick="searchInventory()">SEARCH</button>
           </div>
           <div id="invResults" class="space-y-2"></div>
+        </div>
+
+        <!-- SALES REPORT TAB -->
+        <div id="tabSales" class="hidden">
+          <div class="flex items-center justify-between mb-3">
+            <button class="btn-ghost px-4" onclick="backToSell()">← BACK</button>
+            <p class="text-white text-sm font-bold">SALES REPORT</p>
+            <p class="text-cyan-400 text-xs font-bold" id="salesTotalLabel"></p>
+          </div>
+          <div id="salesList" class="space-y-2"></div>
         </div>
 
         <!-- SETUP TAB -->
@@ -160,6 +170,7 @@
           </div>
           <div class="card mb-3">
             <p class="text-white text-xs font-bold uppercase tracking-wider mb-3">🖨️ Bluetooth Printer</p>
+            <p id="printerStatusLine" class="text-[11px] font-bold text-red-400 mb-3">🖨️ NOT CONNECTED</p>
             <button class="btn-ghost w-full mb-3" onclick="refreshPrinters()">🔄 REFRESH PAIRED PRINTERS</button>
             <div id="printerList"></div>
             <p id="printerHint" class="text-gray-500 text-[11px] mt-2">Pair your Xprinter first: Phone Settings → Bluetooth → pair device (once only)</p>
@@ -177,7 +188,65 @@
       <div class="nav-bottom">
         <div class="nav-item active" id="navSell" onclick="switchTab('sell')"><span class="icon">🛒</span>SELL</div>
         <div class="nav-item" id="navInventory" onclick="switchTab('inventory')"><span class="icon">📦</span>INVENTORY</div>
-        <div class="nav-item" id="navSetup" onclick="switchTab('setup')"><span class="icon">🖨️</span>SETUP</div>
+        <div class="nav-item" id="navMenu" onclick="openBurgerMenu()"><span class="icon">☰</span>MENU</div>
+      </div>
+    </div>
+
+    <!-- BURGER MENU DRAWER -->
+    <div id="burgerMenu" class="hidden fixed inset-0 z-50 bg-black/70" onclick="if(event.target===this)closeBurgerMenu()">
+      <div class="absolute right-0 top-0 bottom-0 w-72 bg-[#16163a] border-l border-[#222255] p-5 overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-white font-bold text-base">MENU</p>
+          <button onclick="closeBurgerMenu()" class="text-red-400 text-lg font-bold">✕</button>
+        </div>
+
+        <!-- Who's logged in -->
+        <div class="card mb-3">
+          <p class="text-white text-sm font-bold" id="menuUserName"></p>
+          <p class="text-[10px] text-[#5a5a8a] mt-0.5">Jumong Pos v<span id="menuVersion"></span></p>
+          <button onclick="doLogout()" class="btn-danger w-full mt-3">LOGOUT</button>
+        </div>
+
+        <!-- Store / warehouse selector -->
+        <div class="store-chip mb-3" onclick="openMenuStoreSwitcher()">
+          <span class="text-xl" id="menuStoreIcon">🏬</span>
+          <div class="flex-1">
+            <p class="text-white text-sm font-medium" id="menuStoreName"></p>
+            <p class="text-gray-500 text-[11px]">Change store / warehouse</p>
+          </div>
+          <span class="text-gray-500 text-lg">›</span>
+        </div>
+
+        <!-- INVENTORY section -->
+        <p class="text-[10px] text-[#5a5a8a] uppercase tracking-wider font-bold mb-1.5 mt-4">Inventory</p>
+        <div class="space-y-1 mb-2">
+          <div class="menu-row" onclick="goInventory('all')"><span>📦</span>Stock</div>
+          <div class="menu-row" onclick="goInventory('out')"><span>🚫</span>Out of Stock</div>
+          <div class="menu-row" onclick="goInventory('low')"><span>⚠️</span>Low Stock</div>
+        </div>
+
+        <!-- REPORT section -->
+        <p class="text-[10px] text-[#5a5a8a] uppercase tracking-wider font-bold mb-1.5 mt-4">Report</p>
+        <div class="space-y-1 mb-2">
+          <div class="menu-row" onclick="goSalesReport()"><span>🧾</span>Sales</div>
+        </div>
+
+        <!-- SETTINGS section -->
+        <p class="text-[10px] text-[#5a5a8a] uppercase tracking-wider font-bold mb-1.5 mt-4">Settings</p>
+        <div class="space-y-1">
+          <div class="menu-row" onclick="goSetup()"><span>🖨️</span>Setup</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SALE ITEMS MODAL -->
+    <div id="saleItemsModal" class="hidden fixed inset-0 z-50 flex items-end justify-center bg-black/70" onclick="if(event.target===this)closeSaleItems()">
+      <div class="bg-[#16163a] w-full max-w-sm rounded-t-2xl p-5 border-t border-[#222255] pb-8 max-h-[75vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-white font-bold text-base" id="saleItemsTitle"></p>
+          <button onclick="closeSaleItems()" class="text-red-400 text-lg font-bold">✕</button>
+        </div>
+        <div id="saleItemsList" class="space-y-2"></div>
       </div>
     </div>
 
@@ -240,6 +309,7 @@
     let selectedUnitIndex = 0;
     let pendingPay = null;
     let paperWidth = 80;
+    let invMode = 'all';
 
     function toast(msg, type) {
       const t = document.createElement('div');
@@ -311,15 +381,18 @@
     }
 
     function enterMain() {
-      document.getElementById('mainUser').textContent = session.fullName || session.username;
       const isWh = session.storeId === 'STORE-WAREHOUSE';
       document.getElementById('mainStore').textContent = (isWh ? '🏭 ' : '🏬 ') + (session.storeName || session.storeId || '');
-      const multi = (session.stores || []).length > 1;
-      document.getElementById('storeSwitcherChevron').classList.toggle('hidden', !multi);
-      document.getElementById('currentVerLabel').textContent = IN_APP ? (AndroidApp.getVersion() || '?') : 'web';
+      document.getElementById('menuUserName').textContent = (session.fullName || session.username) + ' • ' + (session.role || '');
+      document.getElementById('menuVersion').textContent = IN_APP ? (AndroidApp.getVersion() || '?') : 'web';
+      document.getElementById('menuStoreName').textContent = (isWh ? '🏭 ' : '🏬 ') + (session.storeName || session.storeId || '');
+      document.getElementById('menuStoreIcon').textContent = isWh ? '🏭' : '🏬';
       setScreen('main');
       const savedTab = localStorage.getItem('wh_tab');
-      switchTab(savedTab === 'inventory' || savedTab === 'setup' ? savedTab : 'sell');
+      const tab = (savedTab === 'inventory' || savedTab === 'setup' || savedTab === 'sales') ? savedTab : 'sell';
+      switchTab(tab);
+      if (tab === 'inventory') searchInventory();
+      if (tab === 'sales') loadSales();
       document.getElementById('appInfo').textContent = IN_APP ? 'App version: ' + AndroidApp.getVersion() + ' (native APK with Bluetooth)' : 'Browser mode (no Bluetooth print)';
       loadPaperWidth();
       if (IN_APP) { refreshPrinters(); if (AndroidPrinter.isConnected()) updatePrinterStatus(true); }
@@ -356,6 +429,33 @@
 
     function closeStoreSwitcher() { hide(document.getElementById('storeSwitcherModal')); }
 
+    // ─── BURGER MENU ────────────────────────────────────────
+    function openBurgerMenu() { show(document.getElementById('burgerMenu')); }
+
+    function closeBurgerMenu() { hide(document.getElementById('burgerMenu')); }
+
+    function openMenuStoreSwitcher() {
+      if ((session.stores || []).length <= 1) { toast('Only one store assigned to your account'); return; }
+      closeBurgerMenu();
+      openStoreSwitcher();
+    }
+
+    function goInventory(mode) {
+      invMode = mode;
+      closeBurgerMenu();
+      const titles = { all: 'STOCK', out: 'OUT OF STOCK', low: 'LOW STOCK' };
+      document.getElementById('invTitle').textContent = titles[mode] || 'STOCK';
+      if (mode === 'all') document.getElementById('invSearch').value = '';
+      switchTab('inventory');
+      searchInventory();
+    }
+
+    function goSalesReport() { closeBurgerMenu(); switchTab('sales'); loadSales(); }
+
+    function backToSell() { switchTab('sell'); }
+
+    function goSetup() { closeBurgerMenu(); switchTab('setup'); }
+
     function doLogout() {
       const token = session ? session.token : '';
       const username = session ? session.username : '';
@@ -369,6 +469,7 @@
         }).catch(() => {});
       }
       document.getElementById('passwordInput').value = '';
+      closeBurgerMenu();
       setScreen('login');
       document.getElementById('usernameInput').focus();
     }
@@ -377,13 +478,14 @@
       localStorage.setItem('wh_tab', tab);
       hide(document.getElementById('tabSell'));
       hide(document.getElementById('tabInventory'));
+      hide(document.getElementById('tabSales'));
       hide(document.getElementById('tabSetup'));
       document.getElementById('navSell').classList.remove('active');
       document.getElementById('navInventory').classList.remove('active');
-      document.getElementById('navSetup').classList.remove('active');
       if (tab === 'sell') { show(document.getElementById('tabSell')); document.getElementById('navSell').classList.add('active'); }
       if (tab === 'inventory') { show(document.getElementById('tabInventory')); document.getElementById('navInventory').classList.add('active'); document.getElementById('invSearch').focus(); }
-      if (tab === 'setup') { show(document.getElementById('tabSetup')); document.getElementById('navSetup').classList.add('active'); refreshPrinters(); loadPaperWidth(); }
+      if (tab === 'sales') { show(document.getElementById('tabSales')); }
+      if (tab === 'setup') { show(document.getElementById('tabSetup')); refreshPrinters(); loadPaperWidth(); }
     }
 
     // ─── MODERN PULL-TO-REFRESH (called by native app) ───────
@@ -393,6 +495,8 @@
         searchInventory();
       } else if (tab === 'setup') {
         refreshPrinters();
+      } else if (tab === 'sales') {
+        loadSales();
       } else {
         if (IN_APP) refreshPrinters();
         const q = document.getElementById('sellSearch').value.trim();
@@ -429,11 +533,10 @@
     }
 
     function updatePrinterStatus(connected, label) {
-      const b = document.getElementById('printerStatusBadge');
-      b.textContent = connected ? '🖨️ CONNECTED' : ('🖨️ ' + (label || 'NOT CONNECTED'));
-      b.className = connected
-        ? 'text-[10px] px-2 py-1 rounded-full bg-emerald-950/50 text-emerald-400 border border-emerald-900/40 font-medium'
-        : 'text-[10px] px-2 py-1 rounded-full bg-red-950/50 text-red-400 border border-red-900/40 font-medium';
+      const el = document.getElementById('printerStatusLine');
+      if (!el) return;
+      el.textContent = connected ? '🖨️ CONNECTED' : ('🖨️ ' + (label || 'NOT CONNECTED'));
+      el.className = 'text-[11px] font-bold mt-1 ' + (connected ? 'text-emerald-400' : 'text-red-400');
     }
 
     function refreshPrinters() {
@@ -663,7 +766,10 @@
         const data = await r.json();
         const box = document.getElementById('invResults');
         box.innerHTML = '';
-        (data || []).filter(p => p.isActive !== false).slice(0, 50).forEach(p => {
+        let rows = (data || []).filter(p => p.isActive !== false);
+        if (invMode === 'out') rows = rows.filter(p => p.stockQty === 0);
+        else if (invMode === 'low') rows = rows.filter(p => p.stockQty > 0 && p.stockQty <= 10);
+        rows.slice(0, 500).forEach(p => {
           const low = p.stockQty <= 10;
           const div = document.createElement('div');
           div.className = 'card';
@@ -672,9 +778,58 @@
             '<p class="text-lg font-bold ' + (p.stockQty === 0 ? 'text-red-400' : low ? 'text-orange-400' : 'text-emerald-400') + '">' + p.stockQty + '</p></div>';
           box.appendChild(div);
         });
-        if (!data || !data.length) box.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No products found</p>';
+        if (!rows.length) box.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No products found</p>';
       } catch (e) { toast('Failed: ' + e.message, 'error'); }
     }
+
+    // ─── SALES REPORT ────────────────────────────────────────
+    async function loadSales() {
+      const url = API + '/dashboard/warehouse/sales?limit=100';
+      const list = document.getElementById('salesList');
+      list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Loading...</p>';
+      try {
+        const r = await fetch(url);
+        const data = await r.json();
+        const rows = (data || []).filter(x => !x.isVoided);
+        list.innerHTML = '';
+        let total = 0, count = 0;
+        rows.forEach(x => {
+          if (x.isVoided) return;
+          count++; total += (x.total || 0);
+          const dt = new Date(x.createdAt);
+          const div = document.createElement('div');
+          div.className = 'card';
+          div.innerHTML = '<div class="flex items-center justify-between" onclick="loadSaleItems(' + x.id + ',\'' + String(x.invoiceNo || x.id).replace(/'/g, '') + '\')"><div><p class="text-white text-sm font-bold">' + (x.invoiceNo || ('#' + x.id)) + '</p>' +
+            '<p class="text-gray-500 text-[11px]">' + (x.customerName || 'Walk-in Customer') + ' • ' + dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) + '</p></div>' +
+            '<p class="text-cyan-400 text-sm font-bold">₱' + Number(x.total || 0).toFixed(2) + '</p></div>';
+          list.appendChild(div);
+        });
+        if (!rows.length) list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No sales recorded</p>';
+        document.getElementById('salesTotalLabel').textContent = rows.length ? (rows.length + ' • ₱' + total.toFixed(2)) : '';
+      } catch (e) { list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Failed to load: ' + e.message + '</p>'; }
+    }
+
+    async function loadSaleItems(id, label) {
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/sales/' + id + '/items');
+        const items = await r.json();
+        document.getElementById('saleItemsTitle').textContent = 'SALE ' + label;
+        const box = document.getElementById('saleItemsList');
+        box.innerHTML = '';
+        (items || []).forEach(it => {
+          const div = document.createElement('div');
+          div.className = 'cart-item';
+          div.innerHTML = '<div class="flex-1"><p class="text-white text-xs font-bold' + (it.isVoided ? ' line-through text-gray-500' : '') + '">' + (it.productName || 'Item') + '</p>' +
+            '<p class="text-gray-500 text-[10px]">' + (it.unitName || '') + ' x' + it.qty + (it.isVoided ? ' (voided)' : '') + '</p></div>' +
+            '<p class="text-cyan-400 text-xs font-bold">₱' + Number(it.subtotal || 0).toFixed(2) + '</p>';
+          box.appendChild(div);
+        });
+        if (!items || !items.length) box.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No items</p>';
+        show(document.getElementById('saleItemsModal'));
+      } catch (e) { toast('Failed to load items: ' + e.message, 'error'); }
+    }
+
+    function closeSaleItems() { hide(document.getElementById('saleItemsModal')); }
 
     // ─── APP UPDATE ──────────────────────────────────────────
     function compareVersions(a, b) {
