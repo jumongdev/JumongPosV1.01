@@ -158,6 +158,40 @@
           <div id="salesList" class="space-y-2"></div>
         </div>
 
+        <!-- PRODUCT TAB -->
+        <div id="tabProducts" class="hidden">
+          <div class="flex items-center justify-between mb-3">
+            <button class="btn-ghost px-4" onclick="backToSell()">← BACK</button>
+            <p class="text-white text-sm font-bold">PRODUCTS</p>
+            <p class="text-gray-500 text-[11px]">warehouse items</p>
+          </div>
+          <div class="flex gap-2 mb-3">
+            <input id="prodSearch" class="input-field flex-1" type="text" placeholder="🔍 Search product">
+            <button class="btn-ghost px-4" onclick="searchProducts()">SEARCH</button>
+          </div>
+          <div id="prodResults" class="space-y-2"></div>
+        </div>
+
+        <!-- ONLINE ORDER TAB -->
+        <div id="tabOrders" class="hidden">
+          <div class="flex items-center justify-between mb-3">
+            <button class="btn-ghost px-4" onclick="backToSell()">← BACK</button>
+            <p class="text-white text-sm font-bold">ONLINE ORDERS</p>
+            <p class="text-gray-500 text-[11px]">customer orders</p>
+          </div>
+          <div id="ordersList" class="space-y-2"></div>
+        </div>
+
+        <!-- TRANSFER TAB -->
+        <div id="tabTransfers" class="hidden">
+          <div class="flex items-center justify-between mb-3">
+            <button class="btn-ghost px-4" onclick="backToSell()">← BACK</button>
+            <p class="text-white text-sm font-bold">TRANSFERS</p>
+            <p class="text-gray-500 text-[11px]">warehouse to POS</p>
+          </div>
+          <div id="transfersList" class="space-y-2"></div>
+        </div>
+
         <!-- SETUP TAB -->
         <div id="tabSetup" class="hidden">
           <div class="card mb-3">
@@ -217,18 +251,21 @@
           <span class="text-gray-500 text-lg">›</span>
         </div>
 
-        <!-- INVENTORY section -->
-        <p class="text-[10px] text-[#5a5a8a] uppercase tracking-wider font-bold mb-1.5 mt-4">Inventory</p>
+        <!-- WAREHOUSE section -->
+        <p class="text-[10px] text-[#5a5a8a] uppercase tracking-wider font-bold mb-1.5 mt-4">Warehouse</p>
         <div class="space-y-1 mb-2">
-          <div class="menu-row" onclick="goInventory('all')"><span>📦</span>Stock</div>
-          <div class="menu-row" onclick="goInventory('out')"><span>🚫</span>Out of Stock</div>
-          <div class="menu-row" onclick="goInventory('low')"><span>⚠️</span>Low Stock</div>
+          <div class="menu-row" onclick="goProducts()"><span>📦</span>Product</div>
+          <div class="menu-row" onclick="goInventory('all')"><span>📊</span>Inventory</div>
+          <div class="menu-row" onclick="goSalesReport()"><span>🧾</span>Sales</div>
+          <div class="menu-row" onclick="goOrders()"><span>🛒</span>Online Order</div>
+          <div class="menu-row" onclick="goTransfers()"><span>🚚</span>Transfer</div>
         </div>
 
-        <!-- REPORT section -->
-        <p class="text-[10px] text-[#5a5a8a] uppercase tracking-wider font-bold mb-1.5 mt-4">Report</p>
+        <!-- INVENTORY modes -->
+        <p class="text-[10px] text-[#5a5a8a] uppercase tracking-wider font-bold mb-1.5 mt-4">Quick Views</p>
         <div class="space-y-1 mb-2">
-          <div class="menu-row" onclick="goSalesReport()"><span>🧾</span>Sales</div>
+          <div class="menu-row" onclick="goInventory('out')"><span>🚫</span>Out of Stock</div>
+          <div class="menu-row" onclick="goInventory('low')"><span>⚠️</span>Low Stock</div>
         </div>
 
         <!-- SETTINGS section -->
@@ -247,6 +284,17 @@
           <button onclick="closeSaleItems()" class="text-red-400 text-lg font-bold">✕</button>
         </div>
         <div id="saleItemsList" class="space-y-2"></div>
+      </div>
+    </div>
+
+    <!-- TX ITEMS MODAL (orders / transfers) -->
+    <div id="txItemsModal" class="hidden fixed inset-0 z-50 flex items-end justify-center bg-black/70" onclick="if(event.target===this)closeTxItems()">
+      <div class="bg-[#16163a] w-full max-w-sm rounded-t-2xl p-5 border-t border-[#222255] pb-8 max-h-[75vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-white font-bold text-base" id="txItemsTitle"></p>
+          <button onclick="closeTxItems()" class="text-red-400 text-lg font-bold">✕</button>
+        </div>
+        <div id="txItemsList" class="space-y-2"></div>
       </div>
     </div>
 
@@ -389,10 +437,13 @@
       document.getElementById('menuStoreIcon').textContent = isWh ? '🏭' : '🏬';
       setScreen('main');
       const savedTab = localStorage.getItem('wh_tab');
-      const tab = (savedTab === 'inventory' || savedTab === 'setup' || savedTab === 'sales') ? savedTab : 'sell';
+      const tab = (savedTab === 'inventory' || savedTab === 'setup' || savedTab === 'sales' || savedTab === 'products' || savedTab === 'orders' || savedTab === 'transfers') ? savedTab : 'sell';
       switchTab(tab);
       if (tab === 'inventory') searchInventory();
       if (tab === 'sales') loadSales();
+      if (tab === 'products') loadProducts();
+      if (tab === 'orders') loadOrders();
+      if (tab === 'transfers') loadTransfers();
       document.getElementById('appInfo').textContent = IN_APP ? 'App version: ' + AndroidApp.getVersion() + ' (native APK with Bluetooth)' : 'Browser mode (no Bluetooth print)';
       loadPaperWidth();
       if (IN_APP) { refreshPrinters(); if (AndroidPrinter.isConnected()) updatePrinterStatus(true); }
@@ -454,6 +505,10 @@
 
     function backToSell() { switchTab('sell'); }
 
+    function goProducts() { closeBurgerMenu(); switchTab('products'); loadProducts(); }
+    function goOrders() { closeBurgerMenu(); switchTab('orders'); loadOrders(); }
+    function goTransfers() { closeBurgerMenu(); switchTab('transfers'); loadTransfers(); }
+
     function goSetup() { closeBurgerMenu(); switchTab('setup'); }
 
     function doLogout() {
@@ -480,12 +535,18 @@
       hide(document.getElementById('tabInventory'));
       hide(document.getElementById('tabSales'));
       hide(document.getElementById('tabSetup'));
+      hide(document.getElementById('tabProducts'));
+      hide(document.getElementById('tabOrders'));
+      hide(document.getElementById('tabTransfers'));
       document.getElementById('navSell').classList.remove('active');
       document.getElementById('navInventory').classList.remove('active');
       if (tab === 'sell') { show(document.getElementById('tabSell')); document.getElementById('navSell').classList.add('active'); }
       if (tab === 'inventory') { show(document.getElementById('tabInventory')); document.getElementById('navInventory').classList.add('active'); document.getElementById('invSearch').focus(); }
       if (tab === 'sales') { show(document.getElementById('tabSales')); }
       if (tab === 'setup') { show(document.getElementById('tabSetup')); refreshPrinters(); loadPaperWidth(); }
+      if (tab === 'products') { show(document.getElementById('tabProducts')); document.getElementById('prodSearch').focus(); }
+      if (tab === 'orders') { show(document.getElementById('tabOrders')); }
+      if (tab === 'transfers') { show(document.getElementById('tabTransfers')); }
     }
 
     // ─── MODERN PULL-TO-REFRESH (called by native app) ───────
@@ -497,6 +558,12 @@
         refreshPrinters();
       } else if (tab === 'sales') {
         loadSales();
+      } else if (tab === 'products') {
+        loadProducts();
+      } else if (tab === 'orders') {
+        loadOrders();
+      } else if (tab === 'transfers') {
+        loadTransfers();
       } else {
         if (IN_APP) refreshPrinters();
         const q = document.getElementById('sellSearch').value.trim();
@@ -718,6 +785,7 @@
         customerName: 'Walk-in Customer',
         paymentMethod: method,
         cashReceived: cash,
+        source: 'mobile',
         items
       };
       try {
@@ -838,6 +906,158 @@
     }
 
     function closeSaleItems() { hide(document.getElementById('saleItemsModal')); }
+
+    // ─── PRODUCTS ───────────────────────────────────────────
+    let prodCache = [];
+
+    async function loadProducts() {
+      const q = document.getElementById('prodSearch').value.trim();
+      const url = API + '/dashboard/warehouse/products?activeOnly=true&noImage=true' + (q ? '&search=' + encodeURIComponent(q) : '');
+      const list = document.getElementById('prodResults');
+      list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Loading...</p>';
+      try {
+        const r = await fetch(url);
+        const data = await r.json();
+        const rows = data || [];
+        prodCache = rows;
+        list.innerHTML = '';
+        if (!rows.length) { list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No products found</p>'; return; }
+        rows.forEach(x => {
+          const div = document.createElement('div');
+          div.className = 'card';
+          const stock = Number(x.stockQty || 0);
+          const stockColor = stock <= 0 ? 'text-red-400' : (stock <= 10 ? 'text-amber-400' : 'text-emerald-400');
+          div.innerHTML = '<div class="flex items-center justify-between" onclick="showProductDetail(' + x.id + ')"><div class="flex-1 pr-2"><p class="text-white text-sm font-bold">' + x.name + '</p>' +
+            '<p class="text-gray-500 text-[10px]">' + (x.barcode || '—') + (x.category ? ' • ' + x.category : '') + '</p></div>' +
+            '<div class="text-right"><p class="' + stockColor + ' text-xs font-bold">' + stock + ' pcs</p>' +
+            (x.piecePrice > 0 ? '<p class="text-cyan-400 text-xs font-bold">₱' + Number(x.piecePrice).toFixed(2) + '/pc</p>' : '') +
+            (x.boxQty > 1 ? '<p class="text-gray-500 text-[10px]">₱' + Number(x.boxPrice).toFixed(2) + ' / ' + x.boxQty + 'pcs</p>' : '') + '</div></div>';
+          list.appendChild(div);
+        });
+      } catch (e) { list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Failed to load: ' + e.message + '</p>'; }
+    }
+
+    function searchProducts() { loadProducts(); }
+
+    function showProductDetail(id) {
+      const x = prodCache.find(p => p.id === id);
+      if (!x) { toast('Product not found', 'error'); return; }
+      document.getElementById('txItemsTitle').textContent = x.name;
+      const box = document.getElementById('txItemsList');
+      box.innerHTML = '';
+      const mkRow = (k, v) => {
+        const d = document.createElement('div');
+        d.className = 'cart-item';
+        d.innerHTML = '<div class="flex-1"><p class="text-gray-400 text-[11px]">' + k + '</p></div><p class="text-white text-xs font-bold">' + v + '</p>';
+        box.appendChild(d);
+      };
+      mkRow('Barcode', x.barcode || '—');
+      mkRow('Category', x.category || '—');
+      mkRow('Stock', Number(x.stockQty || 0) + ' pcs');
+      mkRow('Piece price', '₱' + Number(x.piecePrice || 0).toFixed(2));
+      if (x.boxQty > 1) mkRow('Box ' + x.boxQty + ' pcs', '₱' + Number(x.boxPrice || 0).toFixed(2));
+      mkRow('Cost / pc', '₱' + Number(x.cost || 0).toFixed(2));
+      (x.units || []).forEach(u => {
+        const d = document.createElement('div');
+        d.className = 'cart-item';
+        d.innerHTML = '<div class="flex-1"><p class="text-white text-xs font-bold">' + u.unitName + (u.isDefault ? ' ★' : '') + '</p><p class="text-gray-500 text-[10px]">' + (u.qtyPerUnit || 1) + ' pc(s)</p></div><p class="text-cyan-400 text-xs font-bold">₱' + Number(u.price || 0).toFixed(2) + '</p>';
+        box.appendChild(d);
+      });
+      show(document.getElementById('txItemsModal'));
+    }
+
+    // ─── ONLINE ORDERS ──────────────────────────────────────
+    async function loadOrders() {
+      const list = document.getElementById('ordersList');
+      list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Loading...</p>';
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/orders');
+        const data = await r.json();
+        const rows = data || [];
+        list.innerHTML = '';
+        if (!rows.length) { list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No orders</p>'; return; }
+        rows.forEach(x => {
+          const st = String(x.status || '').toLowerCase();
+          const stColor = st === 'completed' || st === 'received' ? 'text-emerald-400' : (st === 'pending' ? 'text-amber-400' : 'text-cyan-400');
+          const div = document.createElement('div');
+          div.className = 'card';
+          const dt = new Date(x.createdAt);
+          div.innerHTML = '<div class="flex items-center justify-between" onclick="loadOrderItems(' + x.id + ',\'' + String(x.id).replace(/'/g, '') + '\')"><div class="flex-1 pr-2"><p class="text-white text-sm font-bold">Order #' + x.id + (x.hasShortage ? ' ⚠' : '') + '</p>' +
+            '<p class="text-gray-500 text-[11px]">' + (x.clientName || '') + ' • ' + dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) + '</p></div>' +
+            '<div class="text-right"><p class="' + stColor + ' text-[10px] font-bold uppercase">' + (x.status || '') + '</p>' +
+            '<p class="text-cyan-400 text-xs font-bold">₱' + Number(x.totalAmount || 0).toFixed(2) + '</p></div></div>';
+          list.appendChild(div);
+        });
+      } catch (e) { list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Failed to load: ' + e.message + '</p>'; }
+    }
+
+    async function loadOrderItems(id, label) {
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/orders/' + id + '/items');
+        const items = await r.json();
+        document.getElementById('txItemsTitle').textContent = 'ORDER #' + label;
+        const box = document.getElementById('txItemsList');
+        box.innerHTML = '';
+        (items || []).forEach(it => {
+          const d = document.createElement('div');
+          d.className = 'cart-item';
+          d.innerHTML = '<div class="flex-1"><p class="text-white text-xs font-bold">' + it.productName + '</p>' +
+            '<p class="text-gray-500 text-[10px]">' + (it.unitType || 'Piece') + ' x' + it.qty + '</p></div>' +
+            '<p class="text-cyan-400 text-xs font-bold">₱' + Number(it.totalPrice || 0).toFixed(2) + '</p>';
+          box.appendChild(d);
+        });
+        if (!items || !items.length) box.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No items</p>';
+        show(document.getElementById('txItemsModal'));
+      } catch (e) { toast('Failed: ' + e.message, 'error'); }
+    }
+
+    // ─── TRANSFERS ──────────────────────────────────────────
+    async function loadTransfers() {
+      const list = document.getElementById('transfersList');
+      list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Loading...</p>';
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/transfers');
+        const j = await r.json();
+        const rows = (j && j.items) ? j.items : [];
+        list.innerHTML = '';
+        if (!rows.length) { list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No transfers</p>'; return; }
+        rows.forEach(x => {
+          const st = String(x.status || '').toLowerCase();
+          const stColor = st === 'completed' ? 'text-emerald-400' : (st === 'pending' ? 'text-amber-400' : 'text-cyan-400');
+          const div = document.createElement('div');
+          div.className = 'card';
+          const dt = new Date(x.createdAt);
+          div.innerHTML = '<div class="flex items-center justify-between" onclick="loadTransferItems(' + x.id + ',\'' + String(x.id).replace(/'/g, '') + '\')"><div class="flex-1 pr-2"><p class="text-white text-sm font-bold">Transfer #' + x.id + (x.hasShortage ? ' ⚠' : '') + '</p>' +
+            '<p class="text-gray-500 text-[11px]">' + (x.clientName || '') + ' • ' + dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) + '</p></div>' +
+            '<p class="' + stColor + ' text-[10px] font-bold uppercase">' + (x.status || '') + '</p></div>';
+          list.appendChild(div);
+        });
+      } catch (e) { list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Failed to load: ' + e.message + '</p>'; }
+    }
+
+    async function loadTransferItems(id, label) {
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/transfers/' + id + '/items');
+        const items = await r.json();
+        document.getElementById('txItemsTitle').textContent = 'TRANSFER #' + label;
+        const box = document.getElementById('txItemsList');
+        box.innerHTML = '';
+        (items || []).forEach(it => {
+          const d = document.createElement('div');
+          d.className = 'cart-item';
+          const rec = it.receivedQty || 0;
+          const partial = rec > 0 && rec < it.qty;
+          d.innerHTML = '<div class="flex-1"><p class="text-white text-xs font-bold">' + it.productName + '</p>' +
+            '<p class="text-gray-500 text-[10px]">' + (partial ? 'received ' + rec + ' / ' + it.qty : 'qty ' + it.qty) + (it.currentStock ? ' • stock ' + it.currentStock : '') + '</p></div>' +
+            '<p class="' + (partial ? 'text-amber-400' : 'text-emerald-400') + ' text-[10px] font-bold">' + (partial ? 'PARTIAL' : (rec > 0 ? 'OK' : '')) + '</p>';
+          box.appendChild(d);
+        });
+        if (!items || !items.length) box.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No items</p>';
+        show(document.getElementById('txItemsModal'));
+      } catch (e) { toast('Failed: ' + e.message, 'error'); }
+    }
+
+    function closeTxItems() { hide(document.getElementById('txItemsModal')); }
 
     // ─── APP UPDATE ──────────────────────────────────────────
     function compareVersions(a, b) {

@@ -1162,7 +1162,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.1.0" });
+            return Ok(new { version = "1.1.1" });
     }
 
         [HttpGet("fix-hvr-times")]
@@ -2729,13 +2729,16 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 deduct.ExecuteNonQuery();
 
                 // Log stock trail
+                var isMobile = string.Equals(req.Source, "mobile", StringComparison.OrdinalIgnoreCase);
+                var trailSource = isMobile ? "mobile" : "desktop";
                 using var trail = conn.CreateCommand(); trail.Transaction = tx;
-                trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) VALUES (@pid, @pn, @bc, @qc, @ref, 'walkin_sale')";
+                trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type, source) VALUES (@pid, @pn, @bc, @qc, @ref, 'walkin_sale', @src)";
                 trail.Parameters.AddWithValue("pid", item.ProductId);
                 trail.Parameters.AddWithValue("pn", productName);
                 trail.Parameters.AddWithValue("bc", barcode);
                 trail.Parameters.AddWithValue("qc", -stockDeduction);
-                trail.Parameters.AddWithValue("ref", $"{invoiceNo} | {req.CustomerName.Trim()} | {unitName} x {item.Qty}");
+                trail.Parameters.AddWithValue("ref", $"{invoiceNo} | {req.CustomerName.Trim()} | {unitName} x {item.Qty}{(isMobile ? " | Mobile" : "")}");
+                trail.Parameters.AddWithValue("src", trailSource);
                 trail.ExecuteNonQuery();
 
                 // Insert sale item
@@ -3407,6 +3410,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         public string CustomerName { get; set; } = "";
         public string PaymentMethod { get; set; } = "Cash";
         public decimal CashReceived { get; set; }
+        public string? Source { get; set; }
         public List<WhWalkinSellItem> Items { get; set; } = new();
     }
     public class WhVoidRequest { public string Reason { get; set; } = ""; public string? UserName { get; set; } public List<WhVoidItemDto>? Items { get; set; } }

@@ -709,5 +709,10 @@ public static class PgDatabaseHelper
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )";
         try { whTokMig.ExecuteNonQuery(); } catch { }
+
+        // Migration: source column on wh_stock_trails to distinguish mobile vs desktop
+        using var whTrailSrcMig = conn.CreateCommand();
+        whTrailSrcMig.CommandText = "ALTER TABLE wh_stock_trails ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT ''";
+        try { whTrailSrcMig.ExecuteNonQuery(); } catch { }
     }
 }
