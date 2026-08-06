@@ -141,6 +141,19 @@
             <p class="text-white text-sm font-bold" id="invTitle">STOCK</p>
             <p class="text-gray-500 text-[11px]">warehouse inventory</p>
           </div>
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div class="card !mb-0">
+              <p class="text-gray-400 text-[10px] uppercase tracking-wider mb-1">💰 Cost Value</p>
+              <p class="text-white text-lg font-bold" id="invCost">₱0.00</p>
+            </div>
+            <div class="card !mb-0">
+              <p class="text-gray-400 text-[10px] uppercase tracking-wider mb-1">💵 Gross Value (SRP)</p>
+              <p class="text-white text-lg font-bold" id="invGross">₱0.00</p>
+            </div>
+            <div class="card !mb-0 col-span-2">
+              <p class="text-gray-400 text-[10px] uppercase tracking-wider mb-1" id="invItemsLine">items • units</p>
+            </div>
+          </div>
           <div class="flex gap-2 mb-3">
             <input id="invSearch" class="input-field flex-1" type="text" placeholder="🔍 Search product">
             <button class="btn-ghost px-4" onclick="searchInventory()">SEARCH</button>
@@ -371,8 +384,8 @@
     </div>
 
     <!-- RECEIVING MODAL -->
-    <div id="recvModal" class="hidden fixed inset-0 z-50 flex items-end justify-center bg-black/70" onclick="if(event.target===this)closeRecvModal()">
-      <div class="bg-[#16163a] w-full max-w-sm rounded-t-2xl p-5 border-t border-[#222255] pb-8">
+    <div id="recvModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" onclick="if(event.target===this)closeRecvModal()">
+      <div class="bg-[#16163a] w-full max-w-sm rounded-2xl p-5 border border-[#222255] pb-8 max-h-[85vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-4">
           <p class="text-white font-bold text-base" id="recvModalTitle"></p>
           <button onclick="closeRecvModal()" class="text-red-400 text-lg font-bold">✕</button>
@@ -646,7 +659,7 @@
       document.getElementById('navSell').classList.remove('active');
       document.getElementById('navInventory').classList.remove('active');
       if (tab === 'sell') { show(document.getElementById('tabSell')); document.getElementById('navSell').classList.add('active'); }
-      if (tab === 'inventory') { show(document.getElementById('tabInventory')); document.getElementById('navInventory').classList.add('active'); document.getElementById('invSearch').focus(); }
+      if (tab === 'inventory') { show(document.getElementById('tabInventory')); document.getElementById('navInventory').classList.add('active'); document.getElementById('invSearch').focus(); loadInventoryTotals(); }
       if (tab === 'sales') { show(document.getElementById('tabSales')); }
       if (tab === 'setup') { show(document.getElementById('tabSetup')); refreshPrinters(); loadPaperWidth(); }
       if (tab === 'products') { show(document.getElementById('tabProducts')); document.getElementById('prodSearch').focus(); }
@@ -660,6 +673,7 @@
     function refreshCurrentTab() {
       const tab = localStorage.getItem('wh_tab') || 'sell';
       if (tab === 'inventory') {
+        loadInventoryTotals();
         searchInventory();
       } else if (tab === 'setup') {
         refreshPrinters();
@@ -957,7 +971,18 @@
     }
 
     // ─── INVENTORY ───────────────────────────────────────────
+    async function loadInventoryTotals() {
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/inventory-summary');
+        const j = await r.json();
+        document.getElementById('invCost').textContent = '₱' + Number(j.totalCost || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('invGross').textContent = '₱' + Number(j.totalPrice || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('invItemsLine').textContent = '📦 ' + (j.totalItems || 0) + ' items • ' + (j.totalStockQty || 0) + ' units total';
+      } catch (e) { /* totals optional */ }
+    }
+
     async function searchInventory() {
+      loadInventoryTotals();
       const q = document.getElementById('invSearch').value.trim();
       const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true';
       try {
@@ -1379,7 +1404,6 @@
         '<button class="btn-ghost flex-1" onclick="closeRecvModal()">CANCEL</button>' +
         '<button class="btn-green flex-1" onclick="saveReceiving()">SAVE</button></div>';
       show(document.getElementById('recvModal'));
-      setTimeout(() => { const q = document.getElementById('recvQty'); if (q) q.focus(); }, 100);
     }
 
     function closeRecvModal() { hide(document.getElementById('recvModal')); recvTarget = null; }
