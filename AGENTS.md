@@ -1198,3 +1198,53 @@ Copy JumongWarehouse.apk to JumongCloudAPI\wwwroot\updates\ AND JumongCloudAPI\b
 | `JumongCloudAPI/wwwroot/whmobile.html` | `savedTab` still supports legacy 'setup' — drawer Menu routes to it. |
 
 **Impact:** Warehouse app is now a full-featured mobile POS with a drawer menu, per-mode inventory views, and sales reports — all in `whmobile.html` (no APK rebuild needed). The nav redesign shipped as a web-only deployment to `admin.jumongdev.com`.
+
+### v1.1.1 (Cloud API) — Mobile Warehouse Tabs + Source Marker in Stock Trails
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs` | Version bumped to `"1.1.1"`. `WhSell` now writes `source` (`'mobile'` vs `'desktop'`) to `wh_stock_trails` from request body. |
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs:713-715` | Migration: `ALTER TABLE wh_stock_trails ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT ''`. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | Warehouse section in burger menu: **📦 Product**, **📊 Inventory**, **🧾 Sales**, **🛒 Online Order**, **🚚 Transfer**. `goProducts()/goOrders()/goTransfers()` swap to warehouse tabs; SELL/INVENTORY stay bottom-nav. |
+
+**Impact:** Phone trails can be distinguished from desktop-synced ones on the cloud (`source` column). Warehouse Product/Orders/Transfers screens reachable from the mobile menu.
+
+### v1.1.2 — Mobile SELL fix, Receiving tab, Sales summary, Transfer picker exclusion
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **WhStockMoveDto.Source** — `WhStockMove` (PUT stock-move) now writes `source` to `wh_stock_trails` + appends `" | Mobile"` to reference (fixed `mvSource`→`mvSrc` typo). |
+| `JumongCloudAPI/Controllers/DashboardController.cs:2831-2854` | **New `GET /warehouse/sales/summary?from=&to=`** → `{totalSales, transactionCount, grossInventoryCost}`. COGS = `si.stock_deduction × COALESCE(mp.cost, wp.box_cost/NULLIF(wp.box_qty,0), 0)`, voided excluded. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1165` | Version bumped to `"1.1.2"`. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | **SELL fix** — duplicate `searchProducts()` (PRODUCT tab at :998 overrode SELL at :774) renamed to `searchProdList()` (includes its SEARCH button + refreshCurrentTab products case). |
+| `JumongCloudAPI/wwwroot/whmobile.html` | `openUnitPicker()` rewritten — was fetching `?search=<productId>` (which searches name/barcode, never matches an ID). Now `ensureSellProdCache()` loads the active product list once and looks up by ID client-side. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | **Sales report cards** — Total Sales 💵 / Transactions 🧾 / Gross Inventory Cost 📦 + TODAY / ALL / single-day date picker; `setSalesDay()`, `salesFromTo()`, `loadSalesSummary()`. |
+| `JumongCloudAPI/wwwroot/whmobile.html` + `index.html:1815` | Transfer client pickers (mobile `loadTxClients()` + web dropdown) now exclude `STORE-WAREHOUSE` (`c.storeId !== 'STORE-WAREHOUSE'`) so the warehouse can't transfer to itself. |
+| `Services/…` | No POS client changes. |
+
+**Impact:** SELL tab works correctly (unit picker resolved by ID, no stale search). Warehouse mobile sales report shows today's/all-time totals with gross inventory cost (per-day via date picker). Warehouse excluded as a transfer destination. Requires v1.1.2 API deploy for the summary endpoint + stock-move source.
+
+### Warehouse mobile UI fixes — keyboard, inventory totals, header
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/whmobile.html` | **Receiving modal hidden behind keypad** — was bottom-anchored (`items-end`); now `items-start pt-[8vh]` (float above the soft keyboard) + `enterkeyhint="done"` on qty input. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | **INVENTORY totals cards** — Cost Value + Gross Value (SRP) + items/units line via existing `GET /warehouse/inventory-summary` (DashboardController.cs:1678); `loadInventoryTotals()` on tab open, pull-to-refresh, and search. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | **Top header removed** — deleted JUMONG POS + store name bar (`#mainStore`) to free ~50px; user/version/logout + store switcher already live in the burger drawer (`menuUserName`/`menuStoreName`). |
+
+**Impact:** Receiving works with the keypad up; Inventory shows the total warehouse worth (cost + SRP); more vertical space on every screen. Web-only deploys.
+
+### v1.1.3 — Batch Stock Receiving with Source + Print History (mobile)
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **New `POST /warehouse/receivings`** — body `{source, items:[{productId, qty}]}` → atomic tx: validates source non-empty + qty>0, builds ref `RECV-yyyyMMdd-HHmmss | Supplier`, UPDATEs each product stock (guards negatives), inserts one `wh_stock_trails` row per item (type `manual_receive`, `source='mobile'`, shared ref). Returns `{success, reference}`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **New `GET /warehouse/receivings`** — `SELECT reference, MIN(created_at), COUNT(*), SUM(qty_change) … WHERE reference_type='manual_receive' AND reference LIKE 'RECV-%' GROUP BY reference ORDER BY created_at DESC LIMIT 100`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **New `GET /warehouse/receivings/{ref}/items`** — product rows for a reference (used for reprint). |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | Added `WhReceivingDto` / `WhReceivingItemDto`; version bumped to `"1.1.3"`. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | **Receiving tab rebuild** — required 🏷️ **Supplier/Source** input; **batch cart** (search/scan → + ADD → qty prompt AN→ ADD TO BATCH; rows with +/− qty, ✕ remove, CLEAR); one **SAVE RECEIVING (N pcs)** button; atomic cloud save. Success modal shows `+N pcs received`, ref, **🖨️ PRINT RECEIVING** (multi-item voucher: ref, source, cashier, item/qty list, totals) + **DONE**. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | **🖨️ HISTORY sub-view** — `toggleRecvHistory()`/`loadRecvHistory()` lists past receivings (ref, supplier parsed from ` | `, date, item count); tap → item detail; **REPRINT** fetches the ref's items and re-sends to printer. History lives in cloud `wh_stock_trails`, so it survives app re-installs and works across devices. |
+
+**Impact:** Receiving is now a true multi-item workflow — enter every item from a delivery first, save once (atomic), print one voucher, and reprint anytime from stored history. No schema change (reuses `wh_stock_trails.reference` as the batch/print-history ID). Requires v1.1.3 API deploy.
+
+**Impact:** Warehouse app is now a full-featured mobile POS with a drawer menu, per-mode inventory views, and sales reports — all in `whmobile.html` (no APK rebuild needed). The nav redesign shipped as a web-only deployment to `admin.jumongdev.com`.
