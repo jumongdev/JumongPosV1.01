@@ -123,19 +123,22 @@ Set-Location -LiteralPath "C:\Users\ADMIN\Desktop\JumongPosV1.01\JumongCloudAPI"
 | Binary | `cloudflared.exe` (runs as background process, no window) |
 
 ## Cloud API
-- **DigitalOcean URL (still active):** https://jumong-pos-api-p285q.ondigitalocean.app/api — 4 POS clients still pointing here
-- **Local URL (new):** https://admin.jumongdev.com/api (via Cloudflare Tunnel)
-- **Upgrade Note:** When POS clients switch API URL, change in Settings → CLOUD SYNC → `CloudApiUrl` from DigitalOcean URL to `https://admin.jumongdev.com/api`
+- **DigitalOcean URL:** https://jumong-pos-api-p285q.ondigitalocean.app/api — **NO LONGER IN USE. Verified 2026-08-06: all 4 POS clients already sync to the local server** (all stores show sales + agent heartbeats on `admin.jumongdev.com` that day). DO can be decommissioned.
+- **Local URL:** https://admin.jumongdev.com/api (via Cloudflare Tunnel) — ALL 4 POS clients on this
 - **DB connection:** `DATABASE_URL` env var (PostgreSQL, default `localhost:5432`), or check Helpers/CloudDatabaseHelper.cs
-- **DO App ID:** `1bc1369e-6ece-4645-be57-1a7fcf7e90b8` (to be decommissioned)
-- **DO DB ID:** `c6bababf-6a01-418a-9244-a830526f83b3` (to be decommissioned)
+- **DO App ID:** `1bc1369e-6ece-4645-be57-1a7fcf7e90b8` (ready for cancellation)
+- **DO DB ID:** `c6bababf-6a01-418a-9244-a830526f83b3` (ready for cancellation)
 - **DO API Token:** `dop_v1_...` (decommissioned, no longer active)
 
-## Stores (in Cloud)
-| Store ID | Name |
-|---|---|
-| `STORE-20260602-7159` | Andengs Superstore - HQ |
-| `STORE-20260602-AA36` | Andengs Superstore - HVR |
+## Stores (in Cloud / Local PG)
+| Store ID | Name | Machine | IP |
+|---|---|---|---|
+| `STORE-20260602-7159` | Andengs Superstore - HQ | DESKTOP-UU8E0D4 | 192.168.1.37 |
+| `STORE-20260602-AA36` | Andengs Superstore - HVR | DESKTOP-TK63MO6 | 192.168.1.4 |
+| `STORE-20260622-E174` | U Got Minimart - Naic | DESKTOP-NISQ3Q7 | 192.168.1.152 |
+| `STORE-20260626-A80C` | ACGS - Naic Market | DESKTOP-TK63MO6 | 192.168.0.100 |
+| `STORE-DEV-0001` | DEV - Local Testing | — | — |
+| `STORE-WAREHOUSE` | Warehouse (whapp) | — | — |
 
 ## Complete Change History
 
@@ -863,7 +866,7 @@ Restart-Service JumongCloudAPI
 12. **WhSyncFromMaster and auto-sync** reference `wh_products` table directly (not alias `wh`) — the `wh` alias was never defined, causing `missing FROM-clause entry for table "wh"` errors.
 13. **Local server deployment** — API is a Windows service (NSSM) at `C:\JumongAPI\JumongCloudAPI.exe`. Cloudflare Tunnel `jumong-pos` routes `admin.jumongdev.com` → `localhost:5000`. Deploy by copying publish output and restarting service.
 14. **Connection status** — POS sidebar shows green/red dot refreshed every 10s via `CheckConnectionAsync()` pinging `/dashboard/version`. No blocking — just visual indicator.
-15. **DO decommission order** — Keep DO running until last POS client switches API URL to `admin.jumongdev.com`. Then cancel DO App Platform + Managed PostgreSQL.
+15. **DO decommission order** — ~~Keep DO running until last POS client switches API URL~~ **DONE (verified 2026-08-06): all 4 POS clients on `admin.jumongdev.com`.** DO App Platform + Managed PostgreSQL can now be cancelled. App ID `1bc1369e-6ece-4645-be57-1a7fcf7e90b8`, DB ID `c6bababf-6a01-418a-9244-a830526f83b3`.
 16. **DB protection** — Set NTFS permissions on `JumongPos.db` to deny `Write`/`Delete` for `Users` group to prevent accidental deletion by employees. Cloud restore is the fallback (SYNC FROM CLOUD for master data, cloud PG has all sales/expenses).
 17. **Tailscale uninstalled** — Was only needed for remote SMB access to Naic client, but UAC blocked admin shares. No longer needed since updates are via UPDATE APP over internet.
 18. **Install PG on client? No** — POS clients keep SQLite + REST API sync to `admin.jumongdev.com/api`. Installing PG on each PC adds complexity with no benefit.
@@ -1111,6 +1114,17 @@ Compress-Archive -Force -Path "bin\Release\net8.0-windows\win-x64\publish\*" -De
 | `Services/SaleService.cs:670` | Fixed `GetItems(saleId)` call — removed (was missing `conn` parameter causing build failure). Uses `updatedSale.Items` instead. |
 
 **Impact:** Credit balance changes (payment, credit sale, void) now sync to cloud via REST API. The 5-min customer download from cloud no longer has any path to touch local `CreditBalance`. Cloud PG `credit_balance` zeroed for all 334 customers. Only EMZ ABAYON (₱1,278) has active debt. Build cache issue fixed: always run `dotnet clean` before `dotnet publish` to prevent stale exe.
+
+### 2026-08-06 — DigitalOcean Migration Verified Complete (DO Ready for Decommission)
+
+| Item | Detail |
+|---|---|
+| Check | Queried local PostgreSQL (`sales`, `stock_trails` per store) + `/api/dashboard/agent/status` endpoint |
+| Result | **All 4 POS clients already on `admin.jumongdev.com`** — every store has sales + stock trails on 2026-08-06, all agents heartbeat to the local server (last seen within the minute) |
+| Stores confirmed | HQ `7159` (DESKTOP-UU8E0D4 / 192.168.1.37 / app 1.1.27), HVR `AA36` (DESKTOP-TK63MO6 / 192.168.1.4 / app 1.1.25), U Got Minimart `E174` (DESKTOP-NISQ3Q7 / 192.168.1.152 / app 1.1.28), ACGS `A80C` (DESKTOP-TK63MO6 / 192.168.0.100 / app 1.1.30) |
+| Action | None taken — DO App Platform + Managed PostgreSQL now safe to cancel. App ID `1bc1369e-6ece-4645-be57-1a7fcf7e90b8`, DB ID `c6bababf-6a01-418a-9244-a830526f83b3` |
+
+**Impact:** No client is pointed at DigitalOcean anymore — their data lands on the local server. The old "4 POS clients still pointing here" note is removed; Stores table now lists all 4 with machine/IP; Key Decision #15 marked DONE.
 
 
 ## Warehouse Mobile App (Android, WarehouseApp/)
