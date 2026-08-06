@@ -285,13 +285,26 @@
           <div class="flex items-center justify-between mb-3">
             <button class="btn-ghost px-4" onclick="backToSell()">← BACK</button>
             <p class="text-white text-sm font-bold">STOCK RECEIVING</p>
-            <p class="text-gray-500 text-[11px]">add stock</p>
+            <button class="btn-ghost px-4 text-xs" onclick="toggleRecvHistory()" id="btnRecvHistory">🖨️ HISTORY</button>
           </div>
-          <div class="flex gap-2 mb-3">
-            <input id="recvSearch" class="input-field flex-1" type="text" placeholder="🔍 Search or scan barcode">
-            <button class="btn-ghost px-4" onclick="searchRecvProducts()">SEARCH</button>
+
+          <div id="recvEntryView">
+            <div class="card mb-3">
+              <p class="text-gray-400 text-[10px] uppercase tracking-wider mb-1.5">🏷️ Supplier / Source *</p>
+              <input id="recvSource" class="input-field" type="text" placeholder="e.g. SM MEGA delivery" enterkeyhint="done">
+            </div>
+            <div class="flex gap-2 mb-3">
+              <input id="recvSearch" class="input-field flex-1" type="text" placeholder="🔍 Search or scan barcode">
+              <button class="btn-ghost px-4" onclick="searchRecvProducts()">SEARCH</button>
+            </div>
+            <div id="recvResults" class="space-y-2 mb-3"></div>
+            <div id="recvCart" class="space-y-2 mb-3"></div>
+            <button class="btn-green w-full" id="btnSaveReceiving" onclick="saveReceivingBatch()">SAVE RECEIVING</button>
           </div>
-          <div id="recvResults" class="space-y-2"></div>
+
+          <div id="recvHistoryView" class="hidden">
+            <div id="recvHistoryList" class="space-y-2"></div>
+          </div>
         </div>
       </div>
 
@@ -1357,6 +1370,7 @@
     // ─── RECEIVING ──────────────────────────────────────────
     let recvProdCache = [];
     let recvTarget = null;
+    let recvCart = [];
 
     async function searchRecvProducts() {
       const q = document.getElementById('recvSearch').value.trim();
@@ -1375,7 +1389,7 @@
           const stock = Number(x.stockQty || 0);
           d.innerHTML = '<div class="flex items-center justify-between"><div class="flex-1 pr-2"><p class="text-white text-sm font-bold">' + x.name + '</p>' +
             '<p class="text-gray-500 text-[10px]">' + (x.barcode || '—') + ' • stock ' + stock + '</p></div>' +
-            '<button class="btn-green px-3 py-1.5 text-[10px]" onclick="openRecvModal(' + x.id + ')">+ RECEIVE</button></div>';
+            '<button class="btn-green px-3 py-1.5 text-[10px]" onclick="openRecvModal(' + x.id + ')">+ ADD</button></div>';
           box.appendChild(d);
         });
       } catch (e) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Failed: ' + e.message + '</p>'; }
@@ -1394,39 +1408,101 @@
         '<p class="text-gray-500 text-[11px] text-center">' + (x.barcode || '—') + '</p>' +
         '<div class="flex gap-2 pt-2">' +
         '<button class="btn-ghost flex-1" onclick="closeRecvModal()">CANCEL</button>' +
-        '<button class="btn-green flex-1" onclick="saveReceiving()">SAVE</button></div>';
+        '<button class="btn-green flex-1" onclick="addToRecvCart()">ADD TO BATCH</button></div>';
       show(document.getElementById('recvModal'));
     }
 
     function closeRecvModal() { hide(document.getElementById('recvModal')); recvTarget = null; }
 
-    async function saveReceiving() {
+    function addToRecvCart() {
       if (!recvTarget) return;
       const qty = parseInt(document.getElementById('recvQty').value || '0', 10);
       if (!qty || qty <= 0) { toast('Enter a valid quantity', 'error'); return; }
-      const body = { qtyChange: qty, reason: 'Mobile receiving', source: 'mobile' };
+      const existing = recvCart.find(i => i.id === recvTarget.id);
+      if (existing) existing.qty += qty;
+      else recvCart.push({ id: recvTarget.id, name: recvTarget.name, barcode: recvTarget.barcode || '', stock: Number(recvTarget.stockQty || 0), qty });
+      closeRecvModal();
+      recvTarget = null;
+      renderRecvCart();
+      toast('Added to batch (' + recvCart.length + ' items)');
+    }
+
+    function recvQtyStep(idx, delta) {
+      const it = recvCart[idx];
+      if (!it) return;
+      it.qty += delta;
+      if (it.qty < 1) it.qty = 1;
+      renderRecvCart();
+    }
+
+    function removeRecvItem(idx) {
+      recvCart.splice(idx, 1);
+      renderRecvCart();
+    }
+
+    function renderRecvCart() {
+      const box = document.getElementById('recvCart');
+      box.innerHTML = '';
+      if (!recvCart.length) { document.getElementById('btnSaveReceiving').textContent = 'SAVE RECEIVING'; return; }
+      const title = document.createElement('div');
+      title.className = 'flex items-center justify-between mb-1';
+      title.innerHTML = '<p class="text-[10px] text-[#5a5a8a] uppercase tracking-wider font-bold">📦 Batch (' + recvCart.length + ' items)</p>' +
+        '<button class="text-red-400 text-[11px] font-bold" onclick="clearRecvCart()">CLEAR</button>';
+      box.appendChild(title);
+      recvCart.forEach((it, i) => {
+        const d = document.createElement('div');
+        d.className = 'card !mb-0';
+        d.innerHTML = '<div class="flex items-center justify-between mb-1"><p class="text-white text-xs font-bold flex-1 pr-2">' + it.name + '</p>' +
+          '<button class="text-red-400 text-xs font-bold" onclick="removeRecvItem(' + i + ')">✕</button></div>' +
+          '<p class="text-gray-500 text-[10px] mb-2">' + (it.barcode || '—') + ' • stock ' + it.stock + '</p>' +
+          '<div class="flex items-center gap-2"><button class="qty-btn" onclick="recvQtyStep(' + i + ',-1)">−</button>' +
+          '<span class="flex-1 text-center text-white font-bold">' + it.qty + '</span>' +
+          '<button class="qty-btn" onclick="recvQtyStep(' + i + ',1)">+</button></div>';
+        box.appendChild(d);
+      });
+      document.getElementById('btnSaveReceiving').textContent = 'SAVE RECEIVING (' + recvCart.reduce((s, i) => s + i.qty, 0) + ' pcs)';
+    }
+
+    function clearRecvCart() { recvCart = []; renderRecvCart(); }
+
+    async function saveReceivingBatch() {
+      const source = document.getElementById('recvSource').value.trim();
+      if (!source) { toast('Enter the supplier / source', 'error'); document.getElementById('recvSource').focus(); return; }
+      if (!recvCart.length) { toast('Add at least one item', 'error'); return; }
+      const body = { source, items: recvCart.map(i => ({ productId: i.id, qty: i.qty })) };
+      const btn = document.getElementById('btnSaveReceiving');
+      btn.disabled = true; btn.textContent = 'SAVING...';
       try {
-        const r = await fetch(API + '/dashboard/warehouse/products/' + recvTarget.id + '/stock-move', {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        const r = await fetch(API + '/dashboard/warehouse/receivings', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         });
         const j = await r.json();
         if (!r.ok) { toast(j.error || 'Failed to save', 'error'); return; }
-        const newStock = Number(recvTarget.stockQty || 0) + qty;
         document.getElementById('recvModalTitle').textContent = '✓ RECEIVED';
-        const box = document.getElementById('recvModalBody');
-        box.innerHTML = '<div class="text-center pb-3"><p class="text-emerald-400 font-bold text-lg">+' + qty + ' pcs added</p>' +
-          '<p class="text-gray-400 text-[11px] mt-1">' + recvTarget.name + '</p>' +
-          '<p class="text-white font-bold text-xl mt-1">' + newStock + ' pcs total</p></div>' +
-          '<button class="btn-primary w-full mb-2" onclick="printReceiving(' + qty + ',' + newStock + ')">🖨️ PRINT RECEIVING</button>' +
+        const mbox = document.getElementById('recvModalBody');
+        const total = recvCart.reduce((s, i) => s + i.qty, 0);
+        mbox.innerHTML = '<div class="text-center pb-3"><p class="text-emerald-400 font-bold text-lg">+' + total + ' pcs received</p>' +
+          '<p class="text-gray-400 text-[11px] mt-1">' + recvCart.length + ' items • ' + source + '</p>' +
+          '<p class="text-cyan-400 text-xs font-bold mt-2">' + j.reference + '</p></div>' +
+          '<button class="btn-primary w-full mb-2" onclick="printReceivingBatch()">🖨️ PRINT RECEIVING</button>' +
           '<button class="btn-ghost w-full" onclick="closeRecvModal()">DONE</button>';
-        recvTarget.stockQty = newStock;
-        toast('Stock received: +' + qty);
-        searchRecvProducts();
+        show(document.getElementById('recvModal'));
+        recvCart = [];
+        renderRecvCart();
+        document.getElementById('recvSearch').value = '';
+        document.getElementById('recvResults').innerHTML = '';
+        document.getElementById('recvSource').value = '';
+        toast('Stock received: +' + total + ' pcs');
       } catch (e) { toast('Failed: ' + e.message, 'error'); }
+      finally { btn.disabled = false; btn.textContent = 'SAVE RECEIVING'; }
     }
 
-    function printReceiving(qty, newStock) {
+    // ─── RECEIVING PRINT HISTORY ─────────────────────────────
+    let lastReceiving = null;
+
+    function printReceivingBatch() {
+      if (!lastReceiving) { toast('Nothing to print', 'error'); return; }
       if (!IN_APP || !AndroidPrinter.isConnected()) { toast('Printer not connected', 'error'); return; }
       const W = paperWidth <= 50 ? 32 : 48;
       const dash = '------------------------------------------------'.slice(0, W);
@@ -1436,19 +1512,82 @@
         '        JUMONG POS WAREHOUSE',
         dash,
         'STOCK RECEIVING',
+        'Ref: ' + fit(lastReceiving.reference.split(' | ')[0]),
+        'Source: ' + fit(lastReceiving.source),
         'Date: ' + now.toLocaleString('en-PH', { timeZone: 'Asia/Manila' }),
         'Cashier: ' + (session && (session.fullName || session.username) || '—'),
         dash,
-        fit('Item: ' + (recvTarget ? recvTarget.name : '')),
-        fit('Barcode: ' + (recvTarget ? (recvTarget.barcode || '—') : '—')),
-        'Qty received: +' + qty,
-        'New stock: ' + newStock,
-        dash,
-        'Thank you!'
+        'Qty  Item'
       ];
+      lastReceiving.items.forEach(it => {
+        lines.push(String(it.qty).padStart(3) + '   ' + fit(it.productName));
+      });
+      lines.push(dash);
+      lines.push('TOTAL ITEMS: ' + lastReceiving.items.length);
+      lines.push('TOTAL QTY: ' + lastReceiving.items.reduce((s, i) => s + i.qty, 0));
+      lines.push(dash);
+      lines.push('Thank you!');
       const pr = AndroidPrinter.print(lines.join('\n'));
       if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
       else toast('Receiving voucher printed');
+    }
+
+    function toggleRecvHistory() {
+      const h = document.getElementById('recvHistoryView');
+      if (h.classList.contains('hidden')) { h.classList.remove('hidden'); document.getElementById('recvEntryView').classList.add('hidden'); document.getElementById('btnRecvHistory').textContent = '← ENTRY'; loadRecvHistory(); }
+      else { h.classList.add('hidden'); document.getElementById('recvEntryView').classList.remove('hidden'); document.getElementById('btnRecvHistory').textContent = '🖨️ HISTORY'; }
+    }
+
+    async function loadRecvHistory() {
+      const box = document.getElementById('recvHistoryList');
+      box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading...</p>';
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/receivings');
+        const rows = await r.json();
+        box.innerHTML = '';
+        if (!rows || !rows.length) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">No receiving history yet</p>'; return; }
+        rows.forEach(row => {
+          const parts = String(row.reference || '').split(' | ');
+          const ref = parts[0] || row.reference;
+          const source = parts[1] || '—';
+          const d = new Date(row.createdAt);
+          const div = document.createElement('div');
+          div.className = 'card';
+          div.innerHTML = '<div class="flex items-center justify-between" onclick="showRecvHistoryItems(\'' + ref.replace(/'/g, '') + '\')"><div class="flex-1 pr-2"><p class="text-white text-xs font-bold">' + ref + '</p>' +
+            '<p class="text-gray-500 text-[10px]">' + source + ' • ' + d.toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) + '</p>' +
+            '<p class="text-gray-500 text-[10px]">' + row.itemCount + ' items • ' + row.totalQty + ' pcs</p></div>' +
+            '<button class="text-cyan-400 text-[11px] font-bold" onclick="event.stopPropagation(); reprintReceiving(\'' + ref.replace(/'/g, '') + '\')">REPRINT</button></div>';
+          box.appendChild(div);
+        });
+      } catch (e) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Failed: ' + e.message + '</p>'; }
+    }
+
+    async function showRecvHistoryItems(ref) {
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/receivings/' + encodeURIComponent(ref) + '/items');
+        const items = await r.json();
+        const box = document.getElementById('recvHistoryList');
+        box.innerHTML = '<div class="card !mb-2"><p class="text-white text-xs font-bold">' + ref + '</p>' +
+          '<p class="text-gray-500 text-[10px]">' + items.length + ' items</p></div>';
+        (items || []).forEach(it => {
+          const d = document.createElement('div');
+          d.className = 'card !mb-1';
+          d.innerHTML = '<div class="flex items-center justify-between"><p class="text-white text-xs font-bold flex-1 pr-2">' + it.productName + '</p>' +
+            '<p class="text-emerald-400 text-xs font-bold">+' + it.qty + '</p></div>' +
+            '<p class="text-gray-500 text-[10px] mt-1">' + (it.barcode || '—') + '</p>';
+          box.appendChild(d);
+        });
+      } catch (e) { toast('Failed: ' + e.message, 'error'); }
+    }
+
+    async function reprintReceiving(ref) {
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/receivings/' + encodeURIComponent(ref) + '/items');
+        const items = await r.json();
+        const parts = ref.split(' | ');
+        lastReceiving = { reference: ref, source: parts[1] || '—', items: (items || []).map(i => ({ productName: i.productName, qty: i.qty })) };
+        printReceivingBatch();
+      } catch (e) { toast('Failed: ' + e.message, 'error'); }
     }
 
     // ─── APP UPDATE ──────────────────────────────────────────

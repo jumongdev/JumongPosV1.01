@@ -1162,7 +1162,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.1.2" });
+            return Ok(new { version = "1.1.3" });
     }
 
         [HttpGet("fix-hvr-times")]
@@ -1745,6 +1745,84 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 return Ok(new { success = true });
             }
             catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
+        }
+
+        [HttpPost("warehouse/receivings")]
+        public IActionResult WhCreateReceiving([FromBody] WhReceivingDto b)
+        {
+            if (string.IsNullOrWhiteSpace(b.Source))
+                return BadRequest(new { error = "Source is required" });
+            if (b.Items == null || b.Items.Count == 0)
+                return BadRequest(new { error = "No items" });
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var tx = conn.BeginTransaction();
+            try
+            {
+                var reference = "RECV-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + " | " + b.Source.Trim();
+
+                foreach (var it in b.Items)
+                {
+                    if (it.Qty <= 0) { tx.Rollback(); return BadRequest(new { error = "Invalid quantity for item " + it.ProductId }); }
+                    string? name = null, barcode = null; int stock = 0;
+                    using (var get = conn.CreateCommand()) { get.Transaction = tx;
+                        get.CommandText = "SELECT name, barcode, stock_qty FROM wh_products WHERE id = @id";
+                        get.Parameters.AddWithValue("id", it.ProductId);
+                        using var r = get.ExecuteReader();
+                        if (!r.Read()) { tx.Rollback(); return NotFound(new { error = "Product not found: " + it.ProductId }); }
+                        name = r.GetString(0); barcode = r.IsDBNull(1) ? null : r.GetString(1); stock = r.GetInt32(2);
+                    }
+                    using var upd = conn.CreateCommand(); upd.Transaction = tx;
+                    upd.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @q WHERE id = @id";
+                    upd.Parameters.AddWithValue("q", it.Qty);
+                    upd.Parameters.AddWithValue("id", it.ProductId);
+                    upd.ExecuteNonQuery();
+
+                    using var trail = conn.CreateCommand(); trail.Transaction = tx;
+                    trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type, source) VALUES (@pid, @pn, @bc, @qty, @ref, 'manual_receive', @src)";
+                    trail.Parameters.AddWithValue("pid", it.ProductId);
+                    trail.Parameters.AddWithValue("pn", name ?? "");
+                    trail.Parameters.AddWithValue("bc", barcode ?? "");
+                    trail.Parameters.AddWithValue("qty", it.Qty);
+                    trail.Parameters.AddWithValue("ref", reference);
+                    trail.Parameters.AddWithValue("src", b.Source2 == "desktop" ? "desktop" : "mobile");
+                    trail.ExecuteNonQuery();
+                }
+
+                tx.Commit();
+                return Ok(new { success = true, reference });
+            }
+            catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
+        }
+
+        [HttpGet("warehouse/receivings")]
+        public IActionResult WhGetReceivings()
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT reference, MIN(created_at) AS created_at, COUNT(*) AS item_count, SUM(qty_change) AS total_qty
+                FROM wh_stock_trails
+                WHERE reference_type = 'manual_receive' AND reference LIKE 'RECV-%'
+                GROUP BY reference ORDER BY created_at DESC LIMIT 100";
+            var list = new List<object>();
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+                list.Add(new { reference = r.GetString(0), createdAt = r.GetDateTime(1), itemCount = r.GetInt64(2), totalQty = r.GetInt64(3) });
+            return Ok(list);
+        }
+
+        [HttpGet("warehouse/receivings/{ref}/items")]
+        public IActionResult WhGetReceivingItems(string @ref)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT product_id, product_name, barcode, qty_change, created_at FROM wh_stock_trails WHERE reference = @ref ORDER BY id";
+            cmd.Parameters.AddWithValue("ref", @ref);
+            var list = new List<object>();
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+                list.Add(new { productId = r.GetInt32(0), productName = r.GetString(1), barcode = r.IsDBNull(2) ? "" : r.GetString(2), qty = r.GetInt32(3), createdAt = r.GetDateTime(4) });
+            return Ok(list);
         }
 
         [HttpPut("warehouse/products/{id}/stock-set")]
@@ -3399,6 +3477,9 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     public class WhProductDto { public string Name { get; set; } = ""; public string? Barcode { get; set; } public string? Category { get; set; } public decimal BoxPrice { get; set; } public decimal BoxCost { get; set; } public int BoxQty { get; set; } = 1; public decimal PiecePrice { get; set; } }
     public class WhStockDto { public int StockQty { get; set; } }
     public class WhStockMoveDto { public int QtyChange { get; set; } public string Reason { get; set; } = ""; public string? Source { get; set; } }
+
+    public class WhReceivingDto { public string Source { get; set; } = ""; public string? Source2 { get; set; } public List<WhReceivingItemDto> Items { get; set; } = new(); }
+    public class WhReceivingItemDto { public int ProductId { get; set; } public int Qty { get; set; } }
     public class WhClientDto { public string Name { get; set; } = ""; public string? Contact { get; set; } public string? Address { get; set; } public string? StoreType { get; set; } public string? StoreId { get; set; } }
     public class WhOrderDto { public int ClientId { get; set; } public string? ClientName { get; set; } public string? Notes { get; set; } public List<WhOrderItemDto>? Items { get; set; } }
     public class WhOrderItemDto { public int ProductId { get; set; } public string ProductName { get; set; } = ""; public string? UnitType { get; set; } public int Qty { get; set; } public decimal Price { get; set; } public decimal TotalPrice { get; set; } public int BaseQty { get; set; } public string? BaseUnitName { get; set; } public int BoxQtyPerUnit { get; set; } = 1; }
