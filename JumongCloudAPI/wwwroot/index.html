@@ -1812,7 +1812,7 @@ tailwind.config = {
                   const clients = await fetchJSON(API+'/warehouse/clients');
                   const sel = $el;
                   sel.innerHTML = '<option value=\'\'>Select POS client...</option>';
-                  clients.filter(c=>c.storeType==='pos').forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; o.setAttribute('data-sid',c.storeId||''); sel.appendChild(o) });
+                  clients.filter(c=>c.storeType==='pos' && c.storeId!=='STORE-WAREHOUSE').forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; o.setAttribute('data-sid',c.storeId||''); sel.appendChild(o) });
                 })">
             </select>
           </div>

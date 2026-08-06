@@ -153,8 +153,30 @@
           <div class="flex items-center justify-between mb-3">
             <button class="btn-ghost px-4" onclick="backToSell()">← BACK</button>
             <p class="text-white text-sm font-bold">SALES REPORT</p>
-            <p class="text-cyan-400 text-xs font-bold" id="salesTotalLabel"></p>
+            <p class="text-gray-500 text-[11px]" id="salesRangeLabel">TODAY</p>
           </div>
+
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div class="card !mb-0">
+              <p class="text-gray-400 text-[10px] uppercase tracking-wider mb-1">💵 Total Sales</p>
+              <p class="text-white text-lg font-bold" id="sumSales">₱0.00</p>
+            </div>
+            <div class="card !mb-0">
+              <p class="text-gray-400 text-[10px] uppercase tracking-wider mb-1">🧾 Transactions</p>
+              <p class="text-white text-lg font-bold" id="sumTxns">0</p>
+            </div>
+            <div class="card !mb-0 col-span-2">
+              <p class="text-gray-400 text-[10px] uppercase tracking-wider mb-1">📦 Gross Inventory Cost</p>
+              <p class="text-white text-lg font-bold" id="sumCost">₱0.00</p>
+            </div>
+          </div>
+
+          <div class="flex gap-2 mb-3">
+            <button class="btn-green flex-1 text-xs" id="btnToday" onclick="setSalesDay('today')">TODAY</button>
+            <button class="btn-ghost flex-1 text-xs" id="btnAll" onclick="setSalesDay('all')">ALL</button>
+            <input id="salesDate" class="input-field flex-1" type="date" onchange="setSalesDay(document.getElementById('salesDate').value)">
+          </div>
+
           <div id="salesList" class="space-y-2"></div>
         </div>
 
@@ -167,7 +189,7 @@
           </div>
           <div class="flex gap-2 mb-3">
             <input id="prodSearch" class="input-field flex-1" type="text" placeholder="🔍 Search product">
-            <button class="btn-ghost px-4" onclick="searchProducts()">SEARCH</button>
+            <button class="btn-ghost px-4" onclick="searchProdList()">SEARCH</button>
           </div>
           <div id="prodResults" class="space-y-2"></div>
         </div>
@@ -251,6 +273,20 @@
             <button class="btn-ghost w-full mt-3" onclick="checkAppUpdate(true)">🔍 CHECK FOR UPDATE</button>
           </div>
         </div>
+
+        <!-- RECEIVING TAB -->
+        <div id="tabReceiving" class="hidden">
+          <div class="flex items-center justify-between mb-3">
+            <button class="btn-ghost px-4" onclick="backToSell()">← BACK</button>
+            <p class="text-white text-sm font-bold">STOCK RECEIVING</p>
+            <p class="text-gray-500 text-[11px]">add stock</p>
+          </div>
+          <div class="flex gap-2 mb-3">
+            <input id="recvSearch" class="input-field flex-1" type="text" placeholder="🔍 Search or scan barcode">
+            <button class="btn-ghost px-4" onclick="searchRecvProducts()">SEARCH</button>
+          </div>
+          <div id="recvResults" class="space-y-2"></div>
+        </div>
       </div>
 
       <!-- Bottom nav -->
@@ -294,6 +330,7 @@
           <div class="menu-row" onclick="goSalesReport()"><span>🧾</span>Sales</div>
           <div class="menu-row" onclick="goOrders()"><span>🛒</span>Online Order</div>
           <div class="menu-row" onclick="goTransfers()"><span>🚚</span>Transfer</div>
+          <div class="menu-row" onclick="goReceiving()"><span>📥</span>Receiving</div>
         </div>
 
         <!-- INVENTORY modes -->
@@ -330,6 +367,17 @@
           <button onclick="closeTxItems()" class="text-red-400 text-lg font-bold">✕</button>
         </div>
         <div id="txItemsList" class="space-y-2"></div>
+      </div>
+    </div>
+
+    <!-- RECEIVING MODAL -->
+    <div id="recvModal" class="hidden fixed inset-0 z-50 flex items-end justify-center bg-black/70" onclick="if(event.target===this)closeRecvModal()">
+      <div class="bg-[#16163a] w-full max-w-sm rounded-t-2xl p-5 border-t border-[#222255] pb-8">
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-white font-bold text-base" id="recvModalTitle"></p>
+          <button onclick="closeRecvModal()" class="text-red-400 text-lg font-bold">✕</button>
+        </div>
+        <div id="recvModalBody" class="space-y-3"></div>
       </div>
     </div>
 
@@ -473,7 +521,7 @@
       setScreen('main');
       const savedTab = localStorage.getItem('wh_tab');
       const tab = (savedTab === 'inventory' || savedTab === 'setup' || savedTab === 'sales' || savedTab === 'products' || savedTab === 'orders' || savedTab === 'transfers') ? savedTab : 'sell';
-      if (savedTab === 'newtransfer') { localStorage.setItem('wh_tab', 'transfers'); }
+      if (savedTab === 'newtransfer' || savedTab === 'receiving') { localStorage.setItem('wh_tab', 'transfers'); }
       switchTab(tab);
       if (tab === 'inventory') searchInventory();
       if (tab === 'sales') loadSales();
@@ -544,6 +592,7 @@
     function goProducts() { closeBurgerMenu(); switchTab('products'); loadProducts(); }
     function goOrders() { closeBurgerMenu(); switchTab('orders'); loadOrders(); }
     function goTransfers() { closeBurgerMenu(); switchTab('transfers'); loadTransfers(); }
+    function goReceiving() { closeBurgerMenu(); switchTab('receiving'); document.getElementById('recvSearch').value = ''; document.getElementById('recvResults').innerHTML = ''; document.getElementById('recvSearch').focus(); }
     function goNewTransfer() {
       switchTab('newtransfer');
       txItems = [];
@@ -593,6 +642,7 @@
       hide(document.getElementById('tabOrders'));
       hide(document.getElementById('tabTransfers'));
       hide(document.getElementById('tabNewTransfer'));
+      hide(document.getElementById('tabReceiving'));
       document.getElementById('navSell').classList.remove('active');
       document.getElementById('navInventory').classList.remove('active');
       if (tab === 'sell') { show(document.getElementById('tabSell')); document.getElementById('navSell').classList.add('active'); }
@@ -603,6 +653,7 @@
       if (tab === 'orders') { show(document.getElementById('tabOrders')); }
       if (tab === 'transfers') { show(document.getElementById('tabTransfers')); }
       if (tab === 'newtransfer') { show(document.getElementById('tabNewTransfer')); }
+      if (tab === 'receiving') { show(document.getElementById('tabReceiving')); document.getElementById('recvSearch').focus(); }
     }
 
     // ─── MODERN PULL-TO-REFRESH (called by native app) ───────
@@ -622,6 +673,9 @@
         loadTransfers();
       } else if (tab === 'newtransfer') {
         loadTxClients();
+      } else if (tab === 'receiving') {
+        const q = document.getElementById('recvSearch').value.trim();
+        if (q) searchRecvProducts();
       } else {
         if (IN_APP) refreshPrinters();
         const q = document.getElementById('sellSearch').value.trim();
@@ -738,12 +792,23 @@
       } catch (e) { toast('Search failed: ' + e.message, 'error'); }
     }
 
-    async function openUnitPicker(productId) {
-      const url = API + '/dashboard/warehouse/products?search=' + productId + '&noImage=true';
+    let sellProdCache = [];
+    let sellProdCacheLoaded = false;
+
+    async function ensureSellProdCache() {
+      if (sellProdCacheLoaded) return;
       try {
-        const r = await fetch(url);
+        const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true');
         const data = await r.json();
-        const p = (data || []).find(x => x.id === productId);
+        sellProdCache = data || [];
+        sellProdCacheLoaded = true;
+      } catch (e) { throw new Error(e.message); }
+    }
+
+    async function openUnitPicker(productId) {
+      try {
+        await ensureSellProdCache();
+        const p = sellProdCache.find(x => x.id === productId);
         if (!p) { toast('Product not found', 'error'); return; }
         currentProduct = p;
         document.getElementById('pickProductName').textContent = p.name;
@@ -917,19 +982,47 @@
     }
 
     // ─── SALES REPORT ────────────────────────────────────────
+    let salesDay = 'today';
+
+    function setSalesDay(day) {
+      salesDay = day;
+      document.getElementById('btnToday').className = 'btn-green flex-1 text-xs';
+      document.getElementById('btnAll').className = 'btn-ghost flex-1 text-xs';
+      if (day === 'today') {
+        document.getElementById('btnToday').className = 'btn-green flex-1 text-xs';
+        document.getElementById('salesDate').value = '';
+        document.getElementById('salesRangeLabel').textContent = 'TODAY';
+      } else if (day === 'all') {
+        document.getElementById('btnAll').className = 'btn-green flex-1 text-xs';
+        document.getElementById('salesDate').value = '';
+        document.getElementById('salesRangeLabel').textContent = 'ALL';
+      } else {
+        document.getElementById('salesDate').value = day;
+        document.getElementById('salesRangeLabel').textContent = day;
+      }
+      loadSales();
+    }
+
+    function salesFromTo() {
+      if (salesDay === 'all') return { from: '', to: '' };
+      const d = salesDay === 'today' ? new Date() : new Date(salesDay + 'T00:00:00');
+      const from = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      return { from, to: from };
+    }
+
     async function loadSales() {
-      const url = API + '/dashboard/warehouse/sales?limit=100';
       const list = document.getElementById('salesList');
       list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Loading...</p>';
+      const range = salesFromTo();
+      let url = API + '/dashboard/warehouse/sales?limit=100';
+      if (range.from) url += '&from=' + range.from + '&to=' + range.to;
       try {
         const r = await fetch(url);
         const data = await r.json();
         const rows = (data || []).filter(x => !x.isVoided);
         list.innerHTML = '';
-        let total = 0, count = 0;
+        if (!rows.length) list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No sales recorded</p>';
         rows.forEach(x => {
-          if (x.isVoided) return;
-          count++; total += (x.total || 0);
           const dt = new Date(x.createdAt);
           const div = document.createElement('div');
           div.className = 'card';
@@ -938,9 +1031,24 @@
             '<p class="text-cyan-400 text-sm font-bold">₱' + Number(x.total || 0).toFixed(2) + '</p></div>';
           list.appendChild(div);
         });
-        if (!rows.length) list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No sales recorded</p>';
-        document.getElementById('salesTotalLabel').textContent = rows.length ? (rows.length + ' • ₱' + total.toFixed(2)) : '';
+        loadSalesSummary();
       } catch (e) { list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Failed to load: ' + e.message + '</p>'; }
+    }
+
+    async function loadSalesSummary() {
+      const range = salesFromTo();
+      let url = API + '/dashboard/warehouse/sales/summary';
+      if (range.from) url += '?from=' + range.from + '&to=' + range.to;
+      try {
+        const r = await fetch(url);
+        const j = await r.json();
+        document.getElementById('sumSales').textContent = '₱' + Number(j.totalSales || 0).toFixed(2);
+        document.getElementById('sumTxns').textContent = String(j.transactionCount || 0);
+        document.getElementById('sumCost').textContent = '₱' + Number(j.grossInventoryCost || 0).toFixed(2);
+      } catch (e) {
+        document.getElementById('sumSales').textContent = '—';
+        document.getElementById('sumCost').textContent = '—';
+      }
     }
 
     async function loadSaleItems(id, label) {
@@ -995,7 +1103,7 @@
       } catch (e) { list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Failed to load: ' + e.message + '</p>'; }
     }
 
-    function searchProducts() { loadProducts(); }
+    function searchProdList() { loadProducts(); }
 
     function showProductDetail(id) {
       const x = prodCache.find(p => p.id === id);
@@ -1129,7 +1237,7 @@
       try {
         const r = await fetch(API + '/dashboard/warehouse/clients');
         const data = await r.json();
-        (data || []).filter(c => c.storeType === 'pos').forEach(c => {
+        (data || []).filter(c => c.storeType === 'pos' && c.storeId !== 'STORE-WAREHOUSE').forEach(c => {
           const o = document.createElement('option');
           o.value = c.id;
           o.textContent = c.name;
@@ -1227,6 +1335,104 @@
         loadTransfers();
       } catch (e) { toast('Failed: ' + e.message, 'error'); }
       finally { if (btn) { btn.disabled = false; btn.textContent = 'CREATE TRANSFER'; } }
+    }
+
+    // ─── RECEIVING ──────────────────────────────────────────
+    let recvProdCache = [];
+    let recvTarget = null;
+
+    async function searchRecvProducts() {
+      const q = document.getElementById('recvSearch').value.trim();
+      if (!q) { toast('Search or scan a product', 'error'); return; }
+      const box = document.getElementById('recvResults');
+      box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading...</p>';
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&search=' + encodeURIComponent(q));
+        const data = await r.json();
+        recvProdCache = data || [];
+        box.innerHTML = '';
+        if (!recvProdCache.length) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">No products found</p>'; return; }
+        recvProdCache.forEach(x => {
+          const d = document.createElement('div');
+          d.className = 'card';
+          const stock = Number(x.stockQty || 0);
+          d.innerHTML = '<div class="flex items-center justify-between"><div class="flex-1 pr-2"><p class="text-white text-sm font-bold">' + x.name + '</p>' +
+            '<p class="text-gray-500 text-[10px]">' + (x.barcode || '—') + ' • stock ' + stock + '</p></div>' +
+            '<button class="btn-green px-3 py-1.5 text-[10px]" onclick="openRecvModal(' + x.id + ')">+ RECEIVE</button></div>';
+          box.appendChild(d);
+        });
+      } catch (e) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Failed: ' + e.message + '</p>'; }
+    }
+
+    function openRecvModal(id) {
+      const x = recvProdCache.find(p => p.id === id);
+      if (!x) { toast('Product not found', 'error'); return; }
+      recvTarget = x;
+      document.getElementById('recvModalTitle').textContent = x.name;
+      const box = document.getElementById('recvModalBody');
+      box.innerHTML = '<div class="text-center pb-2"><p class="text-gray-400 text-[11px]">Current stock</p>' +
+        '<p class="text-white text-2xl font-bold">' + Number(x.stockQty || 0) + ' pcs</p></div>' +
+        '<div><p class="text-gray-400 text-[11px] mb-1">Quantity to receive</p>' +
+        '<input id="recvQty" class="input-field w-full text-center text-2xl font-bold" type="number" min="1" value="1" inputmode="numeric"></div>' +
+        '<p class="text-gray-500 text-[11px] text-center">' + (x.barcode || '—') + '</p>' +
+        '<div class="flex gap-2 pt-2">' +
+        '<button class="btn-ghost flex-1" onclick="closeRecvModal()">CANCEL</button>' +
+        '<button class="btn-green flex-1" onclick="saveReceiving()">SAVE</button></div>';
+      show(document.getElementById('recvModal'));
+      setTimeout(() => { const q = document.getElementById('recvQty'); if (q) q.focus(); }, 100);
+    }
+
+    function closeRecvModal() { hide(document.getElementById('recvModal')); recvTarget = null; }
+
+    async function saveReceiving() {
+      if (!recvTarget) return;
+      const qty = parseInt(document.getElementById('recvQty').value || '0', 10);
+      if (!qty || qty <= 0) { toast('Enter a valid quantity', 'error'); return; }
+      const body = { qtyChange: qty, reason: 'Mobile receiving', source: 'mobile' };
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/products/' + recvTarget.id + '/stock-move', {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const j = await r.json();
+        if (!r.ok) { toast(j.error || 'Failed to save', 'error'); return; }
+        const newStock = Number(recvTarget.stockQty || 0) + qty;
+        document.getElementById('recvModalTitle').textContent = '✓ RECEIVED';
+        const box = document.getElementById('recvModalBody');
+        box.innerHTML = '<div class="text-center pb-3"><p class="text-emerald-400 font-bold text-lg">+' + qty + ' pcs added</p>' +
+          '<p class="text-gray-400 text-[11px] mt-1">' + recvTarget.name + '</p>' +
+          '<p class="text-white font-bold text-xl mt-1">' + newStock + ' pcs total</p></div>' +
+          '<button class="btn-primary w-full mb-2" onclick="printReceiving(' + qty + ',' + newStock + ')">🖨️ PRINT RECEIVING</button>' +
+          '<button class="btn-ghost w-full" onclick="closeRecvModal()">DONE</button>';
+        recvTarget.stockQty = newStock;
+        toast('Stock received: +' + qty);
+        searchRecvProducts();
+      } catch (e) { toast('Failed: ' + e.message, 'error'); }
+    }
+
+    function printReceiving(qty, newStock) {
+      if (!IN_APP || !AndroidPrinter.isConnected()) { toast('Printer not connected', 'error'); return; }
+      const W = paperWidth <= 50 ? 32 : 48;
+      const dash = '------------------------------------------------'.slice(0, W);
+      const fit = s => { const str = String(s); return str.length > W ? str.slice(0, W - 1) + '~' : str; };
+      const now = new Date();
+      const lines = [
+        '        JUMONG POS WAREHOUSE',
+        dash,
+        'STOCK RECEIVING',
+        'Date: ' + now.toLocaleString('en-PH', { timeZone: 'Asia/Manila' }),
+        'Cashier: ' + (session && (session.fullName || session.username) || '—'),
+        dash,
+        fit('Item: ' + (recvTarget ? recvTarget.name : '')),
+        fit('Barcode: ' + (recvTarget ? (recvTarget.barcode || '—') : '—')),
+        'Qty received: +' + qty,
+        'New stock: ' + newStock,
+        dash,
+        'Thank you!'
+      ];
+      const pr = AndroidPrinter.print(lines.join('\n'));
+      if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
+      else toast('Receiving voucher printed');
     }
 
     // ─── APP UPDATE ──────────────────────────────────────────

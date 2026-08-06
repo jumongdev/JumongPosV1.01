@@ -1162,7 +1162,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.1.1" });
+            return Ok(new { version = "1.1.2" });
     }
 
         [HttpGet("fix-hvr-times")]
@@ -1729,14 +1729,16 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 // Log trail
                 var refType = s.QtyChange > 0 ? "manual_receive" : "manual_return";
                 var refText = s.Reason;
+                var mvSrc = string.Equals(s.Source, "mobile", StringComparison.OrdinalIgnoreCase) ? "mobile" : "desktop";
                 using var trail = conn.CreateCommand(); trail.Transaction = tx;
-                trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) VALUES (@pid, @pn, @bc, @qty, @ref, @rt)";
+                trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type, source) VALUES (@pid, @pn, @bc, @qty, @ref, @rt, @src)";
                 trail.Parameters.AddWithValue("pid", id);
                 trail.Parameters.AddWithValue("pn", name ?? "");
                 trail.Parameters.AddWithValue("bc", barcode ?? "");
                 trail.Parameters.AddWithValue("qty", s.QtyChange);
-                trail.Parameters.AddWithValue("ref", refText);
+                trail.Parameters.AddWithValue("ref", refText + (mvSrc == "mobile" ? (string.IsNullOrEmpty(refText) ? "Mobile receiving" : " | Mobile") : ""));
                 trail.Parameters.AddWithValue("rt", refType);
+                trail.Parameters.AddWithValue("src", mvSrc);
                 trail.ExecuteNonQuery();
 
                 tx.Commit();
@@ -2815,7 +2817,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         if (!string.IsNullOrEmpty(to)) { cmd.CommandText += " AND s.created_at <= @to"; cmd.Parameters.AddWithValue("to", to + " 23:59:59"); }
         cmd.CommandText += " ORDER BY s.created_at DESC LIMIT " + limit;
 
-        var list = new List<object>();
+            var list = new List<object>();
         using var r = cmd.ExecuteReader();
         while (r.Read())
         {
@@ -2823,6 +2825,32 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             list.Add(new { id = saleId, customerName = r.GetString(1), total = r.GetDecimal(2), itemCount = r.GetInt32(3), createdAt = r.GetDateTime(4), isVoided = r.GetBoolean(5), invoiceNo = r.IsDBNull(6) ? "" : r.GetString(6) });
         }
         return Ok(list);
+    }
+
+    [HttpGet("warehouse/sales/summary")]
+    public IActionResult WhGetSalesSummary([FromQuery] string? from, [FromQuery] string? to)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        var sql = @"
+            SELECT COALESCE(SUM(s.total_amount), 0) AS total_sales,
+                   COUNT(*) AS txn_count,
+                   COALESCE(SUM(si.stock_deduction * COALESCE(mp.cost, wp.box_cost / NULLIF(wp.box_qty, 0), 0)), 0) AS gross_cost
+            FROM wh_walkin_sales s
+            LEFT JOIN wh_walkin_sale_items si ON si.sale_id = s.id AND COALESCE(si.is_voided, FALSE) = FALSE
+            LEFT JOIN wh_products wp ON wp.id = si.product_id
+            LEFT JOIN master_products mp ON mp.id = wp.master_product_id
+            WHERE COALESCE(s.is_voided, FALSE) = FALSE AND 1=1";
+        if (!string.IsNullOrEmpty(from)) { sql += " AND s.created_at >= @from"; cmd.Parameters.AddWithValue("from", from); }
+        if (!string.IsNullOrEmpty(to)) { sql += " AND s.created_at <= @to"; cmd.Parameters.AddWithValue("to", to + " 23:59:59"); }
+        cmd.CommandText = sql;
+        using var r = cmd.ExecuteReader();
+        if (!r.Read()) return Ok(new { totalSales = 0m, transactionCount = 0, grossInventoryCost = 0m });
+        return Ok(new {
+            totalSales = r.GetDecimal(0),
+            transactionCount = r.GetInt32(1),
+            grossInventoryCost = r.GetDecimal(2)
+        });
     }
 
     [HttpGet("warehouse/sales/{id}/items")]
@@ -3370,7 +3398,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
 
     public class WhProductDto { public string Name { get; set; } = ""; public string? Barcode { get; set; } public string? Category { get; set; } public decimal BoxPrice { get; set; } public decimal BoxCost { get; set; } public int BoxQty { get; set; } = 1; public decimal PiecePrice { get; set; } }
     public class WhStockDto { public int StockQty { get; set; } }
-    public class WhStockMoveDto { public int QtyChange { get; set; } public string Reason { get; set; } = ""; }
+    public class WhStockMoveDto { public int QtyChange { get; set; } public string Reason { get; set; } = ""; public string? Source { get; set; } }
     public class WhClientDto { public string Name { get; set; } = ""; public string? Contact { get; set; } public string? Address { get; set; } public string? StoreType { get; set; } public string? StoreId { get; set; } }
     public class WhOrderDto { public int ClientId { get; set; } public string? ClientName { get; set; } public string? Notes { get; set; } public List<WhOrderItemDto>? Items { get; set; } }
     public class WhOrderItemDto { public int ProductId { get; set; } public string ProductName { get; set; } = ""; public string? UnitType { get; set; } public int Qty { get; set; } public decimal Price { get; set; } public decimal TotalPrice { get; set; } public int BaseQty { get; set; } public string? BaseUnitName { get; set; } public int BoxQtyPerUnit { get; set; } = 1; }
