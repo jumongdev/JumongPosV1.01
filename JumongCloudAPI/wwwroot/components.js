@@ -1273,6 +1273,92 @@ Alpine.store('app', {
     }
   }));
 
+  Alpine.data('posQrPanel', () => ({
+    d: [], sel: {}, header: '', imgUrl: '', imgPreview: '', fileName: '', pushing: false, restartPos: false,
+    statuses: [], msg: '',
+    async init() {
+      if (Alpine.store('app').section === 'posqr') await this.load();
+      this.$watch('$store.app.section', v => { if (v === 'posqr') this.load(); });
+    },
+    async load() {
+      try {
+        const agents = await fetchJSON(API + '/agent/status');
+        this.d = (agents || []).map(a => a.storeId);
+        this.statuses = this.d.map(sid => ({ storeId: sid, state: 'idle', msg: '' }));
+      } catch (e) { this.d = []; this.statuses = []; }
+    },
+    storeName(sid) { return Alpine.store('app').storeMap[sid] || sid; },
+    toggleAll(on) { this.d.forEach(sid => this.sel[sid] = on); },
+    async handleUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      if (!/\.(png|jpe?g|gif|bmp)$/i.test(file.name)) { this.msg = 'Only image files (png/jpg/gif/bmp) allowed'; return; }
+      this.msg = 'Uploading to cloud...';
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const r = await fetch(API + '/agent/upload-file', { method: 'POST', body: fd });
+        if (!r.ok) throw new Error('Upload failed');
+        const d = await r.json();
+        this.imgUrl = d.fullUrl || ('https://admin.jumongdev.com' + d.url);
+        this.imgPreview = d.url;
+        this.fileName = file.name;
+        this.msg = 'Image ready — push to stores below.';
+      } catch (ex) { this.msg = 'Upload error: ' + ex.message; }
+    },
+    async pushAll() {
+      const targets = this.d.filter(sid => this.sel[sid]);
+      if (!targets.length) { this.msg = 'Select at least one store'; return; }
+      if (!this.imgUrl) { this.msg = 'Upload an image first'; return; }
+      if (!this.header.trim()) { this.msg = 'Enter a title first'; return; }
+      this.pushing = true;
+      const sql = "UPDATE Settings SET Value='" +
+        JSON.stringify([{ header: this.header.trim(), file: this.fileName }]).replace(/'/g, "''") +
+        "' WHERE Key='StoreQrCodes';";
+      const tgt = targets.map(sid => ({ storeId: sid, state: 'sending', msg: '', updateId: 0, sqlId: 0, restartId: 0 }));
+      this.statuses = this.d.map(sid => {
+        const t = tgt.find(x => x.storeId === sid);
+        return t || { storeId: sid, state: 'skip', msg: '' };
+      });
+      for (const t of tgt) {
+        try {
+          const u = await fetchJSON(API + '/agent/send/' + encodeURIComponent(t.storeId), { method: 'POST', body: JSON.stringify({ type: 'update', payload: this.imgUrl + '|..\\assets\\' + this.fileName }), headers: { 'Content-Type': 'application/json' } });
+          t.updateId = u.commandId;
+          const s = await fetchJSON(API + '/agent/send/' + encodeURIComponent(t.storeId), { method: 'POST', body: JSON.stringify({ type: 'sql', payload: sql }), headers: { 'Content-Type': 'application/json' } });
+          t.sqlId = s.commandId;
+          if (this.restartPos) {
+            const r = await fetchJSON(API + '/agent/send/' + encodeURIComponent(t.storeId), { method: 'POST', body: JSON.stringify({ type: 'restart', payload: '' }), headers: { 'Content-Type': 'application/json' } });
+            t.restartId = r.commandId;
+          }
+          t.state = 'pushing';
+        } catch (ex) { t.state = 'error'; t.msg = 'send failed: ' + ex.message; }
+      }
+      this.msg = 'Commands sent. Waiting for agents...';
+      await this.poll(tgt);
+      this.pushing = false;
+    },
+    async poll(tgt) {
+      for (let n = 0; n < 14; n++) {
+        await new Promise(r => setTimeout(r, 2500));
+        let pending = false;
+        for (const t of tgt) {
+          if (t.state !== 'pushing') continue;
+          try {
+            const list = await fetchJSON(API + '/agent/results/' + encodeURIComponent(t.storeId));
+            const u = list.find(x => x.commandId === t.updateId);
+            const s = list.find(x => x.commandId === t.sqlId);
+            if (u && s) {
+              t.state = (u.error || s.error) ? 'error' : 'done';
+              t.msg = (u.error || 'Image OK') + ' / ' + (s.error || 'Title OK') + (t.restartId ? ' / restart sent' : '');
+            } else pending = true;
+          } catch (e) { pending = true; }
+        }
+        if (!pending) { this.msg = 'Done — check the statuses below.'; return; }
+      }
+      this.msg = 'Some stores timed out — check AGENTS panel for connectivity.';
+    }
+  }));
+
   Alpine.data('suspect1pcPanel', () => ({
     data: [],
     filterStore: '',
