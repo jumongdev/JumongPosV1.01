@@ -132,7 +132,7 @@
               <p class="text-gray-400 text-sm">TOTAL</p>
               <p class="text-white text-xl font-bold" id="cartTotal">₱0.00</p>
             </div>
-            <button class="btn-green mt-3" onclick="checkout()">SELL NOW</button>
+            <button class="btn-green mt-3" id="btnSellNow" onclick="checkout()">SELL NOW</button>
           </div>
         </div>
 
@@ -939,10 +939,20 @@
     }
 
     function scrollCartIntoView() {
-      const f = document.getElementById('cartFooter');
-      if (f && cart.length) {
-        setTimeout(() => { try { f.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch (e) { f.scrollIntoView(); } }, 60);
-      }
+      const b = document.getElementById('btnSellNow');
+      if (!b || !cart.length) return;
+      setTimeout(() => {
+        const nav = 84;
+        const vv = window.visualViewport;
+        const vh = vv ? vv.height : window.innerHeight;
+        const offTop = vv ? vv.offsetTop : 0;
+        const r = b.getBoundingClientRect();
+        const target = r.bottom - (offTop + vh - nav);
+        if (target > 4) {
+          try { window.scrollBy({ top: target + 8, behavior: 'smooth' }); }
+          catch (e) { window.scrollTo(0, window.scrollY + target + 8); }
+        }
+      }, 60);
     }
 
     function changeQty(i, delta) {
@@ -991,7 +1001,7 @@
     }
 
     // ─── CHECKOUT ────────────────────────────────────────────
-    // When the soft keypad opens, push the cart footer back into view
+    // When the soft keypad opens, push the SELL NOW button back into view
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', () => {
         if (cart.length && !document.getElementById('tabSell').classList.contains('hidden')) {
