@@ -1067,6 +1067,37 @@ public class PrinterService
         try { doc.Print(); }
         catch (Exception ex) { MessageBox.Show("Print failed: " + ex.Message, "Print Error", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
     }
+
+    public static void PrintRawText(string text)
+    {
+        var printer = GetSetting("PrinterName");
+        if (string.IsNullOrEmpty(printer)) { MessageBox.Show("No printer configured.", "Printer Not Set", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+
+        var paperWidth = int.TryParse(GetSetting("PaperWidth"), out var pw) ? pw : 315;
+        var marginLeft = int.TryParse(GetSetting("PrinterMarginLeft"), out var ml) ? ml : 0;
+        var marginRight = int.TryParse(GetSetting("PrinterMarginRight"), out var mr) ? mr : 0;
+
+        var doc = new PrintDocument();
+        doc.PrinterSettings.PrinterName = printer;
+        doc.DefaultPageSettings.PaperSize = new PaperSize("Custom", paperWidth, 3000);
+        doc.DefaultPageSettings.Margins = new Margins(marginLeft, marginRight, 0, 0);
+
+        doc.PrintPage += (sender, e) =>
+        {
+            var sf = StringFormat.GenericTypographic;
+            using var font9B = new Font("Courier New", 9, FontStyle.Bold);
+            var brush = Brushes.Black;
+            var y = 5f;
+            foreach (var line in text.Replace("\r\n", "\n").Split('\n'))
+            {
+                e.Graphics.DrawString(line, font9B, brush, 0, y, sf);
+                y += e.Graphics.MeasureString(line, font9B).Height + 2;
+            }
+        };
+
+        try { doc.Print(); }
+        catch (Exception ex) { MessageBox.Show("Print failed: " + ex.Message, "Print Error", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
+    }
 }
 
 

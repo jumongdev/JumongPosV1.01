@@ -604,6 +604,23 @@ public static class PgDatabaseHelper
             SELECT 1, '' WHERE NOT EXISTS (SELECT 1 FROM pos_promo);";
         try { promoMig.ExecuteNonQuery(); } catch { }
 
+        // Migration: branding table for cloud-managed app branding (splash/login/colors)
+        using var brandMig = conn.CreateCommand();
+        brandMig.CommandText = @"
+            CREATE TABLE IF NOT EXISTS branding (
+                id INT PRIMARY KEY,
+                app_title TEXT NOT NULL DEFAULT '',
+                logo_url TEXT NOT NULL DEFAULT '',
+                splash_bg TEXT NOT NULL DEFAULT '',
+                login_bg TEXT NOT NULL DEFAULT '',
+                primary_color TEXT NOT NULL DEFAULT '',
+                icon_key TEXT NOT NULL DEFAULT '',
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            INSERT INTO branding (id, app_title, logo_url, splash_bg, login_bg, primary_color, icon_key)
+            SELECT 1, '', '', '', '', '', '' WHERE NOT EXISTS (SELECT 1 FROM branding);";
+        try { brandMig.ExecuteNonQuery(); } catch { }
+
         // Migration: add is_voided to wh_walkin_sales
         using var voidMig = conn.CreateCommand();
         voidMig.CommandText = "ALTER TABLE wh_walkin_sales ADD COLUMN IF NOT EXISTS is_voided BOOLEAN NOT NULL DEFAULT FALSE";

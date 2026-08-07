@@ -9,14 +9,15 @@
 <style>
   * { -webkit-tap-highlight-color: transparent; }
   html, body { padding: 0; margin: 0; }
-  body { background: #10102a; font-family: 'Segoe UI', system-ui, sans-serif; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  :root { --jbg: #10102a; --jacc: #06b6d4; --jacc-dark: #0891b2; }
+  body { background: var(--jbg); font-family: 'Segoe UI', system-ui, sans-serif; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
   .input-field {
     width: 100%; background: #181848; border: 1px solid #222255;
     border-radius: 12px; padding: 14px 16px; color: #e2e8f0; font-size: 15px; outline: none;
   }
-  .input-field:focus { border-color: #06b6d4; box-shadow: 0 0 0 3px rgba(6,182,212,0.15); }
-  .btn-primary { width: 100%; background: #06b6d4; color: white; font-weight: 700; border-radius: 12px; padding: 15px; font-size: 15px; letter-spacing: 0.5px; }
-  .btn-primary:active { background: #0891b2; }
+  .input-field:focus { border-color: var(--jacc); box-shadow: 0 0 0 3px rgba(6,182,212,0.15); }
+  .btn-primary { width: 100%; background: var(--jacc); color: white; font-weight: 700; border-radius: 12px; padding: 15px; font-size: 15px; letter-spacing: 0.5px; }
+  .btn-primary:active { background: var(--jacc-dark); }
   .btn-primary:disabled { opacity: 0.5; }
   .btn-ghost { background: #181848; border: 1px solid #222255; color: #e2e8f0; font-weight: 600; border-radius: 12px; padding: 12px; font-size: 14px; }
   .btn-ghost:active { background: #1e1e52; }
@@ -24,22 +25,24 @@
   .btn-green { background: #059669; color: white; font-weight: 700; border-radius: 12px; padding: 14px; font-size: 15px; }
   .btn-green:active { background: #047857; }
   .store-chip { display: flex; align-items: center; gap: 10px; padding: 14px 16px; background: #181848; border: 1px solid #222255; border-radius: 12px; cursor: pointer; transition: all 0.15s; }
-  .store-chip.active { border-color: #06b6d4; background: rgba(6,182,212,0.1); }
+  .store-chip.active { border-color: var(--jacc); background: rgba(6,182,212,0.1); }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1e293b; color: #f8fafc; padding: 12px 20px; border-radius: 10px; font-size: 13px; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.4); max-width: 90%; text-align: center; }
   .toast.error { background: #7f1d1d; }
   .card { background: #181848; border: 1px solid #222255; border-radius: 14px; padding: 14px; }
   .tab-btn { flex: 1; padding: 12px 4px; font-size: 13px; font-weight: 700; color: #7878aa; border-radius: 10px; text-align: center; }
-  .tab-btn.active { background: #06b6d4; color: white; }
+  .tab-btn.active { background: var(--jacc); color: white; }
   .printer-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: #14143a; border: 1px solid #222255; border-radius: 10px; margin-bottom: 8px; }
   .printer-row.connected { border-color: #059669; }
   .qty-btn { width: 40px; height: 40px; border-radius: 10px; background: #181848; border: 1px solid #222255; color: white; font-size: 18px; font-weight: 700; }
   .qty-btn:active { background: #26265e; }
+  .qty-input { width: 44px; height: 40px; border-radius: 10px; background: #0d0d24; border: 1px solid var(--jacc); color: white; font-size: 15px; font-weight: 800; text-align: center; -moz-appearance: textfield; }
+  .qty-input::-webkit-outer-spin-button, .qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .cart-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: #14143a; border: 1px solid #222255; border-radius: 10px; margin-bottom: 8px; }
   .unit-chip { display: inline-block; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; border: 1px solid #222255; color: #a5a5d0; margin: 3px; }
-  .unit-chip.selected { background: #06b6d4; color: white; border-color: #06b6d4; }
+  .unit-chip.selected { background: var(--jacc); color: white; border-color: var(--jacc); }
   .nav-bottom { position: fixed; bottom: 0; left: 0; right: 0; background: #16163a; border-top: 1px solid #222255; display: flex; padding: 8px 12px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); z-index: 50; }
   .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; color: #7878aa; font-weight: 600; padding: 6px 0; }
-  .nav-item.active { color: #06b6d4; }
+  .nav-item.active { color: var(--jacc); }
   .nav-item span.icon { font-size: 20px; }
   .main-content { padding-bottom: 120px; }
   .menu-row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; background: #181848; border: 1px solid #222255; border-radius: 10px; color: #e2e8f0; font-size: 13px; font-weight: 600; cursor: pointer; }
@@ -52,8 +55,9 @@
 
     <!-- LOADING SCREEN -->
     <div id="loadingScreen" class="flex-1 flex flex-col items-center justify-center px-6">
-      <div class="text-5xl mb-4 animate-pulse">📦</div>
-      <h1 class="text-xl font-bold text-cyan-400 tracking-wide mb-2">JUMONG POS</h1>
+      <div id="loadingLogo" class="text-5xl mb-4 animate-pulse">📦</div>
+      <img id="loadingLogoImg" class="w-20 h-20 mb-4 object-contain hidden" alt="logo">
+      <h1 id="loadingTitle" class="text-xl font-bold text-cyan-400 tracking-wide mb-2">JUMONG POS</h1>
       <p class="text-gray-500 text-sm">Validating session...</p>
     </div>
 
@@ -61,8 +65,9 @@
     <div id="loginScreen" class="flex-1 flex flex-col items-center justify-center px-6">
       <div class="w-full max-w-sm">
         <div class="text-center mb-8">
-          <div class="text-5xl mb-3">📦</div>
-          <h1 class="text-2xl font-bold text-cyan-400 tracking-wide">JUMONG POS</h1>
+          <div id="loginLogo" class="text-5xl mb-3">📦</div>
+          <img id="loginLogoImg" class="w-24 h-24 mb-2 mx-auto object-contain hidden" alt="logo">
+          <h1 id="loginTitle" class="text-2xl font-bold text-cyan-400 tracking-wide">JUMONG POS</h1>
           <p class="text-gray-500 text-sm mt-1">Mobile Access</p>
         </div>
         <div class="space-y-4">
@@ -93,7 +98,7 @@
 
     <!-- MAIN SCREEN -->
     <div id="mainScreen" class="flex-1 hidden flex-col">
-      <div class="main-content flex-1 p-4 space-y-4">
+      <div class="main-content flex-1 px-4 pt-4 pb-36 space-y-4">
         <!-- SELL TAB -->
         <div id="tabSell">
           <div class="flex gap-2 mb-3">
@@ -414,6 +419,7 @@
           <button onclick="closeSaleItems()" class="text-red-400 text-lg font-bold">✕</button>
         </div>
         <div id="saleItemsList" class="space-y-2"></div>
+        <button onclick="reprintSale()" class="w-full mt-4 bg-cyan-600 text-white text-sm font-bold py-3 rounded-xl active:scale-[.98]">🖨️ REPRINT RECEIPT</button>
       </div>
     </div>
 
@@ -492,6 +498,38 @@
   <script>
     const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
     const IN_APP = typeof AndroidPrinter !== 'undefined';
+
+    // ─── Crash reporting: send any native crash.log (from the uncaught-exception
+    // handler in MainActivity) to the server on the next successful launch. Also
+    // capture uncaught JS errors so the web layer problems are visible too. ────
+    let jsErrorLog = [];
+    window.onerror = function (msg, src, line, col, err) {
+      try {
+        jsErrorLog.push((err && err.stack) ? err.stack : (msg + ' @ ' + src + ':' + line));
+        if (jsErrorLog.length > 5) jsErrorLog.shift();
+      } catch (e) {}
+    };
+    function reportToCloud() {
+      try {
+        const device = IN_APP ? (AndroidApp.getVersion ? ('android-app-v' + AndroidApp.getVersion()) : 'android-app') : navigator.userAgent.slice(0, 120);
+        const nativeLogs = (IN_APP && AndroidApp.getCrashLog) ? AndroidApp.getCrashLog() : '';
+        if (nativeLogs || jsErrorLog.length) {
+          const body = {
+            app: 'whapp',
+            version: IN_APP && AndroidApp.getVersion ? AndroidApp.getVersion() : '-',
+            device: device,
+            type: nativeLogs ? 'native-crash' : 'web-error',
+            log: (nativeLogs || jsErrorLog.join('\n')).substring(0, 19000)
+          };
+          fetch(API + '/dashboard/crash-report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          }).catch(() => {});
+          if (AndroidApp.clearCrashLog) AndroidApp.clearCrashLog();
+        }
+      } catch (e) {}
+    }
     let session = null;
     let cart = [];
     let currentProduct = null;
@@ -521,6 +559,47 @@
       if (name === 'store' || name === 'loading') target.classList.add('flex');
       if (name === 'main') { target.classList.remove('hidden'); target.classList.add('flex'); }
       show(target);
+    }
+
+    // ─── BRANDING (cloud-managed splash/login/appearance) ───
+    function applyBrandCached(b) {
+      if (!b) return;
+      if (b.splashBg && /^#[0-9a-fA-F]{3,8}$/.test(b.splashBg)) {
+        document.documentElement.style.setProperty('--jbg', b.splashBg);
+        const m = document.querySelector('meta[name="theme-color"]');
+        if (m) m.content = b.splashBg;
+      }
+      if (b.primaryColor && /^#[0-9a-fA-F]{3,8}$/.test(b.primaryColor)) {
+        document.documentElement.style.setProperty('--jacc', b.primaryColor);
+        document.documentElement.style.setProperty('--jacc-dark', b.primaryColor);
+      }
+      if (b.appTitle) {
+        document.title = b.appTitle;
+        document.getElementById('loadingTitle').textContent = b.appTitle;
+        document.getElementById('loginTitle').textContent = b.appTitle;
+      }
+      if (b.logoUrl) {
+        const loadImg = document.getElementById('loadingLogoImg');
+        const loginImg = document.getElementById('loginLogoImg');
+        if (loadImg) { loadImg.src = b.logoUrl; loadImg.classList.remove('hidden'); document.getElementById('loadingLogo').style.display = 'none'; }
+        if (loginImg) { loginImg.src = b.logoUrl; loginImg.classList.remove('hidden'); document.getElementById('loginLogo').style.display = 'none'; }
+      }
+      if (IN_APP && b.iconKey && typeof AndroidApp !== 'undefined' && AndroidApp.setAppIcon) {
+        try { AndroidApp.setAppIcon(b.iconKey); } catch (e) { }
+      }
+    }
+
+    async function applyBranding() {
+      try {
+        const local = JSON.parse(localStorage.getItem('wh_brand') || 'null');
+        if (local) applyBrandCached(local);
+        const r = await fetch(API + '/dashboard/branding', { signal: AbortSignal.timeout(6000) });
+        if (r.ok) {
+          const b = await r.json();
+          localStorage.setItem('wh_brand', JSON.stringify(b));
+          applyBrandCached(b);
+        }
+      } catch (e) { }
     }
 
     // ─── AUTH ─────────────────────────────────────────────────
@@ -961,7 +1040,7 @@
         div.innerHTML = '<div class="flex-1"><p class="text-white text-xs font-bold">' + c.productName + '</p>' +
           '<p class="text-gray-500 text-[10px]">' + c.unitName + ' @ ₱' + c.price.toFixed(2) + (c.qtyPerUnit > 1 ? ' (×' + c.qtyPerUnit + 'pcs)' : '') + '</p></div>' +
           '<div class="flex items-center gap-2"><button class="qty-btn" onclick="changeQty(' + i + ',-1)">−</button>' +
-          '<span class="text-white text-sm font-bold w-6 text-center">' + c.qty + '</span>' +
+          '<input class="qty-input" type="number" min="1" inputmode="numeric" value="' + c.qty + '" onchange="setQty(' + i + ', this.value)">' +
           '<button class="qty-btn" onclick="changeQty(' + i + ',1)">+</button>' +
           '<span class="text-cyan-400 text-xs font-bold w-16 text-right">₱' + (c.price * c.qty).toFixed(2) + '</span></div>';
         list.appendChild(div);
@@ -991,6 +1070,29 @@
       if (delta > 0 && cart[i] && !increaseAllowedRow(cart[i])) return;
       cart[i].qty += delta;
       if (cart[i].qty <= 0) cart.splice(i, 1);
+      if (!cart.length && selectedCustomer) { selectedCustomer = null; }
+      renderCart();
+    }
+
+    function setQty(i, val) {
+      if (!cart[i]) return;
+      const qty = Math.round(Number(val));
+      if (isNaN(qty)) { renderCart(); return; }
+      const unitPcs = cart[i].qtyPerUnit || 1;
+      const used = cart.filter(x => x.productId === cart[i].productId && x !== cart[i]).reduce((s, x) => s + x.qty * (x.qtyPerUnit || 1), 0);
+      const p = sellProdCache.find(x => x.id === cart[i].productId);
+      const stock = Number(p && p.stockQty) || 0;
+      const maxQty = Math.floor((stock - used) / unitPcs);
+      let target = qty;
+      if (qty > maxQty) {
+        target = maxQty;
+        toast('Max ' + maxQty + ' ' + cart[i].unitName + ' — stock lang: ' + cart[i].productName, 'error');
+      }
+      if (target <= 0) {
+        cart.splice(i, 1);
+      } else {
+        cart[i].qty = target;
+      }
       if (!cart.length && selectedCustomer) { selectedCustomer = null; }
       renderCart();
     }
@@ -1128,7 +1230,7 @@
       const method = document.getElementById('payMethod').value;
       const cash = parseFloat(document.getElementById('payCash').value) || 0;
       if (method === 'Cash' && cash < pendingPay) { toast('Cash must cover the total', 'error'); return; }
-      const items = cart.map(c => ({ productId: c.productId, productName: c.productName, unitIndex: c.unitIndex, qty: c.qty }));
+      const items = cart.map(c => ({ productId: c.productId, productName: c.productName, unitIndex: c.unitIndex, qty: c.qty, price: c.price, unitName: c.unitName }));
       const body = {
         customerId: selectedCustomer ? selectedCustomer.id : 0,
         customerName: selectedCustomer ? selectedCustomer.name : 'Walk-in Customer',
@@ -1165,21 +1267,37 @@
         const str = String(s);
         return str.length > W ? str.slice(0, W - 1) + '~' : str;
       };
+      const pad = (label, amount) => {
+        const l = fit(label);
+        const a = fit(amount);
+        const padN = W - l.length - a.length;
+        return padN > 0 ? l + ' '.repeat(padN) + a : l + ' ' + a;
+      };
+      const money = n => '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       let t = '';
       t += '<<CENTER>>JUMONG POS\n';
       t += '<<CENTER>>' + fit(session.storeName || '') + '\n';
       t += '<<CENTER>>Invoice: ' + (j.invoiceNo || j.saleId) + '\n';
-      t += '<<CENTER>>Cashier: ' + fit((session.fullName || session.username)) + '\n';
+      t += '<<CENTER>>Cashier: ' + fit(session.fullName || session.username) + '\n';
       t += '<<CENTER>>' + new Date().toLocaleString('en-PH') + '\n';
       t += dash + '\n';
-      cart.forEach(c => {
+      items.forEach(c => {
         t += fit(c.productName) + '\n';
-        t += fit('  ' + c.unitName + ' x' + c.qty + '  ' + (c.price * c.qty).toFixed(2)) + '\n';
+        const line = fit((c.unitName || 'Piece') + ' x ' + c.qty);
+        const amt = money(c.price * c.qty);
+        t += pad(line, amt) + '\n';
       });
       t += dash + '\n';
-      t += 'TOTAL: ' + j.grandTotal.toFixed(2) + '\n';
+      t += pad('TOTAL', money(j.grandTotal)) + '\n';
       t += 'PAYMENT: ' + method + '\n';
+      const cash = parseFloat(document.getElementById('payCash').value) || 0;
+      if (method === 'Cash' && cash > 0) {
+        t += pad('CASH', money(cash)) + '\n';
+        t += pad('CHANGE', money(cash - (j.grandTotal || 0))) + '\n';
+      }
+      t += '\n';
       t += '<<CENTER>>THANK YOU!\n';
+      t += '<<CENTER>>Please come again\n';
       return t;
     }
 
@@ -1290,6 +1408,7 @@
     }
 
     async function loadSaleItems(id, label) {
+      currentSaleId = id;
       try {
         const r = await fetch(API + '/dashboard/warehouse/sales/' + id + '/items');
         const items = await r.json();
@@ -1307,6 +1426,56 @@
         if (!items || !items.length) box.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No items</p>';
         show(document.getElementById('saleItemsModal'));
       } catch (e) { toast('Failed to load items: ' + e.message, 'error'); }
+    }
+
+    let currentSaleId = null;
+    async function reprintSale() {
+      if (!currentSaleId) { toast('No sale selected', 'error'); return; }
+      if (!IN_APP || !AndroidPrinter.isConnected()) { toast('Connect printer first', 'error'); return; }
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/sales/' + currentSaleId + '/receipt');
+        if (!r.ok) { toast('Failed to load receipt', 'error'); return; }
+        const j = await r.json();
+        const h = j.header || {};
+        const text = buildReceiptTextReprint(h, j.items || []);
+        const pr = AndroidPrinter.print(text);
+        if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
+        else toast('Receipt re-printed');
+      } catch (e) { toast('Reprint failed: ' + e.message, 'error'); }
+    }
+
+    function buildReceiptTextReprint(h, items) {
+      const W = paperWidth <= 50 ? 32 : 48;
+      const dash = '------------------------------------------------'.slice(0, W);
+      const fit = s => { const str = String(s); return str.length > W ? str.slice(0, W - 1) + '~' : str; };
+      const pad = (label, amount) => {
+        const l = fit(label); const a = fit(amount);
+        const padN = W - l.length - a.length;
+        return padN > 0 ? l + ' '.repeat(padN) + a : l + ' ' + a;
+      };
+      const money = n => '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const dt = new Date(h.createdAt || new Date());
+      let t = '';
+      t += '<<CENTER>>JUMONG POS\n';
+      t += '<<CENTER>>' + fit(session.storeName || '') + '\n';
+      t += '<<CENTER>>Invoice: ' + (h.invoiceNo || h.id) + '\n';
+      t += '<<CENTER>>Cashier: ' + fit(session.fullName || session.username) + '\n';
+      t += '<<CENTER>>' + dt.toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) + '\n';
+      if (h.customerName) t += '<<CENTER>>Customer: ' + fit(h.customerName) + '\n';
+      t += dash + '\n';
+      (items || []).forEach(c => {
+        t += fit(c.productName) + '\n';
+        const line = fit((c.unitName || 'Piece') + ' x ' + c.qty);
+        const amt = money(c.price * c.qty);
+        t += pad(line, amt) + '\n';
+      });
+      t += dash + '\n';
+      t += pad('TOTAL', money(h.total)) + '\n';
+      t += 'PAYMENT: ' + (h.paymentMethod || 'Cash') + '\n';
+      t += '\n';
+      t += '<<CENTER>>THANK YOU!\n';
+      t += '<<CENTER>>Please come again\n';
+      return t;
     }
 
     function closeSaleItems() { hide(document.getElementById('saleItemsModal')); }
@@ -1848,12 +2017,26 @@
       if (!IN_APP) return;
       try {
         const current = AndroidApp.getVersion() || '0.0.0';
-        const txt = AndroidApp.checkForUpdate('https://admin.jumongdev.com/updates/warehouse-version.json');
-        if (txt.startsWith('ERR:')) {
-          if (force) toast('Update check failed: ' + txt.replace('ERR:', ''), 'error');
+        let txt = '';
+        try {
+          txt = AndroidApp.checkForUpdate('https://admin.jumongdev.com/updates/warehouse-version.json');
+        } catch (e) {
+          // Bridge failure — never show tech errors to end users, just skip silently
+          if (force) toast('Update check not available right now');
           return;
         }
-        const j = JSON.parse(txt);
+        if (!txt || txt.startsWith('ERR:')) {
+          if (force) toast('Update check not available right now');
+          return;
+        }
+        let j = null;
+        try {
+          j = JSON.parse(txt.replace(/^\uFEFF/, '').trim());
+        } catch (e) {
+          // Malformed response (e.g. BOM / encoding) — treat as no update, never crash
+          if (force) toast('Update check not available right now');
+          return;
+        }
         if (j && j.version && compareVersions(j.version, current) > 0) {
           const lockKey = 'wh_update_prompted_' + j.version;
           localStorage.removeItem('wh_update_prompted');
@@ -1868,7 +2051,7 @@
           if (force) toast('You are up to date (v' + current + ')');
         }
       } catch (e) {
-        if (force) toast('Update check error: ' + e.message, 'error');
+        if (force) toast('Update check not available right now');
       }
     }
 
@@ -1899,6 +2082,9 @@
 
     // ─── INIT: validate session on every open ────────────────
     (function init() {
+      reportToCloud();
+      applyBrandCached(JSON.parse(localStorage.getItem('wh_brand') || 'null'));
+      applyBranding();
       setScreen('loading');
       updateHeldBadge();
       const saved = localStorage.getItem('wh_session');

@@ -1162,7 +1162,50 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.1.3" });
+            return Ok(new { version = "1.1.6" });
+    }
+
+    [HttpPost("crash-report")]
+    public IActionResult PostCrashReport([FromBody] CrashReportRequest req)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using (var ensure = new NpgsqlCommand(@"
+            CREATE TABLE IF NOT EXISTS crash_reports (
+                id BIGSERIAL PRIMARY KEY,
+                app TEXT NOT NULL DEFAULT '',
+                version TEXT NOT NULL DEFAULT '',
+                device TEXT NOT NULL DEFAULT '',
+                type TEXT NOT NULL DEFAULT 'crash',
+                log TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())", conn))
+        {
+            ensure.ExecuteNonQuery();
+        }
+        using var cmd = new NpgsqlCommand(@"
+            INSERT INTO crash_reports (app, version, device, type, log)
+            VALUES (@app, @ver, @dev, @t, @log)", conn);
+        cmd.Parameters.AddWithValue("app", req.App ?? "");
+        cmd.Parameters.AddWithValue("ver", req.Version ?? "");
+        cmd.Parameters.AddWithValue("dev", req.Device ?? "");
+        cmd.Parameters.AddWithValue("t", req.Type ?? "crash");
+        var log = req.Log ?? "";
+        cmd.Parameters.AddWithValue("log", log.Length > 20000 ? log.Substring(0, 20000) : log);
+        cmd.ExecuteNonQuery();
+        return Ok(new { ok = true });
+    }
+
+    [HttpGet("crash-reports")]
+    public IActionResult GetCrashReports(int limit = 50)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = new NpgsqlCommand(@"SELECT id, app, version, device, type, log, created_at
+            FROM crash_reports ORDER BY id DESC LIMIT @lim", conn);
+        cmd.Parameters.AddWithValue("lim", Math.Clamp(limit, 1, 500));
+        using var rdr = cmd.ExecuteReader();
+        var list = new List<object>();
+        while (rdr.Read())
+            list.Add(new { id = rdr.GetInt64(0), app = rdr.GetString(1), version = rdr.GetString(2), device = rdr.GetString(3), type = rdr.GetString(4), log = rdr.GetString(5), createdAt = rdr.GetDateTime(6) });
+        return Ok(list);
     }
 
         [HttpGet("fix-hvr-times")]
@@ -2891,8 +2934,8 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         using var conn = Data.PgDatabaseHelper.GetConnection();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT s.id, s.customer_name, s.total_amount, s.item_count, s.created_at, COALESCE(s.is_voided, FALSE), COALESCE(s.invoice_no, '') FROM wh_walkin_sales s WHERE 1=1";
-        if (!string.IsNullOrEmpty(from)) { cmd.CommandText += " AND s.created_at >= @from"; cmd.Parameters.AddWithValue("from", from); }
-        if (!string.IsNullOrEmpty(to)) { cmd.CommandText += " AND s.created_at <= @to"; cmd.Parameters.AddWithValue("to", to + " 23:59:59"); }
+        if (!string.IsNullOrEmpty(from) && DateTime.TryParse(from, out var fromDate)) { cmd.CommandText += " AND s.created_at >= @from"; cmd.Parameters.AddWithValue("from", fromDate); }
+        if (!string.IsNullOrEmpty(to) && DateTime.TryParse(to, out var toDate)) { cmd.CommandText += " AND s.created_at <= @to"; cmd.Parameters.AddWithValue("to", toDate.Date.AddDays(1)); }
         cmd.CommandText += " ORDER BY s.created_at DESC LIMIT " + limit;
 
             var list = new List<object>();
@@ -2910,18 +2953,25 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     {
         using var conn = Data.PgDatabaseHelper.GetConnection();
         using var cmd = conn.CreateCommand();
-        var sql = @"
-            SELECT COALESCE(SUM(s.total_amount), 0) AS total_sales,
-                   COUNT(*) AS txn_count,
-                   COALESCE(SUM(si.stock_deduction * COALESCE(mp.cost, wp.box_cost / NULLIF(wp.box_qty, 0), 0)), 0) AS gross_cost
+        var where = "COALESCE(s.is_voided, FALSE) = FALSE";
+        var filter = " COALESCE(S.is_voided, FALSE) = FALSE";
+        if (!string.IsNullOrEmpty(from) && DateTime.TryParse(from, out var fromDate)) { where += " AND s.created_at >= @from"; filter += " AND S.created_at >= @from"; cmd.Parameters.AddWithValue("from", fromDate); }
+        if (!string.IsNullOrEmpty(to) && DateTime.TryParse(to, out var toDate)) { where += " AND s.created_at <= @to"; filter += " AND S.created_at <= @to"; cmd.Parameters.AddWithValue("to", toDate.Date.AddDays(1)); }
+        // Total sales + transaction count come from the header ONLY (one row per sale) via
+        // scalar subqueries; the item join below is used exclusively for gross inventory
+        // cost. Previously COUNT(*) and SUM(s.total_amount) ran over the joined rows,
+        // so a sale with N items was counted N times (e.g. 16 sales -> 28 rows -> inflated
+        // 465703.00 instead of 193087.00).
+        cmd.CommandText = @"
+            SELECT
+                (SELECT COALESCE(SUM(S.total_amount), 0) FROM wh_walkin_sales S WHERE " + filter + @"),
+                (SELECT COUNT(*) FROM wh_walkin_sales S WHERE " + filter + @"),
+                COALESCE(SUM(si.stock_deduction * COALESCE(mp.cost, wp.box_cost / NULLIF(wp.box_qty, 0), 0)), 0) AS gross_cost
             FROM wh_walkin_sales s
             LEFT JOIN wh_walkin_sale_items si ON si.sale_id = s.id AND COALESCE(si.is_voided, FALSE) = FALSE
             LEFT JOIN wh_products wp ON wp.id = si.product_id
             LEFT JOIN master_products mp ON mp.id = wp.master_product_id
-            WHERE COALESCE(s.is_voided, FALSE) = FALSE AND 1=1";
-        if (!string.IsNullOrEmpty(from)) { sql += " AND s.created_at >= @from"; cmd.Parameters.AddWithValue("from", from); }
-        if (!string.IsNullOrEmpty(to)) { sql += " AND s.created_at <= @to"; cmd.Parameters.AddWithValue("to", to + " 23:59:59"); }
-        cmd.CommandText = sql;
+            WHERE " + where;
         using var r = cmd.ExecuteReader();
         if (!r.Read()) return Ok(new { totalSales = 0m, transactionCount = 0, grossInventoryCost = 0m });
         return Ok(new {
@@ -2943,6 +2993,31 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         while (r.Read())
             list.Add(new { id = r.GetInt32(0), productName = r.GetString(1), unitName = r.GetString(2), qty = r.GetInt32(3), price = r.GetDecimal(4), subtotal = r.GetDecimal(5), points = r.GetInt32(6), isVoided = r.GetBoolean(7) });
         return Ok(list);
+    }
+
+    [HttpGet("warehouse/sales/{id}/receipt")]
+    public IActionResult WhGetSaleReceipt(int id)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        object? header = null;
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT id, COALESCE(invoice_no, ''), COALESCE(customer_name, ''), total_amount, COALESCE(payment_method, 'Cash'), created_at, COALESCE(is_voided, FALSE) FROM wh_walkin_sales WHERE id = @sid";
+            cmd.Parameters.AddWithValue("sid", id);
+            using var r = cmd.ExecuteReader();
+            if (!r.Read()) return NotFound(new { error = "Sale not found" });
+            header = new { id = r.GetInt32(0), invoiceNo = r.GetString(1), customerName = r.GetString(2), total = r.GetDecimal(3), paymentMethod = r.GetString(4), createdAt = r.GetDateTime(5), isVoided = r.GetBoolean(6) };
+        }
+        var items = new List<object>();
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT product_name, unit_name, qty, price, subtotal, COALESCE(is_voided, FALSE) FROM wh_walkin_sale_items WHERE sale_id = @sid ORDER BY id";
+            cmd.Parameters.AddWithValue("sid", id);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+                items.Add(new { productName = r.GetString(0), unitName = r.GetString(1), qty = r.GetInt32(2), price = r.GetDecimal(3), subtotal = r.GetDecimal(4), isVoided = r.GetBoolean(5) });
+        }
+        return Ok(new { header, items });
     }
 
     [HttpPost("warehouse/sales/{id}/void")]
@@ -3324,6 +3399,58 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         return Ok(new { ok = true });
     }
 
+    [HttpGet("branding")]
+    public IActionResult GetBranding()
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = new NpgsqlCommand("SELECT app_title, logo_url, splash_bg, login_bg, primary_color, icon_key FROM branding WHERE id = 1", conn);
+        using var rdr = cmd.ExecuteReader();
+        if (!rdr.Read()) return Ok(new BrandingConfig());
+        return Ok(new BrandingConfig
+        {
+            AppTitle = rdr.GetString(0),
+            LogoUrl = rdr.GetString(1),
+            SplashBg = rdr.GetString(2),
+            LoginBg = rdr.GetString(3),
+            PrimaryColor = rdr.GetString(4),
+            IconKey = rdr.GetString(5)
+        });
+    }
+
+    [HttpPost("branding")]
+    public IActionResult SetBranding([FromBody] BrandingConfig req)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = new NpgsqlCommand(@"
+            INSERT INTO branding (id, app_title, logo_url, splash_bg, login_bg, primary_color, icon_key, updated_at)
+            VALUES (1, @t, @l, @s, @lb, @p, @ik, NOW())
+            ON CONFLICT (id) DO UPDATE SET
+                app_title = @t, logo_url = @l, splash_bg = @s, login_bg = @lb,
+                primary_color = @p, icon_key = @ik, updated_at = NOW()", conn);
+        cmd.Parameters.AddWithValue("t", req.AppTitle ?? "");
+        cmd.Parameters.AddWithValue("l", req.LogoUrl ?? "");
+        cmd.Parameters.AddWithValue("s", req.SplashBg ?? "");
+        cmd.Parameters.AddWithValue("lb", req.LoginBg ?? "");
+        cmd.Parameters.AddWithValue("p", req.PrimaryColor ?? "");
+        cmd.Parameters.AddWithValue("ik", req.IconKey ?? "");
+        cmd.ExecuteNonQuery();
+        return Ok(new { ok = true });
+    }
+
+    [HttpPost("branding/logo")]
+    public async Task<IActionResult> UploadBrandingLogo(IFormFile file)
+    {
+        if (file == null || file.Length == 0) return BadRequest("No file");
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!new[] { ".png", ".jpg", ".jpeg", ".webp", ".svg" }.Contains(ext)) return BadRequest("Invalid image type");
+        var fileName = "brand_logo" + ext;
+        var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "assets", fileName);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        using var stream = new FileStream(path, FileMode.Create);
+        await file.CopyToAsync(stream);
+        return Ok(new { url = "/assets/" + fileName, fullUrl = "https://admin.jumongdev.com/assets/" + fileName });
+    }
+
     // ── Agent (remote diagnostic) ──
 
     private static readonly ConcurrentDictionary<string, Queue<AgentCommand>> _cmdQueues = new();
@@ -3468,6 +3595,8 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     }
 
     public class PosPromoRequest { public string Message { get; set; } = ""; }
+    public class CrashReportRequest { public string App { get; set; } = ""; public string? Version { get; set; } public string? Device { get; set; } public string Type { get; set; } = "crash"; public string? Log { get; set; } }
+    public class BrandingConfig { public string AppTitle { get; set; } = ""; public string LogoUrl { get; set; } = ""; public string SplashBg { get; set; } = ""; public string LoginBg { get; set; } = ""; public string PrimaryColor { get; set; } = ""; public string IconKey { get; set; } = ""; }
     public class Suspect1PcRequest { public string? StoreId { get; set; } public string? StoreName { get; set; } public string InvoiceNo { get; set; } = ""; public string? Cashier { get; set; } public string? SaleDate { get; set; } public List<Suspect1PcItem>? Items { get; set; } }
     public class Suspect1PcItem { public string ProductName { get; set; } = ""; public string UnitName { get; set; } = ""; public decimal Price { get; set; } public int Quantity { get; set; } }
     public class Suspect1PcAssignRequest { public string Checker { get; set; } = ""; }

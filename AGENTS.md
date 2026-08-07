@@ -102,15 +102,41 @@ Set-Location -LiteralPath "C:\Users\ADMIN\Desktop\JumongPosV1.01\JumongCloudAPI"
 ```
 
 ## Local Server Infrastructure
+
+### Machine Roles (IMPORTANT — WHERE IS WHAT)
+| Machine | Role | What lives there |
+|---|---|---|
+| `DESKTOP-I097OO9` @ `192.168.1.24` | **DEV machine + CLOUD API HOST** (this PC) | Source at `C:\Users\ADMIN\Desktop\JumongPosV1.01`, API service at `C:\JumongAPI\`, test `C:\JumongAPI\client\`, Cloudflare tunnel, PostgreSQL |
+| `DESKTOP-UU8E0D4` @ `192.168.1.37` | **HQ store (Andengs Superstore - HQ)** | POS client at **`C:\Users\ADMIN\Desktop\JumongPosHW\`** ← NOT in `C:\JumongAPI\client\` |
+| `DESKTOP-TK63MO6` @ `192.168.1.4` | HVR store | (needs path verify) |
+| `DESKTOP-NISQ3Q7` @ `192.168.1.152` | U Got Minimart - Naic | (needs path verify) |
+| `DESKTOP-TK63MO6` @ `192.168.0.100` | ACGS - Naic Market | (needs path verify) |
+
+> **GOTCHA:** `C:\JumongAPI\client\` is where the **newest client build gets published** on the dev/API host — it is NOT the running install on the HQ machine. The real HQ POS runs from `C:\Users\ADMIN\Desktop\JumongPosHW\` on the HQ machine. When diagnosing/fixing a store, always target the correct machine via the Agent (see Agent section), not the local `C:\JumongAPI\client\` folder.
+
 | Component | Path / Detail |
 |---|---|
 | API executable | `C:\JumongAPI\JumongCloudAPI.exe` |
 | API output folder | `C:\JumongAPI\` (bin, wwwroot, config files) |
-| Client app output | `C:\JumongAPI\client\JumongPosV1.01.exe` |
+| Client app output (DEV build target) | `C:\JumongAPI\client\JumongPosV1.01.exe` |
+| HQ POS client (store machine) | `C:\Users\ADMIN\Desktop\JumongPosHW\JumongPosV1.01.exe` |
 | API port | `http://localhost:5000` |
 | LAN access | `http://192.168.1.39:5000` |
 | Service name | `JumongCloudAPI` (NSSM, Automatic start) |
 | Restart command | `Restart-Service JumongCloudAPI` |
+
+### Agent (remote diagnostic) version gotcha
+- The Agent reads `AppVersion` from the store DB **once at startup** (it caches the version). If the POS app updates while the Agent keeps running, heartbeats keep reporting the OLD version.
+- To refresh: restart the Agent (or the whole POS app, which restarts the Agent). On the dashboard, an agent showing e.g. `v1.1.27` while the app is really `v1.1.33` just means its cached value is stale — restart it. Heartbeats are every 3s, so a `lastSeen` within a few seconds means the agent is alive (not asleep).
+- Agent DB resolution: `baseDir\JumongPos.db` (Agent folder), else parent folder. Agent commands: `sql`, `ps`, `readfile`, `writefile`, `update`, `restart`.
+
+### POS QR codes (v1.0.85+)
+- POS app reads `StoreQrCodes` (JSON `[{header,file}]`) from local SQLite Settings, then loads `assets\<file>` **relative to the app's own exe folder** (`AppDomain.CurrentDomain.BaseDirectory`).
+- If `assets\` folder or the image file is missing on the store machine → header (title) text still shows, but **no picture**. This is a common silent failure — picture "wala".
+- The dashboard's **POS QR** panel (`posQrPanel` in wwwroot/components.js) is how you push a QR image to stores: it uploads to the API, then sends `update` (download image) + `sql` (write StoreQrCodes) commands per store via the agents.
+- **QR push requires TWO things on the store:** (1) the DB updated, AND (2) the physical image file in `assets\` next to the app. `update` command only works if the assets dir already exists on the store.
+- If Admin just sets `StoreQrCodes` but no file (`assets\ugot_qrcode.jpg` doesn't exist), the app shows only the header. Always create the folder and drop the file too.
+- Uploaded images go to the API's `wwwroot\assets\` → served at `https://admin.jumongdev.com/assets/<file>`. If a debug push used a 404 URL, the file never lands on the store → same "no picture" symptom. Always `Invoke-WebRequest -Head` the URL first to confirm 200.
 
 ## Cloudflare Tunnel
 | Item | Detail |
@@ -1126,6 +1152,18 @@ Compress-Archive -Force -Path "bin\Release\net8.0-windows\win-x64\publish\*" -De
 
 **Impact:** No client is pointed at DigitalOcean anymore — their data lands on the local server. The old "4 POS clients still pointing here" note is removed; Stores table now lists all 4 with machine/IP; Key Decision #15 marked DONE.
 
+### 2026-08-07 — HQ POS QR "No Picture" Investigation + Machine Roles Documentation
+
+| Item | Detail |
+|---|---|
+| Check | Agent `sql` + `ps` commands against HQ (STORE-20260602-7159) via `/dashboard/agent/send` |
+| Result | HQ DB is correct: `StoreQrCodes=[{"header":"ito muna ang Gamitin","file":"ugot_qrcode.jpg"}]`, `AppVersion=1.1.33`. BUT `C:\Users\ADMIN\Desktop\JumongPosHW\assets\` **does not exist** → app shows header only, no image |
+| Root cause | (1) The HQ POS runs from `C:\Users\ADMIN\Desktop\JumongPosHW\` (NOT `C:\JumongAPI\client\`); (2) the assets dir was never created there, so the agent `update` (image download) can't write to `..\assets\`; (3) any push URL must first return HTTP 200 from `https://admin.jumongdev.com/assets/<file>` |
+| Fix applied | Wrote StoreQrCodes directly into `C:\JumongAPI\client\JumongPos.db` + `publish\JumongPos.db` (dev/test DBs); copied `ugot_qrcode.jpg` into `publish\assets\` — for the real HQ machine the fix must be done via Agent (create `assets\` dir first, then `update` the image, then `restart`) |
+| AGENTS.md | Added Machine Roles table (dev/API host vs store machines), HQ POS path gotcha, Agent version-cache note, POS QR push procedure |
+
+**Impact:** Documented where each machine's POS actually lives and how QR pushes actually reach a store (DB value + physical file). Agent `lastSeen` within a few seconds means alive — version number on the dashboard may be stale until agent restart.
+
 
 ## Warehouse Mobile App (Android, WarehouseApp/)
 
@@ -1248,3 +1286,126 @@ Copy JumongWarehouse.apk to JumongCloudAPI\wwwroot\updates\ AND JumongCloudAPI\b
 **Impact:** Receiving is now a true multi-item workflow — enter every item from a delivery first, save once (atomic), print one voucher, and reprint anytime from stored history. No schema change (reuses `wh_stock_trails.reference` as the batch/print-history ID). Requires v1.1.3 API deploy.
 
 **Impact:** Warehouse app is now a full-featured mobile POS with a drawer menu, per-mode inventory views, and sales reports — all in `whmobile.html` (no APK rebuild needed). The nav redesign shipped as a web-only deployment to `admin.jumongdev.com`.
+
+### Warehouse mobile — bulk qty input + cleaner receipts (web-only)
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/whmobile.html` | **Cart qty is now an editable input** (`qty-input` class, `type=number inputmode=numeric`) — tap the number and type `50` instead of tapping + 50 times. New `setQty(i, val)` validates stock (clamps to max available including other cart rows of the same product), removes the row if qty ≤ 0. `+`/`−` buttons unchanged. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | **Receipt rewrite** (`buildReceiptText`) — items now two-line (product name, then `Unit x qty` left + amount right-aligned via `pad()`), TOTAL/CASH/CHANGE right-aligned with `₱` comma formatting, CASH+CHANGE lines shown for Cash payments, `THANK YOU / Please come again` footer. `items` passed from `confirmPay` now includes `price` + `unitName` (was missing → receipt would've printed NaN). |
+| — | **Web-only deploy** — `Copy-Item` to `C:\JumongAPI\wwwroot\whmobile.html` (live, no restart needed) + `bin\Release\net8.0\win-x64\publish\wwwroot\` (next full deploy). Verified live: `setQty` + `qty-input` present on `admin.jumongdev.com/whmobile.html`. |
+
+**Impact:** Warehouse walk-in sellers can type bulk quantities directly (no more tapping + 50×). Receipts print with right-aligned ₱ amounts, cash/change breakdown, and proper item layout. No APK rebuild — web-only fix.
+
+### Warehouse Mobile Sales Report 500 Fix (string → DateTime date params)
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs:2894-2895` | **WhGetSales date filter fixed** — was passing raw `from`/`to` strings → PG error `42883: operator does not exist: timestamp with time zone >= text` → 500 on ANY date-filtered query (mobile sales report TODAY/date picker always sends from/to). Now `DateTime.TryParse` + `AddWithValue("from", DateTime)` (to = `toDate.Date.AddDays(1)`), same pattern as `WhGetInventoryActivity`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:2922-2923` | **WhGetSalesSummary** — same string→DateTime fix (mobile summary cards were also 500ing). |
+| — | Deployed via `deploy_api.bat` (elevated UAC). Verified live: `GET /warehouse/sales?from=2026-08-07&to=2026-08-07` → 200, 13 sales; summary OK. |
+
+**Impact:** Mobile warehouse SALES report showed "No sales recorded"/failed silently because every date-filtered call returned 500. Sales themselves were always saved fine (`wh_walkin_sales` rows exist) — only the REPORT query was broken. The "request queue is full" 503 seen in-app was a downstream symptom of repeated failing requests. Fix deployed + verified live.
+
+### v1.0.6 (APK) — Stable Bluetooth Printing (chunked writes + keep-alive + auto-reconnect)
+
+| File | Change |
+|---|---|
+| `WarehouseApp/app/src/main/java/com/jumong/warehouse/BluetoothPrinter.kt` | **Chunked writes** — `printBytes` now writes in 96-byte chunks with 8ms delay between each (cheap thermal printer RX buffer overflow was killing the socket mid-print: "read failed, socket might closed, read ret: -1"). |
+| `WarehouseApp/.../BluetoothPrinter.kt` | **Keep-alive polling** — background daemon thread sends a 3-byte ESC/POS DLE EOT status request every 8s while connected, so the printer never sleeps/shuts its BT radio. Idle sleep was the real cause of "connected but instantly dropped, nothing even printed". Auto-reconnects silently if the keep-alive write fails. |
+| `WarehouseApp/.../BluetoothPrinter.kt` | **Auto-reconnect + retry** — if a print's write fails, reconnect once and retry the whole job before giving up (invisible-retry pattern used by retail POS apps). |
+| `WarehouseApp/.../BluetoothPrinter.kt` | **Insecure RFCOMM fallback** — if the standard SPP socket is refused, falls back to `createInsecureRfcommSocketToServiceRecord` (cheap printers often reject the secure channel). |
+| `WarehouseApp/.../BluetoothPrinter.kt` | **Connect timeout** — 8s connect timeout via reflection so the UI never hangs forever on a dead printer; `cancelDiscovery()` before connect. |
+| `WarehouseApp/.../BluetoothPrinter.kt` | **₱ (U+20B1) → 'P'** — peso sign is outside 7-bit ASCII; replaced so US_ASCII encoding never drops the stream mid-receipt. |
+| `WarehouseApp/app/build.gradle` | versionCode bumped to 7, versionName `"1.0.6"`. |
+| `JumongCloudAPI/wwwroot/updates/JumongWarehouse.apk` | Rebuilt + signed with `jumong_sign.keystore` (same cert — existing installs can update without uninstalling). |
+| `JumongCloudAPI/wwwroot/updates/warehouse-version.json` | version `"1.0.6"` — changelog documents the stability fixes. |
+
+**Impact:** Bluetooth thermal printing is now stable — no more "read failed, socket might closed / read ret -1" errors. Root causes: (a) one giant `write()` overflows the printer RX buffer; (b) the printer enters sleep mode after ~1-2 min idle and silently drops the RFCOMM link even though the app thinks it's connected. Fixed the same way Loyverse/Zobaze-style POS apps win: chunked writes + persistent socket + 8s keep-alive poll + invisible reconnect, plus an insecure-RFCOMM fallback and a connect timeout. Same signing cert, existing installs can use SETUP → UPDATE APP. NOTE: build requires `JAVA_HOME=C:\Program Files\Android\Android Studio\jbr` — the Adoptium path in AGENTS.md no longer exists.
+
+### v1.0.6 (APK) — Update Check BOM Fix + Silent Error Handling
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/updates/warehouse-version.json` | **BOM removed** — was saved UTF-8-with-BOM (`EF BB BF`); Android `checkForUpdate` returned the raw bytes → `JSON.parse` threw "Unexpected token". Rewritten as UTF-8 no-BOM. Deployed to source + live `C:\JumongAPI\wwwroot\updates\`. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | `checkAppUpdate()` hardened — strips `\uFEFF` BOM + `.trim()` before parse; **all failures now fail silently** ("Update check not available right now" on manual check, nothing on auto) instead of showing raw exception messages like "unexpected token" to end users. |
+| `WarehouseApp/.../MainActivity.kt` | `checkForUpdate()` reads as **UTF-8 explicitly** and strips BOM + trims in Kotlin before returning to JS (defense in depth). |
+| — | Deployed whmobile.html to all 3 locations + rebuilt/signed APK (same cert, still v1.0.6). Verified live JSON parses OK (first byte `7B`, no BOM). |
+
+**Impact:** End users never see cryptic errors. The update prompt appears on app open if a newer version exists; any network/parse hiccup is silently skipped. BOM source was PowerShell `Set-Content -Encoding UTF8` (writes BOM) — always use `[System.IO.File]::WriteAllText(path, content, UTF8Encoding($false))` for JSON files.
+
+### v1.0.7 (APK) + v1.1.4 (Cloud API) — Dashboard-Controlled Branding (Mobile App)
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs:607-618` | New `branding` table (id PK, app_title, logo_url, splash_bg, login_bg, primary_color, icon_key, updated_at) with id=1 seed. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:3327-3372` | New `GET /dashboard/branding` (returns BrandingConfig) + `POST /dashboard/branding` (upsert via ON CONFLICT id=1) + `POST /dashboard/branding/logo` (multipart upload -> wwwroot/assets/brand_logo.ext, validated png/jpg/webp/svg). Version bumped to `"1.1.4"`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | Added `BrandingConfig` DTO class. |
+| `JumongCloudAPI/wwwroot/index.html` | Sidebar `Branding` nav item + **MOBILE APP BRANDING** panel (App Title input, Launcher Icon dropdown default/xmas/gold/blue, Splash bg + Accent color pickers, Logo file upload with preview, SAVE). |
+| `JumongCloudAPI/wwwroot/components.js` | Added `brandingPanel` Alpine component (load/save/handleLogoUpload). |
+| `JumongCloudAPI/wwwroot/whmobile.html` | CSS: `:root` vars `--jbg`/`--jacc`/`--jacc-dark` replace hardcoded colors across body, btn-primary, focus, chips, nav, qty-input. Loading/login screens got IDs for logo/title swap. Added `applyBrandCached(b)` (instant cached branding: bg color, accent, title, logo img, theme-color meta) + `applyBranding()` (fetches `/dashboard/branding` with 6s timeout, caches to localStorage, calls `AndroidApp.setAppIcon(iconKey)` when in app). Called at startup in `init()`. |
+| `WarehouseApp/app/src/main/AndroidManifest.xml` | Launcher moved to 4 `activity-alias` entries (AliasDefault enabled=true, AliasXmas/AliasGold/AliasBlue enabled=false), each with own `android:icon` + MAIN/LAUNCHER filter. MainActivity no longer carries the launcher intent-filter. |
+| `WarehouseApp/app/src/main/res/drawable/icon_{xmas,gold,blue}.xml` | 3 new pre-shipped vector launcher icons (Christmas tree, gold bars, blue bars) alongside existing icon_fg. |
+| `WarehouseApp/.../MainActivity.kt` | Added `setAppIcon(key)` @JavascriptInterface -> `setAppIconFor(key)` toggles PackageManager.setComponentEnabledSetting across the 4 aliases (enable target, disable rest, DONT_KILL_APP). |
+| `WarehouseApp/app/build.gradle` | versionCode 8, versionName `"1.0.7"`. |
+| `JumongCloudAPI/wwwroot/updates/warehouse-version.json` | `"1.0.7"` changelog; rebuilt + signed APK (same jumong_sign keystore) deployed to all 3 update folders, no BOM. |
+
+**Impact:** Warehouse app branding (splash + login + accent + title) is now controlled from the web dashboard's Branding panel; logo uploads land in wwwroot/assets. Launcher icon switches among pre-shipped variants at runtime via PackageManager (bank-app trick) — the icon may take a moment to refresh on the home screen. Limits: brand-new icon colors still need an APK rebuild; splash/login changes are instant because they live in whmobile.html. Verified live: GET/POST branding round-trip, logo upload serves at /assets/, version json 1.0.7, API version 1.1.4.
+
+### v1.0.8 (APK) — Update Install Fix (REQUEST_INSTALL_PACKAGES permission missing)
+
+| File | Change |
+|---|---|
+| `WarehouseApp/app/src/main/AndroidManifest.xml` | Added `android.permission.REQUEST_INSTALL_PACKAGES` — **critical**: without it on Android 8+, the APK download "completed" but the OS silently blocked the INSTALL because the app couldn't self-install, even after the user enabled "Install unknown apps" in Settings. |
+| `WarehouseApp/.../MainActivity.kt` | Added `pendingApkFile` field + `onResume()` listener — after the user grants "Install unknown apps" in Settings and returns to the app, the pending APK install now auto-resumes (no need to tap UPDATE NOW again). Extracted `launchApkInstall(file)` helper. |
+| `WarehouseApp/app/build.gradle` | versionCode 9, versionName `"1.0.8"`. |
+| `JumongCloudAPI/wwwroot/updates/warehouse-version.json` | `"1.0.8"` changelog; rebuilt + signed APK (same jumong_sign keystore) deployed to all 3 update folders, no BOM. |
+
+**Impact:** Warehouse app updates now actually install. Root cause: `REQUEST_INSTALL_PACKAGES` was never declared in the manifest, so on Android 8+ the system silently refused the install even though the APK downloaded and the user enabled unknown-app sources. Fixed by (1) declaring the permission and (2) auto-resuming the install when the user returns from the Settings grant screen. Diagnosed from the user report "Nag-download, di nag-install".
+
+### v1.0.9 (APK) — Auto-Reopen After Update + Startup ANR Fix
+
+| File | Change |
+|---|---|
+| `WarehouseApp/.../ReopenReceiver.kt` | **New file** — BroadcastReceiver for `ACTION_MY_PACKAGE_REPLACED`: relaunches the app 500ms after an in-app update installs, so the user doesn't drop back to the home screen. |
+| `WarehouseApp/app/src/main/AndroidManifest.xml` | Registered `ReopenReceiver` (exported=false, MY_PACKAGE_REPLACED intent-filter). |
+| `WarehouseApp/.../MainActivity.kt` | **Removed `webView.clearCache(true)` + `clearHistory()`** — they run synchronously on the main thread at startup and cause "app not responding" (ANR) on slow phones. The page URL is already version-busted (`?v=timestamp`) and `cacheMode=LOAD_NO_CACHE`, so web updates still go live without clearing. |
+| `WarehouseApp/app/build.gradle` | versionCode 10, versionName `"1.0.9"`. |
+| `JumongCloudAPI/wwwroot/updates/warehouse-version.json` | `"1.0.9"` changelog; rebuilt + signed APK (same jumong_sign keystore) deployed to all 3 update folders, no BOM. |
+
+**Impact:** After tapping UPDATE NOW and the new version installs, the app now reopens itself automatically. Startup is faster and no longer ANRs on slow devices. Diagnosed from user reports "close program after update" + "app not responding".
+
+### v1.0.10 (APK) + v1.1.5 (Cloud API) — Built-In Crash Logger
+
+| File | Change |
+|---|---|
+| `WarehouseApp/.../MainActivity.kt` | **`Thread.setDefaultUncaughtExceptionHandler`** — writes every uncaught crash (time, app version, device model/SDK, thread, exception class+message+full stacktrace) to `getExternalFilesDir/crash.log`. Safe handler (double try/catch — must never crash itself). Added `getCrashLog()` / `clearCrashLog()` JS bridge so the web page can read + clear the log. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | `window.onerror` captures uncaught JS errors (last 5, stack-incl). `reportToCloud()` on `init()` — if a native `crash.log` exists or JS errors are queued, POSTs `{app, version, device, type ('native-crash'|'web-error'), log}` to `/api/dashboard/crash-report`, then clears the log. Silent failure (never blocks startup). |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | New `POST /dashboard/crash-report` (creates `crash_reports` table if missing; inserts app/version/device/type/log capped 20000 chars) + `GET /dashboard/crash-reports?limit=` (id, app, version, device, type, log, createdAt, newest first). Version bumped to `"1.1.5"`. |
+| `WarehouseApp/app/build.gradle` | versionCode 11, versionName `"1.0.10"`. |
+| `JumongCloudAPI/wwwroot/updates/warehouse-version.json` | `"1.0.10"` changelog; rebuilt + signed APK (same jumong_sign keystore) deployed to all 3 update folders, ASCII-only changelog (no em dash — rendered as mojibake). |
+
+**Impact:** Every crash on a real phone now reports itself to the cloud. Next time the app "keeps stopping" or the user reports a hang, the exact exception + device + version is already in the `crash_reports` PG table — no more guessing from user descriptions. Requires v1.1.5 API deploy (the `.exe`/`.dll` were rebuilt; run `deploy_api.bat` as admin to take effect).
+
+### v1.1.6 (Cloud API) + v1.1.34 (POS) — Wholesale Sales Report: Summary Fix + Dashboard Cards + POS Report
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs:2951` | **`WhGetSalesSummary` bug fix** — Total Sales + Transaction Count now computed via scalar subqueries against `wh_walkin_sales` header only, while the `wh_walkin_sale_items` join stays exclusively for Gross Inventory Cost. Previously `COUNT(*)`/`SUM(s.total_amount)` ran over JOINED rows where each sale with N items was counted N times (Aug 7: 16 sales → 28 rows → inflated `465703.00` instead of correct `193087.00`). Verified via psql: now returns `193087.00 | 16 | 191303.00`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1165` | Version bumped to `"1.1.6"`. |
+| `JumongCloudAPI/wwwroot/components.js:466,565` | Added `saleSummary` state; `loadSales()` now also fetches `/warehouse/sales/summary` with the same from/to filter. |
+| `JumongCloudAPI/wwwroot/index.html:1527-1543` | **Warehouse → Sales subpage**: 3 summary cards (Total Sales ₱cyan / Transactions white / Gross Cost amber) shown above the table, updated on TODAY/FILTER. |
+| `Forms/WarehouseSellForm.cs` | Added **📄 REPORT** button (below WH-INVENTORY) — opens a sales report popup with date range (From→To), FILTER, PRINT, summary labels (Total Sales / Transactions / Gross Cost / Gross Profit) + per-row invoice list (Invoice #, Customer, Items, Total, Date, Voided). Loads `/dashboard/warehouse/sales?from&to` and `/summary`. |
+| `Services/PrinterService.cs:1071` | Added `PrintRawText(string)` — generic Courier New 9pt Bold print of pre-formatted text (used by the wholesale report PRINT). |
+| `Services/AppVersion.cs` | Bumped to `"1.1.34"`. |
+| — | Built + deployed web files (`index.html`/`components.js`) to live `C:\JumongAPI\wwwroot\` + `publish\wwwroot\`. POS client published to `C:\JumongAPI\client`. |
+
+**Impact:** Mobile wholesale sales summary now matches reality (was inflated by item-join row multiplication). The dashboard Warehouse Sales page shows the same progressive cards as mobile. The POS client (HQ) gets a dedicated wholesale REPORT with date filter, summary labels and per-sale list — consistent reporting across all 3 surfaces from the same cloud endpoints. Requires v1.1.6 API deploy (`deploy_api.bat` as admin) for the fixed summary + the already-built `warehouse/sales/{id}/receipt` endpoint.
+
+### v1.1.7 (web-only) — Mobile Bottom Nav Clearance Fix (Sales Report 0000 Overlap)
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/whmobile.html:101` | **Bottom nav overlap fix** — `main-content` used `p-4` (padding: 1rem) PLUS the inline `.main-content{padding-bottom:120px}` rule. Tailwind CDN injects its generated CSS *after* the inline `<style>` block, so equal-specificity `.p-4` overrode the 120px bottom clearance → actual padding-bottom was only **16px**. The fixed bottom nav (SELL/INVENTORY/MENU ≈58px + safe-area) therefore covered the last row of every page — on the Sales report the old invoice `WH-20260807-0000` was hidden. Fixed by replacing `p-4` with explicit utilities: `px-4 pt-4 pb-36 space-y-4` (`pb-36` = 144px, wins the cascade). |
+
+**Impact:** All mobile pages now reserve the nav height — the last row on every tab is fully visible/scrollable. Web-only change; deployed to live `C:\JumongAPI\wwwroot\` + publish. Verify with `?v=` cache-bust on the WebView.

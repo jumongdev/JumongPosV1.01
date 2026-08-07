@@ -67,6 +67,7 @@ tailwind.config = {
         { id:'settings', icon:'🔧', label:'Settings' },
         { id:'pospromo', icon:'📢', label:'POS Promo' },
         { id:'posqr', icon:'📱', label:'POS QR' },
+        { id:'branding', icon:'🎨', label:'Branding' },
         { id:'suspect1pc', icon:'⚠️', label:'1PC CHECK' },
         { id:'analytics', icon:'📈', label:'Analytics' }
       ]" :key="item.id">
@@ -1523,6 +1524,22 @@ tailwind.config = {
                 <input type="date" x-model="saleTo" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5">
                 <button @click="loadSales()" class="text-xs px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">FILTER</button>
               </div>
+              <template x-if="saleSummary">
+                <div class="grid grid-cols-3 gap-3 px-4 py-3">
+                  <div class="rounded-xl bg-[#12123a] border border-[#222255] px-4 py-3">
+                    <div class="text-[10px] uppercase tracking-wider text-[#7878aa]">Total Sales</div>
+                    <div class="text-lg font-bold text-cyan-300">&#8369;<span x-text="fmt(saleSummary.totalSales)"></span></div>
+                  </div>
+                  <div class="rounded-xl bg-[#12123a] border border-[#222255] px-4 py-3">
+                    <div class="text-[10px] uppercase tracking-wider text-[#7878aa]">Transactions</div>
+                    <div class="text-lg font-bold text-slate-100" x-text="saleSummary.transactionCount"></div>
+                  </div>
+                  <div class="rounded-xl bg-[#12123a] border border-[#222255] px-4 py-3">
+                    <div class="text-[10px] uppercase tracking-wider text-[#7878aa]">Gross Cost</div>
+                    <div class="text-lg font-bold text-amber-300">&#8369;<span x-text="fmt(saleSummary.grossInventoryCost)"></span></div>
+                  </div>
+                </div>
+              </template>
               <template x-if="salesData.length===0"><div class="text-center py-6 text-gray-400">No walk-in sales</div></template>
               <template x-if="salesData.length > 0">
                 <table class="w-full text-xs">
@@ -2402,7 +2419,68 @@ tailwind.config = {
       </div>
     </div>
 
-      <!-- POS QR SECTION -->
+    <!-- BRANDING SECTION                                  -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div x-show="$store.app.section === 'branding'" x-transition.opacity>
+      <div x-data="brandingPanel">
+        <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[#222255]">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">MOBILE APP BRANDING</h3>
+            <button @click="load()" class="text-xs px-3 py-1 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">REFRESH</button>
+          </div>
+          <div class="p-4 space-y-4">
+            <p class="text-xs text-gray-500 dark:text-[#7878aa]">Controls the Warehouse mobile app's splash screen, login screen, accent color, and launcher icon. Saved values are auto-fetched by the app every launch.</p>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">App Title (shown on splash + login)</label>
+                <input x-model="appTitle" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200" placeholder="e.g. Jumong Wholesale">
+              </div>
+              <div>
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Launcher Icon (pre-shipped set)</label>
+                <select x-model="iconKey" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                  <option value="">Default (Jumong)</option>
+                  <option value="xmas">🎄 Christmas</option>
+                  <option value="gold">🥇 Gold</option>
+                  <option value="blue">🔵 Blue</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div>
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Splash + Login Background Color</label>
+                <input type="color" x-model="splashBg" class="w-full h-9 bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg cursor-pointer">
+                <div class="text-[10px] text-gray-400 mt-1">Hex: <span x-text="splashBg"></span></div>
+              </div>
+              <div>
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Accent Color (buttons)</label>
+                <input type="color" x-model="primaryColor" class="w-full h-9 bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg cursor-pointer">
+                <div class="text-[10px] text-gray-400 mt-1">Hex: <span x-text="primaryColor"></span></div>
+              </div>
+              <div>
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Logo Image</label>
+                <input type="file" @change="handleLogoUpload($event)" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg p-2 text-gray-700 dark:text-slate-200">
+              </div>
+            </div>
+
+            <div x-show="logoUrl" class="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255]">
+              <img :src="logoUrl" class="w-12 h-12 object-contain rounded-lg bg-white border border-gray-200 dark:border-[#222255]">
+              <div class="text-[10px] text-gray-500 dark:text-[#7878aa]">
+                <div>Current logo URL (relative)</div>
+                <div class="font-mono text-green-500" x-text="logoUrl"></div>
+              </div>
+            </div>
+
+            <div class="flex justify-end gap-2">
+              <button @click="load()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CANCEL</button>
+              <button @click="save()" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">SAVE BRANDING</button>
+            </div>
+            <div x-show="saved" class="text-xs text-green-500" x-text="saved"></div>
+          </div>
+        </div>
+      </div>
+    </div>
       <div x-show="$store.app.section === 'posqr'" x-transition.opacity>
         <div x-data="posQrPanel" class="space-y-4">
           <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">📱 POS QR Codes</h3>

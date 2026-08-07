@@ -593,6 +593,15 @@ public class WarehouseSellForm : Form
         };
         btnViewStock.Click += async (_, _) => await ShowWhInventoryAsync();
 
+        btnReport = new Button
+        {
+            Text = "\uD83D\uDCC4 REPORT",
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 },
+            BackColor = Color.FromArgb(100, 80, 180), ForeColor = Color.White, Cursor = Cursors.Hand
+        };
+        btnReport.Click += async (_, _) => await ShowWhReportAsync();
+
         btnVoid = new Button
         {
             Text = "\u2716 VOID RECEIPT",
@@ -605,7 +614,7 @@ public class WarehouseSellForm : Form
         _pnlTotals.Controls.AddRange(new Control[] {
             lblTotalDueHint, lblGrandTotal, sep1,
             lblSubTotalLbl, lblSubTotal,
-            sep2, btnSell, btnEndShiftWh, btnVoid, btnViewStock
+            sep2, btnSell, btnEndShiftWh, btnVoid, btnViewStock, btnReport
         });
 
         Controls.AddRange(new Control[] { _pnlTopbar, _pnlCustomerBar, _pnlSearch, _pnlCart, _pnlTotals });
@@ -690,7 +699,8 @@ public class WarehouseSellForm : Form
         btnSell.Location = new Point(m, ry); btnSell.Size = new Size(pw, 52); ry += 58;
         btnEndShiftWh.Location = new Point(m, ry); btnEndShiftWh.Size = new Size(pw, 40); ry += 46;
         btnVoid.Location = new Point(m, ry); btnVoid.Size = new Size(pw, 36); ry += 42;
-        btnViewStock.Location = new Point(m, ry); btnViewStock.Size = new Size(pw, 36);
+        btnViewStock.Location = new Point(m, ry); btnViewStock.Size = new Size(pw, 36); ry += 42;
+        btnReport.Location = new Point(m, ry); btnReport.Size = new Size(pw, 36);
     }
 
     private async Task ShowCustomerPickerAsync()
@@ -1457,6 +1467,130 @@ public class WarehouseSellForm : Form
         popup.ShowDialog(this);
     }
 
+    private async Task ShowWhReportAsync()
+    {
+        try
+        {
+            var popup = new Form
+            {
+                Text = "Wholesale Sales Report",
+                Size = new Size(900, 600),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.Sizable,
+                MaximizeBox = true, MinimizeBox = true,
+                BackColor = CSurface
+            };
+
+            var pnlTop = new Panel { Dock = DockStyle.Top, Height = 44, BackColor = CCard };
+            var dtFrom = new DateTimePicker { Format = DateTimePickerFormat.Short, Location = new Point(12, 10), Size = new Size(110, 26), BackColor = CInputBg, ForeColor = CInputFg };
+            var lblTo = new Label { Text = "→", Location = new Point(128, 13), Size = new Size(20, 20), ForeColor = CTextMuted, TextAlign = ContentAlignment.MiddleCenter };
+            var dtTo = new DateTimePicker { Format = DateTimePickerFormat.Short, Location = new Point(150, 10), Size = new Size(110, 26), BackColor = CInputBg, ForeColor = CInputFg };
+            var btnFilter = new Button { Text = "FILTER", Location = new Point(268, 8), Size = new Size(90, 30), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = CBlueMid, ForeColor = Color.White, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand };
+            var btnPrint = new Button { Text = "\uD83D\uDDA8 PRINT", Location = new Point(364, 8), Size = new Size(100, 30), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = Color.FromArgb(0, 150, 136), ForeColor = Color.White, Font = new Font("Segoe UI", 9F, FontStyle.Bold), Cursor = Cursors.Hand };
+
+            var pnlSummary = new Panel { Dock = DockStyle.Top, Height = 56, BackColor = CSurface };
+            var lblSales = new Label { Text = "Total Sales: ₱0.00", Location = new Point(12, 8), Size = new Size(250, 20), ForeColor = CBlueLight, Font = new Font("Segoe UI", 11F, FontStyle.Bold) };
+            var lblTxns = new Label { Text = "Transactions: 0", Location = new Point(280, 8), Size = new Size(200, 20), ForeColor = CText, Font = new Font("Segoe UI", 11F, FontStyle.Bold) };
+            var lblCost = new Label { Text = "Gross Cost: ₱0.00", Location = new Point(500, 8), Size = new Size(250, 20), ForeColor = Color.FromArgb(255, 180, 60), Font = new Font("Segoe UI", 11F, FontStyle.Bold) };
+            var lblProfit = new Label { Text = "Gross Profit: ₱0.00", Location = new Point(12, 32), Size = new Size(350, 20), ForeColor = CGreenMid, Font = new Font("Segoe UI", 11F, FontStyle.Bold) };
+
+            var dgv = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                ReadOnly = true, AllowUserToAddRows = false, RowHeadersVisible = false,
+                BackgroundColor = CSurface, Font = new Font("Segoe UI", 9F),
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                ColumnHeadersHeight = 28, EnableHeadersVisualStyles = false
+            };
+            dgv.Columns.Add("Id", "ID"); dgv.Columns[0].FillWeight = 6;
+            dgv.Columns.Add("Invoice", "Invoice #"); dgv.Columns[1].FillWeight = 18;
+            dgv.Columns.Add("Customer", "Customer"); dgv.Columns[2].FillWeight = 24;
+            dgv.Columns.Add("Items", "Items"); dgv.Columns[3].FillWeight = 8; dgv.Columns[3].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            dgv.Columns.Add("Total", "Total"); dgv.Columns[4].FillWeight = 14; dgv.Columns[4].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            dgv.Columns.Add("Date", "Date"); dgv.Columns[5].FillWeight = 16;
+            dgv.Columns.Add("Voided", "Voided"); dgv.Columns[6].FillWeight = 7; dgv.Columns[6].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
+            var pnlBottom = new Panel { Dock = DockStyle.Bottom, Height = 36, BackColor = CCard };
+            var btnClose = new Button { Text = "CLOSE", Location = new Point(popup.ClientSize.Width - 100, 4), Size = new Size(80, 28), Anchor = AnchorStyles.Right, FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = CCard, ForeColor = CTextMuted, Cursor = Cursors.Hand };
+            btnClose.Click += (_, _) => popup.Close();
+
+            async Task LoadReport()
+            {
+                try
+                {
+                    var from = dtFrom.Value.Date.ToString("yyyy-MM-dd");
+                    var to = dtTo.Value.Date.ToString("yyyy-MM-dd");
+                    var baseUrl = SyncService.ApiUrl.TrimEnd('/') + "/dashboard/warehouse/sales";
+                    var listJson = await _http.GetStringAsync(baseUrl + "?from=" + from + "&to=" + to);
+                    using var listDoc = JsonDocument.Parse(listJson);
+
+                    dgv.Rows.Clear();
+                    foreach (var s in listDoc.RootElement.EnumerateArray())
+                    {
+                        var sid = s.GetProperty("id").GetInt32();
+                        var inv = s.TryGetProperty("invoiceNo", out var ip) ? ip.GetString() ?? "" : "";
+                        var cn = s.TryGetProperty("customerName", out var c) ? c.GetString() ?? "" : "";
+                        var total = s.TryGetProperty("total", out var t) ? t.GetDecimal() : 0;
+                        var items = s.TryGetProperty("itemCount", out var ic) ? ic.GetInt32() : 0;
+                        var dt = s.GetProperty("createdAt").GetDateTime().ToString("MMM dd hh:mm tt");
+                        var isVoided = s.TryGetProperty("isVoided", out var iv) && iv.GetBoolean();
+                        dgv.Rows.Add(sid, inv, cn, items, total, dt, isVoided ? "✔" : "");
+                    }
+
+                    var sumJson = await _http.GetStringAsync(baseUrl + "/summary?from=" + from + "&to=" + to);
+                    using var sumDoc = JsonDocument.Parse(sumJson);
+                    var totalSales = sumDoc.RootElement.GetProperty("totalSales").GetDecimal();
+                    var txns = sumDoc.RootElement.GetProperty("transactionCount").GetInt32();
+                    var grossCost = sumDoc.RootElement.GetProperty("grossInventoryCost").GetDecimal();
+                    lblSales.Text = "Total Sales: ₱" + totalSales.ToString("N2");
+                    lblTxns.Text = "Transactions: " + txns;
+                    lblCost.Text = "Gross Cost: ₱" + grossCost.ToString("N2");
+                    lblProfit.Text = "Gross Profit: ₱" + (totalSales - grossCost).ToString("N2");
+                }
+                catch (Exception ex) { MessageBox.Show("Failed to load report: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+            }
+
+            btnFilter.Click += async (_, _) => await LoadReport();
+            btnPrint.Click += (_, _) =>
+            {
+                if (dgv.Rows.Count == 0) { MessageBox.Show("No data to print.", "Empty", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+                var lines = new System.Text.StringBuilder();
+                lines.AppendLine("WHOLESALE SALES REPORT");
+                lines.AppendLine("Range: " + dtFrom.Value.ToString("MMM dd, yyyy") + " - " + dtTo.Value.ToString("MMM dd, yyyy"));
+                lines.AppendLine(new string('=', 42));
+                lines.AppendLine(lblSales.Text);
+                lines.AppendLine(lblTxns.Text);
+                lines.AppendLine(lblCost.Text);
+                lines.AppendLine(lblProfit.Text);
+                lines.AppendLine(new string('-', 42));
+                foreach (DataGridViewRow row in dgv.Rows)
+                {
+                    var inv = row.Cells[1].Value?.ToString() ?? "";
+                    var cn = row.Cells[2].Value?.ToString() ?? "";
+                    var total = row.Cells[4].Value is decimal d ? d.ToString("N2") : "0.00";
+                    var dt = row.Cells[5].Value?.ToString() ?? "";
+                    lines.AppendLine(inv + " | " + cn + " | " + dt);
+                    lines.AppendLine("    Total: ₱" + total + (row.Cells[6].Value?.ToString() == "✔" ? "  [VOIDED]" : ""));
+                }
+                PrinterService.PrintRawText(lines.ToString());
+            };
+
+            pnlTop.Controls.AddRange(new Control[] { dtFrom, lblTo, dtTo, btnFilter, btnPrint });
+            pnlSummary.Controls.AddRange(new Control[] { lblSales, lblTxns, lblCost, lblProfit });
+            pnlBottom.Controls.Add(btnClose);
+            popup.Controls.AddRange(new Control[] { dgv, pnlTop, pnlSummary, pnlBottom });
+
+            popup.Shown += async (_, _) =>
+            {
+                dtFrom.Value = DateTime.Today;
+                dtTo.Value = DateTime.Today;
+                await LoadReport();
+            };
+            popup.ShowDialog(this);
+        }
+        catch (Exception ex) { MessageBox.Show("Failed to open report: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+    }
+
     private async Task ShowWhInventoryAsync()
     {
         try
@@ -1585,6 +1719,7 @@ public class WarehouseSellForm : Form
     private Button btnEndShiftWh = null!;
     private Button btnVoid = null!;
     private Button btnViewStock = null!;
+    private Button btnReport = null!;
 }
 
 public class WhCartItem : INotifyPropertyChanged

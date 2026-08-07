@@ -1,6 +1,4 @@
 {
-    "apkUrl":  "https://admin.jumongdev.com/updates/JumongWarehouse.apk",
-    "changelog":  "v1.0.5: Added Paper Width selector (50mm/80mm) in SETUP tab. Receipts auto-fit selected width. Same signing cert - updates install without uninstalling.",
-    "version":  "1.0.5",
-    "released":  "2026-08-05"
+    "version":  "1.0.10",
+    "changelog":  "v1.0.10: Added built-in crash logger. App now auto-sends crash details (what failed, device, app version) to the server on next launch, so problems are diagnosed exactly instead of guessing."
 }

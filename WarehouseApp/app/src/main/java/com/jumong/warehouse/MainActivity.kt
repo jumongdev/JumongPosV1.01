@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.bluetooth.BluetoothAdapter
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -38,6 +39,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private var pendingPrinterDevice: String? = null
+    private var pendingApkFile: File? = null
 
     private val requestBtPermission =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -53,6 +55,33 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Capture uncaught crashes into a file so they can be auto-reported to the
+        // API on the next successful launch. Everything here must be safe — the
+        // handler itself must never crash.
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                var versionName = "?"
+                try {
+                    versionName = packageManager.getPackageInfo(packageName, 0).versionName ?: "?"
+                } catch (_: Exception) { }
+                val dir = getExternalFilesDir(null) ?: filesDir
+                dir.mkdirs()
+                val sb = StringBuilder()
+                sb.append("=== CRASH ").append(System.currentTimeMillis()).append(" ===\n")
+                sb.append("version: ").append(versionName).append('\n')
+                sb.append("device: ").append(Build.MANUFACTURER).append(" ").append(Build.MODEL)
+                    .append(" | sdk ").append(Build.VERSION.SDK_INT).append(" | android ").append(Build.VERSION.RELEASE).append('\n')
+                sb.append("thread: ").append(thread.name).append('\n')
+                sb.append("failed: ").append(throwable.javaClass.name).append(": ").append(throwable.message).append('\n')
+                for (el in throwable.stackTrace) sb.append("    at ").append(el).append('\n')
+                try {
+                    File(dir, "crash.log").writeText(sb.toString())
+                } catch (_: Exception) { }
+            } catch (_: Exception) { }
+            // Keep original behavior so the OS still shows its default error screen.
+            Log.e("JumongCrash", "uncaught on ${thread.name}", throwable)
+        }
 
         webView = WebView(this)
         val pullToRefresh = androidx.swiperefreshlayout.widget.SwipeRefreshLayout(this)
@@ -116,10 +145,10 @@ class MainActivity : AppCompatActivity() {
         webView.addJavascriptInterface(PrinterBridge(), "AndroidPrinter")
         webView.addJavascriptInterface(AppBridge(), "AndroidApp")
 
-        // Clear cached web content every launch so UI updates are always fresh
-        webView.clearCache(true)
-        webView.clearHistory()
-
+        // No clearCache() here — it runs synchronously on the main thread and blocks
+        // startup on slow phones (ANR "app not responding"). The URL below is
+        // version-busted (?v=timestamp) and cacheMode is LOAD_NO_CACHE, so web
+        // updates still reach the app fresh without clearing anything.
         val url = "https://admin.jumongdev.com/whmobile.html?v=" + System.currentTimeMillis()
         webView.loadUrl(url)
 
@@ -154,6 +183,31 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         BluetoothPrinter.disconnect()
         super.onDestroy()
+    }
+
+    /**
+     * Switches the launcher icon among the pre-shipped aliases (default/xmas/gold/blue)
+     * via PackageManager.setComponentEnabledSetting. One alias is enabled at a time.
+     */
+    private fun setAppIconFor(key: String) {
+        try {
+            val target = when (key) {
+                "xmas" -> "$packageName.AliasXmas"
+                "gold" -> "$packageName.AliasGold"
+                "blue" -> "$packageName.AliasBlue"
+                else -> "$packageName.AliasDefault"
+            }
+            for (alias in listOf("AliasDefault", "AliasXmas", "AliasGold", "AliasBlue")) {
+                val cn = ComponentName(this, "$packageName.$alias")
+                val state = if ("$packageName.$alias" == target)
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                else
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                packageManager.setComponentEnabledSetting(cn, state, PackageManager.DONT_KILL_APP)
+            }
+        } catch (e: Exception) {
+            Log.w("JumongAppIcon", "setAppIcon failed: ${e.message}")
+        }
     }
 
     override fun onBackPressed() {
@@ -260,6 +314,27 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
+        fun setAppIcon(key: String) {
+            setAppIconFor(key)
+        }
+
+        @JavascriptInterface
+        fun getCrashLog(): String {
+            return try {
+                val f = File(getExternalFilesDir(null) ?: filesDir, "crash.log")
+                if (f.exists()) f.readText() else ""
+            } catch (_: Exception) { "" }
+        }
+
+        @JavascriptInterface
+        fun clearCrashLog() {
+            try {
+                val f = File(getExternalFilesDir(null) ?: filesDir, "crash.log")
+                if (f.exists()) f.delete()
+            } catch (_: Exception) { }
+        }
+
+        @JavascriptInterface
         fun openSettings() {
             startActivity(Intent(Settings.ACTION_SETTINGS))
         }
@@ -270,7 +345,8 @@ class MainActivity : AppCompatActivity() {
                 val conn = URL(versionUrl).openConnection() as HttpURLConnection
                 conn.connectTimeout = 10000
                 conn.readTimeout = 10000
-                val text = conn.inputStream.bufferedReader().readText()
+                // Read as UTF-8 and strip any BOM so JSON.parse never sees an invalid token.
+                val text = conn.inputStream.bufferedReader(Charsets.UTF_8).readText().removePrefix("\uFEFF").trim()
                 conn.disconnect()
                 text
             } catch (e: Exception) {
@@ -304,11 +380,26 @@ class MainActivity : AppCompatActivity() {
     private fun installApk(file: File) {
         if (Build.VERSION.SDK_INT >= 26) {
             if (!packageManager.canRequestPackageInstalls()) {
+                pendingApkFile = file
                 Toast.makeText(this, "Allow 'Install unknown apps' for this app", Toast.LENGTH_LONG).show()
                 startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
                 return
             }
         }
+        launchApkInstall(file)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // If the user just granted "Install unknown apps" from Settings, resume the pending install.
+        val file = pendingApkFile
+        if (file != null && Build.VERSION.SDK_INT >= 26 && packageManager.canRequestPackageInstalls()) {
+            pendingApkFile = null
+            launchApkInstall(file)
+        }
+    }
+
+    private fun launchApkInstall(file: File) {
         val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")

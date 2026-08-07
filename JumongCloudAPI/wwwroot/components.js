@@ -463,7 +463,7 @@ Alpine.store('app', {
   /* ΓöÇΓöÇ Warehouse ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('warehousePanel', () => ({
     products: [], clientsData: [], orders: [], transfers: [], loading: true, catFilter: '', search: '',
-    salesData: [], saleFrom: '', saleTo: '', saleViewOpen: false, saleViewItems: [],
+    salesData: [], saleFrom: '', saleTo: '', saleViewOpen: false, saleViewItems: [], saleSummary: null,
     invActivity: [], invSearch: '', invFrom: '', invTo: '', invExpanded: true, invActivityLoading: false,
     inventorySummary: null,
     transferPage: 1, transferPageSize: 30, transferTotal: 0, transferFilterDate: '', transferFilterSearch: '',
@@ -559,7 +559,11 @@ Alpine.store('app', {
           url += '?' + p.join('&');
         }
         this.salesData = await fetchJSON(url);
-      } catch (e) { this.salesData = [] }
+        const su = [];
+        if (this.saleFrom) su.push('from=' + this.saleFrom);
+        if (this.saleTo) su.push('to=' + this.saleTo);
+        this.saleSummary = await fetchJSON(API + '/warehouse/sales/summary' + (su.length ? '?' + su.join('&') : ''));
+      } catch (e) { this.salesData = []; this.saleSummary = null }
       this.loading = false;
     },
     async viewSaleItems(id) {
@@ -1199,6 +1203,50 @@ Alpine.store('app', {
         this.saved = 'Promo message saved!';
         setTimeout(() => this.saved = '', 3000);
       } catch (e) { this.saved = 'Error saving promo message.' }
+    }
+  }));
+
+  // Mobile app branding (splash/login colors, logo, title, launcher icon)
+  Alpine.data('brandingPanel', () => ({
+    appTitle: '',
+    logoUrl: '',
+    splashBg: '#10102a',
+    primaryColor: '#06b6d4',
+    iconKey: '',
+    saved: '',
+    async init() {
+      if (Alpine.store('app').section === 'branding') await this.load();
+      this.$watch('$store.app.section', v => { if (v === 'branding') this.load(); });
+    },
+    async load() {
+      try {
+        const res = await fetchJSON(API + '/branding');
+        this.appTitle = res.appTitle || '';
+        this.logoUrl = res.logoUrl || '';
+        this.splashBg = res.splashBg || '#10102a';
+        this.primaryColor = res.primaryColor || '#06b6d4';
+        this.iconKey = res.iconKey || '';
+      } catch (e) { }
+    },
+    async handleLogoUpload(evt) {
+      const f = evt.target.files[0];
+      if (!f) return;
+      const fd = new FormData();
+      fd.append('file', f);
+      try {
+        const res = await fetchJSON(API + '/branding/logo', { method: 'POST', body: fd });
+        this.logoUrl = res.url || '';
+        this.saved = 'Logo uploaded! Click SAVE BRANDING to commit.';
+        setTimeout(() => this.saved = '', 4000);
+      } catch (e) { this.saved = 'Logo upload failed: ' + e.message }
+    },
+    async save() {
+      this.saved = '';
+      try {
+        await fetchJSON(API + '/branding', { method: 'POST', body: JSON.stringify({ appTitle: this.appTitle, logoUrl: this.logoUrl, splashBg: this.splashBg, primaryColor: this.primaryColor, iconKey: this.iconKey }), headers: { 'Content-Type': 'application/json' } });
+        this.saved = 'Branding saved! Mobile app will apply it on next launch.';
+        setTimeout(() => this.saved = '', 5000);
+      } catch (e) { this.saved = 'Error saving branding.' }
     }
   }));
 
