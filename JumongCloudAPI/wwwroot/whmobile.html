@@ -41,7 +41,7 @@
   .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; color: #7878aa; font-weight: 600; padding: 6px 0; }
   .nav-item.active { color: #06b6d4; }
   .nav-item span.icon { font-size: 20px; }
-  .main-content { padding-bottom: 80px; }
+  .main-content { padding-bottom: 120px; }
   .menu-row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; background: #181848; border: 1px solid #222255; border-radius: 10px; color: #e2e8f0; font-size: 13px; font-weight: 600; cursor: pointer; }
   .menu-row:active { background: #1e1e52; }
   .menu-row span { font-size: 16px; }
@@ -112,20 +112,27 @@
             </div>
           </div>
 
-          <div class="card mb-3">
+          <div class="card mb-3" id="cartCard">
             <div class="flex items-center justify-between mb-2">
               <p class="text-white text-xs font-bold uppercase tracking-wider">Cart</p>
               <p class="text-cyan-400 text-xs font-bold" id="cartCount">0 items</p>
             </div>
+            <button class="store-chip !mb-3 w-full" onclick="openCustPicker()" id="custRow">
+              <span class="text-xl">👤</span>
+              <div class="flex-1 text-left">
+                <p class="text-white text-sm font-medium" id="custName">Walk-in Customer</p>
+                <p class="text-gray-500 text-[11px]">Tap to select or add customer</p>
+              </div>
+              <span class="text-gray-500 text-lg">›</span>
+            </button>
             <div id="cartList" class="space-y-2"></div>
             <div id="cartEmpty" class="text-center text-gray-500 text-sm py-4">Cart is empty</div>
-            <div class="border-t border-[#222255] mt-3 pt-3 flex items-center justify-between">
+            <div class="border-t border-[#222255] mt-3 pt-3 flex items-center justify-between" id="cartFooter">
               <p class="text-gray-400 text-sm">TOTAL</p>
               <p class="text-white text-xl font-bold" id="cartTotal">₱0.00</p>
             </div>
+            <button class="btn-green mt-3" onclick="checkout()">SELL NOW</button>
           </div>
-
-          <button class="btn-green" onclick="checkout()">SELL NOW</button>
         </div>
 
         <!-- INVENTORY TAB -->
@@ -367,6 +374,22 @@
       </div>
     </div>
 
+    <!-- CUSTOMER PICKER MODAL -->
+    <div id="custPickerModal" class="hidden fixed inset-0 z-50 flex items-start justify-center bg-black/70 px-4 pt-[10vh]" onclick="if(event.target===this)closeCustPicker()">
+      <div class="bg-[#16163a] w-full max-w-sm rounded-2xl p-5 border border-[#222255] pb-8 max-h-[75vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-white font-bold text-base">Select Customer</p>
+          <button onclick="closeCustPicker()" class="text-red-400 text-lg font-bold">✕</button>
+        </div>
+        <div class="flex gap-2 mb-3">
+          <input id="custSearch" class="input-field flex-1" type="text" placeholder="🔍 Search name or phone" enterkeyhint="search">
+          <button class="btn-ghost px-4" onclick="searchCustomers()">SEARCH</button>
+        </div>
+        <button class="btn-ghost w-full mb-3" onclick="pickCustomer(null)">🚶 Walk-in (no customer)</button>
+        <div id="custResults" class="space-y-2"></div>
+      </div>
+    </div>
+
     <!-- SALE ITEMS MODAL -->
     <div id="saleItemsModal" class="hidden fixed inset-0 z-50 flex items-end justify-center bg-black/70" onclick="if(event.target===this)closeSaleItems()">
       <div class="bg-[#16163a] w-full max-w-sm rounded-t-2xl p-5 border-t border-[#222255] pb-8 max-h-[75vh] overflow-y-auto">
@@ -457,6 +480,7 @@
     let cart = [];
     let currentProduct = null;
     let selectedUnitIndex = 0;
+    let selectedCustomer = null;
     let pendingPay = null;
     let paperWidth = 80;
     let invMode = 'all';
@@ -881,6 +905,7 @@
       list.innerHTML = '';
       document.getElementById('cartEmpty').style.display = cart.length ? 'none' : 'block';
       document.getElementById('cartCount').textContent = cart.length + ' item(s)';
+      document.getElementById('custName').textContent = selectedCustomer ? selectedCustomer.name : 'Walk-in Customer';
       let total = 0;
       cart.forEach((c, i) => {
         total += c.price * c.qty;
@@ -895,15 +920,71 @@
         list.appendChild(div);
       });
       document.getElementById('cartTotal').textContent = '₱' + total.toFixed(2);
+      scrollCartIntoView();
+    }
+
+    function scrollCartIntoView() {
+      const f = document.getElementById('cartFooter');
+      if (f && cart.length) {
+        setTimeout(() => { try { f.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch (e) { f.scrollIntoView(); } }, 60);
+      }
     }
 
     function changeQty(i, delta) {
       cart[i].qty += delta;
       if (cart[i].qty <= 0) cart.splice(i, 1);
+      if (!cart.length && selectedCustomer) { selectedCustomer = null; }
       renderCart();
     }
 
+    // ─── CUSTOMER PICKER ────────────────────────────────────
+    function openCustPicker() {
+      document.getElementById('custResults').innerHTML = '';
+      document.getElementById('custSearch').value = '';
+      show(document.getElementById('custPickerModal'));
+      setTimeout(() => { const s = document.getElementById('custSearch'); if (s) s.focus(); }, 100);
+    }
+
+    function closeCustPicker() { hide(document.getElementById('custPickerModal')); }
+
+    function pickCustomer(c) {
+      selectedCustomer = c;
+      closeCustPicker();
+      renderCart();
+      if (c) toast('Customer: ' + c.name);
+      else toast('Customer cleared');
+    }
+
+    async function searchCustomers() {
+      const q = document.getElementById('custSearch').value.trim();
+      const box = document.getElementById('custResults');
+      box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading...</p>';
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/customers?search=' + encodeURIComponent(q), { signal: AbortSignal.timeout(12000) });
+        const data = await r.json();
+        box.innerHTML = '';
+        if (!data || !data.length) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">No customers found</p>'; return; }
+        data.forEach(c => {
+          const d = document.createElement('div');
+          d.className = 'cart-item';
+          d.innerHTML = '<div class="flex-1"><p class="text-white text-xs font-bold">' + c.name + '</p>' +
+            '<p class="text-gray-500 text-[10px]">' + (c.phone || 'no phone') + (c.creditBalance > 0 ? ' • credit ₱' + Number(c.creditBalance).toFixed(2) : '') + '</p></div>' +
+            '<button class="btn-green px-3 py-1.5 text-[10px]" onclick="pickCustomer({id:' + c.id + ',name:\'' + String(c.name).replace(/'/g, '') + '\'})">SELECT</button>';
+          box.appendChild(d);
+        });
+      } catch (e) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Failed: ' + e.message + '</p>'; }
+    }
+
     // ─── CHECKOUT ────────────────────────────────────────────
+    // When the soft keypad opens, push the cart footer back into view
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
+        if (cart.length && !document.getElementById('tabSell').classList.contains('hidden')) {
+          setTimeout(scrollCartIntoView, 150);
+        }
+      });
+    }
+
     function checkout() {
       if (!cart.length) { toast('Cart is empty', 'error'); return; }
       const total = cart.reduce((s, c) => s + c.price * c.qty, 0);
@@ -923,8 +1004,8 @@
       if (method === 'Cash' && cash < pendingPay) { toast('Cash must cover the total', 'error'); return; }
       const items = cart.map(c => ({ productId: c.productId, productName: c.productName, unitIndex: c.unitIndex, qty: c.qty }));
       const body = {
-        customerId: 0,
-        customerName: 'Walk-in Customer',
+        customerId: selectedCustomer ? selectedCustomer.id : 0,
+        customerName: selectedCustomer ? selectedCustomer.name : 'Walk-in Customer',
         paymentMethod: method,
         cashReceived: cash,
         source: 'mobile',
@@ -945,6 +1026,7 @@
         }
         toast('Sale complete! ' + invoiceNo);
         cart = [];
+        selectedCustomer = null;
         renderCart();
         closePay();
       } catch (e) { toast('Sale failed: ' + e.message, 'error'); }
