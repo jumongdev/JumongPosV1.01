@@ -133,6 +133,10 @@
               <p class="text-white text-xl font-bold" id="cartTotal">₱0.00</p>
             </div>
             <button class="btn-green mt-3" id="btnSellNow" onclick="checkout()">SELL NOW</button>
+            <div class="flex gap-2 mt-2">
+              <button class="btn-ghost flex-1" onclick="holdCart()">⏸ HOLD</button>
+              <button class="btn-ghost flex-1" id="btnHeldCarts" onclick="openHeldCarts()">HELD (0)</button>
+            </div>
           </div>
         </div>
 
@@ -388,6 +392,17 @@
         </div>
         <button class="btn-ghost w-full mb-3" onclick="pickCustomer(null)">🚶 Walk-in (no customer)</button>
         <div id="custResults" class="space-y-2"></div>
+      </div>
+    </div>
+
+    <!-- HELD CARTS MODAL -->
+    <div id="heldCartsModal" class="hidden fixed inset-0 z-50 flex items-start justify-center bg-black/70 px-4 pt-[10vh]" onclick="if(event.target===this)closeHeldCarts()">
+      <div class="bg-[#16163a] w-full max-w-sm rounded-2xl p-5 border border-[#222255] pb-8 max-h-[75vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-white font-bold text-base">⏸ Held Carts</p>
+          <button onclick="closeHeldCarts()" class="text-red-400 text-lg font-bold">✕</button>
+        </div>
+        <div id="heldList" class="space-y-2"></div>
       </div>
     </div>
 
@@ -838,11 +853,14 @@
         const box = document.getElementById('productResults');
         box.innerHTML = '';
         (data || []).filter(p => p.isActive !== false).slice(0, 20).forEach(p => {
+          const out = Number(p.stockQty) <= 0;
           const div = document.createElement('div');
           div.className = 'card';
           div.innerHTML = '<div class="flex items-center justify-between"><div><p class="text-white text-sm font-bold">' + p.name + '</p>' +
             '<p class="text-gray-500 text-[11px]">' + stockText(p) + ' • ' + (p.barcode || 'no barcode') + '</p></div>' +
-            '<button class="text-xs px-3 py-2 rounded-lg bg-cyan-600 text-white font-bold" onclick="openUnitPicker(' + p.id + ')">+ ADD</button></div>';
+            (out
+              ? '<button class="text-xs px-3 py-2 rounded-lg bg-gray-700 text-gray-500 cursor-not-allowed">NO STOCK</button>'
+              : '<button class="text-xs px-3 py-2 rounded-lg bg-cyan-600 text-white font-bold" onclick="openUnitPicker(' + p.id + ')">+ ADD</button>') + '</div>';
           box.appendChild(div);
         });
         if (!data || !data.length) box.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No products found</p>';
@@ -867,6 +885,7 @@
         await ensureSellProdCache();
         const p = sellProdCache.find(x => x.id === productId);
         if (!p) { toast('Product not found', 'error'); return; }
+        if (Number(p.stockQty) <= 0) { toast('OUT OF STOCK: ' + p.name, 'error'); return; }
         currentProduct = p;
         document.getElementById('pickProductName').textContent = p.name;
         document.getElementById('pickProductStock').innerHTML = stockText(p);
@@ -903,13 +922,26 @@
       currentProduct = null;
     }
 
+    function increaseAllowedRow(c) {
+      const used = cart.filter(x => x.productId === c.productId).reduce((s, x) => s + x.qty * (x.qtyPerUnit || 1), 0);
+      const p = sellProdCache.find(x => x.id === c.productId);
+      const stock = Number(p && p.stockQty) || 0;
+      if (used + (c.qtyPerUnit || 1) > stock) { toast('Not enough stock: ' + c.productName, 'error'); return false; }
+      return true;
+    }
+
     function addToCart() {
       if (!currentProduct) return;
       const units = currentProduct.units || [];
       const unit = units.length > 0 ? units[selectedUnitIndex] : { unitName: 'Piece', price: currentProduct.piecePrice, qtyPerUnit: 1 };
       const existing = cart.find(c => c.productId === currentProduct.id && c.unitIndex === selectedUnitIndex);
-      if (existing) existing.qty += 1;
-      else cart.push({ productId: currentProduct.id, productName: currentProduct.name, unitIndex: selectedUnitIndex, unitName: unit.unitName || 'Piece', price: unit.price || 0, qtyPerUnit: unit.qtyPerUnit || 1, qty: 1 });
+      if (existing) {
+        if (!increaseAllowedRow(existing)) return;
+        existing.qty += 1;
+      } else {
+        if (Number(currentProduct.stockQty) < (unit.qtyPerUnit || 1)) { toast('Not enough stock: ' + currentProduct.name, 'error'); return; }
+        cart.push({ productId: currentProduct.id, productName: currentProduct.name, unitIndex: selectedUnitIndex, unitName: unit.unitName || 'Piece', price: unit.price || 0, qtyPerUnit: unit.qtyPerUnit || 1, qty: 1 });
+      }
       renderCart();
       closeUnitPicker();
       toast('Added: ' + currentProduct.name);
@@ -956,6 +988,7 @@
     }
 
     function changeQty(i, delta) {
+      if (delta > 0 && cart[i] && !increaseAllowedRow(cart[i])) return;
       cart[i].qty += delta;
       if (cart[i].qty <= 0) cart.splice(i, 1);
       if (!cart.length && selectedCustomer) { selectedCustomer = null; }
@@ -978,6 +1011,74 @@
       renderCart();
       if (c) toast('Customer: ' + c.name);
       else toast('Customer cleared');
+    }
+
+    // ─── HOLD CART ──────────────────────────────────────────
+    function getHeldCarts() {
+      try { return JSON.parse(localStorage.getItem('wh_held_carts') || '[]'); } catch (e) { return []; }
+    }
+    function saveHeldCarts(list) { localStorage.setItem('wh_held_carts', JSON.stringify(list)); updateHeldBadge(); }
+    function updateHeldBadge() {
+      const b = document.getElementById('btnHeldCarts');
+      if (b) b.textContent = 'HELD (' + getHeldCarts().length + ')';
+    }
+
+    function holdCart() {
+      if (!cart.length) { toast('Cart is empty', 'error'); return; }
+      const held = getHeldCarts();
+      held.unshift({
+        id: Date.now(),
+        at: new Date().toLocaleString(),
+        customer: selectedCustomer ? { id: selectedCustomer.id, name: selectedCustomer.name } : null,
+        items: JSON.parse(JSON.stringify(cart)),
+        total: cart.reduce((s, c) => s + c.price * c.qty, 0)
+      });
+      saveHeldCarts(held.slice(0, 50));
+      cart = [];
+      selectedCustomer = null;
+      renderCart();
+      toast('Cart held');
+    }
+
+    function openHeldCarts() {
+      const list = getHeldCarts();
+      const box = document.getElementById('heldList');
+      box.innerHTML = '';
+      updateHeldBadge();
+      if (!list.length) { box.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No held carts</p>'; }
+      list.forEach((h, i) => {
+        const d = document.createElement('div');
+        d.className = 'card';
+        d.innerHTML = '<div class="flex items-center justify-between mb-1"><p class="text-white text-xs font-bold flex-1 pr-2">' + (h.customer ? h.customer.name : 'Walk-in Customer') + '</p>' +
+          '<span class="text-cyan-400 text-xs font-bold">₱' + Number(h.total || 0).toFixed(2) + '</span></div>' +
+          '<p class="text-gray-500 text-[10px] mb-2">' + h.at + ' • ' + (h.items ? h.items.length : 0) + ' item(s)</p>' +
+          '<div class="flex gap-2"><button class="btn-green flex-1 text-xs" onclick="restoreHeldCart(' + i + ')">RESTORE</button>' +
+          '<button class="btn-ghost flex-1 text-xs text-red-400" onclick="deleteHeldCart(' + i + ')">DELETE</button></div>';
+        box.appendChild(d);
+      });
+      show(document.getElementById('heldCartsModal'));
+    }
+
+    function closeHeldCarts() { hide(document.getElementById('heldCartsModal')); }
+
+    function restoreHeldCart(i) {
+      const held = getHeldCarts();
+      const h = held[i];
+      if (!h) return;
+      cart = JSON.parse(JSON.stringify(h.items || []));
+      selectedCustomer = h.customer || null;
+      held.splice(i, 1);
+      saveHeldCarts(held);
+      closeHeldCarts();
+      renderCart();
+      toast('Cart restored');
+    }
+
+    function deleteHeldCart(i) {
+      const held = getHeldCarts();
+      held.splice(i, 1);
+      saveHeldCarts(held);
+      openHeldCarts();
     }
 
     async function searchCustomers() {
@@ -1799,6 +1900,7 @@
     // ─── INIT: validate session on every open ────────────────
     (function init() {
       setScreen('loading');
+      updateHeldBadge();
       const saved = localStorage.getItem('wh_session');
       if (saved) {
         try {
