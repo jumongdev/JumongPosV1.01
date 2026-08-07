@@ -107,6 +107,7 @@
                 <p class="text-white text-sm font-bold" id="pickProductName"></p>
                 <button class="text-red-400 text-xs font-bold" onclick="closeUnitPicker()">✕</button>
               </div>
+              <p class="text-gray-500 text-[11px] mb-2" id="pickProductStock"></p>
               <div id="unitOptions"></div>
               <button class="btn-primary mt-3" onclick="addToCart()">ADD TO CART</button>
             </div>
@@ -814,6 +815,19 @@
     }
 
     // ─── PRODUCT SEARCH ──────────────────────────────────────
+    function boxesText(stock, boxQty) {
+      const q = Number(boxQty) || 0;
+      const s = Number(stock) || 0;
+      if (q <= 1) return '';
+      const whole = Math.floor(s / q);
+      return ' = ' + whole + ' box' + (whole === 1 ? '' : 's') + (s % q ? ' + ' + s % q + ' pcs' : '');
+    }
+    function stockText(p) {
+      const s = Number(p && p.stockQty) || 0;
+      if (s <= 0) return '<span class="text-red-400 font-bold">OUT OF STOCK (0 pcs)</span>';
+      return 'Stock: ' + s + ' pcs' + boxesText(s, p.boxQty);
+    }
+
     async function searchProducts() {
       const q = document.getElementById('sellSearch').value.trim();
       if (!q) return;
@@ -827,7 +841,7 @@
           const div = document.createElement('div');
           div.className = 'card';
           div.innerHTML = '<div class="flex items-center justify-between"><div><p class="text-white text-sm font-bold">' + p.name + '</p>' +
-            '<p class="text-gray-500 text-[11px]">Stock: ' + p.stockQty + ' • ' + (p.barcode || 'no barcode') + '</p></div>' +
+            '<p class="text-gray-500 text-[11px]">' + stockText(p) + ' • ' + (p.barcode || 'no barcode') + '</p></div>' +
             '<button class="text-xs px-3 py-2 rounded-lg bg-cyan-600 text-white font-bold" onclick="openUnitPicker(' + p.id + ')">+ ADD</button></div>';
           box.appendChild(div);
         });
@@ -855,6 +869,7 @@
         if (!p) { toast('Product not found', 'error'); return; }
         currentProduct = p;
         document.getElementById('pickProductName').textContent = p.name;
+        document.getElementById('pickProductStock').innerHTML = stockText(p);
         const units = p.units || [];
         const box = document.getElementById('unitOptions');
         box.innerHTML = '';
@@ -1085,7 +1100,7 @@
           const div = document.createElement('div');
           div.className = 'card';
           div.innerHTML = '<div class="flex items-center justify-between"><div><p class="text-white text-sm font-bold">' + p.name + '</p>' +
-            '<p class="text-gray-500 text-[11px]">' + (p.barcode || 'no barcode') + '</p></div>' +
+            '<p class="text-gray-500 text-[11px]">' + (p.barcode || 'no barcode') + (Number(p.boxQty) > 1 ? ' • ' + boxesText(p.stockQty, p.boxQty) : '') + '</p></div>' +
             '<p class="text-lg font-bold ' + (p.stockQty === 0 ? 'text-red-400' : low ? 'text-orange-400' : 'text-emerald-400') + '">' + p.stockQty + '</p></div>';
           box.appendChild(div);
         });
@@ -1483,10 +1498,18 @@
       recvTarget = x;
       document.getElementById('recvModalTitle').textContent = x.name;
       const box = document.getElementById('recvModalBody');
+      const boxq = Number(x.boxQty || 0);
       box.innerHTML = '<div class="text-center pb-2"><p class="text-gray-400 text-[11px]">Current stock</p>' +
-        '<p class="text-white text-2xl font-bold">' + Number(x.stockQty || 0) + ' pcs</p></div>' +
-        '<div><p class="text-gray-400 text-[11px] mb-1">Quantity to receive</p>' +
-        '<input id="recvQty" class="input-field w-full text-center text-2xl font-bold" type="number" min="1" value="1" inputmode="numeric" enterkeyhint="done"></div>' +
+        '<p class="text-white text-2xl font-bold">' + Number(x.stockQty || 0) + ' pcs' + (boxq > 1 ? boxesText(x.stockQty, boxq) : '') + '</p></div>' +
+        (boxq > 1
+          ? '<div class="flex gap-2">' +
+            '<div class="flex-1"><p class="text-gray-400 text-[11px] mb-1">' + boxq + ' pcs per box</p>' +
+            '<input id="recvBoxes" class="input-field w-full text-center text-2xl font-bold" type="number" min="0" value="0" inputmode="numeric" enterkeyhint="done" oninput="updateRecvConversion()"></div>' +
+            '<div class="flex-1"><p class="text-gray-400 text-[11px] mb-1">Extra pcs</p>' +
+            '<input id="recvExtraPcs" class="input-field w-full text-center text-2xl font-bold" type="number" min="0" value="0" inputmode="numeric" enterkeyhint="done" oninput="updateRecvConversion()"></div></div>' +
+          '<p id="recvConversion" class="text-cyan-400 text-xs font-bold text-center">= 0 pcs total</p>'
+          : '<div><p class="text-gray-400 text-[11px] mb-1">Pieces to receive</p>' +
+            '<input id="recvQty" class="input-field w-full text-center text-2xl font-bold" type="number" min="1" value="1" inputmode="numeric" enterkeyhint="done"></div>') +
         '<p class="text-gray-500 text-[11px] text-center">' + (x.barcode || '—') + '</p>' +
         '<div class="flex gap-2 pt-2">' +
         '<button class="btn-ghost flex-1" onclick="closeRecvModal()">CANCEL</button>' +
@@ -1496,9 +1519,35 @@
 
     function closeRecvModal() { hide(document.getElementById('recvModal')); recvTarget = null; }
 
+    function updateRecvConversion() {
+      if (!recvTarget) return;
+      const boxq = Number(recvTarget.boxQty || 0);
+      if (boxq <= 1) return;
+      const b = document.getElementById('recvBoxes');
+      const e = document.getElementById('recvExtraPcs');
+      const boxes = b ? parseInt(b.value || '0', 10) || 0 : 0;
+      const extra = e ? parseInt(e.value || '0', 10) || 0 : 0;
+      const el = document.getElementById('recvConversion');
+      if (el) el.textContent = '= ' + (boxes * boxq + extra) + ' pcs total';
+    }
+
+    function recvTotalPieces() {
+      if (!recvTarget) return 0;
+      const boxq = Number(recvTarget.boxQty || 0);
+      if (boxq > 1) {
+        const b = document.getElementById('recvBoxes');
+        const e = document.getElementById('recvExtraPcs');
+        const boxes = b ? parseInt(b.value || '0', 10) || 0 : 0;
+        const extra = e ? parseInt(e.value || '0', 10) || 0 : 0;
+        return boxes * boxq + extra;
+      }
+      const q = document.getElementById('recvQty');
+      return q ? parseInt(q.value || '0', 10) || 0 : 0;
+    }
+
     function addToRecvCart() {
       if (!recvTarget) return;
-      const qty = parseInt(document.getElementById('recvQty').value || '0', 10);
+      const qty = recvTotalPieces();
       if (!qty || qty <= 0) { toast('Enter a valid quantity', 'error'); return; }
       const existing = recvCart.find(i => i.id === recvTarget.id);
       if (existing) existing.qty += qty;
