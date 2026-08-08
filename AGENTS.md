@@ -1095,6 +1095,7 @@ Compress-Archive -Force -Path "bin\Release\net8.0-windows\win-x64\publish\*" -De
 - All commands execute locally on the POS machine
 - Agent timeout: 15 minutes (for large file downloads)
 - No GUI required — works fully over CLI/API
+- **Auto-start is at Windows LOGON level, NOT POS-app-open** (v1.1.35+): both `Program.cs StartAgent()` and the Agent itself write the `HKCU\...\CurrentVersion\Run` → `JumongPosAgent` Run key (pointing at `Agent\Agent.exe`), and `StopAgent()` is an empty no-op. So the agent starts at every Windows logon even if the POS app is never opened, and survives POS app close/lock screen. **Caveat:** HKCU Run fires only when a Windows user logs in — if the PC sits at the login screen (e.g., overnight reboot, nobody logged in), the agent does NOT run until someone logs in. A Windows-service/SYSTEM scheduled-task install would be needed for boot-time-without-login coverage — decided NOT worth it (store is closed anyway).
 
 ### v1.1.08–v1.1.15 — Bidirectional Sync, Inventory Fixes, Transfer Rework, Agent Dashboard, Warehouse Viewer
 
