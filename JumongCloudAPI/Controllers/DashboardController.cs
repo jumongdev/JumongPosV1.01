@@ -1162,7 +1162,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.1.6" });
+            return Ok(new { version = "1.1.7" });
     }
 
     [HttpPost("crash-report")]
@@ -2223,14 +2223,29 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
 
             if (s.Status == "shipped")
             {
-                using var ded = conn.CreateCommand();
-                ded.CommandText = @"
-                    UPDATE wh_products SET stock_qty = stock_qty - COALESCE((
-                        SELECT SUM(oi.base_qty) FROM wh_order_items oi WHERE oi.order_id = @oid AND oi.product_id = wh_products.id
-                    ), 0)
-                    WHERE id IN (SELECT DISTINCT product_id FROM wh_order_items WHERE order_id = @oid)";
-                ded.Parameters.AddWithValue("oid", id);
-                ded.ExecuteNonQuery();
+                using var get = conn.CreateCommand();
+                get.CommandText = "SELECT product_id, product_name, base_qty FROM wh_order_items WHERE order_id = @oid";
+                get.Parameters.AddWithValue("oid", id);
+                var shipItems = new List<(int pid, string pn, int qty)>();
+                using (var r = get.ExecuteReader())
+                    while (r.Read()) shipItems.Add((r.GetInt32(0), r.GetString(1), r.GetInt32(2)));
+
+                foreach (var (pid, pn, qty) in shipItems)
+                {
+                    using var ded = conn.CreateCommand();
+                    ded.CommandText = "UPDATE wh_products SET stock_qty = stock_qty - @q WHERE id = @pid";
+                    ded.Parameters.AddWithValue("q", qty);
+                    ded.Parameters.AddWithValue("pid", pid);
+                    ded.ExecuteNonQuery();
+
+                    using var trail = conn.CreateCommand();
+                    trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) VALUES (@pid, @pn, '', @q, @ref, 'order_shipped')";
+                    trail.Parameters.AddWithValue("pid", pid);
+                    trail.Parameters.AddWithValue("pn", pn);
+                    trail.Parameters.AddWithValue("q", -qty);
+                    trail.Parameters.AddWithValue("ref", $"Order #{id} shipped");
+                    trail.ExecuteNonQuery();
+                }
             }
 
             return Ok(new { success = true });
@@ -2321,6 +2336,15 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                         restock.Parameters.AddWithValue("qty", baseQty);
                         restock.Parameters.AddWithValue("pid", productId);
                         restock.ExecuteNonQuery();
+
+                        using var trail = conn.CreateCommand(); trail.Transaction = tx;
+                        trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) VALUES (@pid, @pn, @bc, @qty, @ref, 'shortage_return')";
+                        trail.Parameters.AddWithValue("pid", productId);
+                        trail.Parameters.AddWithValue("pn", productName);
+                        trail.Parameters.AddWithValue("bc", barcode);
+                        trail.Parameters.AddWithValue("qty", baseQty);
+                        trail.Parameters.AddWithValue("ref", $"Order #{id} shortage restock");
+                        trail.ExecuteNonQuery();
 
                         shortages.Add(new { productId, productName, baseQty });
 
@@ -3122,19 +3146,27 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         {
             // Restore all original stock deductions
             using var orig = conn.CreateCommand(); orig.Transaction = tx;
-            orig.CommandText = "SELECT product_id, stock_deduction FROM wh_walkin_sale_items WHERE sale_id = @sid";
+            orig.CommandText = "SELECT product_id, product_name, stock_deduction FROM wh_walkin_sale_items WHERE sale_id = @sid";
             orig.Parameters.AddWithValue("sid", id);
             using var rOrig = orig.ExecuteReader();
-            var restores = new List<(int pid, int qty)>();
-            while (rOrig.Read()) restores.Add((rOrig.GetInt32(0), rOrig.GetInt32(1)));
+            var restores = new List<(int pid, string pn, int qty)>();
+            while (rOrig.Read()) restores.Add((rOrig.GetInt32(0), rOrig.GetString(1), rOrig.GetInt32(2)));
             rOrig.Close();
-            foreach (var (pid, qty) in restores)
+            foreach (var (pid, pn, qty) in restores)
             {
                 using var res = conn.CreateCommand(); res.Transaction = tx;
                 res.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @qty WHERE id = @pid";
                 res.Parameters.AddWithValue("pid", pid);
                 res.Parameters.AddWithValue("qty", qty);
                 res.ExecuteNonQuery();
+
+                using var trail = conn.CreateCommand(); trail.Transaction = tx;
+                trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) VALUES (@pid, @pn, '', @qty, @ref, 'walkin_sale_edit_restore')";
+                trail.Parameters.AddWithValue("pid", pid);
+                trail.Parameters.AddWithValue("pn", pn);
+                trail.Parameters.AddWithValue("qty", qty);
+                trail.Parameters.AddWithValue("ref", $"Wholesale Edit #{id} restore");
+                trail.ExecuteNonQuery();
             }
 
             // Delete old items
@@ -3182,6 +3214,14 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 ded.CommandText = "UPDATE wh_products SET stock_qty = stock_qty - @sd WHERE id = @pid";
                 ded.Parameters.AddWithValue("pid", item.ProductId); ded.Parameters.AddWithValue("sd", stockDeduction);
                 ded.ExecuteNonQuery();
+
+                using var trail = conn.CreateCommand(); trail.Transaction = tx;
+                trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) VALUES (@pid, @pn, '', @qty, @ref, 'walkin_sale')";
+                trail.Parameters.AddWithValue("pid", item.ProductId);
+                trail.Parameters.AddWithValue("pn", pn);
+                trail.Parameters.AddWithValue("qty", -stockDeduction);
+                trail.Parameters.AddWithValue("ref", $"Wholesale Edit #{id} | {unitName} x {item.Qty}");
+                trail.ExecuteNonQuery();
 
                 grandTotal += subtotal;
             }
