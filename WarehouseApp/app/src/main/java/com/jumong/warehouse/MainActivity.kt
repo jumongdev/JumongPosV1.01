@@ -4,8 +4,12 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -164,6 +168,12 @@ class MainActivity : AppCompatActivity() {
         requestBluetoothPermissions()
     }
 
+    override fun onPause() {
+        super.onPause()
+        // Release the printer while backgrounded so other devices can use it
+        BluetoothPrinter.disconnect()
+    }
+
     private fun requestBluetoothPermissions() {
         val perms = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= 31) {
@@ -284,6 +294,70 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+
+        /**
+         * Discovers nearby Bluetooth devices (like Loyverse's Search button).
+         * Runs for ~8s, returns JSON [{name, address, paired}].
+         */
+        @JavascriptInterface
+        fun searchDevices(): String {
+            val adapter = BluetoothAdapter.getDefaultAdapter() ?: return "[]"
+            if (Build.VERSION.SDK_INT >= 31) {
+                if (!granted(Manifest.permission.BLUETOOTH_CONNECT) || !granted(Manifest.permission.BLUETOOTH_SCAN)) {
+                    return "ERR:PERMISSION"
+                }
+            } else {
+                if (!granted(Manifest.permission.ACCESS_FINE_LOCATION)) {
+                    return "ERR:PERMISSION"
+                }
+            }
+            if (!adapter.isEnabled) {
+                adapter.enable()
+                try { Thread.sleep(1500) } catch (_: InterruptedException) { }
+            }
+            val found = linkedMapOf<String, JSONObject>()
+            try {
+                BluetoothPrinter.getPairedDevices().forEach { d ->
+                    if (!BluetoothPrinter.isPrinterDevice(d)) return@forEach
+                    found[d.address] = JSONObject().apply {
+                        put("name", d.name ?: "Unknown")
+                        put("address", d.address)
+                        put("paired", true)
+                    }
+                }
+            } catch (_: Exception) { }
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    if (intent?.action != BluetoothDevice.ACTION_FOUND) return
+                    val d = intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE) ?: return
+                    if (!BluetoothPrinter.isPrinterDevice(d)) return
+                    val name = d.name ?: return
+                    found[d.address] = JSONObject().apply {
+                        put("name", name)
+                        put("address", d.address)
+                        put("paired", d.bondState == BluetoothDevice.BOND_BONDED)
+                    }
+                }
+            }
+            registerReceiver(receiver, IntentFilter(BluetoothDevice.ACTION_FOUND))
+            try { adapter.startDiscovery() } catch (_: Exception) { }
+            try { Thread.sleep(12000) } catch (_: InterruptedException) { }
+            try { adapter.cancelDiscovery() } catch (_: Exception) { }
+            try { unregisterReceiver(receiver) } catch (_: Exception) { }
+            return JSONArray(found.values.toList()).toString()
+        }
+
+        @JavascriptInterface
+        fun pairDevice(address: String): String {
+            return try {
+                val adapter = BluetoothAdapter.getDefaultAdapter() ?: return "ERR:no-bt"
+                val d = adapter.getRemoteDevice(address)
+                d.createBond()
+                "OK"
+            } catch (e: Exception) {
+                "ERR:${e.message}"
+            }
+        }
     }
 
     // ─── JS Bridge: App utilities ─────────────────────────────────────────
@@ -396,6 +470,12 @@ class MainActivity : AppCompatActivity() {
         if (file != null && Build.VERSION.SDK_INT >= 26 && packageManager.canRequestPackageInstalls()) {
             pendingApkFile = null
             launchApkInstall(file)
+        }
+        // Reconnect to last saved printer when app returns to foreground
+        val savedPrinter = getSharedPreferences("wh_prefs", MODE_PRIVATE)
+            .getString("last_printer", "")
+        if (!savedPrinter.isNullOrEmpty() && !BluetoothPrinter.isConnected) {
+            Thread { BluetoothPrinter.connect(savedPrinter) }.start()
         }
     }
 

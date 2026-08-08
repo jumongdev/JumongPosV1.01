@@ -1,4 +1,1 @@
-{
-    "version":  "1.0.10",
-    "changelog":  "v1.0.10: Added built-in crash logger. App now auto-sends crash details (what failed, device, app version) to the server on next launch, so problems are diagnosed exactly instead of guessing."
-}
+{"version": "1.0.14", "changelog": "v1.0.14: Search shows printers only (phones/speakers filtered out). Tap a printer row to connect (Loyverse-style). Connect now has a hard 8-second timeout - no more app freeze when the printer is busy."}

@@ -70,6 +70,19 @@ Console.WriteLine($"API: {apiUrl}");
 Console.WriteLine($"DB: {dbPath}");
 Console.WriteLine();
 
+// Register itself to auto-start at every Windows logon — the agent runs
+// independently of the POS app, so remote diagnostics work even before
+// anyone logs into the POS. Always overwrites so a moved install folder
+// never leaves a stale path behind.
+try
+{
+    using var runKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+        @"Software\Microsoft\Windows\CurrentVersion\Run", writable: true);
+    if (runKey != null)
+        runKey.SetValue("JumongPosAgent", "\"" + Environment.ProcessPath + "\"");
+}
+catch { }
+
 using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(15) };
 
 while (true)

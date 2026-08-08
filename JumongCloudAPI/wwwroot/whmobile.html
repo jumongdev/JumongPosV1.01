@@ -48,6 +48,9 @@
   .menu-row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; background: #181848; border: 1px solid #222255; border-radius: 10px; color: #e2e8f0; font-size: 13px; font-weight: 600; cursor: pointer; }
   .menu-row:active { background: #1e1e52; }
   .menu-row span { font-size: 16px; }
+  .inv-mode-btn { background: #181848; border: 1px solid #222255; color: #a5a5d0; font-weight: 700; border-radius: 10px; padding: 8px 4px; font-size: 11px; letter-spacing: 0.3px; }
+  .inv-mode-btn:active { background: #1e1e52; }
+  .inv-mode-btn.active { background: var(--jacc); border-color: var(--jacc); color: white; }
 </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -139,6 +142,7 @@
             </div>
             <button class="btn-green mt-3" id="btnSellNow" onclick="checkout()">SELL NOW</button>
             <div class="flex gap-2 mt-2">
+              <button class="btn-danger flex-1" onclick="clearCart()">🗑 CLEAR</button>
               <button class="btn-ghost flex-1" onclick="holdCart()">⏸ HOLD</button>
               <button class="btn-ghost flex-1" id="btnHeldCarts" onclick="openHeldCarts()">HELD (0)</button>
             </div>
@@ -160,8 +164,18 @@
               <p class="text-gray-400 text-[10px] uppercase tracking-wider mb-1">💵 Gross Value (SRP)</p>
               <p class="text-white text-lg font-bold" id="invGross">₱0.00</p>
             </div>
-            <div class="card !mb-0 col-span-2">
-              <p class="text-gray-400 text-[10px] uppercase tracking-wider mb-1" id="invItemsLine">items • units</p>
+            <div class="card !mb-0 col-span-2 space-y-2">
+              <div class="grid grid-cols-3 gap-2">
+                <button class="inv-mode-btn" data-mode="all" id="invBtnAll" onclick="setInvMode('all')">STOCK · 0</button>
+                <button class="inv-mode-btn" data-mode="low" id="invBtnLow" onclick="setInvMode('low')">LOW · 0</button>
+                <button class="inv-mode-btn" data-mode="out" id="invBtnOut" onclick="setInvMode('out')">NONE · 0</button>
+              </div>
+              <div class="flex gap-2">
+                <select id="invCatSel" class="input-field flex-1 !py-2.5 !px-3 text-sm" onchange="searchInventory()">
+                  <option value="">ALL CATEGORIES</option>
+                </select>
+                <button class="btn-ghost px-3 whitespace-nowrap" onclick="printInventory()">🖨️ PRINT</button>
+              </div>
             </div>
           </div>
           <div class="flex gap-2 mb-3">
@@ -169,6 +183,13 @@
             <button class="btn-ghost px-4" onclick="searchInventory()">SEARCH</button>
           </div>
           <div id="invResults" class="space-y-2"></div>
+          <div id="invPager" class="hidden mt-3">
+            <div class="flex items-center justify-between gap-2">
+              <button class="btn-ghost px-3 py-2 text-xs" id="invPrevBtn" onclick="invGoTo(-1)">‹ PREV</button>
+              <p class="text-gray-500 text-[11px] text-center" id="invPageInfo"></p>
+              <button class="btn-ghost px-3 py-2 text-xs" id="invNextBtn" onclick="invGoTo(1)">NEXT ›</button>
+            </div>
+          </div>
         </div>
 
         <!-- SALES REPORT TAB -->
@@ -285,9 +306,14 @@
           <div class="card mb-3">
             <p class="text-white text-xs font-bold uppercase tracking-wider mb-3">🖨️ Bluetooth Printer</p>
             <p id="printerStatusLine" class="text-[11px] font-bold text-red-400 mb-3">🖨️ NOT CONNECTED</p>
-            <button class="btn-ghost w-full mb-3" onclick="refreshPrinters()">🔄 REFRESH PAIRED PRINTERS</button>
+            <div class="grid grid-cols-2 gap-2 mb-3">
+              <button class="btn-ghost" onclick="refreshPrinters()">🔄 REFRESH PAIRED</button>
+              <button class="btn-ghost" onclick="searchDevices()">🔍 SEARCH PRINTERS</button>
+              <button class="btn-ghost col-span-2" onclick="openBtSettings()">⚙️ OPEN BLUETOOTH SETTINGS</button>
+            </div>
+            <p id="searchStatus" class="text-cyan-300 text-[11px] hidden mb-2">Searching for printers… (12s)</p>
             <div id="printerList"></div>
-            <p id="printerHint" class="text-gray-500 text-[11px] mt-2">Pair your Xprinter first: Phone Settings → Bluetooth → pair device (once only)</p>
+            <p id="printerHint" class="text-gray-500 text-[11px] mt-2">Tap SEARCH PRINTERS — only printers are shown. Tap your printer to connect. If it asks for a PIN, enter 0000 or 1234. Make sure Bluetooth is ON.</p>
             <button class="btn-primary mt-3" onclick="printTest()">🧪 PRINT TEST</button>
           </div>
           <div class="card">
@@ -538,6 +564,9 @@
     let pendingPay = null;
     let paperWidth = 80;
     let invMode = 'all';
+    let invRows = [];
+    let invPage = 1;
+    const INV_PAGE_SIZE = 20;
 
     function toast(msg, type) {
       const t = document.createElement('div');
@@ -715,11 +744,8 @@
     function goInventory(mode) {
       invMode = mode;
       closeBurgerMenu();
-      const titles = { all: 'STOCK', out: 'OUT OF STOCK', low: 'LOW STOCK' };
-      document.getElementById('invTitle').textContent = titles[mode] || 'STOCK';
-      if (mode === 'all') document.getElementById('invSearch').value = '';
       switchTab('inventory');
-      searchInventory();
+      setInvMode(mode);
     }
 
     function goSalesReport() { closeBurgerMenu(); switchTab('sales'); loadSales(); }
@@ -875,30 +901,93 @@
       list.innerHTML = '';
       document.getElementById('printerHint').classList.toggle('hidden', printers.length > 0);
       if (!printers.length) {
-        list.innerHTML = '<p class="text-gray-500 text-xs py-2">No printer found. Make sure your Xprinter is paired in Phone Settings → Bluetooth.</p>';
+        list.innerHTML = '<p class="text-gray-500 text-xs py-2">No printer found. Press SEARCH PRINTERS above to find nearby devices, or pair it first in Bluetooth settings.</p>';
         updatePrinterStatus(false);
         return;
       }
-      printers.forEach(p => {
-        const row = document.createElement('div');
-        row.className = 'printer-row';
-        row.innerHTML = '<div><p class="text-white text-sm font-medium">🖨️ ' + p.name + '</p><p class="text-gray-500 text-[11px]">' + p.address + '</p></div>' +
-          '<button class="text-xs px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium" onclick="connectPrinter(\'' + p.address + '\')">CONNECT</button>';
-        list.appendChild(row);
-      });
+      printers.forEach(p => renderPrinterRow(p, list));
     }
+
+    function renderPrinterRow(p, list) {
+      const row = document.createElement('div');
+      row.className = 'printer-row cursor-pointer';
+      const paired = p.paired || p.bonded;
+      row.innerHTML = '<div><p class="text-white text-sm font-medium">🖨️ ' + p.name + '</p><p class="text-gray-500 text-[11px]">' + p.address + (paired ? '' : ' ⚠️ not paired — tap to pair (PIN 0000/1234)') + '</p></div>' +
+        (paired
+          ? '<span class="text-xs px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium">TAP TO CONNECT</span>'
+          : '<span class="text-xs px-3 py-1.5 rounded-lg bg-amber-600 text-white font-medium">TAP TO PAIR</span>');
+      row.addEventListener('click', () => {
+        if (paired) connectPrinter(p.address);
+        else pairPrinter(p.address);
+      });
+      list.appendChild(row);
+    }
+
+    function searchDevices() {
+      if (!IN_APP) { toast('Search works only in the installed app (APK)', 'error'); return; }
+      const statusEl = document.getElementById('searchStatus');
+      const list = document.getElementById('printerList');
+      statusEl.classList.remove('hidden');
+      list.innerHTML = '<p class="text-gray-500 text-xs py-2">Searching nearby Bluetooth devices… wait ~12 seconds.</p>';
+      try {
+        const found = JSON.parse(AndroidPrinter.searchDevices());
+        statusEl.classList.add('hidden');
+        list.innerHTML = '';
+        document.getElementById('printerHint').classList.toggle('hidden', found.length > 0);
+        if (!found.length) {
+          list.innerHTML = '<p class="text-gray-500 text-xs py-2">No devices found. Check the printer is ON and near the device, then try again.</p>';
+          return;
+        }
+        found.forEach(p => renderPrinterRow(p, list));
+      } catch (e) {
+        statusEl.classList.add('hidden');
+        if (e && e.message && e.message.indexOf('ERR:PERMISSION') >= 0) {
+          list.innerHTML = '<p class="text-orange-400 text-xs py-2">Bluetooth permission needed — tap OPEN BLUETOOTH SETTINGS and allow permissions, then search again.</p>';
+        } else {
+          list.innerHTML = '<p class="text-orange-400 text-xs py-2">Search failed: ' + e.message + '</p>';
+        }
+      }
+    }
+
+    function pairPrinter(address) {
+      if (!IN_APP) { toast('Open the app (APK) to use Bluetooth', 'error'); return; }
+      const result = AndroidPrinter.pairDevice(address);
+      if (result === 'OK') {
+        toast('Pairing… Check the phone for a PIN prompt (0000/1234)');
+        setTimeout(() => refreshPrinters(), 3000);
+      } else {
+        toast(result.replace('ERR:', 'Pairing failed: '), 'error');
+      }
+    }
+
+    function openBtSettings() {
+      if (IN_APP && AndroidApp.openSettings) AndroidApp.openSettings();
+      else toast('Android app needed', 'error');
+    }
+
+    let _connectRetryTimer = null;
 
     function connectPrinter(address) {
       if (!IN_APP) { toast('Open the app (APK) to use Bluetooth', 'error'); return; }
-      const result = AndroidPrinter.connect(address);
-      if (result === 'OK') {
-        updatePrinterStatus(true);
-        localStorage.setItem('wh_printer', address);
-        toast('Printer connected!');
-      } else {
-        updatePrinterStatus(false);
-        toast(result.replace('ERR:', ''), 'error');
-      }
+      clearTimeout(_connectRetryTimer);
+      const statusEl = document.getElementById('printerStatusLine');
+      statusEl.textContent = '🖨️ Connecting… (max ~10s)';
+      statusEl.className = 'text-[11px] font-bold text-amber-400';
+      const doTry = (attempt) => {
+        const result = AndroidPrinter.connect(address);
+        if (result === 'OK') {
+          updatePrinterStatus(true);
+          localStorage.setItem('wh_printer', address);
+          toast('Printer connected!');
+        } else if (attempt < 3) {
+          statusEl.textContent = '🖨️ ' + result.replace('ERR:', '') + ' — retrying (' + attempt + '/3)';
+          _connectRetryTimer = setTimeout(() => doTry(attempt + 1), 5000);
+        } else {
+          updatePrinterStatus(false, 'CONNECTION FAILED');
+          toast('Cannot connect — printer/another app may be busy. Check the printer is ON & not used by another app, or pair again (PIN 0000/1234). Details: ' + result.replace('ERR:', ''), 'error');
+        }
+      };
+      doTry(1);
     }
 
     function printTest() {
@@ -924,12 +1013,12 @@
 
     async function searchProducts() {
       const q = document.getElementById('sellSearch').value.trim();
-      if (!q) return;
+      const box = document.getElementById('productResults');
+      if (!q) { box.innerHTML = ''; return; }
       const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true';
       try {
         const r = await fetch(url);
         const data = await r.json();
-        const box = document.getElementById('productResults');
         box.innerHTML = '';
         (data || []).filter(p => p.isActive !== false).slice(0, 20).forEach(p => {
           const out = Number(p.stockQty) <= 0;
@@ -1142,6 +1231,15 @@
       toast('Cart held');
     }
 
+    function clearCart() {
+      if (!cart.length) { toast('Cart is empty', 'error'); return; }
+      if (!confirm('Clear the cart? ' + cart.length + ' item(s) will be removed.')) return;
+      cart = [];
+      selectedCustomer = null;
+      renderCart();
+      toast('Cart cleared');
+    }
+
     function openHeldCarts() {
       const list = getHeldCarts();
       const box = document.getElementById('heldList');
@@ -1230,7 +1328,7 @@
       const method = document.getElementById('payMethod').value;
       const cash = parseFloat(document.getElementById('payCash').value) || 0;
       if (method === 'Cash' && cash < pendingPay) { toast('Cash must cover the total', 'error'); return; }
-      const items = cart.map(c => ({ productId: c.productId, productName: c.productName, unitIndex: c.unitIndex, qty: c.qty, price: c.price, unitName: c.unitName }));
+      const items = cart.map(c => ({ productId: c.productId, productName: c.productName, unitIndex: c.unitIndex, qty: c.qty, price: c.price, unitName: c.unitName, qtyPerUnit: c.qtyPerUnit || 1 }));
       const body = {
         customerId: selectedCustomer ? selectedCustomer.id : 0,
         customerName: selectedCustomer ? selectedCustomer.name : 'Walk-in Customer',
@@ -1262,32 +1360,41 @@
 
     function buildReceiptText(j, items, method) {
       const W = paperWidth <= 50 ? 32 : 48;
-      const dash = '------------------------------------------------'.slice(0, W);
-      const fit = s => {
+      const hair = '------------------------------------------------'.slice(0, W);
+      const heavy = '================================================'.slice(0, W);
+      const money = n => '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const wrap = (s, max) => {
         const str = String(s);
-        return str.length > W ? str.slice(0, W - 1) + '~' : str;
+        const out = [];
+        let rest = str;
+        while (rest.length > max) { out.push(rest.slice(0, max)); rest = rest.slice(max); }
+        if (rest.length) out.push(rest);
+        return out.length ? out : [''];
       };
       const pad = (label, amount) => {
-        const l = fit(label);
-        const a = fit(amount);
-        const padN = W - l.length - a.length;
-        return padN > 0 ? l + ' '.repeat(padN) + a : l + ' ' + a;
+        const l = String(label).slice(0, W - 16);
+        const a = String(amount).slice(0, 14);
+        const dots = Math.max(2, W - l.length - a.length - 1);
+        return l + '.'.repeat(dots) + a;
       };
-      const money = n => '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       let t = '';
+      t += '\n';
       t += '<<CENTER>>JUMONG POS\n';
-      t += '<<CENTER>>' + fit(session.storeName || '') + '\n';
-      t += '<<CENTER>>Invoice: ' + (j.invoiceNo || j.saleId) + '\n';
-      t += '<<CENTER>>Cashier: ' + fit(session.fullName || session.username) + '\n';
-      t += '<<CENTER>>' + new Date().toLocaleString('en-PH') + '\n';
-      t += dash + '\n';
+      t += '<<CENTER>>' + String(session.storeName || '').slice(0, W) + '\n';
+      t += heavy + '\n';
+      t += 'Invoice : ' + (j.invoiceNo || j.saleId) + '\n';
+      t += 'Cashier : ' + String(session.fullName || session.username || '').slice(0, W) + '\n';
+      t += 'Date    : ' + new Date().toLocaleString('en-PH') + '\n';
+      t += heavy + '\n';
+      t += 'ITEMS  (' + items.length + ')\n';
       items.forEach(c => {
-        t += fit(c.productName) + '\n';
-        const line = fit((c.unitName || 'Piece') + ' x ' + c.qty);
-        const amt = money(c.price * c.qty);
-        t += pad(line, amt) + '\n';
+        const nameLines = wrap(c.productName, W - 2);
+        nameLines.forEach((l, i) => t += (i === 0 ? '' : '  ') + l + '\n');
+        let unitLine = String(c.unitName || 'Piece') + ' x ' + c.qty;
+        if ((c.qtyPerUnit || 1) > 1) unitLine += ' (' + (c.qty * (c.qtyPerUnit || 1)) + 'pcs)';
+        t += pad(unitLine, money(c.price * c.qty)) + '\n';
       });
-      t += dash + '\n';
+      t += hair + '\n';
       t += pad('TOTAL', money(j.grandTotal)) + '\n';
       t += 'PAYMENT: ' + method + '\n';
       const cash = parseFloat(document.getElementById('payCash').value) || 0;
@@ -1295,21 +1402,70 @@
         t += pad('CASH', money(cash)) + '\n';
         t += pad('CHANGE', money(cash - (j.grandTotal || 0))) + '\n';
       }
+      t += heavy + '\n';
       t += '\n';
       t += '<<CENTER>>THANK YOU!\n';
       t += '<<CENTER>>Please come again\n';
+      t += '\n';
       return t;
     }
 
     // ─── INVENTORY ───────────────────────────────────────────
+    function setInvMode(mode) {
+      invMode = mode;
+      const titles = { all: 'STOCK', out: 'OUT OF STOCK', low: 'LOW STOCK' };
+      document.getElementById('invTitle').textContent = titles[mode] || 'STOCK';
+      ['all', 'low', 'out'].forEach(m => {
+        const b = document.getElementById('invBtn' + (m === 'all' ? 'All' : m === 'low' ? 'Low' : 'Out'));
+        if (b) b.classList.toggle('active', m === mode);
+      });
+      searchInventory();
+    }
+
     async function loadInventoryTotals() {
       try {
         const r = await fetch(API + '/dashboard/warehouse/inventory-summary');
         const j = await r.json();
         document.getElementById('invCost').textContent = '₱' + Number(j.totalCost || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         document.getElementById('invGross').textContent = '₱' + Number(j.totalPrice || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        document.getElementById('invItemsLine').textContent = '📦 ' + (j.totalItems || 0) + ' items • ' + (j.totalStockQty || 0) + ' units total';
       } catch (e) { /* totals optional */ }
+    }
+
+    function updateInvModeCounts(data) {
+      const list = (data || []).filter(p => p.isActive !== false);
+      const nStock = list.filter(p => Number(p.stockQty) > 0).length;
+      const nLow = list.filter(p => Number(p.stockQty) > 0 && Number(p.stockQty) <= 10).length;
+      const nOut = list.filter(p => Number(p.stockQty) === 0).length;
+      const a = document.getElementById('invBtnAll'); if (a) a.textContent = 'STOCK · ' + nStock;
+      const l = document.getElementById('invBtnLow'); if (l) l.textContent = 'LOW · ' + nLow;
+      const o = document.getElementById('invBtnOut'); if (o) o.textContent = 'NONE · ' + nOut;
+    }
+
+    function populateInvCatSel(data) {
+      const sel = document.getElementById('invCatSel');
+      if (!sel) return;
+      const cur = sel.value;
+      const cats = [];
+      (data || []).forEach(p => { const c = (p.category || '').trim(); if (c && !cats.includes(c)) cats.push(c); });
+      cats.sort();
+      sel.innerHTML = '<option value="">ALL CATEGORIES</option>' +
+        cats.map(c => '<option value="' + c.replace(/"/g, '&quot;') + '"' + (c === cur ? ' selected' : '') + '>' + c + '</option>').join('');
+    }
+
+    function getInvCatFilter() {
+      const sel = document.getElementById('invCatSel');
+      return sel ? sel.value : '';
+    }
+
+    function invFilterRows(data) {
+      let rows = (data || []).filter(p => p.isActive !== false);
+      const cat = getInvCatFilter();
+      if (cat) rows = rows.filter(p => (p.category || '') === cat);
+      if (invMode === 'all') rows = rows.filter(p => Number(p.stockQty) > 0);
+      else if (invMode === 'out') rows = rows.filter(p => Number(p.stockQty) === 0);
+      else if (invMode === 'low') rows = rows.filter(p => Number(p.stockQty) > 0 && Number(p.stockQty) <= 10);
+      rows.sort((a, b) => (Number(a.stockQty) - Number(b.stockQty)) || String(a.name).localeCompare(String(b.name)));
+      return rows;
     }
 
     async function searchInventory() {
@@ -1319,25 +1475,90 @@
       try {
         const r = await fetch(url);
         const data = await r.json();
-        const box = document.getElementById('invResults');
-        box.innerHTML = '';
-        let rows = (data || []).filter(p => p.isActive !== false);
-        if (invMode === 'out') rows = rows.filter(p => p.stockQty === 0);
-        else if (invMode === 'low') rows = rows.filter(p => p.stockQty > 0 && p.stockQty <= 10);
-        rows.slice(0, 500).forEach(p => {
-          const low = p.stockQty <= 10;
-          const div = document.createElement('div');
-          div.className = 'card';
-          div.innerHTML = '<div class="flex items-center justify-between"><div><p class="text-white text-sm font-bold">' + p.name + '</p>' +
-            '<p class="text-gray-500 text-[11px]">' + (p.barcode || 'no barcode') + (Number(p.boxQty) > 1 ? ' • ' + boxesText(p.stockQty, p.boxQty) : '') + '</p></div>' +
-            '<p class="text-lg font-bold ' + (p.stockQty === 0 ? 'text-red-400' : low ? 'text-orange-400' : 'text-emerald-400') + '">' + p.stockQty + '</p></div>';
-          box.appendChild(div);
-        });
-        if (!rows.length) box.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No products found</p>';
+        updateInvModeCounts(data);
+        populateInvCatSel(data);
+        invRows = invFilterRows(data);
+        invPage = 1;
+        renderInvPage();
       } catch (e) { toast('Failed: ' + e.message, 'error'); }
     }
 
-    // ─── SALES REPORT ────────────────────────────────────────
+    function renderInvPage() {
+      const box = document.getElementById('invResults');
+      box.innerHTML = '';
+      const totalPages = Math.max(1, Math.ceil(invRows.length / INV_PAGE_SIZE));
+      if (invPage > totalPages) invPage = totalPages;
+      const start = (invPage - 1) * INV_PAGE_SIZE;
+      const pageRows = invRows.slice(start, start + INV_PAGE_SIZE);
+      pageRows.forEach(p => {
+        const low = p.stockQty <= 10;
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = '<div class="flex items-center justify-between"><div><p class="text-white text-sm font-bold">' + p.name + '</p>' +
+          '<p class="text-gray-500 text-[11px]">' + (p.barcode || 'no barcode') + (Number(p.boxQty) > 1 ? ' • ' + boxesText(p.stockQty, p.boxQty) : '') + '</p></div>' +
+          '<p class="text-lg font-bold ' + (p.stockQty === 0 ? 'text-red-400' : low ? 'text-orange-400' : 'text-emerald-400') + '">' + p.stockQty + '</p></div>';
+        box.appendChild(div);
+      });
+      if (!invRows.length) box.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No products found</p>';
+      const pager = document.getElementById('invPager');
+      const showPager = invRows.length > INV_PAGE_SIZE;
+      pager.classList.toggle('hidden', !showPager);
+      if (showPager) {
+        document.getElementById('invPageInfo').textContent = 'Page ' + invPage + ' / ' + totalPages + ' · ' + (start + 1) + '–' + Math.min(start + INV_PAGE_SIZE, invRows.length) + ' of ' + invRows.length;
+        document.getElementById('invPrevBtn').classList.toggle('opacity-40', invPage <= 1);
+        document.getElementById('invNextBtn').classList.toggle('opacity-40', invPage >= totalPages);
+      }
+    }
+
+    function invGoTo(delta) {
+      const totalPages = Math.max(1, Math.ceil(invRows.length / INV_PAGE_SIZE));
+      invPage = Math.min(totalPages, Math.max(1, invPage + delta));
+      renderInvPage();
+    }
+
+    async function printInventory() {
+      if (!IN_APP || !AndroidPrinter.isConnected()) { toast('Connect printer first', 'error'); return; }
+      const q = document.getElementById('invSearch').value.trim();
+      const cat = getInvCatFilter();
+      const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true';
+      let data = [];
+      try {
+        const r = await fetch(url);
+        data = await r.json();
+      } catch (e) { toast('Fetch failed: ' + e.message, 'error'); return; }
+      const rows = invFilterRows(data);
+      if (!rows.length) { toast('Nothing to print', 'error'); return; }
+      const W = paperWidth <= 50 ? 32 : 48;
+      const dash = '------------------------------------------------'.slice(0, W);
+      const fit = s => { const str = String(s); return str.length > W ? str.slice(0, W - 1) + '~' : str; };
+      const now = new Date();
+      const catTitle = cat ? cat : 'ALL CATEGORIES';
+      const modeTitle = invMode === 'out' ? 'NO STOCK' : invMode === 'low' ? 'LOW STOCK' : 'STOCK';
+      const lines = [
+        '        JUMONG POS WAREHOUSE',
+        dash,
+        'INVENTORY - ' + fit(modeTitle),
+        'Category: ' + fit(catTitle),
+        'Date: ' + now.toLocaleString('en-PH', { timeZone: 'Asia/Manila' }),
+        'Cashier: ' + (session && (session.fullName || session.username) || '-'),
+        dash
+      ];
+      const rowW = W - 8;
+      lines.push('ITEM'.padEnd(rowW) + 'STOCK' + ' ____');
+      rows.slice(0, 500).forEach(p => {
+        const raw = String(p.name);
+        const nm = raw.length > rowW ? raw.slice(0, rowW - 1) + '~' : raw;
+        lines.push(nm.padEnd(rowW) + String(Number(p.stockQty || 0)).padStart(3) + ' ____');
+      });
+      lines.push(dash);
+      lines.push('TOTAL ITEMS: ' + rows.length);
+      lines.push('TOTAL UNITS: ' + rows.reduce((s, p) => s + Number(p.stockQty || 0), 0));
+      lines.push(dash);
+      lines.push('Thank you!');
+      const pr = AndroidPrinter.print(lines.join('\n'));
+      if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
+      else toast('Inventory printed (' + rows.length + ' items)');
+    }
     let salesDay = 'today';
 
     function setSalesDay(day) {
@@ -1536,7 +1757,45 @@
         d.innerHTML = '<div class="flex-1"><p class="text-white text-xs font-bold">' + u.unitName + (u.isDefault ? ' ★' : '') + '</p><p class="text-gray-500 text-[10px]">' + (u.qtyPerUnit || 1) + ' pc(s)</p></div><p class="text-cyan-400 text-xs font-bold">₱' + Number(u.price || 0).toFixed(2) + '</p>';
         box.appendChild(d);
       });
+      const btn = document.createElement('button');
+      btn.className = 'btn-ghost w-full mt-3';
+      btn.textContent = '📜 STOCK TRAIL';
+      btn.onclick = () => loadStockTrail(x.id, x.name);
+      box.appendChild(btn);
+      const trailBox = document.createElement('div');
+      trailBox.id = 'txTrailBox';
+      trailBox.className = 'space-y-2 mt-2';
+      box.appendChild(trailBox);
       show(document.getElementById('txItemsModal'));
+    }
+
+    function formatType(t) {
+      const map = { manual_receive: 'Receive', manual_return: 'Return', manual_set: 'Manual Set', transfer_out: 'Transfer Out', shortage_return: 'Shortage Return', walkin_sale: 'Walk-in Sale' };
+      return map[t] || String(t || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    async function loadStockTrail(id, name) {
+      const box = document.getElementById('txTrailBox');
+      if (!box) return;
+      box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading trail...</p>';
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/stock-trails?productId=' + id);
+        const data = await r.json();
+        box.innerHTML = '';
+        if (!data || !data.length) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">No stock trail records</p>'; return; }
+        data.forEach(x => {
+          const q = Number(x.qtyChange || 0);
+          const qCls = q < 0 ? 'text-red-400' : 'text-emerald-400';
+          const tCls = x.type === 'transfer_out' ? 'bg-amber-900/30 text-amber-300' : (x.type === 'manual_return' || x.type === 'shortage_return' || x.type === 'walkin_sale' ? 'bg-red-900/30 text-red-300' : 'bg-emerald-900/30 text-emerald-300');
+          const d = document.createElement('div');
+          d.className = 'cart-item';
+          d.innerHTML = '<div class="flex-1 min-w-0"><p class="text-white text-xs font-bold">' + formatType(x.type || '') + '</p>' +
+            '<p class="text-gray-500 text-[10px] truncate">' + (x.reference || x.invoiceNo || '—') + ' • ' + new Date(x.createdAt).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) + '</p></div>' +
+            '<div class="text-right ml-2"><p class="' + qCls + ' text-xs font-bold">' + (q > 0 ? '+' : '') + q + '</p>' +
+            '<p class="text-gray-500 text-[10px]">' + Number(x.stockBefore || 0) + ' → ' + Number(x.stockAfter || 0) + '</p></div>';
+          box.appendChild(d);
+        });
+      } catch (e) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Failed: ' + e.message + '</p>'; }
     }
 
     // ─── ONLINE ORDERS ──────────────────────────────────────
@@ -1656,8 +1915,8 @@
 
     async function searchTxProducts() {
       const q = document.getElementById('txSearch').value.trim();
-      if (!q) { toast('Type a product name or barcode', 'error'); return; }
       const box = document.getElementById('txSearchResults');
+      if (!q) { box.innerHTML = ''; return; }
       box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading...</p>';
       try {
         const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&search=' + encodeURIComponent(q));
@@ -1751,8 +2010,8 @@
 
     async function searchRecvProducts() {
       const q = document.getElementById('recvSearch').value.trim();
-      if (!q) { toast('Search or scan a product', 'error'); return; }
       const box = document.getElementById('recvResults');
+      if (!q) { box.innerHTML = ''; return; }
       box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading...</p>';
       try {
         const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&search=' + encodeURIComponent(q));
@@ -1926,7 +2185,7 @@
         'Ref: ' + fit(lastReceiving.reference.split(' | ')[0]),
         'Source: ' + fit(lastReceiving.source),
         'Date: ' + now.toLocaleString('en-PH', { timeZone: 'Asia/Manila' }),
-        'Cashier: ' + (session && (session.fullName || session.username) || '—'),
+        'Cashier: ' + (session && (session.fullName || session.username) || '-'),
         dash,
         'Qty  Item'
       ];
@@ -1960,7 +2219,7 @@
         rows.forEach(row => {
           const parts = String(row.reference || '').split(' | ');
           const ref = parts[0] || row.reference;
-          const source = parts[1] || '—';
+          const source = parts[1] || '-';
           const d = new Date(row.createdAt);
           const div = document.createElement('div');
           div.className = 'card';
@@ -2135,6 +2394,23 @@
     document.getElementById('passwordInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
     document.getElementById('sellSearch').addEventListener('keydown', e => { if (e.key === 'Enter') searchProducts(); });
     document.getElementById('invSearch').addEventListener('keydown', e => { if (e.key === 'Enter') searchInventory(); });
+
+    // ─── LIVE SEARCH (results while typing) ─────────────────
+    function bindLiveSearch(id, fn, delay) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      let timer = null;
+      el.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(fn, delay || 250);
+      });
+    }
+    bindLiveSearch('sellSearch', searchProducts);
+    bindLiveSearch('invSearch', searchInventory);
+    bindLiveSearch('prodSearch', searchProdList);
+    bindLiveSearch('txSearch', searchTxProducts);
+    bindLiveSearch('recvSearch', searchRecvProducts);
+    bindLiveSearch('custSearch', searchCustomers);
   </script>
 </body>
 </html>

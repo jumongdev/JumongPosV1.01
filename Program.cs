@@ -217,12 +217,13 @@ Stack Trace:
                     Process.Start(psi);
                 }
 
-                // Register agent to auto-start with Windows (on first run or if missing)
+                // Register agent to auto-start with Windows (always rewrite so a
+                // moved POS folder never leaves a stale Run path behind)
                 try
                 {
                     using var reg = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
                         @"Software\Microsoft\Windows\CurrentVersion\Run", writable: true);
-                    if (reg != null && reg.GetValue("JumongPosAgent") == null)
+                    if (reg != null)
                         reg.SetValue("JumongPosAgent", $"\"{agentPath}\"");
                 }
                 catch { }

@@ -1657,7 +1657,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                        COALESCE(mp.cost, wp.box_cost / NULLIF(wp.box_qty, 0), 0) AS cost
                 FROM wh_products wp
                 LEFT JOIN master_products mp ON mp.id = wp.master_product_id
-                WHERE {where} ORDER BY wp.name {(string.IsNullOrEmpty(search) ? "" : "LIMIT 100")}";
+                WHERE {where} ORDER BY wp.name {(string.IsNullOrEmpty(search) ? "" : "LIMIT 500")}";
             if (!string.IsNullOrEmpty(search))
                 cmd.Parameters.AddWithValue("s", $"%{search}%");
             var data = new List<object>();
