@@ -1444,3 +1444,16 @@ Copy JumongWarehouse.apk to JumongCloudAPI\wwwroot\updates\ AND JumongCloudAPI\b
 | DashboardController.cs:1165 | Version bumped to "1.1.9" |
 
 **Impact:** Mobile inventory Cost Value now reflects true per-PC catalog cost (~1.78M instead of 0.83M vs gross 1.82M ~3% margin). Mobile reprint of partially-voided wholesale sales prints only active items with VOID ADJUSTED marker. Requires v1.1.9 API deploy; whmobile.html already deployed live.
+
+### v1.1.10 (Cloud API) + mobile web — Warehouse End Shift (Mobile Only)
+
+| File | Change |
+|---|---|
+| JumongCloudAPI/Controllers/DashboardController.cs:3301-3393 | WhEndShift rewritten — `since` is computed server-side as `MAX(close_date)` from `wh_daily_closes` (no client `Since`); `preview=true` returns totals without INSERT; single shared shift for mobile + POS wholesale (same cash drawer). Response now returns id, totals, saleCount, cashOnHand, difference, expenses, and all denom fields (for instant thermal print). |
+| JumongCloudAPI/Controllers/DashboardController.cs:3690-3715 | WhEndShiftRequest changed: removed `Since`/`CashOnHand`; now `Preview`, `Expenses`, `CashierName`, `Denom1000`, `Denom500`, `Denom200`, `Denom100`, `Denom50`, `Denom20`, `DenomCoins` (cash on hand computed server-side from denominations). |
+| JumongCloudAPI/Controllers/DashboardController.cs:3395-3416 | WhGetShifts now returns denom1000..denom_coins columns for history detail view. |
+| JumongCloudAPI/Data/PgDatabaseHelper.cs:700-709 | Migration: `ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS denom1000/500/200/100/50/20/denom_coins NUMERIC`. |
+| JumongCloudAPI/wwwroot/whmobile.html | **END SHIFT** menu item added (WAREHOUSE section in burger menu). Modal with shift totals card (Total Sales / Sale Count / Cash / E-Wallet / Credit / Voided + Expected Cash), denomination inputs ₱1000/₱500/₱200/₱100/₱50/₱20 counts + Coins with live per-row totals (recalcEndShift), Expenses input, Cash on Hand vs Expected + diff (green OVER / red SHORT), SAVE END SHIFT → confirm dialog → POST → thermal print (printEndShift, denial check) → SHIFT HISTORY (loadShiftHistory) with per-shift detail view. JS verified with node --check. |
+| DashboardController.cs:1165 | Version bumped to "1.1.10" |
+
+**Impact:** Warehouse mobile sellers can close the shift like the POS EndShiftForm — count denominations from the shared cash drawer, see expected cash vs on-hand (short/over), expenses, and print the end-of-shift report. The cloud dashboard does NOT have a UI yet (only API + mobile). Requires v1.1.10 API deploy (run deploy_api.bat as admin; web files are already live).
