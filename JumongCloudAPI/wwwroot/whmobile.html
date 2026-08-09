@@ -1676,6 +1676,7 @@
         const j = await r.json();
         const h = j.header || {};
         const text = buildReceiptTextReprint(h, j.items || []);
+        if (text === null) { toast('All items in this receipt are voided. Nothing to reprint.', 'warning'); return; }
         const pr = AndroidPrinter.print(text);
         if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
         else toast('Receipt re-printed');
@@ -1693,6 +1694,9 @@
       };
       const money = n => '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const dt = new Date(h.createdAt || new Date());
+      const active = (items || []).filter(c => !c.isVoided);
+      const voidedCount = (items || []).length - active.length;
+      if (!active.length) return null;
       let t = '';
       t += '<<CENTER>>JUMONG POS\n';
       t += '<<CENTER>>' + fit(session.storeName || '') + '\n';
@@ -1701,14 +1705,16 @@
       t += '<<CENTER>>' + dt.toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) + '\n';
       if (h.customerName) t += '<<CENTER>>Customer: ' + fit(h.customerName) + '\n';
       t += dash + '\n';
-      (items || []).forEach(c => {
+      active.forEach(c => {
         t += fit(c.productName) + '\n';
         const line = fit((c.unitName || 'Piece') + ' x ' + c.qty);
-        const amt = money(c.price * c.qty);
+        const amt = money(Number(c.subtotal) || (c.price * c.qty));
         t += pad(line, amt) + '\n';
       });
       t += dash + '\n';
-      t += pad('TOTAL', money(h.total)) + '\n';
+      const total = active.reduce((s, c) => s + (Number(c.subtotal) || (c.price * c.qty) || 0), 0);
+      t += pad('TOTAL', money(total)) + '\n';
+      if (voidedCount > 0) t += 'VOID ADJUSTED (' + voidedCount + ' item' + (voidedCount > 1 ? 's' : '') + ' voided)\n';
       t += 'PAYMENT: ' + (h.paymentMethod || 'Cash') + '\n';
       t += '\n';
       t += '<<CENTER>>THANK YOU!\n';

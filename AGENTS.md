@@ -1434,3 +1434,13 @@ Copy JumongWarehouse.apk to JumongCloudAPI\wwwroot\updates\ AND JumongCloudAPI\b
 | Services/AppVersion.cs | Current bumped to "1.1.36". |
 
 **Impact:** Reprint after a partial void on the POS HQ wholesale report now shows the ADJUSTED total (voided item subtotals excluded) with a "REPRINT (VOID ADJUSTED)" banner, matching the POS ReportsForm behavior. Root cause: WhVoidSale only sets is_voided=TRUE (subtotal kept in DB), and the old reprint summed every item's subtotal without the isVoided filter. Client-only change - no cloud API deploy needed.
+
+### v1.1.9 (Cloud API) + mobile web — Inventory Summary PC-Basis Cost + Void-Adjusted Reprint (mobile)
+
+| File | Change |
+|---|---|
+| JumongCloudAPI/Controllers/DashboardController.cs:1726-1733 | WhInventorySummary cost now uses per-PC basis: COALESCE(mp.cost, w.box_cost/NULLIF(w.box_qty,0), 0) * w.stock_qty via LEFT JOIN master_products (was ox_cost/box_qty * stock_qty which understated cost when box_qty was corrected to real carton qty, e.g. Kopiko 125/120=1.04). zero_cost_items now based on COALESCE(mp.cost, w.box_cost). |
+| JumongCloudAPI/wwwroot/whmobile.html | buildReceiptTextReprint(): filters out isVoided items, computes TOTAL from active subtotals (no longer h.total), prints "VOID ADJUSTED (n items voided)" note, returns null when all voided -> reprintSale() shows "Nothing to reprint" toast. Matches POS WholesaleSendForm/PrintWhReceipt behavior. |
+| DashboardController.cs:1165 | Version bumped to "1.1.9" |
+
+**Impact:** Mobile inventory Cost Value now reflects true per-PC catalog cost (~1.78M instead of 0.83M vs gross 1.82M ~3% margin). Mobile reprint of partially-voided wholesale sales prints only active items with VOID ADJUSTED marker. Requires v1.1.9 API deploy; whmobile.html already deployed live.

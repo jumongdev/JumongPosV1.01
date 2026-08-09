@@ -1162,7 +1162,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.1.8" });
+            return Ok(new { version = "1.1.9" });
     }
 
     [HttpPost("crash-report")]
@@ -1726,11 +1726,13 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             cmd.CommandText = @"
                 SELECT
                     COUNT(*)::bigint AS total_items,
-                    COALESCE(SUM(stock_qty), 0)::bigint AS total_stock_qty,
-                    COALESCE(SUM((box_cost / NULLIF(box_qty, 0)) * stock_qty), 0) AS total_cost,
-                    COALESCE(SUM(piece_price * stock_qty), 0) AS total_price,
-                    COUNT(*) FILTER (WHERE box_cost = 0 OR box_cost IS NULL)::bigint AS zero_cost_items
-                FROM wh_products WHERE is_active = true";
+                    COALESCE(SUM(w.stock_qty), 0)::bigint AS total_stock_qty,
+                    COALESCE(SUM(COALESCE(mp.cost, w.box_cost / NULLIF(w.box_qty, 0), 0) * w.stock_qty), 0) AS total_cost,
+                    COALESCE(SUM(w.piece_price * w.stock_qty), 0) AS total_price,
+                    COUNT(*) FILTER (WHERE COALESCE(mp.cost, w.box_cost) = 0 OR COALESCE(mp.cost, w.box_cost) IS NULL)::bigint AS zero_cost_items
+                FROM wh_products w
+                LEFT JOIN master_products mp ON mp.id = w.master_product_id
+                WHERE w.is_active = true";
             using var r = cmd.ExecuteReader();
             if (r.Read()) return Ok(new {
                 totalItems = r.GetInt64(0),
