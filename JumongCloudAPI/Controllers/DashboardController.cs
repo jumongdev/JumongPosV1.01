@@ -3312,6 +3312,12 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 last.Parameters.AddWithValue("min", since);
                 since = Convert.ToDateTime(last.ExecuteScalar());
             }
+            if (since == DateTime.MinValue)
+            {
+                var ph = TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila");
+                var todayPh = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, ph).Date;
+                since = TimeZoneInfo.ConvertTimeToUtc(todayPh, ph);
+            }
 
             using var totals = conn.CreateCommand(); totals.Transaction = tx;
             totals.CommandText = $@"SELECT
