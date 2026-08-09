@@ -929,7 +929,22 @@ Restart-Service JumongCloudAPI
 
 ## Complete Change History (cont.)
 
-### v1.0.85 � QR Code Carousel on POS Sales Screen
+### v1.1.37 (POS) + v1.1.11 (Cloud API) — Void Integrity, End Shift Flow Alignment, Wholesale Method Badges
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **WhVoidSale fixes**: (1) partial void now decrements `wh_walkin_sales.total_amount` so voided amounts are removed from ALL sales computations (summary, end shift, reports) — previously partial-voided amounts stayed in totals; (2) **credit reversal** — voiding a Credit sale now inserts a reversal `credit_transactions` row (type `Void`, credit=voidedAmt) and decrements `customers.credit_balance`; (3) **loyalty points reversal** — voids now deduct `points_earned` from customer. Check query now reads `payment_method` + `customer_id`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | `WhGetSales` now returns `paymentMethod` (COALESCE 'Cash') — feeds the method badges. API version bumped to `"1.1.11"`; agent `latestVer` = `"1.1.37"`. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | **Sales report method badges** — CASH (green) / E-WALLET (blue) / CREDIT (purple) chip per sale card. **VOID** — added ✖ VOID SALE + per-item ✖ VOID buttons in sale items modal (confirm + reason prompt, POST `/warehouse/sales/{id}/void`, reloads). **End Shift gap banner** — amber warning when preview `since` is ≥1 day ago ("kasama ang lahat ng benta mula noon"). |
+| `Forms/WarehouseSellForm.cs` | Wholesale REPORT popup now shows **METHOD column** (parsed from `paymentMethod`) and the printout includes `inv | customer | METHOD | date`. |
+| `Forms/EndShiftForm.cs` | **PRINT button REMOVED** — printing now only via auto-print after SAVE, or 📋 HISTORY reprint (prevents HVR-style "printed but never saved" 2-day-gap closes). EMAIL moved to x=115. Added `WarnIfShiftGap()` on load — amber date warning + MessageBox when last close is ≥1 day ago (2-day window visibility). |
+| `JumongCloudAPI/wwwroot/components.js`, `index.html` | Inventory Cost Report rows now show **⚠ 2-DAY WINDOW badge** when consecutive closes for a store are ≥2 days apart (per-store prev-date tracking). ("NO CLOSE TODAY" alert already existed via `missingShifts`.) |
+| `Services/AppVersion.cs` | Bumped to `"1.1.37"`. |
+| — | Voided wholesale sales remain EXCLUDED from gross/total sales computations per store policy (user-confirmed: "dapat hindi"). Verified stock restore on void is correct (`stock_deduction` pc-sqty, `void_return` trail, item/header `is_voided` flags, transactional). |
+
+**Impact:** Voiding a wholesale sale (full or partial) now fully reverses stock, money (credit balance for credit sales), and loyalty points; partially voided sales no longer inflate shift/sales totals. POS end shift can no longer be "printed but never saved" — eliminates the HVR Aug 8 missing-close scenario. Method badges visible on mobile + POS wholesale report + dashboard. Deploy: `deploy_api.bat` (admin) for API; web copy `whmobile.html`/`components.js`/`index.html` → `C:\JumongAPI\wwwroot\` + `publish\wwwroot\`; client publish → `C:\JumongAPI\client\`; stores via UPDATE APP.
+
+### v1.0.85 QR Code Carousel on POS Sales Screen
 
 | File | Change |
 |---|---|

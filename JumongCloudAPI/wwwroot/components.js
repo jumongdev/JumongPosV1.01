@@ -1146,6 +1146,7 @@ Alpine.store('app', {
         // Sort ascending by date for proper expected calculation
         const sorted = [...raw].sort((a, b) => new Date(a.closeDate) - new Date(b.closeDate));
         var prevInvByStore = {};
+        var prevDateByStore = {};
         for (var i = 0; i < sorted.length; i++) {
           var x = sorted[i];
           var ic = x.totalInventoryCost || 0;
@@ -1155,7 +1156,10 @@ Alpine.store('app', {
           x.prevInvCost = prevInvCost;
           x.expected = prevInvCost + sr - cs;
           x.variance = ic - x.expected;
+          var prevDate = prevDateByStore[x.storeId];
+          x.gapDays = prevDate ? Math.round((new Date(x.closeDate) - prevDate) / 86400000) : 0;
           prevInvByStore[x.storeId] = ic;
+          prevDateByStore[x.storeId] = new Date(x.closeDate);
         }
         // Sort back to descending for display
         this.d = sorted.sort((a, b) => new Date(b.closeDate) - new Date(a.closeDate));

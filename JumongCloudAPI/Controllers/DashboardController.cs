@@ -1162,7 +1162,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.1.10" });
+            return Ok(new { version = "1.1.11" });
     }
 
     [HttpPost("crash-report")]
@@ -2959,7 +2959,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     {
         using var conn = Data.PgDatabaseHelper.GetConnection();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT s.id, s.customer_name, s.total_amount, s.item_count, s.created_at, COALESCE(s.is_voided, FALSE), COALESCE(s.invoice_no, '') FROM wh_walkin_sales s WHERE 1=1";
+        cmd.CommandText = "SELECT s.id, s.customer_name, s.total_amount, s.item_count, s.created_at, COALESCE(s.is_voided, FALSE), COALESCE(s.invoice_no, ''), COALESCE(s.payment_method, 'Cash') FROM wh_walkin_sales s WHERE 1=1";
         if (!string.IsNullOrEmpty(from) && DateTime.TryParse(from, out var fromDate)) { cmd.CommandText += " AND s.created_at >= @from"; cmd.Parameters.AddWithValue("from", fromDate); }
         if (!string.IsNullOrEmpty(to) && DateTime.TryParse(to, out var toDate)) { cmd.CommandText += " AND s.created_at <= @to"; cmd.Parameters.AddWithValue("to", toDate.Date.AddDays(1)); }
         cmd.CommandText += " ORDER BY s.created_at DESC LIMIT " + limit;
@@ -2969,7 +2969,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         while (r.Read())
         {
             var saleId = r.GetInt32(0);
-            list.Add(new { id = saleId, customerName = r.GetString(1), total = r.GetDecimal(2), itemCount = r.GetInt32(3), createdAt = r.GetDateTime(4), isVoided = r.GetBoolean(5), invoiceNo = r.IsDBNull(6) ? "" : r.GetString(6) });
+            list.Add(new { id = saleId, customerName = r.GetString(1), total = r.GetDecimal(2), itemCount = r.GetInt32(3), createdAt = r.GetDateTime(4), isVoided = r.GetBoolean(5), invoiceNo = r.IsDBNull(6) ? "" : r.GetString(6), paymentMethod = r.IsDBNull(7) ? "Cash" : r.GetString(7) });
         }
         return Ok(list);
     }
@@ -3055,7 +3055,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         {
             string invoiceNo = "";
             using var chk = conn.CreateCommand(); chk.Transaction = tx;
-            chk.CommandText = "SELECT is_voided, COALESCE(invoice_no, ''), customer_name, total_amount FROM wh_walkin_sales WHERE id = @id";
+            chk.CommandText = "SELECT is_voided, COALESCE(invoice_no, ''), customer_name, total_amount, COALESCE(payment_method, 'Cash'), COALESCE(customer_id, 0) FROM wh_walkin_sales WHERE id = @id";
             chk.Parameters.AddWithValue("id", id);
             using var cr = chk.ExecuteReader();
             if (!cr.Read()) return NotFound(new { error = "Sale not found" });
@@ -3063,6 +3063,8 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             invoiceNo = cr.GetString(1);
             var custName = cr.IsDBNull(2) ? "" : cr.GetString(2);
             var totalAmt = cr.GetDecimal(3);
+            var paymentMethod = cr.IsDBNull(4) ? "Cash" : cr.GetString(4);
+            var customerId = cr.IsDBNull(5) ? 0 : cr.GetInt32(5);
             cr.Close();
 
             var isPartial = req?.Items != null && req.Items.Count > 0;
@@ -3072,17 +3074,18 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     if (vi.ItemId > 0) voidItemIds.Add(vi.ItemId);
 
             using var items = conn.CreateCommand(); items.Transaction = tx;
-            items.CommandText = "SELECT id, product_id, product_name, stock_deduction, qty, price FROM wh_walkin_sale_items WHERE sale_id = @sid AND COALESCE(is_voided, FALSE) = FALSE";
+            items.CommandText = "SELECT id, product_id, product_name, stock_deduction, qty, price, COALESCE(points_earned, 0) FROM wh_walkin_sale_items WHERE sale_id = @sid AND COALESCE(is_voided, FALSE) = FALSE";
             items.Parameters.AddWithValue("sid", id);
             using var r = items.ExecuteReader();
-            var allItems = new List<(int itemId, int pid, string pname, int dedQty, int qty, decimal price)>();
+            var allItems = new List<(int itemId, int pid, string pname, int dedQty, int qty, decimal price, int pts)>();
             while (r.Read())
-                allItems.Add((r.GetInt32(0), r.GetInt32(1), r.GetString(2), r.GetInt32(3), r.GetInt32(4), r.GetDecimal(5)));
+                allItems.Add((r.GetInt32(0), r.GetInt32(1), r.GetString(2), r.GetInt32(3), r.GetInt32(4), r.GetDecimal(5), r.GetInt32(6)));
             r.Close();
 
             int voidedCount = 0;
             decimal voidedAmt = 0;
-            foreach (var (itemId, pid, pname, dedQty, qty, price) in allItems)
+            int voidedPoints = 0;
+            foreach (var (itemId, pid, pname, dedQty, qty, price, pts) in allItems)
             {
                 if (isPartial && !voidItemIds.Contains(itemId)) continue;
 
@@ -3120,6 +3123,45 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
 
                 voidedCount++;
                 voidedAmt += price * qty;
+                voidedPoints += pts;
+            }
+
+            if (isPartial && voidedAmt > 0)
+            {
+                using var updH = conn.CreateCommand(); updH.Transaction = tx;
+                updH.CommandText = "UPDATE wh_walkin_sales SET total_amount = total_amount - @amt WHERE id = @id";
+                updH.Parameters.AddWithValue("amt", voidedAmt);
+                updH.Parameters.AddWithValue("id", id);
+                updH.ExecuteNonQuery();
+            }
+
+            if (customerId > 0 && voidedAmt > 0 && string.Equals(paymentMethod, "Credit", StringComparison.OrdinalIgnoreCase))
+            {
+                using var cb = conn.CreateCommand(); cb.Transaction = tx;
+                cb.CommandText = "UPDATE customers SET credit_balance = COALESCE(credit_balance, 0) - @amt WHERE id = @cid";
+                cb.Parameters.AddWithValue("amt", voidedAmt);
+                cb.Parameters.AddWithValue("cid", customerId);
+                cb.ExecuteNonQuery();
+
+                using var ct = conn.CreateCommand(); ct.Transaction = tx;
+                ct.CommandText = @"INSERT INTO credit_transactions (pos_id, store_id, customer_id, sale_id, type, description, debit, credit, balance, payment_method, user_name, created_at, synced_at)
+                    VALUES (@pos, '', @cid, @sid, 'Void', @desc, 0, @amt, (SELECT COALESCE(credit_balance, 0) FROM customers WHERE id = @cid), 'Credit', @un, NOW(), NOW())";
+                ct.Parameters.AddWithValue("pos", id);
+                ct.Parameters.AddWithValue("cid", customerId);
+                ct.Parameters.AddWithValue("sid", id);
+                ct.Parameters.AddWithValue("desc", $"Void Invoice {invoiceNo} - {voidedCount} item(s)");
+                ct.Parameters.AddWithValue("amt", voidedAmt);
+                ct.Parameters.AddWithValue("un", req?.UserName ?? "");
+                ct.ExecuteNonQuery();
+            }
+
+            if (customerId > 0 && voidedPoints > 0)
+            {
+                using var pt = conn.CreateCommand(); pt.Transaction = tx;
+                pt.CommandText = "UPDATE customers SET loyalty_points = COALESCE(loyalty_points, 0) - @pts WHERE id = @cid";
+                pt.Parameters.AddWithValue("pts", voidedPoints);
+                pt.Parameters.AddWithValue("cid", customerId);
+                pt.ExecuteNonQuery();
             }
 
             if (!isPartial)
@@ -3530,7 +3572,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         [HttpGet("agent/status")]
         public IActionResult AgentStatus()
         {
-            var latestVer = "1.1.11";
+            var latestVer = "1.1.37";
             var list = _agents.Select(a => new { storeId = a.Key, lastSeen = a.Value.lastSeen, ip = a.Value.ip, machine = a.Value.machine, appVersion = a.Value.appVersion, outdated = string.Compare(latestVer, a.Value.appVersion ?? "", StringComparison.Ordinal) > 0, hasError = a.Value.hasError, errorSummary = a.Value.errorSummary }).OrderBy(a => a.storeId);
             return Ok(list);
         }

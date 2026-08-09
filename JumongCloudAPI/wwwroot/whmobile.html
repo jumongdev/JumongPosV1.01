@@ -447,6 +447,7 @@
         </div>
         <div id="saleItemsList" class="space-y-2"></div>
         <button onclick="reprintSale()" class="w-full mt-4 bg-cyan-600 text-white text-sm font-bold py-3 rounded-xl active:scale-[.98]">🖨️ REPRINT RECEIPT</button>
+        <button onclick="voidFullSale()" class="w-full mt-2 bg-red-600 text-white text-sm font-bold py-3 rounded-xl active:scale-[.98]">✖ VOID SALE</button>
       </div>
     </div>
 
@@ -495,6 +496,7 @@
         </div>
 
         <!-- shift totals (preview) -->
+        <div id="esGapBanner" class="hidden mb-3 bg-amber-900/40 border border-amber-600/60 text-amber-300 text-[11px] font-bold rounded-lg px-3 py-2">⚠ <span id="esGapText"></span></div>
         <div class="card mb-3" id="esTotalsCard">
           <p class="text-[10px] text-[#5a5a8a] uppercase tracking-wider font-bold mb-2">Shift Summary (since last close)</p>
           <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
@@ -1671,8 +1673,11 @@
         rows.forEach(x => {
           const dt = new Date(x.createdAt);
           const div = document.createElement('div');
+          const pm = (x.paymentMethod || 'Cash').toUpperCase();
+          const pmCls = pm === 'E-WALLET' ? 'bg-blue-900/60 text-blue-300' : pm === 'CREDIT' ? 'bg-purple-900/60 text-purple-300' : 'bg-[#0c4a2d] text-emerald-300';
           div.className = 'card';
-          div.innerHTML = '<div class="flex items-center justify-between" onclick="loadSaleItems(' + x.id + ',\'' + String(x.invoiceNo || x.id).replace(/'/g, '') + '\')"><div><p class="text-white text-sm font-bold">' + (x.invoiceNo || ('#' + x.id)) + '</p>' +
+          div.innerHTML = '<div class="flex items-center justify-between" onclick="loadSaleItems(' + x.id + ',\'' + String(x.invoiceNo || x.id).replace(/'/g, '') + '\')"><div><p class="text-white text-sm font-bold">' + (x.invoiceNo || ('#' + x.id)) +
+            ' <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ' + pmCls + '">' + pm + '</span></p>' +
             '<p class="text-gray-500 text-[11px]">' + (x.customerName || 'Walk-in Customer') + ' • ' + dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) + '</p></div>' +
             '<p class="text-cyan-400 text-sm font-bold">₱' + Number(x.total || 0).toFixed(2) + '</p></div>';
           list.appendChild(div);
@@ -1710,7 +1715,8 @@
           div.className = 'cart-item';
           div.innerHTML = '<div class="flex-1"><p class="text-white text-xs font-bold' + (it.isVoided ? ' line-through text-gray-500' : '') + '">' + (it.productName || 'Item') + '</p>' +
             '<p class="text-gray-500 text-[10px]">' + (it.unitName || '') + ' x' + it.qty + (it.isVoided ? ' (voided)' : '') + '</p></div>' +
-            '<p class="text-cyan-400 text-xs font-bold">₱' + Number(it.subtotal || 0).toFixed(2) + '</p>';
+            '<p class="text-cyan-400 text-xs font-bold">₱' + Number(it.subtotal || 0).toFixed(2) + '</p>' +
+            (it.isVoided ? '' : '<button onclick="event.stopPropagation();voidItem(' + it.id + ')" class="ml-2 text-red-400 text-[10px] font-bold px-2 py-1 rounded bg-red-900/30">✖</button>');
           box.appendChild(div);
         });
         if (!items || !items.length) box.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No items</p>';
@@ -1719,6 +1725,40 @@
     }
 
     let currentSaleId = null;
+    async function voidItem(itemId) {
+      if (!currentSaleId) { toast('No sale selected', 'error'); return; }
+      const reason = prompt('Reason for voiding this item?', '') || '';
+      if (!confirm('Void this item? Stock will be returned to the warehouse.')) return;
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/sales/' + currentSaleId + '/void', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason, userName: session.fullName || session.username || '', items: [{ itemId: itemId }] })
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { toast(j.error || 'Void failed', 'error'); return; }
+        toast('Item voided — stock restored');
+        loadSaleItems(currentSaleId, document.getElementById('saleItemsTitle').textContent.replace('SALE ', ''));
+      } catch (e) { toast('Void failed: ' + e.message, 'error'); }
+    }
+
+    async function voidFullSale() {
+      if (!currentSaleId) { toast('No sale selected', 'error'); return; }
+      const reason = prompt('Reason for void?', '') || '';
+      if (!confirm('Void this entire sale? All items\' stock will be returned to the warehouse.')) return;
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/sales/' + currentSaleId + '/void', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason, userName: session.fullName || session.username || '' })
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { toast(j.error || 'Void failed', 'error'); return; }
+        toast('Sale voided — stock restored');
+        closeSaleItems();
+        loadSales();
+      } catch (e) { toast('Void failed: ' + e.message, 'error'); }
+    }
     async function reprintSale() {
       if (!currentSaleId) { toast('No sale selected', 'error'); return; }
       if (!IN_APP || !AndroidPrinter.isConnected()) { toast('Connect printer first', 'error'); return; }
@@ -2531,6 +2571,17 @@
         document.getElementById('esTotalCredit').textContent = fmtMoney(p.totalCredit);
         document.getElementById('esTotalVoided').textContent = fmtMoney(p.totalVoided);
         document.getElementById('esExpectedCash').textContent = fmtMoney(p.totalCash);
+        const gapEl = document.getElementById('esGapBanner');
+        if (p.since) {
+          const sinceUtc = new Date(p.since);
+          const nowPh = new Date();
+          const nowUtc = new Date(nowPh.toISOString());
+          const gapDays = Math.floor((nowUtc.getTime() - sinceUtc.getTime()) / 86400000);
+          if (gapDays >= 1) {
+            document.getElementById('esGapText').textContent = 'Huling end shift: ' + sinceUtc.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) + ' — kasama ang lahat ng benta mula noon (' + gapDays + ' day' + (gapDays > 1 ? 's' : '') + ' window).';
+            gapEl.classList.remove('hidden');
+          } else { gapEl.classList.add('hidden'); }
+        } else { gapEl.classList.add('hidden'); }
         recalcEndShift();
       } catch (e) { toast('Failed to load shift: ' + e.message, 'error'); }
     }

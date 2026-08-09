@@ -1518,7 +1518,8 @@ public class WarehouseSellForm : Form
             dgv.Columns.Add("Items", "Items"); dgv.Columns[3].FillWeight = 8; dgv.Columns[3].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
             dgv.Columns.Add("Total", "Total"); dgv.Columns[4].FillWeight = 14; dgv.Columns[4].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
             dgv.Columns.Add("Date", "Date"); dgv.Columns[5].FillWeight = 16;
-            dgv.Columns.Add("Voided", "Voided"); dgv.Columns[6].FillWeight = 7; dgv.Columns[6].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dgv.Columns.Add("Method", "Method"); dgv.Columns[6].FillWeight = 10;
+            dgv.Columns.Add("Voided", "Voided"); dgv.Columns[7].FillWeight = 7; dgv.Columns[7].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
 
             var pnlBottom = new Panel { Dock = DockStyle.Bottom, Height = 36, BackColor = CCard };
             var btnClose = new Button { Text = "CLOSE", Location = new Point(popup.ClientSize.Width - 100, 4), Size = new Size(80, 28), Anchor = AnchorStyles.Right, FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = CCard, ForeColor = CTextMuted, Cursor = Cursors.Hand };
@@ -1544,7 +1545,8 @@ public class WarehouseSellForm : Form
                         var items = s.TryGetProperty("itemCount", out var ic) ? ic.GetInt32() : 0;
                         var dt = s.GetProperty("createdAt").GetDateTime().ToString("MMM dd hh:mm tt");
                         var isVoided = s.TryGetProperty("isVoided", out var iv) && iv.GetBoolean();
-                        dgv.Rows.Add(sid, inv, cn, items, total, dt, isVoided ? "✔" : "");
+                        var pm = s.TryGetProperty("paymentMethod", out var pmt) ? pmt.GetString() ?? "Cash" : "Cash";
+                        dgv.Rows.Add(sid, inv, cn, items, total, dt, pm, isVoided ? "✔" : "");
                     }
 
                     var sumJson = await _http.GetStringAsync(baseUrl + "/summary?from=" + from + "&to=" + to);
@@ -1579,8 +1581,9 @@ public class WarehouseSellForm : Form
                     var cn = row.Cells[2].Value?.ToString() ?? "";
                     var total = row.Cells[4].Value is decimal d ? d.ToString("N2") : "0.00";
                     var dt = row.Cells[5].Value?.ToString() ?? "";
-                    lines.AppendLine(inv + " | " + cn + " | " + dt);
-                    lines.AppendLine("    Total: ₱" + total + (row.Cells[6].Value?.ToString() == "✔" ? "  [VOIDED]" : ""));
+                    var pm = row.Cells[6].Value?.ToString() ?? "Cash";
+                    lines.AppendLine(inv + " | " + cn + " | " + pm + " | " + dt);
+                    lines.AppendLine("    Total: ₱" + total + (row.Cells[7].Value?.ToString() == "✔" ? "  [VOIDED]" : ""));
                 }
                 PrinterService.PrintRawText(lines.ToString());
             };

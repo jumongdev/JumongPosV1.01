@@ -351,26 +351,7 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
         return audit;
     }
 
-    private void btnPrintReport_Click(object? sender, EventArgs e)
-{
-    var cashierName = string.IsNullOrEmpty(_currentUser.FullName) ? _currentUser.Username : _currentUser.FullName;    var cashOnHand = (int)num1000.Value * 1000m + (int)num500.Value * 500m + (int)num200.Value * 200m + (int)num100.Value * 100m + (int)num50.Value * 50m + (int)num20.Value * 20m + txtCoins.Value;
-    
-    LoadTotals();
-    
-    var diff = cashOnHand + _totalExpenses - _totalCash - _creditPayCash - _openingBalance;
-    
-    var expenses = ExpenseService.GetExpensesForCurrentShift();
-    var gcashTxns = DailyCloseService.GetGcashTransactionsSinceLastClose();
-    var creditCustomers = DailyCloseService.GetCreditCustomersSinceLastClose();
-    var creditPayments = DailyCloseService.GetCreditPaymentsSinceLastClose();
-    var totalInvCost = 0m;
-    try { using var invConn = DatabaseHelper.GetConnection(); invConn.Open(); using var invCmd = new System.Data.SQLite.SQLiteCommand("SELECT COALESCE(SUM(StockQty * Cost), 0) FROM Products", invConn); totalInvCost = Convert.ToDecimal(invCmd.ExecuteScalar()); } catch { }
-        PrinterService.PrintAuditEndShiftReport(cashOnHand, diff, cashierName, TimeHelper.Now, txtNotes.Text.Trim(), _totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, expenses, gcashTxns, creditCustomers, creditPayments,
-            (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value,
-            totalInvCost, _totalCostSold, _totalStockReceivedCost, DailyCloseService.GetLastInventoryCost());
-}
-
-private void btnEmail_Click(object? sender, EventArgs e)
+    private void btnEmail_Click(object? sender, EventArgs e)
 {
     var cashierName = string.IsNullOrEmpty(_currentUser.FullName) ? _currentUser.Username : _currentUser.FullName;
     var cashOnHand = (int)num1000.Value * 1000m + (int)num500.Value * 500m + (int)num200.Value * 200m + (int)num100.Value * 100m + (int)num50.Value * 50m + (int)num20.Value * 20m + txtCoins.Value;
@@ -537,6 +518,31 @@ private void btnEmail_Click(object? sender, EventArgs e)
         LoadTotals();
     }
 
+    private void WarnIfShiftGap()
+    {
+        try
+        {
+            using var conn = DatabaseHelper.GetConnection();
+            conn.Open();
+            using var cmd = new System.Data.SQLite.SQLiteCommand("SELECT MAX(CloseDate) FROM DailyClose", conn);
+            var val = cmd.ExecuteScalar();
+            if (val is string s && DateTime.TryParse(s, out var last))
+            {
+                var now = TimeHelper.Now;
+                var gapDays = (now.Date - last.Date).Days;
+                if (gapDays >= 1)
+                {
+                    lblDate.ForeColor = Color.FromArgb(255, 180, 60);
+                    lblDate.Text = $"⚠ Last close: {last:MMM dd, hh:mm tt} ({gapDays} day{(gapDays > 1 ? "s" : "")} ago)";
+                    MessageBox.Show($"Previous end shift: {last:MMMM dd, yyyy hh:mm tt} ({gapDays} day{(gapDays > 1 ? "s" : "")} ago).",
+                        "Gap Shift Warning",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+        }
+        catch { }
+    }
+
     private void InitializeComponent()
     {
         var t = ThemeManager.Current;
@@ -620,17 +626,15 @@ private void btnEmail_Click(object? sender, EventArgs e)
         btnHistory.Click += btnHistory_Click;
         btnExpenses = new Button { Text = "\uD83D\uDCB8 EXPENSES", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(0, 45), Size = new Size(110, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentOrange, ForeColor = Color.White, Cursor = Cursors.Hand };
         btnExpenses.Click += btnExpenses_Click;
-        btnPrintReport = new Button { Text = "\uD83D\uDDA8\uFE0F PRINT", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(115, 45), Size = new Size(110, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = t.AccentBlue, ForeColor = Color.White, Cursor = Cursors.Hand };
-        btnPrintReport.Click += btnPrintReport_Click;
-        btnEmail = new Button { Text = "\uD83D\uDCE7 EMAIL", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(230, 45), Size = new Size(100, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentPurple, ForeColor = Color.White, Cursor = Cursors.Hand };
+        btnEmail = new Button { Text = "\uD83D\uDCE7 EMAIL", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(115, 45), Size = new Size(100, 34), FlatStyle = FlatStyle.Flat, FlatAppearance = { BorderSize = 0 }, BackColor = accentPurple, ForeColor = Color.White, Cursor = Cursors.Hand };
         btnEmail.Click += btnEmail_Click;
-        pnlActions.Controls.AddRange(new Control[] { lblNotesLabel, txtNotes, btnClose, btnHistory, btnExpenses, btnPrintReport, btnEmail });
+        pnlActions.Controls.AddRange(new Control[] { lblNotesLabel, txtNotes, btnClose, btnHistory, btnExpenses, btnEmail });
 
         pnlMain.Controls.AddRange(new Control[] { pnlSummary, pnlDenom, pnlActions });
         Controls.Clear();
         Controls.AddRange(new Control[] { pnlMain, pnlToolbar });
 
-        Shown += (_, _) => ResizeLayout(pnlSummary, pnlDenom, pnlActions);
+        Shown += (_, _) => { ResizeLayout(pnlSummary, pnlDenom, pnlActions); WarnIfShiftGap(); };
         Resize += (_, _) => ResizeLayout(pnlSummary, pnlDenom, pnlActions);
     }
 
@@ -699,5 +703,5 @@ private void btnEmail_Click(object? sender, EventArgs e)
     private NumericUpDown num1000 = null!, num500 = null!, num200 = null!, num100 = null!, num50 = null!, num20 = null!;
     private NumericUpDown txtCoins = null!;
     private TextBox txtNotes = null!;
-    private Button btnClose = null!, btnHistory = null!, btnPrintReport = null!, btnEmail = null!, btnExpenses = null!;
+    private Button btnClose = null!, btnHistory = null!, btnEmail = null!, btnExpenses = null!;
 }
