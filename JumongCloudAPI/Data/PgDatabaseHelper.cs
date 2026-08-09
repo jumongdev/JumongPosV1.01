@@ -699,6 +699,17 @@ public static class PgDatabaseHelper
             )";
         try { whDcMig.ExecuteNonQuery(); } catch { }
 
+        using var whDcDenoms = conn.CreateCommand();
+        whDcDenoms.CommandText = @"
+            ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS denom1000 NUMERIC NOT NULL DEFAULT 0;
+            ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS denom500 NUMERIC NOT NULL DEFAULT 0;
+            ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS denom200 NUMERIC NOT NULL DEFAULT 0;
+            ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS denom100 NUMERIC NOT NULL DEFAULT 0;
+            ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS denom50 NUMERIC NOT NULL DEFAULT 0;
+            ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS denom20 NUMERIC NOT NULL DEFAULT 0;
+            ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS denom_coins NUMERIC NOT NULL DEFAULT 0";
+        try { whDcDenoms.ExecuteNonQuery(); } catch { }
+
         using var raMig = conn.CreateCommand();
         raMig.CommandText = @"
             CREATE TABLE IF NOT EXISTS receipt_audits (

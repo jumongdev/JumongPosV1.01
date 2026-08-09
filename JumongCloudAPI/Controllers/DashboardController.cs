@@ -1162,7 +1162,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.1.9" });
+            return Ok(new { version = "1.1.10" });
     }
 
     [HttpPost("crash-report")]
@@ -3299,18 +3299,18 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     }
 
     [HttpPost("warehouse/end-shift")]
-    public IActionResult WhEndShift([FromBody] WhEndShiftRequest req)
+    public IActionResult WhEndShift([FromBody] WhEndShiftRequest? req)
     {
+        if (req == null) req = new WhEndShiftRequest();
         using var conn = Data.PgDatabaseHelper.GetConnection();
         using var tx = conn.BeginTransaction();
         try
         {
-            var sinceSql = "1=1";
-            if (!string.IsNullOrEmpty(req.Since))
-            {
-                sinceSql = "created_at > @since";
-                using var p = conn.CreateCommand(); p.Transaction = tx;
-                p.CommandText = "SELECT 1"; p.Parameters.AddWithValue("since", ""); // dummy
+            var since = DateTime.MinValue;
+            using (var last = conn.CreateCommand()) { last.Transaction = tx;
+                last.CommandText = "SELECT COALESCE(MAX(close_date), @min) FROM wh_daily_closes";
+                last.Parameters.AddWithValue("min", since);
+                since = Convert.ToDateTime(last.ExecuteScalar());
             }
 
             using var totals = conn.CreateCommand(); totals.Transaction = tx;
@@ -3321,9 +3321,8 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 COALESCE(SUM(CASE WHEN COALESCE(is_voided, FALSE) = FALSE AND payment_method = 'Credit' THEN total_amount ELSE 0 END), 0) AS total_credit,
                 COALESCE(SUM(CASE WHEN COALESCE(is_voided, FALSE) = TRUE THEN total_amount ELSE 0 END), 0) AS total_voided,
                 COUNT(*) FILTER (WHERE COALESCE(is_voided, FALSE) = FALSE) AS sale_count
-                FROM wh_walkin_sales WHERE {sinceSql}";
-            if (!string.IsNullOrEmpty(req.Since))
-                totals.Parameters.AddWithValue("since", req.Since);
+                FROM wh_walkin_sales WHERE created_at >= @since";
+            totals.Parameters.AddWithValue("since", since);
 
             using var tr = totals.ExecuteReader();
             tr.Read();
@@ -3331,23 +3330,36 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             var totalCredit = tr.GetDecimal(3); var totalVoided = tr.GetDecimal(4); var saleCount = tr.GetInt32(5);
             tr.Close();
 
-            var diff = req.CashOnHand - totalCash;
+            if (req.Preview)
+                return Ok(new { preview = true, since, totalSales, totalCash, totalEw, totalCredit, totalVoided, saleCount });
+
+            var cashOnHand = req.Denom1000 * 1000m + req.Denom500 * 500m + req.Denom200 * 200m + req.Denom100 * 100m
+                + req.Denom50 * 50m + req.Denom20 * 20m + req.DenomCoins;
+            var diff = cashOnHand - totalCash;
+
             using var ins = conn.CreateCommand(); ins.Transaction = tx;
-            ins.CommandText = @"INSERT INTO wh_daily_closes (close_date, total_sales, total_cash, total_ewallet, total_credit, total_voided, cash_on_hand, difference, expenses, cashier_name)
-                VALUES (NOW(), @ts, @tc, @te, @tcr, @tv, @ch, @d, @ex, @cn) RETURNING id";
+            ins.CommandText = @"INSERT INTO wh_daily_closes (close_date, total_sales, total_cash, total_ewallet, total_credit, total_voided, cash_on_hand, difference, expenses, cashier_name, denom1000, denom500, denom200, denom100, denom50, denom20, denom_coins)
+                VALUES (NOW(), @ts, @tc, @te, @tcr, @tv, @ch, @d, @ex, @cn, @d1000, @d500, @d200, @d100, @d50, @d20, @dcoins) RETURNING id";
             ins.Parameters.AddWithValue("ts", totalSales);
             ins.Parameters.AddWithValue("tc", totalCash);
             ins.Parameters.AddWithValue("te", totalEw);
             ins.Parameters.AddWithValue("tcr", totalCredit);
             ins.Parameters.AddWithValue("tv", totalVoided);
-            ins.Parameters.AddWithValue("ch", req.CashOnHand);
+            ins.Parameters.AddWithValue("ch", cashOnHand);
             ins.Parameters.AddWithValue("d", diff);
             ins.Parameters.AddWithValue("ex", req.Expenses ?? 0);
             ins.Parameters.AddWithValue("cn", req.CashierName ?? "");
+            ins.Parameters.AddWithValue("d1000", req.Denom1000);
+            ins.Parameters.AddWithValue("d500", req.Denom500);
+            ins.Parameters.AddWithValue("d200", req.Denom200);
+            ins.Parameters.AddWithValue("d100", req.Denom100);
+            ins.Parameters.AddWithValue("d50", req.Denom50);
+            ins.Parameters.AddWithValue("d20", req.Denom20);
+            ins.Parameters.AddWithValue("dcoins", req.DenomCoins);
             var dcId = Convert.ToInt32(ins.ExecuteScalar());
 
             tx.Commit();
-            return Ok(new { id = dcId, totalSales, totalCash, totalEw, totalCredit, totalVoided, saleCount, difference = diff });
+            return Ok(new { id = dcId, totalSales, totalCash, totalEw, totalCredit, totalVoided, saleCount, cashOnHand, difference = diff, expenses = req.Expenses ?? 0, denom1000 = req.Denom1000, denom500 = req.Denom500, denom200 = req.Denom200, denom100 = req.Denom100, denom50 = req.Denom50, denom20 = req.Denom20, denomCoins = req.DenomCoins });
         }
         catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
     }
@@ -3357,12 +3369,12 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     {
         using var conn = Data.PgDatabaseHelper.GetConnection();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT id, close_date, total_sales, total_cash, total_ewallet, total_credit, total_voided, cash_on_hand, difference, expenses, cashier_name, created_at FROM wh_daily_closes ORDER BY close_date DESC LIMIT @lmt";
+        cmd.CommandText = "SELECT id, close_date, total_sales, total_cash, total_ewallet, total_credit, total_voided, cash_on_hand, difference, expenses, cashier_name, created_at, denom1000, denom500, denom200, denom100, denom50, denom20, denom_coins FROM wh_daily_closes ORDER BY close_date DESC LIMIT @lmt";
         cmd.Parameters.AddWithValue("lmt", limit);
         var list = new List<object>();
         using var r = cmd.ExecuteReader();
         while (r.Read())
-            list.Add(new { id = r.GetInt32(0), closeDate = r.GetDateTime(1), totalSales = r.GetDecimal(2), totalCash = r.GetDecimal(3), totalEw = r.GetDecimal(4), totalCredit = r.GetDecimal(5), totalVoided = r.GetDecimal(6), cashOnHand = r.GetDecimal(7), difference = r.GetDecimal(8), expenses = r.GetDecimal(9), cashierName = r.IsDBNull(10) ? "" : r.GetString(10), createdAt = r.GetDateTime(11) });
+            list.Add(new { id = r.GetInt32(0), closeDate = r.GetDateTime(1), totalSales = r.GetDecimal(2), totalCash = r.GetDecimal(3), totalEw = r.GetDecimal(4), totalCredit = r.GetDecimal(5), totalVoided = r.GetDecimal(6), cashOnHand = r.GetDecimal(7), difference = r.GetDecimal(8), expenses = r.GetDecimal(9), cashierName = r.IsDBNull(10) ? "" : r.GetString(10), createdAt = r.GetDateTime(11), denom1000 = r.GetDecimal(12), denom500 = r.GetDecimal(13), denom200 = r.GetDecimal(14), denom100 = r.GetDecimal(15), denom50 = r.GetDecimal(16), denom20 = r.GetDecimal(17), denomCoins = r.GetDecimal(18) });
         return Ok(list);
     }
 
@@ -3695,7 +3707,19 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     }
     public class WhVoidRequest { public string Reason { get; set; } = ""; public string? UserName { get; set; } public List<WhVoidItemDto>? Items { get; set; } }
     public class WhVoidItemDto { public int ItemId { get; set; } }
-    public class WhEndShiftRequest { public string? Since { get; set; } public decimal CashOnHand { get; set; } public decimal? Expenses { get; set; } public string? CashierName { get; set; } }
+    public class WhEndShiftRequest
+    {
+        public bool Preview { get; set; }
+        public decimal? Expenses { get; set; }
+        public string? CashierName { get; set; }
+        public decimal Denom1000 { get; set; }
+        public decimal Denom500 { get; set; }
+        public decimal Denom200 { get; set; }
+        public decimal Denom100 { get; set; }
+        public decimal Denom50 { get; set; }
+        public decimal Denom20 { get; set; }
+        public decimal DenomCoins { get; set; }
+    }
     public class ReceiptAuditRequest { public string? StoreId { get; set; } public string? StoreName { get; set; } public string? ShiftDate { get; set; } public int TotalReceipts { get; set; } public int VoidedCount { get; set; } public int DeletedCount { get; set; } public decimal LostValue { get; set; } public List<string>? VoidedInvoices { get; set; } public List<string>? MissingInvoices { get; set; } }
     public class WhWalkinSellItem
     {

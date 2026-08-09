@@ -393,6 +393,7 @@
           <div class="menu-row" onclick="goOrders()"><span>🛒</span>Online Order</div>
           <div class="menu-row" onclick="goTransfers()"><span>🚚</span>Transfer</div>
           <div class="menu-row" onclick="goReceiving()"><span>📥</span>Receiving</div>
+          <div class="menu-row" onclick="goEndShift()"><span>🔒</span>End Shift</div>
         </div>
 
         <!-- INVENTORY modes -->
@@ -479,6 +480,57 @@
           <button onclick="closeStoreSwitcher()" class="text-red-400 text-lg font-bold">✕</button>
         </div>
         <div id="storeSwitcherList" class="space-y-2 max-h-[60vh] overflow-y-auto"></div>
+      </div>
+    </div>
+
+    <!-- END SHIFT MODAL -->
+    <div id="endShiftModal" class="hidden fixed inset-0 z-50 flex items-end justify-center bg-black/70" onclick="if(event.target===this)closeEndShift()">
+      <div class="bg-[#16163a] w-full max-w-sm rounded-t-2xl p-5 border-t border-[#222255] pb-8 max-h-[88vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-white font-bold text-base">🔒 END SHIFT</p>
+          <div class="flex items-center gap-2">
+            <button class="btn-ghost px-3 py-1 text-[11px]" onclick="loadShiftHistory()">HISTORY</button>
+            <button onclick="closeEndShift()" class="text-red-400 text-lg font-bold">✕</button>
+          </div>
+        </div>
+
+        <!-- shift totals (preview) -->
+        <div class="card mb-3" id="esTotalsCard">
+          <p class="text-[10px] text-[#5a5a8a] uppercase tracking-wider font-bold mb-2">Shift Summary (since last close)</p>
+          <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+            <div class="flex justify-between"><span class="text-gray-400">Total Sales</span><span class="text-white font-bold" id="esTotalSales">—</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Sale Count</span><span class="text-white font-bold" id="esSaleCount">—</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Cash</span><span class="text-emerald-400 font-bold" id="esTotalCash">—</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">E-Wallet</span><span class="text-cyan-400 font-bold" id="esTotalEw">—</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Credit</span><span class="text-orange-400 font-bold" id="esTotalCredit">—</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Voided</span><span class="text-red-400 font-bold" id="esTotalVoided">—</span></div>
+          </div>
+        </div>
+
+        <!-- cash count denominations -->
+        <p class="text-[10px] text-[#5a5a8a] uppercase tracking-wider font-bold mb-2">Cash Count</p>
+        <div class="space-y-2 mb-3" id="esDenomBox">
+          <div class="flex items-center gap-2"><span class="w-12 text-white text-xs font-bold">₱1000</span><input id="esD1000" class="input-field flex-1" type="number" min="0" inputmode="numeric" value="0" oninput="recalcEndShift()"><span class="w-16 text-right text-cyan-400 text-xs font-bold" id="esT1000"></span></div>
+          <div class="flex items-center gap-2"><span class="w-12 text-white text-xs font-bold">₱500</span><input id="esD500" class="input-field flex-1" type="number" min="0" inputmode="numeric" value="0" oninput="recalcEndShift()"><span class="w-16 text-right text-cyan-400 text-xs font-bold" id="esT500"></span></div>
+          <div class="flex items-center gap-2"><span class="w-12 text-white text-xs font-bold">₱200</span><input id="esD200" class="input-field flex-1" type="number" min="0" inputmode="numeric" value="0" oninput="recalcEndShift()"><span class="w-16 text-right text-cyan-400 text-xs font-bold" id="esT200"></span></div>
+          <div class="flex items-center gap-2"><span class="w-12 text-white text-xs font-bold">₱100</span><input id="esD100" class="input-field flex-1" type="number" min="0" inputmode="numeric" value="0" oninput="recalcEndShift()"><span class="w-16 text-right text-cyan-400 text-xs font-bold" id="esT100"></span></div>
+          <div class="flex items-center gap-2"><span class="w-12 text-white text-xs font-bold">₱50</span><input id="esD50" class="input-field flex-1" type="number" min="0" inputmode="numeric" value="0" oninput="recalcEndShift()"><span class="w-16 text-right text-cyan-400 text-xs font-bold" id="esT50"></span></div>
+          <div class="flex items-center gap-2"><span class="w-12 text-white text-xs font-bold">₱20</span><input id="esD20" class="input-field flex-1" type="number" min="0" inputmode="numeric" value="0" oninput="recalcEndShift()"><span class="w-16 text-right text-cyan-400 text-xs font-bold" id="esT20"></span></div>
+          <div class="flex items-center gap-2"><span class="w-12 text-white text-xs font-bold">Coins</span><input id="esDCoins" class="input-field flex-1" type="number" min="0" step="0.25" inputmode="decimal" value="0" oninput="recalcEndShift()"><span class="w-16 text-right text-cyan-400 text-xs font-bold" id="esTCoins"></span></div>
+        </div>
+
+        <!-- expenses + result -->
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-gray-400 text-xs w-20">Expenses</span>
+          <input id="esExpenses" class="input-field flex-1" type="number" min="0" step="0.01" inputmode="decimal" value="0" oninput="recalcEndShift()">
+        </div>
+        <div class="card mb-3">
+          <div class="flex justify-between text-sm"><span class="text-gray-400">Cash on Hand</span><span class="text-white font-bold" id="esCashOnHand">₱0.00</span></div>
+          <div class="flex justify-between text-sm mt-1"><span class="text-gray-400">Expected Cash</span><span class="text-white font-bold" id="esExpectedCash">—</span></div>
+          <div class="flex justify-between text-sm mt-1"><span class="text-gray-400">Difference</span><span class="font-bold" id="esDiff">—</span></div>
+        </div>
+
+        <button class="btn-danger w-full" onclick="saveEndShift()">🔒 SAVE END SHIFT</button>
       </div>
     </div>
 
@@ -2443,6 +2495,204 @@
     function manualDownload() {
       // Opens APK in browser - most reliable install path
       window.open('https://admin.jumongdev.com/updates/JumongWarehouse.apk', '_system');
+    }
+
+    // ─── END SHIFT ──────────────────────────────────────────
+    let esPreview = null;
+
+    function goEndShift() {
+      closeBurgerMenu();
+      show(document.getElementById('endShiftModal'));
+      loadEndShiftPreview();
+    }
+
+    function closeEndShift() {
+      hide(document.getElementById('endShiftModal'));
+    }
+
+    function fmtMoney(n) {
+      return '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    async function loadEndShiftPreview() {
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/end-shift', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ preview: true })
+        });
+        if (!r.ok) { toast('Failed to load shift totals', 'error'); return; }
+        esPreview = await r.json();
+        const p = esPreview;
+        document.getElementById('esTotalSales').textContent = fmtMoney(p.totalSales);
+        document.getElementById('esSaleCount').textContent = String(p.saleCount || 0);
+        document.getElementById('esTotalCash').textContent = fmtMoney(p.totalCash);
+        document.getElementById('esTotalEw').textContent = fmtMoney(p.totalEw);
+        document.getElementById('esTotalCredit').textContent = fmtMoney(p.totalCredit);
+        document.getElementById('esTotalVoided').textContent = fmtMoney(p.totalVoided);
+        document.getElementById('esExpectedCash').textContent = fmtMoney(p.totalCash);
+        recalcEndShift();
+      } catch (e) { toast('Failed to load shift: ' + e.message, 'error'); }
+    }
+
+    function recalcEndShift() {
+      const denoms = [
+        ['esD1000', 1000, 'esT1000'], ['esD500', 500, 'esT500'], ['esD200', 200, 'esT200'],
+        ['esD100', 100, 'esT100'], ['esD50', 50, 'esT50'], ['esD20', 20, 'esT20']
+      ];
+      let cash = 0;
+      denoms.forEach(([inp, mult, out]) => {
+        const v = Math.max(0, Math.floor(Number(document.getElementById(inp).value || 0))) * mult;
+        document.getElementById(out).textContent = fmtMoney(v);
+        cash += v;
+      });
+      const coins = Math.max(0, Number(document.getElementById('esDCoins').value || 0));
+      document.getElementById('esTCoins').textContent = fmtMoney(coins);
+      cash += coins;
+      document.getElementById('esCashOnHand').textContent = fmtMoney(cash);
+      const expected = Number((esPreview && esPreview.totalCash) || 0);
+      const diff = cash - expected;
+      const el = document.getElementById('esDiff');
+      el.textContent = (diff >= 0 ? '+' : '') + fmtMoney(diff);
+      el.style.color = diff === 0 ? '#ffffff' : (diff > 0 ? '#34d399' : '#f87171');
+    }
+
+    async function saveEndShift() {
+      if (!esPreview) { toast('Load shift totals first', 'error'); return; }
+      const p = esPreview;
+      if (!confirm('Close this shift?\n\nSales: ' + p.saleCount + ' · Total: ' + fmtMoney(p.totalSales) +
+        '\nExpected Cash: ' + fmtMoney(p.totalCash) +
+        '\n\nAfter closing, new transactions start the next shift.')) return;
+      const body = {
+        denom1000: Math.max(0, Math.floor(Number(document.getElementById('esD1000').value || 0))),
+        denom500: Math.max(0, Math.floor(Number(document.getElementById('esD500').value || 0))),
+        denom200: Math.max(0, Math.floor(Number(document.getElementById('esD200').value || 0))),
+        denom100: Math.max(0, Math.floor(Number(document.getElementById('esD100').value || 0))),
+        denom50: Math.max(0, Math.floor(Number(document.getElementById('esD50').value || 0))),
+        denom20: Math.max(0, Math.floor(Number(document.getElementById('esD20').value || 0))),
+        denomCoins: Math.max(0, Number(document.getElementById('esDCoins').value || 0)),
+        expenses: Math.max(0, Number(document.getElementById('esExpenses').value || 0)),
+        cashierName: session.fullName || session.username || ''
+      };
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/end-shift', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}));
+          toast(j.error || 'Failed to close shift', 'error');
+          return;
+        }
+        const j = await r.json();
+        toast('Shift closed #' + j.id);
+        ['esD1000', 'esD500', 'esD200', 'esD100', 'esD50', 'esD20', 'esDCoins', 'esExpenses'].forEach(id => {
+          const el = document.getElementById(id); if (el) el.value = '0';
+        });
+        recalcEndShift();
+        printEndShift(j);
+        loadEndShiftPreview();
+      } catch (e) { toast('Failed: ' + e.message, 'error'); }
+    }
+
+    function printEndShift(j) {
+      if (!IN_APP || !AndroidPrinter.isConnected()) { toast('End shift printed on cloud. Connect printer to print report.', 'warning'); return; }
+      const W = paperWidth <= 50 ? 32 : 48;
+      const dash = '------------------------------------------------'.slice(0, W);
+      const fit = s => { const str = String(s); return str.length > W ? str.slice(0, W - 1) + '~' : str; };
+      const pad = (label, amount) => {
+        const l = fit(label); const a = fit(amount);
+        const padN = W - l.length - a.length;
+        return padN > 0 ? l + ' '.repeat(padN) + a : l + ' ' + a;
+      };
+      const dt = new Date();
+      let t = '';
+      t += '<<CENTER>>JUMONG POS\n';
+      t += '<<CENTER>>' + fit(session.storeName || '') + '\n';
+      t += '<<CENTER>>─── END OF SHIFT ───\n';
+      t += '<<CENTER>>' + dt.toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) + '\n';
+      t += '<<CENTER>>Cashier: ' + fit(session.fullName || session.username) + '\n';
+      t += dash + '\n';
+      t += pad('Total Sales', fmtMoney(j.totalSales)) + '\n';
+      t += pad('Sale Count', String(j.saleCount || 0)) + '\n';
+      t += pad('Cash', fmtMoney(j.totalCash)) + '\n';
+      t += pad('E-Wallet', fmtMoney(j.totalEw)) + '\n';
+      t += pad('Credit', fmtMoney(j.totalCredit)) + '\n';
+      t += pad('Voided', fmtMoney(j.totalVoided)) + '\n';
+      t += dash + '\n';
+      t += pad('₱1000 x' + (j.denom1000 || 0), fmtMoney((j.denom1000 || 0) * 1000)) + '\n';
+      t += pad('₱500 x' + (j.denom500 || 0), fmtMoney((j.denom500 || 0) * 500)) + '\n';
+      t += pad('₱200 x' + (j.denom200 || 0), fmtMoney((j.denom200 || 0) * 200)) + '\n';
+      t += pad('₱100 x' + (j.denom100 || 0), fmtMoney((j.denom100 || 0) * 100)) + '\n';
+      t += pad('₱50 x' + (j.denom50 || 0), fmtMoney((j.denom50 || 0) * 50)) + '\n';
+      t += pad('₱20 x' + (j.denom20 || 0), fmtMoney((j.denom20 || 0) * 20)) + '\n';
+      t += pad('Coins', fmtMoney(j.denomCoins || 0)) + '\n';
+      t += dash + '\n';
+      t += pad('Cash on Hand', fmtMoney(j.cashOnHand)) + '\n';
+      if (j.expenses > 0) t += pad('Expenses', fmtMoney(j.expenses)) + '\n';
+      t += pad('Difference', (j.difference >= 0 ? '+' : '') + fmtMoney(j.difference)) + '\n';
+      t += '\n<<CENTER>>THANK YOU!\n';
+      const pr = AndroidPrinter.print(t);
+      if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
+    }
+
+    async function loadShiftHistory() {
+      const list = document.getElementById('txItemsList');
+      document.getElementById('txItemsTitle').textContent = 'SHIFT HISTORY';
+      list.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading...</p>';
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/shifts?limit=50');
+        const data = await r.json();
+        if (!data || !data.length) { list.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">No shifts yet</p>'; }
+        else {
+          list.innerHTML = '';
+          data.forEach(s => {
+            const d = document.createElement('div');
+            d.className = 'cart-item cursor-pointer';
+            const dt = new Date(s.closeDate);
+            const cls = Number(s.difference) > 0 ? 'text-emerald-400' : (Number(s.difference) < 0 ? 'text-red-400' : 'text-gray-400');
+            d.innerHTML = '<div class="flex-1"><p class="text-white text-xs font-bold">' + dt.toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }) + '</p>' +
+              '<p class="text-gray-500 text-[10px]">' + (s.cashierName || '—') + ' • Sales ' + fmtMoney(s.totalSales) + '</p></div>' +
+              '<div class="text-right"><p class="text-xs font-bold ' + cls + '">' + (s.difference > 0 ? '+' : '') + fmtMoney(s.difference) + '</p>' +
+              '<p class="text-gray-500 text-[10px]">cash ' + fmtMoney(s.cashOnHand) + '</p></div>';
+            d.onclick = () => showShiftDetail(s);
+            list.appendChild(d);
+          });
+        }
+      } catch (e) { list.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Failed: ' + e.message + '</p>'; }
+      show(document.getElementById('txItemsModal'));
+    }
+
+    function showShiftDetail(s) {
+      const list = document.getElementById('txItemsList');
+      document.getElementById('txItemsTitle').textContent = 'SHIFT #' + s.id;
+      const dt = new Date(s.closeDate);
+      const diffCls = Number(s.difference) > 0 ? 'text-emerald-400' : (Number(s.difference) < 0 ? 'text-red-400' : 'text-gray-400');
+      const rows = [
+        ['Date/Time', dt.toLocaleString('en-PH', { timeZone: 'Asia/Manila' })],
+        ['Cashier', s.cashierName || '—'],
+        ['Total Sales', fmtMoney(s.totalSales)],
+        ['Sale Count', String(s.saleCount || 0)],
+        ['Cash', fmtMoney(s.totalCash)],
+        ['E-Wallet', fmtMoney(s.totalEw)],
+        ['Credit', fmtMoney(s.totalCredit)],
+        ['Voided', fmtMoney(s.totalVoided)],
+        ['₱1000 x' + s.denom1000, fmtMoney((s.denom1000 || 0) * 1000)],
+        ['₱500 x' + s.denom500, fmtMoney((s.denom500 || 0) * 500)],
+        ['₱200 x' + s.denom200, fmtMoney((s.denom200 || 0) * 200)],
+        ['₱100 x' + s.denom100, fmtMoney((s.denom100 || 0) * 100)],
+        ['₱50 x' + s.denom50, fmtMoney((s.denom50 || 0) * 50)],
+        ['₱20 x' + s.denom20, fmtMoney((s.denom20 || 0) * 20)],
+        ['Coins', fmtMoney(s.denomCoins || 0)],
+        ['Expenses', fmtMoney(s.expenses || 0)],
+        ['Cash on Hand', fmtMoney(s.cashOnHand)]
+      ];
+      list.innerHTML = '<div class="card">' + rows.map(r =>
+        '<div class="flex justify-between text-xs py-0.5"><span class="text-gray-400">' + r[0] + '</span><span class="text-white font-bold">' + r[1] + '</span></div>'
+      ).join('') +
+        '<div class="flex justify-between text-sm mt-1 pt-1 border-t border-[#222255]"><span class="text-gray-400">Difference</span><span class="font-bold ' + diffCls + '">' + (s.difference > 0 ? '+' : '') + fmtMoney(s.difference) + '</span></div></div>' +
+        '<button class="btn-ghost w-full mt-3" onclick="loadShiftHistory()">← BACK TO HISTORY</button>';
     }
 
     // ─── INIT: validate session on every open ────────────────
