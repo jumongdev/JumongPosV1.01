@@ -998,17 +998,34 @@
     }
 
     // ─── PRODUCT SEARCH ──────────────────────────────────────
-    function boxesText(stock, boxQty) {
+    function unitBoxInfo(p) {
+      const units = (p && p.units) || [];
+      const boxy = units.filter(u => u && Number(u.qtyPerUnit) > 1 && /box|case|ream/i.test(u.unitName || ''));
+      if (boxy.length) {
+        const b = boxy.reduce((a, b) => Number(a.qtyPerUnit) <= Number(b.qtyPerUnit) ? a : b);
+        return { qty: Number(b.qtyPerUnit), label: b.unitName };
+      }
+      const multi = units.filter(u => u && Number(u.qtyPerUnit) > 1);
+      if (multi.length) {
+        const b = multi.reduce((a, b) => Number(a.qtyPerUnit) <= Number(b.qtyPerUnit) ? a : b);
+        return { qty: Number(b.qtyPerUnit), label: b.unitName };
+      }
+      return { qty: Number(p && p.boxQty) || 0, label: 'box' };
+    }
+    function unitBoxQty(p) { return unitBoxInfo(p).qty; }
+    function unitBoxLabel(p) { return unitBoxInfo(p).label; }
+    function boxesText(stock, boxQty, label) {
       const q = Number(boxQty) || 0;
       const s = Number(stock) || 0;
+      const lb = label || 'box';
       if (q <= 1) return '';
       const whole = Math.floor(s / q);
-      return ' = ' + whole + ' box' + (whole === 1 ? '' : 's') + (s % q ? ' + ' + s % q + ' pcs' : '');
+      return ' = ' + whole + ' ' + lb + (whole === 1 ? '' : 's') + (s % q ? ' + ' + s % q + ' pcs' : '');
     }
     function stockText(p) {
       const s = Number(p && p.stockQty) || 0;
       if (s <= 0) return '<span class="text-red-400 font-bold">OUT OF STOCK (0 pcs)</span>';
-      return 'Stock: ' + s + ' pcs' + boxesText(s, p.boxQty);
+      return 'Stock: ' + s + ' pcs' + boxesText(s, unitBoxQty(p), unitBoxLabel(p));
     }
 
     async function searchProducts() {
@@ -1495,7 +1512,7 @@
         const div = document.createElement('div');
         div.className = 'card';
         div.innerHTML = '<div class="flex items-center justify-between"><div><p class="text-white text-sm font-bold">' + p.name + '</p>' +
-          '<p class="text-gray-500 text-[11px]">' + (p.barcode || 'no barcode') + (Number(p.boxQty) > 1 ? ' • ' + boxesText(p.stockQty, p.boxQty) : '') + '</p></div>' +
+          '<p class="text-gray-500 text-[11px]">' + (p.barcode || 'no barcode') + (unitBoxQty(p) > 1 ? ' • ' + boxesText(p.stockQty, unitBoxQty(p), unitBoxLabel(p)) : '') + '</p></div>' +
           '<p class="text-lg font-bold ' + (p.stockQty === 0 ? 'text-red-400' : low ? 'text-orange-400' : 'text-emerald-400') + '">' + p.stockQty + '</p></div>';
         box.appendChild(div);
       });
@@ -2007,6 +2024,8 @@
     let recvProdCache = [];
     let recvTarget = null;
     let recvCart = [];
+    let recvUnitQty = 1;
+    let recvUnitName = 'pc';
 
     async function searchRecvProducts() {
       const q = document.getElementById('recvSearch').value.trim();
@@ -2035,43 +2054,93 @@
       const x = recvProdCache.find(p => p.id === id);
       if (!x) { toast('Product not found', 'error'); return; }
       recvTarget = x;
+      const units = (x.units || []).filter(u => u && Number(u.qtyPerUnit) > 0);
+      recvUnitQty = 1;
+      recvUnitName = 'pc';
       document.getElementById('recvModalTitle').textContent = x.name;
       const box = document.getElementById('recvModalBody');
       const boxq = Number(x.boxQty || 0);
-      box.innerHTML = '<div class="text-center pb-2"><p class="text-gray-400 text-[11px]">Current stock</p>' +
-        '<p class="text-white text-2xl font-bold">' + Number(x.stockQty || 0) + ' pcs' + (boxq > 1 ? boxesText(x.stockQty, boxq) : '') + '</p></div>' +
-        (boxq > 1
-          ? '<div class="flex gap-2">' +
-            '<div class="flex-1"><p class="text-gray-400 text-[11px] mb-1">' + boxq + ' pcs per box</p>' +
-            '<input id="recvBoxes" class="input-field w-full text-center text-2xl font-bold" type="number" min="0" value="0" inputmode="numeric" enterkeyhint="done" oninput="updateRecvConversion()"></div>' +
-            '<div class="flex-1"><p class="text-gray-400 text-[11px] mb-1">Extra pcs</p>' +
-            '<input id="recvExtraPcs" class="input-field w-full text-center text-2xl font-bold" type="number" min="0" value="0" inputmode="numeric" enterkeyhint="done" oninput="updateRecvConversion()"></div></div>' +
-          '<p id="recvConversion" class="text-cyan-400 text-xs font-bold text-center">= 0 pcs total</p>'
-          : '<div><p class="text-gray-400 text-[11px] mb-1">Pieces to receive</p>' +
-            '<input id="recvQty" class="input-field w-full text-center text-2xl font-bold" type="number" min="1" value="1" inputmode="numeric" enterkeyhint="done"></div>') +
-        '<p class="text-gray-500 text-[11px] text-center">' + (x.barcode || '—') + '</p>' +
+      let body = '<div class="text-center pb-2"><p class="text-gray-400 text-[11px]">Current stock</p>' +
+        '<p class="text-white text-2xl font-bold">' + Number(x.stockQty || 0) + ' pcs' + (unitBoxQty(x) > 1 ? boxesText(x.stockQty, unitBoxQty(x), unitBoxLabel(x)) : '') + '</p></div>';
+      if (units.length > 0) {
+        let chips = '';
+        units.forEach((u, i) => {
+          const q = Number(u.qtyPerUnit) || 1;
+          chips += '<span class="unit-chip' + (i === 0 ? ' selected' : '') + '" onclick="recvSelectUnit(' + i + ')">' + u.unitName + (q > 1 ? ' ×' + q : '') + '</span>';
+        });
+        recvUnitQty = Number(units[0].qtyPerUnit) || 1;
+        recvUnitName = units[0].unitName || 'pc';
+        body += '<div class="flex flex-wrap justify-center mb-1" id="recvUnitChips">' + chips + '</div>' +
+          '<div><p class="text-gray-400 text-[11px] mb-1">' + recvUnitName + ' quantity</p>' +
+          '<input id="recvQty" class="input-field w-full text-center text-2xl font-bold" type="number" min="1" value="1" inputmode="numeric" enterkeyhint="done" oninput="updateRecvConversion()"></div>' +
+          '<p id="recvConversion" class="text-cyan-400 text-xs font-bold text-center">= ' + recvUnitQty + ' pcs total (' + recvUnitName + ' × qty)</p>';
+      } else if (boxq > 1) {
+        body += '<div class="flex gap-2">' +
+          '<div class="flex-1"><p class="text-gray-400 text-[11px] mb-1">' + boxq + ' pcs per box</p>' +
+          '<input id="recvBoxes" class="input-field w-full text-center text-2xl font-bold" type="number" min="0" value="0" inputmode="numeric" enterkeyhint="done" oninput="updateRecvConversion()"></div>' +
+          '<div class="flex-1"><p class="text-gray-400 text-[11px] mb-1">Extra pcs</p>' +
+          '<input id="recvExtraPcs" class="input-field w-full text-center text-2xl font-bold" type="number" min="0" value="0" inputmode="numeric" enterkeyhint="done" oninput="updateRecvConversion()"></div></div>' +
+          '<p id="recvConversion" class="text-cyan-400 text-xs font-bold text-center">= 0 pcs total</p>';
+      } else {
+        body += '<div><p class="text-gray-400 text-[11px] mb-1">Pieces to receive</p>' +
+          '<input id="recvQty" class="input-field w-full text-center text-2xl font-bold" type="number" min="1" value="1" inputmode="numeric" enterkeyhint="done" oninput="updateRecvConversion()"></div>' +
+          '<p id="recvConversion" class="text-cyan-400 text-xs font-bold text-center">= 0 pcs total</p>';
+      }
+      body += '<p class="text-gray-500 text-[11px] text-center">' + (x.barcode || '—') + '</p>' +
         '<div class="flex gap-2 pt-2">' +
         '<button class="btn-ghost flex-1" onclick="closeRecvModal()">CANCEL</button>' +
         '<button class="btn-green flex-1" onclick="addToRecvCart()">ADD TO BATCH</button></div>';
+      box.innerHTML = body;
       show(document.getElementById('recvModal'));
+    }
+
+    function recvSelectUnit(idx) {
+      const x = recvTarget;
+      if (!x) return;
+      const units = (x.units || []).filter(u => u && Number(u.qtyPerUnit) > 0);
+      const u = units[idx];
+      if (!u) return;
+      recvUnitQty = Number(u.qtyPerUnit) || 1;
+      recvUnitName = u.unitName || 'pc';
+      document.querySelectorAll('#recvUnitChips .unit-chip').forEach((c, i) => {
+        c.className = 'unit-chip' + (i === idx ? ' selected' : '');
+      });
+      updateRecvConversion();
     }
 
     function closeRecvModal() { hide(document.getElementById('recvModal')); recvTarget = null; }
 
     function updateRecvConversion() {
       if (!recvTarget) return;
-      const boxq = Number(recvTarget.boxQty || 0);
-      if (boxq <= 1) return;
-      const b = document.getElementById('recvBoxes');
-      const e = document.getElementById('recvExtraPcs');
-      const boxes = b ? parseInt(b.value || '0', 10) || 0 : 0;
-      const extra = e ? parseInt(e.value || '0', 10) || 0 : 0;
       const el = document.getElementById('recvConversion');
-      if (el) el.textContent = '= ' + (boxes * boxq + extra) + ' pcs total';
+      if (!el) return;
+      const units = (recvTarget.units || []).filter(u => u && Number(u.qtyPerUnit) > 0);
+      if (units.length > 0) {
+        const q = document.getElementById('recvQty');
+        const n = q ? parseInt(q.value || '0', 10) || 0 : 0;
+        el.textContent = '= ' + (n * recvUnitQty) + ' pcs total (' + recvUnitName + ' × ' + n + ')';
+        return;
+      }
+      const boxq = Number(recvTarget.boxQty || 0);
+      if (boxq > 1) {
+        const b = document.getElementById('recvBoxes');
+        const e = document.getElementById('recvExtraPcs');
+        const boxes = b ? parseInt(b.value || '0', 10) || 0 : 0;
+        const extra = e ? parseInt(e.value || '0', 10) || 0 : 0;
+        el.textContent = '= ' + (boxes * boxq + extra) + ' pcs total';
+        return;
+      }
+      const q = document.getElementById('recvQty');
+      el.textContent = '= ' + (q ? parseInt(q.value || '0', 10) || 0 : 0) + ' pcs total';
     }
 
     function recvTotalPieces() {
       if (!recvTarget) return 0;
+      const units = (recvTarget.units || []).filter(u => u && Number(u.qtyPerUnit) > 0);
+      if (units.length > 0) {
+        const q = document.getElementById('recvQty');
+        return (q ? parseInt(q.value || '0', 10) || 0 : 0) * recvUnitQty;
+      }
       const boxq = Number(recvTarget.boxQty || 0);
       if (boxq > 1) {
         const b = document.getElementById('recvBoxes');
@@ -2088,9 +2157,15 @@
       if (!recvTarget) return;
       const qty = recvTotalPieces();
       if (!qty || qty <= 0) { toast('Enter a valid quantity', 'error'); return; }
-      const existing = recvCart.find(i => i.id === recvTarget.id);
+      const units = (recvTarget.units || []).filter(u => u && Number(u.qtyPerUnit) > 0);
+      const existing = recvCart.find(i => i.id === recvTarget.id && (i.unitQty || 1) === recvUnitQty);
       if (existing) existing.qty += qty;
-      else recvCart.push({ id: recvTarget.id, name: recvTarget.name, barcode: recvTarget.barcode || '', stock: Number(recvTarget.stockQty || 0), qty });
+      else recvCart.push({
+        id: recvTarget.id, name: recvTarget.name, barcode: recvTarget.barcode || '',
+        stock: Number(recvTarget.stockQty || 0), qty,
+        unitName: units.length > 0 ? recvUnitName : (Number(recvTarget.boxQty || 0) > 1 ? 'box' : 'pc'),
+        unitQty: units.length > 0 ? recvUnitQty : (Number(recvTarget.boxQty || 0) > 1 ? Number(recvTarget.boxQty || 0) : 1)
+      });
       closeRecvModal();
       recvTarget = null;
       renderRecvCart();
@@ -2100,7 +2175,8 @@
     function recvQtyStep(idx, delta) {
       const it = recvCart[idx];
       if (!it) return;
-      it.qty += delta;
+      const step = Math.max(1, it.unitQty || 1);
+      it.qty += delta * step;
       if (it.qty < 1) it.qty = 1;
       renderRecvCart();
     }
@@ -2122,12 +2198,19 @@
       recvCart.forEach((it, i) => {
         const d = document.createElement('div');
         d.className = 'card !mb-0';
+        const unitQty = it.unitQty || 1;
+        const unitTxt = unitQty > 1
+          ? (it.qty % unitQty === 0
+              ? String(it.qty / unitQty) + ' ' + (it.unitName || 'box')
+              : String(Math.floor(it.qty / unitQty)) + ' ' + (it.unitName || 'box') + ' + ' + (it.qty % unitQty) + ' pc')
+          : String(it.qty) + ' pc';
         d.innerHTML = '<div class="flex items-center justify-between mb-1"><p class="text-white text-xs font-bold flex-1 pr-2">' + it.name + '</p>' +
           '<button class="text-red-400 text-xs font-bold" onclick="removeRecvItem(' + i + ')">✕</button></div>' +
-          '<p class="text-gray-500 text-[10px] mb-2">' + (it.barcode || '—') + ' • stock ' + it.stock + '</p>' +
+          '<p class="text-gray-500 text-[10px] mb-2">' + (it.barcode || '—') + ' • stock ' + it.stock + (unitQty > 1 ? ' • ' + unitQty + ' pcs per ' + (it.unitName || 'box') : '') + '</p>' +
           '<div class="flex items-center gap-2"><button class="qty-btn" onclick="recvQtyStep(' + i + ',-1)">−</button>' +
-          '<span class="flex-1 text-center text-white font-bold">' + it.qty + '</span>' +
-          '<button class="qty-btn" onclick="recvQtyStep(' + i + ',1)">+</button></div>';
+          '<span class="flex-1 text-center text-white font-bold">' + it.qty + ' pcs</span>' +
+          '<button class="qty-btn" onclick="recvQtyStep(' + i + ',1)">+</button></div>' +
+          '<p class="text-[9px] text-cyan-400 text-center mt-1 font-bold">' + unitTxt + ' total</p>';
         box.appendChild(d);
       });
       document.getElementById('btnSaveReceiving').textContent = 'SAVE RECEIVING (' + recvCart.reduce((s, i) => s + i.qty, 0) + ' pcs)';
@@ -2149,6 +2232,7 @@
         });
         const j = await r.json();
         if (!r.ok) { toast(j.error || 'Failed to save', 'error'); return; }
+        lastReceiving = { reference: j.reference || 'RECV-' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14), source: source, items: recvCart.map(i => ({ productName: i.name, qty: i.qty })) };
         document.getElementById('recvModalTitle').textContent = '✓ RECEIVED';
         const mbox = document.getElementById('recvModalBody');
         const total = recvCart.reduce((s, i) => s + i.qty, 0);
@@ -2220,13 +2304,14 @@
           const parts = String(row.reference || '').split(' | ');
           const ref = parts[0] || row.reference;
           const source = parts[1] || '-';
+          const full = String(row.reference || '').replace(/'/g, '');
           const d = new Date(row.createdAt);
           const div = document.createElement('div');
           div.className = 'card';
-          div.innerHTML = '<div class="flex items-center justify-between" onclick="showRecvHistoryItems(\'' + ref.replace(/'/g, '') + '\')"><div class="flex-1 pr-2"><p class="text-white text-xs font-bold">' + ref + '</p>' +
+          div.innerHTML = '<div class="flex items-center justify-between" onclick="showRecvHistoryItems(\'' + full + '\')"><div class="flex-1 pr-2"><p class="text-white text-xs font-bold">' + ref + '</p>' +
             '<p class="text-gray-500 text-[10px]">' + source + ' • ' + d.toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) + '</p>' +
             '<p class="text-gray-500 text-[10px]">' + row.itemCount + ' items • ' + row.totalQty + ' pcs</p></div>' +
-            '<button class="text-cyan-400 text-[11px] font-bold" onclick="event.stopPropagation(); reprintReceiving(\'' + ref.replace(/'/g, '') + '\')">REPRINT</button></div>';
+            '<button class="text-cyan-400 text-[11px] font-bold" onclick="event.stopPropagation(); reprintReceiving(\'' + full + '\')">REPRINT</button></div>';
           box.appendChild(div);
         });
       } catch (e) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Failed: ' + e.message + '</p>'; }

@@ -1162,7 +1162,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.1.7" });
+            return Ok(new { version = "1.1.8" });
     }
 
     [HttpPost("crash-report")]
@@ -1859,7 +1859,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT product_id, product_name, barcode, qty_change, created_at FROM wh_stock_trails WHERE reference = @ref ORDER BY id";
+            cmd.CommandText = "SELECT product_id, product_name, barcode, qty_change, created_at FROM wh_stock_trails WHERE reference = @ref OR reference LIKE @ref || ' |%' ORDER BY id";
             cmd.Parameters.AddWithValue("ref", @ref);
             var list = new List<object>();
             using var r = cmd.ExecuteReader();

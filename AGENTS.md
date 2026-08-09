@@ -1410,3 +1410,16 @@ Copy JumongWarehouse.apk to JumongCloudAPI\wwwroot\updates\ AND JumongCloudAPI\b
 | `JumongCloudAPI/wwwroot/whmobile.html:101` | **Bottom nav overlap fix** — `main-content` used `p-4` (padding: 1rem) PLUS the inline `.main-content{padding-bottom:120px}` rule. Tailwind CDN injects its generated CSS *after* the inline `<style>` block, so equal-specificity `.p-4` overrode the 120px bottom clearance → actual padding-bottom was only **16px**. The fixed bottom nav (SELL/INVENTORY/MENU ≈58px + safe-area) therefore covered the last row of every page — on the Sales report the old invoice `WH-20260807-0000` was hidden. Fixed by replacing `p-4` with explicit utilities: `px-4 pt-4 pb-36 space-y-4` (`pb-36` = 144px, wins the cascade). |
 
 **Impact:** All mobile pages now reserve the nav height — the last row on every tab is fully visible/scrollable. Web-only change; deployed to live `C:\JumongAPI\wwwroot\` + publish. Verify with `?v=` cache-bust on the WebView.
+
+### v1.1.8 (Cloud API) + v1.1.7 (web) — Mobile Receiving Unit Conversion + History Reprint Fix
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/whmobile.html` | **Receiving modal now unit-aware** — instead of the old fixed "box + extra pcs" (which used `wh_products.box_qty`, the *default* unit qty e.g. 10 for Kopiko "by 10"), it renders **unit chips** (PC / BY 5 / BY 10 / BOX ×120) from `master_product_units` via the existing `units[]` API field, plus qty input. Conversion = `unit.qtyPerUnit × qty` → total pcs (e.g. 1 BOX × 120 = 120 pcs). Batch cart stores pcs; row shows unit breakdown (`3 box + 5 pc`); ± steppers step by the unit's qty. Falls back to old box+pcs split if product has no units but `boxQty > 1`, plain pcs otherwise. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | `unitBoxQty(p)`/`unitBoxLabel(p)` helpers — largest qty unit from `units[]` replaces `boxQty` in stock display (`boxesText`, `stockText`, inventory list). |
+| `JumongCloudAPI/wwwroot/whmobile.html` | **History REPRINT 0-items bug fixed** — `loadRecvHistory` was stripping ` \| supplier` from the reference, so `reprintReceiving`/`showRecvHistoryItems` queried `/receivings/{stripped-ref}/items` which matched nothing → "0 item 0 qty" receipt. Now passes the FULL reference to both handlers. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | `lastReceiving` now set immediately after `saveReceivingBatch` success, so the instant PRINT RECEIVING button after saving works (was "Nothing to print"). |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1862` | `WhGetReceivingItems` hardened — `WHERE reference = @ref OR reference LIKE @ref \|\| ' \|%'` so both full and stripped references resolve items. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1165` | Version bumped to `"1.1.8"`. |
+
+**Impact:** Receiving a box of Kopiko Black (real box = 120 pcs) now adds 120 pcs instead of 10 — the conversion rate comes from the item's own unit attributes instead of the misnamed `box_qty` column. Stock remains pcs-based for transfers + POS selling (unchanged). History reprint now prints the actual items. Requires v1.1.8 API deploy (`deploy_api.bat` as admin) for the backend fix + version; web files are live already (verified 200 on `admin.jumongdev.com/whmobile.html`).
