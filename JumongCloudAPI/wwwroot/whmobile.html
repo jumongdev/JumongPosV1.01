@@ -1975,6 +1975,21 @@
       renderTxItems();
     }
 
+    function setTxQty(i, val) {
+      if (!txItems[i]) return;
+      const qty = Math.round(Number(val));
+      if (isNaN(qty)) { renderTxItems(); return; }
+      const max = Number(txItems[i].stock) || 0;
+      let target = qty;
+      if (qty > max) {
+        target = max;
+        toast('Max ' + max + ' — stock lang: ' + txItems[i].productName, 'error');
+      }
+      if (target <= 0) { txItems.splice(i, 1); }
+      else { txItems[i].qty = target; }
+      renderTxItems();
+    }
+
     function renderTxItems() {
       const box = document.getElementById('txTransferItems');
       const totalQty = txItems.reduce((s, x) => s + x.qty, 0);
@@ -1987,7 +2002,7 @@
         d.className = 'cart-item';
         d.innerHTML = '<div class="flex-1"><p class="text-white text-xs font-bold">' + x.productName + (over ? ' <span class="text-red-400">(stock ' + x.stock + ')</span>' : '') + '</p></div>' +
           '<div class="flex items-center gap-2"><button class="btn-ghost px-2 py-0.5" onclick="changeTxQty(' + i + ',-1)">−</button>' +
-          '<span class="text-white text-xs font-bold w-6 text-center">' + x.qty + '</span>' +
+          '<input class="qty-input" type="number" min="1" inputmode="numeric" value="' + x.qty + '" onchange="setTxQty(' + i + ', this.value)">' +
           '<button class="btn-ghost px-2 py-0.5" onclick="changeTxQty(' + i + ',1)">+</button>' +
           '<button class="text-red-400 text-sm font-bold ml-1" onclick="removeTxItem(' + i + ')">✕</button></div>';
         box.appendChild(d);
