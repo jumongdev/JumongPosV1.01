@@ -1423,3 +1423,14 @@ Copy JumongWarehouse.apk to JumongCloudAPI\wwwroot\updates\ AND JumongCloudAPI\b
 | `JumongCloudAPI/Controllers/DashboardController.cs:1165` | Version bumped to `"1.1.8"`. |
 
 **Impact:** Receiving a box of Kopiko Black (real box = 120 pcs) now adds 120 pcs instead of 10 — the conversion rate comes from the item's own unit attributes instead of the misnamed `box_qty` column. Stock remains pcs-based for transfers + POS selling (unchanged). History reprint now prints the actual items. Requires v1.1.8 API deploy (`deploy_api.bat` as admin) for the backend fix + version; web files are live already (verified 200 on `admin.jumongdev.com/whmobile.html`).
+
+### v1.1.36 — Wholesale Reprint Shows Void-Adjusted Total (POS HQ)
+
+| File | Change |
+|---|---|
+| Forms/WarehouseSellForm.cs:1398-1425 | btnReprint_Click now reads ''isVoided'' from the sale items JSON and skips voided items when summing gTotal. All items voided -> "Nothing to reprint" message. Passes title="REPRINT (VOID ADJUSTED)" when some items were voided. |
+| Forms/WarehouseSellForm.cs:1360 | (existing) Void item picker already knew isVoided - reprint now uses the same flag. |
+| Services/PrinterService.cs:913 | PrintWhReceipt() gained optional ''title'' param - prints bold title line under "─── WALK-IN SALE ───" (default empty, no change to normal receipts). |
+| Services/AppVersion.cs | Current bumped to "1.1.36". |
+
+**Impact:** Reprint after a partial void on the POS HQ wholesale report now shows the ADJUSTED total (voided item subtotals excluded) with a "REPRINT (VOID ADJUSTED)" banner, matching the POS ReportsForm behavior. Root cause: WhVoidSale only sets is_voided=TRUE (subtotal kept in DB), and the old reprint summed every item's subtotal without the isVoided filter. Client-only change - no cloud API deploy needed.

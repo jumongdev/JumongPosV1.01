@@ -1407,9 +1407,13 @@ public class WarehouseSellForm : Form
                 var json = await _http.GetStringAsync(url);
                 using var doc = JsonDocument.Parse(json);
                 var items = new List<(string, string, int, decimal, decimal)>();
+                var totalCount = 0;
                 decimal gTotal = 0;
                 foreach (var it in doc.RootElement.EnumerateArray())
                 {
+                    totalCount++;
+                    var isVoided = it.TryGetProperty("isVoided", out var ivo) && ivo.GetBoolean();
+                    if (isVoided) continue;
                     var pn = it.GetProperty("productName").GetString() ?? "";
                     var un = it.GetProperty("unitName").GetString() ?? "";
                     var qty = it.GetProperty("qty").GetInt32();
@@ -1418,7 +1422,13 @@ public class WarehouseSellForm : Form
                     items.Add((pn, un, qty, pr, st));
                     gTotal += st;
                 }
-                PrinterService.PrintWhReceipt(saleId, cust, items, gTotal, _currentUser?.FullName ?? "Admin", invNo);
+                if (items.Count == 0)
+                {
+                    MessageBox.Show("All items in this receipt are voided. Nothing to reprint.", "No Items", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                var title = totalCount > items.Count ? "REPRINT (VOID ADJUSTED)" : "";
+                PrinterService.PrintWhReceipt(saleId, cust, items, gTotal, _currentUser?.FullName ?? "Admin", invNo, title);
                 MessageBox.Show("Receipt reprinted.", "Reprint", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex) { MessageBox.Show("Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
