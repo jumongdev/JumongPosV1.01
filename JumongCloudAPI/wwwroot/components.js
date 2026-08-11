@@ -67,6 +67,7 @@ Alpine.store('app', {
     saleMarginClass(v) { const m = parseFloat(v); return m > 20 ? 'text-emerald-400' : m > 0 ? 'text-amber-400' : 'text-red-400' },
     switchSection(section) {
       document.getElementById('sidebar')?.classList.remove('open');
+      if (section === 'health') { window.open('health.html', '_blank'); return; }
       if (section.startsWith('wh-')) {
         this.section = 'warehouse';
         this.whSubpage = section.replace('wh-', '');
