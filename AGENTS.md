@@ -2,7 +2,7 @@
 
 ## Project Structure
 ```
-C:\Users\ADMIN\Desktop\JumongPosV1.01\
+C:\dev\JumongPosV1.01\          # DEV PC repo (primary). Server keeps a read-only clone at C:\Users\ADMIN\Desktop\JumongPosV1.01
 ├── JumongPosV1.01.csproj      # WinForms client (.NET 8.0-windows)
 ├── JumongPos.db                # Local SQLite database (project root)
 ├── AGENTS.md                   # THIS FILE — agent guide
@@ -124,7 +124,8 @@ The batch file lives on the Desktop so it's easy to find. It must always be run 
 |---|---|
 | API executable | `C:\JumongAPI\JumongCloudAPI.exe` |
 | API output folder | `C:\JumongAPI\` (bin, wwwroot, config files) |
-| Client app output (DEV build target) | `C:\JumongAPI\client\JumongPosV1.01.exe` |
+| Client build output (DEV PC) | `C:\dev\out\client\JumongPosV1.01.exe` |
+| Client publish DROP (server, for stores' UPDATE APP) | `C:\JumongAPI\client\JumongPosV1.01.exe` |
 | HQ POS client (store machine) | `C:\Users\ADMIN\Desktop\JumongPosHW\JumongPosV1.01.exe` |
 | API port | `http://localhost:5000` |
 | LAN access | `http://192.168.1.39:5000` |
@@ -942,7 +943,7 @@ Remove-PSSession $s
 | **DASHBOARD HTML** | `JumongCloudAPI/wwwroot/index.html` + `order.html` | No build needed — refresh browser after edit |
 | **DASHBOARD JS** | `JumongCloudAPI/wwwroot/components.js` + `app.js` + `style.css` | No build needed — refresh browser after edit |
 | **CLOUD DB** | `JumongCloudAPI/Data/PgDatabaseHelper.cs` | Build + Restart-Service JumongCloudAPI |
-| **POS CLIENT** | `Forms/`, `Services/`, `Models/`, `Data/DatabaseHelper.cs` | `dotnet publish -c Release -r win-x64 --self-contained true -o C:\JumongAPI\client` |
+| **POS CLIENT** | `Forms/`, `Services/`, `Models/`, `Data/DatabaseHelper.cs` | `dotnet publish -c Release -r win-x64 --self-contained true -o C:\dev\out\client` → WinRM push to `C:\JumongAPI\client\` |
 | **MOBILE INV** | `Services/InventoryService.cs`, `Services/InventoryWebServer.cs` (port 5002) | Part of POS Client — publish kasama |
 
 ### Common CMDs
@@ -1115,7 +1116,11 @@ A console app that runs on each POS client machine, connecting outbound to the c
 ```powershell
 Set-Location tools\Agent
 dotnet publish -c Release -r win-x64 --self-contained true
-Compress-Archive -Force -Path "bin\Release\net8.0-windows\win-x64\publish\*" -DestinationPath "C:\JumongAPI\wwwroot\agent.zip"
+Compress-Archive -Force -Path "bin\Release\net8.0-windows\win-x64\publish\*" -DestinationPath "$env:TEMP\agent.zip"
+# push to the server via WinRM (from the dev PC)
+$s = New-PSSession -ComputerName DESKTOP-I097OO9 -Credential DESKTOP-I097OO9\remotedev
+Copy-Item -ToSession $s -Path "$env:TEMP\agent.zip" -Destination 'C:\JumongAPI\wwwroot\agent.zip'
+Remove-PSSession $s
 ```
 
 #### How to install on POS machine
@@ -1233,11 +1238,13 @@ Compress-Archive -Force -Path "bin\Release\net8.0-windows\win-x64\publish\*" -De
 
 ## Warehouse Mobile App (Android, WarehouseApp/)
 
-WebView wrapper app that loads https://admin.jumongdev.com/whmobile.html (login via whapp API, SELL/INVENTORY/SETUP tabs, Bluetooth thermal printing, in-app update). Source: Kotlin, no gradle wrapper — use system Gradle 8.14.3 from C:\Users\ADMIN\.gradle\wrapper\dists\gradle-8.14.3-bin\ with Android Studio JBR 21.
+WebView wrapper app that loads https://admin.jumongdev.com/whmobile.html (login via whapp API, SELL/INVENTORY/SETUP tabs, Bluetooth thermal printing, in-app update). Source: Kotlin, no gradle wrapper — use system Gradle 8.14.3 from C:\dev\gradle\gradle-8.14.3\ with Android Studio JBR 21.
+
+> **NOTE (2026-08-11):** APK builds still run on the **SERVER** (`C:\Users\ADMIN\Desktop\JumongPosV1.01\WarehouseApp`) until Android Studio + Android SDK are installed on the dev PC. The Gradle zip + keystores are already on the dev PC (`C:\dev\gradle\`, `C:\dev\JumongPosV1.01\WarehouseApp\*.keystore`). When the dev PC is APK-ready: `sdk.dir=C:/Users/<you>/AppData/Local/Android/Sdk` (forward slashes) in `local.properties`, `JAVA_HOME=C:\Program Files\Android\Android Studio\jbr`, and use `C:\dev\gradle\gradle-8.14.3\bin\gradle.bat`.
 
 ### Build & Sign
 `powershell
-Set-Location "C:\Users\ADMIN\Desktop\JumongPosV1.01\WarehouseApp"
+Set-Location "C:\Users\ADMIN\Desktop\JumongPosV1.01\WarehouseApp"   # SERVER (until dev PC has Android Studio)
 # local.properties must use FORWARD SLASHES (backslashes = invalid path in Java properties):
 #   sdk.dir=C:/Users/ADMIN/AppData/Local/Android/Sdk
 \C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot = "C:\Program Files\Android\Android Studio\jbr"
