@@ -228,7 +228,7 @@ static bool HasRecentErrors(string dbPath)
     {
         using var conn = new SQLiteConnection($"Data Source={dbPath}");
         conn.Open();
-        using var cmd = new SQLiteCommand("SELECT COUNT(*) FROM SyncLog WHERE Status != 'OK' AND CreatedAt > datetime('now', '-1 hour')", conn);
+        using var cmd = new SQLiteCommand("SELECT COUNT(*) FROM SyncLog WHERE Status != 'OK' AND CreatedAt > datetime('now', 'localtime', '-1 hour')", conn);
         var count = Convert.ToInt32(cmd.ExecuteScalar());
         return count > 0;
     }
@@ -243,7 +243,15 @@ static string GetErrorSummary(string baseDir)
         if (!File.Exists(logPath)) logPath = Path.Combine(baseDir, "error.log");
         if (!File.Exists(logPath)) return "";
         var lines = File.ReadAllLines(logPath);
-        var recent = lines.Where(l => l.Contains("[ERROR]") || l.Contains("Exception")).TakeLast(3).ToList();
+        var cutoff = DateTime.Now.AddHours(-2);
+        var recent = new List<string>();
+        for (int i = lines.Length - 1; i >= 0 && recent.Count < 3; i--)
+        {
+            var line = lines[i];
+            if (!line.StartsWith("[") || line.Length < 20) continue;
+            if (DateTime.TryParse(line.Substring(1, 19), out var ts) && ts < cutoff) break;
+            recent.Add(line);
+        }
         return string.Join(" | ", recent);
     }
     catch { return ""; }

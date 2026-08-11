@@ -113,10 +113,10 @@ The batch file lives on the Desktop so it's easy to find. It must always be run 
 |---|---|---|
 | `DESKTOP-I097OO9` @ `192.168.1.21` (Ethernet, 1 Gbps) + `192.168.1.41` (Wi-Fi) | **SERVER ONLY** (Cloud API host, no dev) | API service at `C:\JumongAPI\` (+ client drop `C:\JumongAPI\client\`), Cloudflare tunnel, PostgreSQL, Cloudflare config. Repo clone kept at `C:\Users\ADMIN\Desktop\JumongPosV1.01` (read-only reference — NO dev work here anymore) |
 | `DESKTOP-Q36S34R` @ `192.168.1.55` | **DEV PC (all development happens here)** | Cloned repo at **`C:\dev\JumongPosV1.01`**, non-git assets at `C:\dev\extras\`, client publish output `C:\dev\out\client`, Gradle at `C:\dev\gradle\gradle-8.14.3`, dev DB `C:\dev\JumongPosV1.01\JumongPos.db` (STORE-DEV-0001) |
-| `DESKTOP-UU8E0D4` @ `192.168.1.37` | **HQ store (Andengs Superstore - HQ)** | POS client at **`C:\Users\ADMIN\Desktop\JumongPosHW\`** ← NOT in `C:\JumongAPI\client\` |
-| `DESKTOP-TK63MO6` @ `192.168.1.4` | HVR store | (needs path verify) |
+| `DESKTOP-UU8E0D4` @ `192.168.1.26` | **HQ store (Andengs Superstore - HQ)** | POS client at **`C:\Users\ADMIN\Desktop\JumongPosHW\`** ← NOT in `C:\JumongAPI\client\` |
+| `DESKTOP-TK63MO6` @ `192.168.1.15` | HVR store | POS client at `C:\Users\Admin\Desktop\JumongPos\` (verified 2026-08-12) |
 | `DESKTOP-NISQ3Q7` @ `192.168.1.152` | U Got Minimart - Naic | (needs path verify) |
-| `DESKTOP-TK63MO6` @ `192.168.0.100` | ACGS - Naic Market | (needs path verify) |
+| `DESKTOP-TK63MO6` @ `192.168.0.103` | ACGS - Naic Market | POS client at `C:\JumongPos\` (verified 2026-08-12) |
 
 > **GOTCHA:** `C:\JumongAPI\client\` is where the **newest client build gets published** on the dev/API host — it is NOT the running install on the HQ machine. The real HQ POS runs from `C:\Users\ADMIN\Desktop\JumongPosHW\` on the HQ machine. When diagnosing/fixing a store, always target the correct machine via the Agent (see Agent section), not the local `C:\JumongAPI\client\` folder.
 
@@ -190,10 +190,10 @@ Invoke-Command -Session $s -ScriptBlock { "OK on $env:COMPUTERNAME" }
 ## Stores (in Cloud / Local PG)
 | Store ID | Name | Machine | IP |
 |---|---|---|---|
-| `STORE-20260602-7159` | Andengs Superstore - HQ | DESKTOP-UU8E0D4 | 192.168.1.37 |
-| `STORE-20260602-AA36` | Andengs Superstore - HVR | DESKTOP-TK63MO6 | 192.168.1.4 |
+| `STORE-20260602-7159` | Andengs Superstore - HQ | DESKTOP-UU8E0D4 | 192.168.1.26 |
+| `STORE-20260602-AA36` | Andengs Superstore - HVR | DESKTOP-TK63MO6 | 192.168.1.15 |
 | `STORE-20260622-E174` | U Got Minimart - Naic | DESKTOP-NISQ3Q7 | 192.168.1.152 |
-| `STORE-20260626-A80C` | ACGS - Naic Market | DESKTOP-TK63MO6 | 192.168.0.100 |
+| `STORE-20260626-A80C` | ACGS - Naic Market | DESKTOP-TK63MO6 | 192.168.0.103 |
 | `STORE-DEV-0001` | DEV - Local Testing | — | — |
 | `STORE-WAREHOUSE` | Warehouse (whapp) | — | — |
 
@@ -1153,6 +1153,8 @@ Remove-PSSession $s
 - Agent timeout: 15 minutes (for large file downloads)
 - No GUI required — works fully over CLI/API
 - **Auto-start is at Windows LOGON level, NOT POS-app-open** (v1.1.35+): both `Program.cs StartAgent()` and the Agent itself write the `HKCU\...\CurrentVersion\Run` → `JumongPosAgent` Run key (pointing at `Agent\Agent.exe`), and `StopAgent()` is an empty no-op. So the agent starts at every Windows logon even if the POS app is never opened, and survives POS app close/lock screen. **Caveat:** HKCU Run fires only when a Windows user logs in — if the PC sits at the login screen (e.g., overnight reboot, nobody logged in), the agent does NOT run until someone logs in. A Windows-service/SYSTEM scheduled-task install would be needed for boot-time-without-login coverage — decided NOT worth it (store is closed anyway).
+- **Dev PC agent = SYSTEM scheduled task (NOT HKCU Run):** the dev PC (`DESKTOP-Q36S34R`, `STORE-DEV-0001`) agent runs as the `JumongPosAgent` scheduled task created with `schtasks /create /tn JumongPosAgent /tr "C:\dev\JumongPosV1.01\Agent\Agent.exe" /sc ONSTART /ru SYSTEM /rl HIGHEST /f` — boots without logon and has full admin power (needed because the server's WinRM token into the dev PC is filtered/non-admin). Only reachable when the dev PC is on. On the dashboard it shows `v?` OUTDATED — cosmetic only (no POS exe next to the agent to read the version from).
+- **Agent error badge gotcha (fixed v1.1.40 agent):** `hasError` used to compare `SyncLog.CreatedAt` (local time) against `datetime('now','-1 hour')` (UTC) — PH is UTC+8, so old failures kept the red ERROR badge lit for up to ~9 hours. Fixed to `datetime('now','localtime','-1 hour')`; `errorSummary` now shows only entries from the last 2 hours (timestamped headers). Stores need the new agent.zip deployed to clear stale badges.
 
 ### v1.1.08–v1.1.15 — Bidirectional Sync, Inventory Fixes, Transfer Rework, Agent Dashboard, Warehouse Viewer
 
@@ -1205,7 +1207,7 @@ Remove-PSSession $s
 |---|---|
 | Check | Queried local PostgreSQL (`sales`, `stock_trails` per store) + `/api/dashboard/agent/status` endpoint |
 | Result | **All 4 POS clients already on `admin.jumongdev.com`** — every store has sales + stock trails on 2026-08-06, all agents heartbeat to the local server (last seen within the minute) |
-| Stores confirmed | HQ `7159` (DESKTOP-UU8E0D4 / 192.168.1.37 / app 1.1.27), HVR `AA36` (DESKTOP-TK63MO6 / 192.168.1.4 / app 1.1.25), U Got Minimart `E174` (DESKTOP-NISQ3Q7 / 192.168.1.152 / app 1.1.28), ACGS `A80C` (DESKTOP-TK63MO6 / 192.168.0.100 / app 1.1.30) |
+| Stores confirmed | HQ `7159` (DESKTOP-UU8E0D4 / 192.168.1.26 / app 1.1.38), HVR `AA36` (DESKTOP-TK63MO6 / 192.168.1.15 / app 1.1.38), U Got Minimart `E174` (DESKTOP-NISQ3Q7 / 192.168.1.152 / app 1.1.38), ACGS `A80C` (DESKTOP-TK63MO6 / 192.168.0.103 / app 1.1.38) |
 | Action | None taken — DO App Platform + Managed PostgreSQL now safe to cancel. App ID `1bc1369e-6ece-4645-be57-1a7fcf7e90b8`, DB ID `c6bababf-6a01-418a-9244-a830526f83b3` |
 
 **Impact:** No client is pointed at DigitalOcean anymore — their data lands on the local server. The old "4 POS clients still pointing here" note is removed; Stores table now lists all 4 with machine/IP; Key Decision #15 marked DONE.
@@ -1563,3 +1565,23 @@ Copy JumongWarehouse.apk to JumongCloudAPI\wwwroot\updates\ AND JumongCloudAPI\b
 | `AGENTS.md` | Fixed 12 U+FFFD mojibake chars (v1.0.85–1.0.90 section) from last night's bad encoding save |
 
 **Impact:** Every print path in the POS client (receipts already bold, now also CHECKLIST + credit statement) and every mobile warehouse print (ESC/POS ESC E bold) prints bold. Cheap thermal clones universally support `ESC E`; if a specific printer ignores it, fallback is `ESC !` bit 3 (not yet needed). Client published to `C:\JumongAPI\client`; APK live at `admin.jumongdev.com/updates/JumongWarehouse.apk` (verified 200).
+
+### v1.1.40 (Agent only) — Fix Stale ERROR Badges on AGENTS Dashboard
+
+| File | Change |
+|---|---|
+| `tools/Agent/Program.cs:231` | **`HasRecentErrors` timezone fix** — was `CreatedAt > datetime('now','-1 hour')` (UTC), but `SyncLog.CreatedAt` is stored as localtime. PH is UTC+8, so any failure from the last ~9 hours counted as "recent", keeping the red ERROR badge lit long after the store recovered. Now `datetime('now','localtime','-1 hour')` — badge clears ~1 hour after the last real failure. |
+| `tools/Agent/Program.cs:246-257` | **`GetErrorSummary` rewrite** — was returning the last 3 lines containing `[ERROR]`/`Exception` anywhere in the whole error.log (stale stack traces shown forever). Now walks backward from the end, parses the `[yyyy-MM-dd HH:mm:ss]` header on each entry, and shows at most 3 entries newer than 2 hours (timestamps included). |
+| — | Rebuilt agent (`dotnet publish -c Release -r win-x64 --self-contained true`), refreshed `agent.zip` at `C:\JumongAPI\wwwroot\agent.zip` (34.7 MB, live 200), and pushed to all 3 erroring stores via `ps` command (download zip → kill Agent.exe → expand → start). All stores verified: `hasError=false`, summaries show only current-window entries. |
+
+**Impact:** The AGENTS dashboard no longer shows stale red ERROR badges for hours after recovery. Root cause of the 2026-08-11 badges: HQ/HVR/ACGS had real sync failures (DNS "No such host is known" + TCP connect timeouts on `FetchPromoMessageAsync`/`DownloadCustomersAsync`, last FAILs 19:47/18:44/18:43 PH) — those were transient (store internet/DNS outage window), all stores reconnected and synced OK afterwards (Naic never had recent failures). Agent-only change — no POS client or API deploy needed; stores with the new agent.zip already updated.
+
+### 2026-08-12 — Store IP + POS Path Verification (via agents)
+
+| Item | Detail |
+|---|---|
+| HQ | `DESKTOP-UU8E0D4` @ `192.168.1.26` (was .37, DHCP change), POS at `C:\Users\ADMIN\Desktop\JumongPosHW\`, agent at `...\JumongPosHW\agent\Agent.exe` |
+| HVR | `DESKTOP-TK63MO6` @ `192.168.1.15` (was .4, DHCP change), POS at `C:\Users\Admin\Desktop\JumongPos\`, agent at `...\JumongPos\Agent\Agent.exe` |
+| ACGS | `DESKTOP-TK63MO6` @ `192.168.0.103` (was .100, DHCP change), POS at `C:\JumongPos\`, agent at `C:\JumongPos\Agent\Agent.exe` |
+| Naic | `DESKTOP-NISQ3Q7` @ `192.168.1.152` (unchanged) |
+| Note | Machine Roles table + Stores table in AGENTS.md updated to verified IPs/paths. All 4 stores confirmed on app v1.1.38, all CloudApiUrl = `https://admin.jumongdev.com/api`. |
