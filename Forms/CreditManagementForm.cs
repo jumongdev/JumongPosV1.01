@@ -326,7 +326,7 @@ public partial class CreditManagementForm : Form
             var doc = new System.Drawing.Printing.PrintDocument();
             doc.PrintPage += (s, args) =>
             {
-                var font = new Font("Consolas", 10F);
+                var font = new Font("Consolas", 10F, FontStyle.Bold);
                 var lines = stmt.Split('\n');
                 if (args.Graphics == null) return;
                 float y = args.MarginBounds.Top;

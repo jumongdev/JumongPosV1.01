@@ -1,1 +1,1 @@
-{"version": "1.0.14", "changelog": "v1.0.14: Search shows printers only (phones/speakers filtered out). Tap a printer row to connect (Loyverse-style). Connect now has a hard 8-second timeout - no more app freeze when the printer is busy."}
+{"version": "1.0.15", "changelog": "v1.0.15: All receipts print in BOLD (ESC E) - sale, reprint, receiving, end shift, credit payment, inventory."}

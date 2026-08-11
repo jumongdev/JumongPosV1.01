@@ -412,6 +412,7 @@ object BluetoothPrinter {
                 "right" -> out.write(ESC_ALIGN_RIGHT)
                 else -> out.write(ESC_ALIGN_LEFT)
             }
+            out.write(ESC_BOLD_ON)
             out.write(content.toByteArray(Charsets.US_ASCII))
             out.write('\n'.code)
         }
@@ -429,8 +430,11 @@ object BluetoothPrinter {
     fun printTest() {
         val out = ByteArrayOutputStream()
         out.write(ESC_ALIGN_CENTER)
+        out.write(ESC_BOLD_ON)
         out.write("JUMONG WAREHOUSE\n".toByteArray(Charsets.US_ASCII))
+        out.write(ESC_BOLD_ON)
         out.write("Bluetooth Printer OK\n".toByteArray(Charsets.US_ASCII))
+        out.write(ESC_BOLD_ON)
         out.write("Testing...\n".toByteArray(Charsets.US_ASCII))
         out.write('\n'.code)
         out.write('\n'.code)
@@ -450,6 +454,7 @@ object BluetoothPrinter {
     private val ESC_ALIGN_CENTER = byteArrayOf(ESC, 0x61, 0x01)
     private val ESC_ALIGN_RIGHT = byteArrayOf(ESC, 0x61, 0x02)
     private val ESC_NL = byteArrayOf(ESC, 0x64, 0x01)
+    private val ESC_BOLD_ON = byteArrayOf(ESC, 0x45, 0x01)
     private val ESC_FEED_3 = byteArrayOf(ESC, 0x64, 0x03)
     private val ESC_CUT = byteArrayOf(GS, 0x56, 0x42, 0x00)
 }

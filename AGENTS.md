@@ -1,4 +1,4 @@
-# JumongPOS — Full Project Guide for AI Agents
+﻿# JumongPOS — Full Project Guide for AI Agents
 
 ## Project Structure
 ```
@@ -949,20 +949,20 @@ Restart-Service JumongCloudAPI
 | File | Change |
 |---|---|
 | Data/DatabaseHelper.cs | Added migration: seeds default QR codes (GCash) in StoreQrCodes setting; adds ssets/ folder creation on startup |
-| Forms/SettingsForm.cs:469-513 | Added **QR CODES** section (Admin only) � DataGridView with HEADER/FILE columns, +ADD/REMOVE buttons, loaded/saved via StoreQrCodes JSON setting |
+| Forms/SettingsForm.cs:469-513 | Added **QR CODES** section (Admin only) — DataGridView with HEADER/FILE columns, +ADD/REMOVE buttons, loaded/saved via StoreQrCodes JSON setting |
 | Forms/SalesForm.cs:1168-1195,1208,1226,1244,1356-1379,1409-1447,1498-1505 | Added QR carousel in right panel: _pbQr PictureBox, _lblQrHeader, _btnQrPrev/_btnQrNext nav buttons, _qrEntries list, LoadQrCodes(), ShowQrIndex(), Recalc() layout below Pay button |
 | Services/AppVersion.cs | Current bumped to "1.0.85" |
 
 **Impact:** POS sales screen shows QR code images (GCash, Maya, etc.) in right panel below totals. Admin configures in Settings.
 
-### v1.0.86 � Inventory Reconciliation in End Shift
+### v1.0.86 — Inventory Reconciliation in End Shift
 
 | File | Change |
 |---|---|
 | Models/DailyClose.cs | Added TotalInventoryCost, TotalCostSold, TotalStockReceivedCost |
 | Data/DatabaseHelper.cs | Migration: adds TotalInventoryCost, TotalCostSold, TotalStockReceivedCost columns |
 | Services/DailyCloseService.cs:64 | GetShiftTotals() returns 10-element tuple. Added GetLastInventoryCost(). |
-| Forms/EndShiftForm.cs:98-107 | Computes 	otalInvCost = SUM(StockQty � Cost) before save |
+| Forms/EndShiftForm.cs:98-107 | Computes 	otalInvCost = SUM(StockQty — Cost) before save |
 | Services/PrinterService.cs | Prints **Inventory Reconciliation** section with variance |
 | Services/EmailService.cs | Inventory reconciliation table in end-shift email |
 | Services/SyncService.cs | SyncDailyClose() includes new fields |
@@ -972,29 +972,29 @@ Restart-Service JumongCloudAPI
 
 **Impact:** End shift captures total inventory cost, COGS, stock received cost. Prints/emails reconciliation with variance.
 
-### v1.0.87 � QR Click-to-Enlarge, Browse Button, Crash Fixes
+### v1.0.87 — QR Click-to-Enlarge, Browse Button, Crash Fixes
 
 | File | Change |
 |---|---|
-| Forms/SalesForm.cs:1175-1190 | Click handler on QR PictureBox � opens full-size maximized Form |
+| Forms/SalesForm.cs:1175-1190 | Click handler on QR PictureBox — opens full-size maximized Form |
 | Forms/SalesForm.cs:1191 | ToolTip "Click to enlarge" on QR |
 | Forms/SettingsForm.cs:501-513 | ADD QR now opens file picker, auto-copies to assets/ |
 | Forms/SettingsForm.cs:519 | QR section height 235?275 (buttons were clipped) |
-| Services/SyncService.cs:914,932 | Fixed InvalidCastException � Convert.ToInt32() for SQLite long |
+| Services/SyncService.cs:914,932 | Fixed InvalidCastException — Convert.ToInt32() for SQLite long |
 | Services/AppVersion.cs | Current bumped to "1.0.87" |
 
-### v1.0.88 � Auto-Cleanup on Startup (Slow HDD Fix)
+### v1.0.88 — Auto-Cleanup on Startup (Slow HDD Fix)
 
 | File | Change |
 |---|---|
-| Helpers/ErrorLogger.cs | Added TrimLog() � keeps last 500 lines if error.log > 1MB |
+| Helpers/ErrorLogger.cs | Added TrimLog() — keeps last 500 lines if error.log > 1MB |
 | Services/EmailService.cs:407-410 | FlushQueue() discards entries older than 7 days |
 | Program.cs:66-71 | Startup: ErrorLogger.TrimLog(), delete SyncLog > 30 days |
 | Services/AppVersion.cs | Current bumped to "1.0.88" |
 
 **Impact:** Fixes 5-10 min startup on HDD. Logs auto-trim. Old failed emails cleared.
 
-### v1.0.89 � POS Promo Message (Local Settings)
+### v1.0.89 — POS Promo Message (Local Settings)
 
 | File | Change |
 |---|---|
@@ -1006,7 +1006,7 @@ Restart-Service JumongCloudAPI
 | Forms/SalesForm.cs:1435-1436 | Loads PosPromoMessage from local Settings |
 | Services/AppVersion.cs | Current bumped to "1.0.89" |
 
-### v1.0.90 � Cloud-Managed POS Promo (Dashboard + Auto-Fetch)
+### v1.0.90 — Cloud-Managed POS Promo (Dashboard + Auto-Fetch)
 
 | File | Change |
 |---|---|
@@ -1015,9 +1015,9 @@ Restart-Service JumongCloudAPI
 | JumongCloudAPI/wwwroot/components.js:953-973 | posPromoPanel Alpine component |
 | JumongCloudAPI/wwwroot/index.html:62 | POS Promo nav item in sidebar |
 | JumongCloudAPI/wwwroot/index.html:1988-2012 | POS Promo section panel with textarea + SAVE |
-| Services/SyncService.cs:976-994 | FetchPromoMessageAsync() � cloud API with local fallback |
+| Services/SyncService.cs:976-994 | FetchPromoMessageAsync() — cloud API with local fallback |
 | Forms/SalesForm.cs:1441-1456 | FetchCloudPromoAsync() after LoadQrCodes |
-| Forms/SettingsForm.cs:504-516 | Fixed IOEception in ADD QR � delete + retry on locked file |
+| Forms/SettingsForm.cs:504-516 | Fixed IOEception in ADD QR — delete + retry on locked file |
 | Services/AppVersion.cs | Current bumped to "1.0.90" |
 
 **Impact:** Admin sets promo message once on dashboard, all POS clients auto-fetch. Falls back to local setting if cloud unreachable.
@@ -1492,3 +1492,17 @@ Copy JumongWarehouse.apk to JumongCloudAPI\wwwroot\updates\ AND JumongCloudAPI\b
 | `JumongCloudAPI/Controllers/DashboardController.cs:1173` | Version bumped to `"1.1.13"`. |
 
 **Impact:** Dashboard CASHIER PERFORMANCE no longer shows mystery "Cashier #N" rows (resolves to last known name). Mobile end shift works with the soft keyboard open, history is reachable, and any old shift can be reprinted. Warehouse sellers can now collect customer credit payments on the phone — balance decremented, Payment trail in credit_transactions (feeds `creditCollected` in end shift), thermal voucher printed, and per-receipt FIFO breakdown shows exactly which invoices still owe (wholesale only — retail POS receipts excluded by `store_id=''` filter on payments). Requires v1.1.13 API deploy (`deploy_api.bat` as admin). Web files already live.
+
+### v1.1.39 (POS) + v1.0.15 (APK) — All Print Fonts Bold
+
+| File | Change |
+|---|---|
+| `Forms/ProductsForm.cs:383` | CHECKLIST print font: `new Font("Courier New", 9F)` — added `FontStyle.Bold` (was Regular) |
+| `Forms/CreditManagementForm.cs:329` | Credit statement PRINT font: `new Font("Consolas", 10F)` — added `FontStyle.Bold` (was Regular) |
+| `WarehouseApp/.../BluetoothPrinter.kt` | **ESC_BOLD_ON** (`0x1B 0x45 0x01`) written before every line's content in `printText()` and `printTest()` — all mobile thermal prints (sale receipt, reprint, receiving voucher, end shift, credit payment, inventory) now print BOLD |
+| `WarehouseApp/app/build.gradle` | versionCode 16, versionName `"1.0.15"` |
+| `JumongCloudAPI/wwwroot/updates/warehouse-version.json` | `"1.0.15"` changelog; rebuilt + signed APK (same jumong_sign keystore) deployed to all update folders, no BOM |
+| `Services/AppVersion.cs` | Current bumped to `"1.1.39"` |
+| `AGENTS.md` | Fixed 12 U+FFFD mojibake chars (v1.0.85–1.0.90 section) from last night's bad encoding save |
+
+**Impact:** Every print path in the POS client (receipts already bold, now also CHECKLIST + credit statement) and every mobile warehouse print (ESC/POS ESC E bold) prints bold. Cheap thermal clones universally support `ESC E`; if a specific printer ignores it, fallback is `ESC !` bit 3 (not yet needed). Client published to `C:\JumongAPI\client`; APK live at `admin.jumongdev.com/updates/JumongWarehouse.apk` (verified 200).

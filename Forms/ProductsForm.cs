@@ -380,7 +380,7 @@ public partial class ProductsForm : Form
             var leftMargin = pageW * marginL / paperW;
             var rightMargin = pageW * marginR / paperW;
 
-            using var font = new Font("Courier New", 9F);
+            using var font = new Font("Courier New", 9F, FontStyle.Bold);
             var sf = StringFormat.GenericTypographic;
             var lines = reportText.Split('\n');
             if (args.Graphics == null) return;
