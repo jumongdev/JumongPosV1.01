@@ -393,6 +393,7 @@
           <div class="menu-row" onclick="goOrders()"><span>🛒</span>Online Order</div>
           <div class="menu-row" onclick="goTransfers()"><span>🚚</span>Transfer</div>
           <div class="menu-row" onclick="goReceiving()"><span>📥</span>Receiving</div>
+          <div class="menu-row" onclick="openCreditBilling()"><span>💳</span>Credit Billing</div>
           <div class="menu-row" onclick="goEndShift()"><span>🔒</span>End Shift</div>
         </div>
 
@@ -438,6 +439,60 @@
       </div>
     </div>
 
+    <!-- CREDIT BILLING MODAL -->
+    <div id="creditModal" class="hidden fixed inset-0 z-[60] flex items-start justify-center bg-black/70 px-4 pt-[8vh]" onclick="if(event.target===this)closeCreditBilling()">
+      <div class="bg-[#16163a] w-full max-w-sm rounded-2xl p-5 border border-[#222255] pb-8 max-h-[80vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-white font-bold text-base">💳 CREDIT BILLING</p>
+          <button onclick="closeCreditBilling()" class="text-red-400 text-lg font-bold">✕</button>
+        </div>
+        <div class="flex gap-2 mb-3">
+          <input id="creditSearch" class="input-field flex-1" type="text" placeholder="🔍 Search name" enterkeyhint="search">
+          <button class="btn-ghost px-4" onclick="loadCreditBilling()">SEARCH</button>
+        </div>
+        <div id="creditList" class="space-y-2"></div>
+      </div>
+    </div>
+
+    <!-- CREDIT BREAKDOWN MODAL -->
+    <div id="creditBreakdownModal" class="hidden fixed inset-0 z-[65] flex items-start justify-center bg-black/70 px-4 pt-[6vh]" onclick="if(event.target===this)closeCreditBreakdown()">
+      <div class="bg-[#16163a] w-full max-w-sm rounded-2xl p-5 border border-[#222255] pb-8 max-h-[85vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-white font-bold text-base" id="creditBreakdownTitle">CREDIT</p>
+          <button onclick="closeCreditBreakdown()" class="text-red-400 text-lg font-bold">✕</button>
+        </div>
+        <div class="card mb-3 text-center">
+          <p class="text-[10px] text-[#5a5a8a] uppercase tracking-wider font-bold">Total Balance</p>
+          <p class="text-orange-400 font-bold text-3xl my-1" id="creditBreakdownBalance">—</p>
+          <p class="text-gray-500 text-[11px]" id="creditBreakdownSub"></p>
+        </div>
+        <div id="creditBreakdownList" class="space-y-2"></div>
+        <button class="btn-green w-full mt-3" onclick="openCreditPayFromBreakdown()">💵 COLLECT PAYMENT</button>
+      </div>
+    </div>
+
+    <!-- CREDIT PAY MODAL -->
+    <div id="creditPayModal" class="hidden fixed inset-0 z-[70] flex items-start justify-center bg-black/70 px-4 pt-[15vh]" onclick="if(event.target===this)closeCreditPay()">
+      <div class="bg-[#16163a] w-full max-w-sm rounded-2xl p-5 border border-[#222255] pb-8">
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-white font-bold text-base" id="creditPayTitle">CREDIT PAYMENT</p>
+          <button onclick="closeCreditPay()" class="text-red-400 text-lg font-bold">✕</button>
+        </div>
+        <div class="card mb-3">
+          <div class="flex justify-between text-sm"><span class="text-gray-400">Customer</span><span class="text-white font-bold" id="creditPayCustomer">—</span></div>
+          <div class="flex justify-between text-sm mt-1"><span class="text-gray-400">Current Balance</span><span class="text-orange-400 font-bold" id="creditPayBalance">—</span></div>
+        </div>
+        <div class="space-y-3 mb-4">
+          <select id="creditPayMethod" class="input-field">
+            <option value="Cash">Cash</option>
+            <option value="E-Wallet">E-Wallet</option>
+          </select>
+          <input id="creditPayAmount" class="input-field" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount to collect" enterkeyhint="done">
+        </div>
+        <button class="btn-green w-full" onclick="submitCreditPay()">💵 RECORD PAYMENT</button>
+      </div>
+    </div>
+
     <!-- SALE ITEMS MODAL -->
     <div id="saleItemsModal" class="hidden fixed inset-0 z-50 flex items-end justify-center bg-black/70" onclick="if(event.target===this)closeSaleItems()">
       <div class="bg-[#16163a] w-full max-w-sm rounded-t-2xl p-5 border-t border-[#222255] pb-8 max-h-[75vh] overflow-y-auto">
@@ -452,7 +507,7 @@
     </div>
 
     <!-- TX ITEMS MODAL (orders / transfers) -->
-    <div id="txItemsModal" class="hidden fixed inset-0 z-50 flex items-end justify-center bg-black/70" onclick="if(event.target===this)closeTxItems()">
+    <div id="txItemsModal" class="hidden fixed inset-0 z-[60] flex items-end justify-center bg-black/70" onclick="if(event.target===this)closeTxItems()">
       <div class="bg-[#16163a] w-full max-w-sm rounded-t-2xl p-5 border-t border-[#222255] pb-8 max-h-[75vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-4">
           <p class="text-white font-bold text-base" id="txItemsTitle"></p>
@@ -485,8 +540,8 @@
     </div>
 
     <!-- END SHIFT MODAL -->
-    <div id="endShiftModal" class="hidden fixed inset-0 z-50 flex items-end justify-center bg-black/70" onclick="if(event.target===this)closeEndShift()">
-      <div class="bg-[#16163a] w-full max-w-sm rounded-t-2xl p-5 border-t border-[#222255] pb-8 max-h-[88vh] overflow-y-auto">
+    <div id="endShiftModal" class="hidden fixed inset-0 z-50 flex items-start justify-center bg-black/70 px-4 pt-[8vh]" onclick="if(event.target===this)closeEndShift()">
+      <div class="bg-[#16163a] w-full max-w-sm rounded-2xl p-5 border border-[#222255] pb-8 max-h-[80vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-4">
           <p class="text-white font-bold text-base">🔒 END SHIFT</p>
           <div class="flex items-center gap-2">
@@ -1370,6 +1425,145 @@
           box.appendChild(d);
         });
       } catch (e) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Failed: ' + e.message + '</p>'; }
+    }
+
+    // ─── CREDIT BILLING ─────────────────────────────────────
+    let creditCustomers = [];
+    let creditTarget = null;
+
+    function openCreditBilling() {
+      closeBurgerMenu();
+      document.getElementById('creditSearch').value = '';
+      show(document.getElementById('creditModal'));
+      loadCreditBilling();
+    }
+    function closeCreditBilling() { hide(document.getElementById('creditModal')); }
+    function closeCreditPay() { hide(document.getElementById('creditPayModal')); }
+
+    async function loadCreditBilling() {
+      const q = document.getElementById('creditSearch').value.trim().toLowerCase();
+      const box = document.getElementById('creditList');
+      box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading...</p>';
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/credit-billing', { signal: AbortSignal.timeout(12000) });
+        const data = await r.json();
+        box.innerHTML = '';
+        creditCustomers = data || [];
+        const owed = creditCustomers.filter(c => !q || String(c.name).toLowerCase().includes(q));
+        if (!owed.length) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">No customers with credit balance</p>'; return; }
+        owed.forEach(c => {
+          const d = document.createElement('div');
+          d.className = 'cart-item cursor-pointer';
+          d.innerHTML = '<div class="flex-1" onclick="openCreditBreakdown(' + c.id + ')"><p class="text-white text-xs font-bold">' + c.name + '</p>' +
+            '<p class="text-gray-500 text-[10px]">' + (c.phone || 'no phone') + '<span class="text-amber-500/80"> • ' + Number(c.billed).toFixed(2) + ' billed / ' + Number(c.paid).toFixed(2) + ' paid</span></p></div>' +
+            '<div class="text-right"><p class="text-orange-400 font-bold text-xs">₱' + Number(c.wholesaleBalance).toFixed(2) + '</p>' +
+            '<button class="btn-green px-3 py-1.5 text-[10px] mt-0.5" onclick="openCreditBreakdown(' + c.id + ')">VIEW</button></div>';
+          box.appendChild(d);
+        });
+      } catch (e) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Failed: ' + e.message + '</p>'; }
+    }
+
+    function openCreditPay(id) {
+      const c = creditTarget = (creditCustomers.find(x => x.id === id)) || null;
+      if (!c) { toast('Customer not loaded', 'error'); return; }
+      const bal = Number(c.wholesaleBalance != null ? c.wholesaleBalance : c.creditBalance);
+      document.getElementById('creditPayTitle').textContent = '💳 PAYMENT';
+      document.getElementById('creditPayCustomer').textContent = c.name;
+      document.getElementById('creditPayBalance').textContent = '₱' + bal.toFixed(2);
+      document.getElementById('creditPayAmount').value = '';
+      show(document.getElementById('creditPayModal'));
+      setTimeout(() => document.getElementById('creditPayAmount').focus(), 100);
+    }
+
+    function closeCreditBreakdown() { hide(document.getElementById('creditBreakdownModal')); }
+
+    let creditBreakdownCustomer = null;
+
+    async function openCreditBreakdown(id) {
+      const c = creditCustomers.find(x => x.id === id);
+      creditBreakdownCustomer = c || { id, name: 'Customer #' + id, wholesaleBalance: creditTotalFor(id) };
+      const box = document.getElementById('creditBreakdownList');
+      box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading...</p>';
+      show(document.getElementById('creditBreakdownModal'));
+      document.getElementById('creditBreakdownTitle').textContent = (c ? c.name : 'Customer —') + ' CREDIT';
+      document.getElementById('creditBreakdownBalance').textContent = '—';
+      document.getElementById('creditBreakdownSub').textContent = '';
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/credit-breakdown?customerId=' + id, { signal: AbortSignal.timeout(12000) });
+        const j = await r.json();
+        if (!r.ok) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Failed to load</p>'; return; }
+        document.getElementById('creditBreakdownTitle').textContent = j.name + ' — CREDIT';
+        document.getElementById('creditBreakdownBalance').textContent = '₱' + Number(j.totalBalance).toFixed(2);
+        document.getElementById('creditBreakdownSub').textContent = '₱' + Number(j.paidTotal).toFixed(2) + ' paid so far';
+        box.innerHTML = '';
+        if (!j.receipts || !j.receipts.length) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">No receipts</p>'; }
+        j.receipts.forEach(x => {
+          const dt = new Date(x.date);
+          const cls = Number(x.remaining) <= 0 ? 'text-emerald-400' : 'text-orange-400';
+          const d = document.createElement('div');
+          d.className = 'cart-item';
+          d.innerHTML = '<div class="flex-1"><p class="text-white text-xs font-bold">' + x.invoiceNo + '</p>' +
+            '<p class="text-gray-500 text-[10px]">' + dt.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: '2-digit' }) + ' • ' + fmtMoney(x.amount) + '</p></div>' +
+            '<div class="text-right"><p class="text-xs font-bold ' + cls + '">' + (Number(x.remaining) <= 0 ? 'PAID' : fmtMoney(x.remaining)) + '</p></div>';
+          box.appendChild(d);
+        });
+      } catch (e) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Failed: ' + e.message + '</p>'; }
+    }
+
+    function creditTotalFor(id) {
+      const c = creditCustomers.find(x => x.id === id);
+      return c ? c.wholesaleBalance : 0;
+    }
+
+    function openCreditPayFromBreakdown() {
+      const c = creditBreakdownCustomer;
+      if (!c) { toast('Customer not loaded', 'error'); return; }
+      creditTarget = c;
+      const bal = Number(c.wholesaleBalance != null ? c.wholesaleBalance : c.creditBalance);
+      document.getElementById('creditPayTitle').textContent = '💳 PAYMENT';
+      document.getElementById('creditPayCustomer').textContent = c.name;
+      document.getElementById('creditPayBalance').textContent = '₱' + bal.toFixed(2);
+      document.getElementById('creditPayAmount').value = '';
+      show(document.getElementById('creditPayModal'));
+      setTimeout(() => document.getElementById('creditPayAmount').focus(), 100);
+    }
+
+    async function submitCreditPay() {
+      if (!creditTarget) return;
+      const amt = Math.max(0, Number(document.getElementById('creditPayAmount').value || 0));
+      if (amt <= 0) { toast('Enter amount', 'error'); return; }
+      const maxBal = Number(creditTarget.wholesaleBalance != null ? creditTarget.wholesaleBalance : creditTarget.creditBalance);
+      if (amt > maxBal) { toast('Amount exceeds balance', 'error'); return; }
+      const method = document.getElementById('creditPayMethod').value;
+      const body = { customerId: creditTarget.id, amount: amt, method, cashierName: session.fullName || session.username || '' };
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/credit-pay', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const j = await r.json();
+        if (!r.ok) { toast(j.error || 'Payment failed', 'error'); return; }
+        toast('Payment recorded: ₱' + amt.toFixed(2) + ' from ' + j.customerName);
+        closeCreditPay();
+        loadCreditBilling();
+        if (IN_APP && AndroidPrinter.isConnected()) {
+          const bal = Number(j.balance || 0);
+          const t = '<<CENTER>>JUMONG POS\n<<CENTER>>' + fit(session.storeName || '') + '\n<<CENTER>>─── CREDIT PAYMENT ───\n' +
+            padDL('Customer', j.customerName) + padDL('Method', method) + padDL('Amount', '₱' + amt.toFixed(2)) +
+            padDL('Remaining', '₱' + bal.toFixed(2)) + '\n<<CENTER>>' + new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) + '\n<<CENTER>>THANK YOU!\n';
+          const pr = AndroidPrinter.print(t);
+          if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
+        }
+      } catch (e) { toast('Failed: ' + e.message, 'error'); }
+    }
+
+    function padDL(label, amount) {
+      const W = paperWidth <= 50 ? 32 : 48;
+      const f = s => { const str = String(s); return str.length > W ? str.slice(0, W - 1) + '~' : str; };
+      const l = f(label); const a = f(amount);
+      const padN = W - l.length - a.length;
+      return (padN > 0 ? l + ' '.repeat(padN) + a : l + ' ' + a) + '\n';
     }
 
     // ─── CHECKOUT ────────────────────────────────────────────
@@ -2570,7 +2764,7 @@
         document.getElementById('esTotalEw').textContent = fmtMoney(p.totalEw);
         document.getElementById('esTotalCredit').textContent = fmtMoney(p.totalCredit);
         document.getElementById('esTotalVoided').textContent = fmtMoney(p.totalVoided);
-        document.getElementById('esExpectedCash').textContent = fmtMoney(p.totalCash);
+        document.getElementById('esExpectedCash').textContent = fmtMoney(p.expectedCash || p.totalCash);
         const gapEl = document.getElementById('esGapBanner');
         if (p.since) {
           const sinceUtc = new Date(p.since);
@@ -2601,7 +2795,7 @@
       document.getElementById('esTCoins').textContent = fmtMoney(coins);
       cash += coins;
       document.getElementById('esCashOnHand').textContent = fmtMoney(cash);
-      const expected = Number((esPreview && esPreview.totalCash) || 0);
+      const expected = Number((esPreview && (esPreview.expectedCash || esPreview.totalCash)) || 0);
       const diff = cash - expected;
       const el = document.getElementById('esDiff');
       el.textContent = (diff >= 0 ? '+' : '') + fmtMoney(diff);
@@ -2612,7 +2806,7 @@
       if (!esPreview) { toast('Load shift totals first', 'error'); return; }
       const p = esPreview;
       if (!confirm('Close this shift?\n\nSales: ' + p.saleCount + ' · Total: ' + fmtMoney(p.totalSales) +
-        '\nExpected Cash: ' + fmtMoney(p.totalCash) +
+        '\nExpected Cash: ' + fmtMoney(p.expectedCash || p.totalCash) +
         '\n\nAfter closing, new transactions start the next shift.')) return;
       const body = {
         denom1000: Math.max(0, Math.floor(Number(document.getElementById('esD1000').value || 0))),
@@ -2647,7 +2841,7 @@
       } catch (e) { toast('Failed: ' + e.message, 'error'); }
     }
 
-    function printEndShift(j) {
+    function printEndShift(j, dateLabel, cashierLabel) {
       if (!IN_APP || !AndroidPrinter.isConnected()) { toast('End shift printed on cloud. Connect printer to print report.', 'warning'); return; }
       const W = paperWidth <= 50 ? 32 : 48;
       const dash = '------------------------------------------------'.slice(0, W);
@@ -2657,19 +2851,20 @@
         const padN = W - l.length - a.length;
         return padN > 0 ? l + ' '.repeat(padN) + a : l + ' ' + a;
       };
-      const dt = new Date();
+      const dt = dateLabel ? new Date(dateLabel) : new Date();
       let t = '';
       t += '<<CENTER>>JUMONG POS\n';
       t += '<<CENTER>>' + fit(session.storeName || '') + '\n';
       t += '<<CENTER>>─── END OF SHIFT ───\n';
       t += '<<CENTER>>' + dt.toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) + '\n';
-      t += '<<CENTER>>Cashier: ' + fit(session.fullName || session.username) + '\n';
+      t += '<<CENTER>>Cashier: ' + fit(cashierLabel || session.fullName || session.username) + '\n';
       t += dash + '\n';
       t += pad('Total Sales', fmtMoney(j.totalSales)) + '\n';
       t += pad('Sale Count', String(j.saleCount || 0)) + '\n';
       t += pad('Cash', fmtMoney(j.totalCash)) + '\n';
       t += pad('E-Wallet', fmtMoney(j.totalEw)) + '\n';
       t += pad('Credit', fmtMoney(j.totalCredit)) + '\n';
+      if (Number(j.creditCollected) > 0) t += pad('Credit Collected', fmtMoney(j.creditCollected)) + '\n';
       t += pad('Voided', fmtMoney(j.totalVoided)) + '\n';
       t += dash + '\n';
       t += pad('₱1000 x' + (j.denom1000 || 0), fmtMoney((j.denom1000 || 0) * 1000)) + '\n';
@@ -2716,6 +2911,7 @@
     }
 
     function showShiftDetail(s) {
+      lastShiftDetail = s;
       const list = document.getElementById('txItemsList');
       document.getElementById('txItemsTitle').textContent = 'SHIFT #' + s.id;
       const dt = new Date(s.closeDate);
@@ -2729,6 +2925,7 @@
         ['E-Wallet', fmtMoney(s.totalEw)],
         ['Credit', fmtMoney(s.totalCredit)],
         ['Voided', fmtMoney(s.totalVoided)],
+        ['Credit Collected', fmtMoney(s.creditCollected || 0)],
         ['₱1000 x' + s.denom1000, fmtMoney((s.denom1000 || 0) * 1000)],
         ['₱500 x' + s.denom500, fmtMoney((s.denom500 || 0) * 500)],
         ['₱200 x' + s.denom200, fmtMoney((s.denom200 || 0) * 200)],
@@ -2743,7 +2940,22 @@
         '<div class="flex justify-between text-xs py-0.5"><span class="text-gray-400">' + r[0] + '</span><span class="text-white font-bold">' + r[1] + '</span></div>'
       ).join('') +
         '<div class="flex justify-between text-sm mt-1 pt-1 border-t border-[#222255]"><span class="text-gray-400">Difference</span><span class="font-bold ' + diffCls + '">' + (s.difference > 0 ? '+' : '') + fmtMoney(s.difference) + '</span></div></div>' +
-        '<button class="btn-ghost w-full mt-3" onclick="loadShiftHistory()">← BACK TO HISTORY</button>';
+        '<button class="btn-ghost w-full mt-2" onclick="printShiftFromHistory()">🖨️ PRINT REPORT</button>' +
+        '<button class="btn-ghost w-full mt-2" onclick="loadShiftHistory()">← BACK TO HISTORY</button>';
+    }
+
+    let lastShiftDetail = null;
+    function printShiftFromHistory() {
+      const s = lastShiftDetail;
+      if (!s) { toast('Nothing to print', 'error'); return; }
+      if (!IN_APP || !AndroidPrinter.isConnected()) { toast('Connect printer to print report', 'warning'); return; }
+      printEndShift({
+        totalSales: s.totalSales, saleCount: s.saleCount, totalCash: s.totalCash, totalEw: s.totalEw,
+        totalCredit: s.totalCredit, creditCollected: s.creditCollected, totalVoided: s.totalVoided,
+        denom1000: s.denom1000, denom500: s.denom500, denom200: s.denom200, denom100: s.denom100,
+        denom50: s.denom50, denom20: s.denom20, denomCoins: s.denomCoins,
+        cashOnHand: s.cashOnHand, expenses: s.expenses, difference: s.difference
+      }, s.closeDate, s.cashierName);
     }
 
     // ─── INIT: validate session on every open ────────────────

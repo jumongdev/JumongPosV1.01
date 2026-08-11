@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
@@ -211,7 +211,9 @@ public class DashboardController : ControllerBase
             if (string.IsNullOrEmpty(range) || range == "all") tf = "";
             cmd.CommandText = $@"
                 SELECT s.invoice_no, s.sale_date, s.grand_total, s.payment_method, s.order_type, s.is_voided,
-                       COALESCE(NULLIF(s.cashier_name,''), NULLIF(u.full_name,''), NULLIF(u.username,''), 'Cashier #' || COALESCE(s.user_id::text,'')) AS cashier, s.store_id
+                       COALESCE(NULLIF(s.cashier_name,''), NULLIF(u.full_name,''), NULLIF(u.username,''),
+                         (SELECT s2.cashier_name FROM sales s2 WHERE s2.store_id = s.store_id AND s2.user_id = s.user_id AND COALESCE(s2.cashier_name,'') <> '' ORDER BY s2.sale_date DESC, s2.id DESC LIMIT 1),
+                         'Cashier #' || COALESCE(s.user_id::text,'')) AS cashier, s.store_id
                 FROM sales s
                 LEFT JOIN users u ON s.user_id = u.pos_id AND s.store_id = u.store_id
                 WHERE 1=1 {StoreFilter(storeId, "s")}{tf}
@@ -842,7 +844,9 @@ public class DashboardController : ControllerBase
             var tf = TimeframeClause(range, "s.sale_date", cmd);
             if (string.IsNullOrEmpty(range) || range == "all") tf = "";
             cmd.CommandText = $@"
-                SELECT COALESCE(NULLIF(s.cashier_name,''), NULLIF(u.full_name,''), NULLIF(u.username,''), 'Cashier #' || COALESCE(s.user_id::text,'Unknown')) AS cashier,
+                SELECT COALESCE(NULLIF(s.cashier_name,''), NULLIF(u.full_name,''), NULLIF(u.username,''),
+                         (SELECT s2.cashier_name FROM sales s2 WHERE s2.store_id = s.store_id AND s2.user_id = s.user_id AND COALESCE(s2.cashier_name,'') <> '' ORDER BY s2.sale_date DESC, s2.id DESC LIMIT 1),
+                         'Cashier #' || COALESCE(s.user_id::text,'Unknown')) AS cashier,
                        COUNT(*) AS total_sales,
                        COALESCE(SUM(s.grand_total),0) AS total_revenue,
                        COALESCE(AVG(s.grand_total),0) AS avg_transaction,
@@ -852,7 +856,9 @@ public class DashboardController : ControllerBase
                 FROM sales s
                 LEFT JOIN users u ON s.user_id = u.pos_id AND s.store_id = u.store_id
                 WHERE s.is_voided = false {StoreFilter(storeId, "s")}{tf}
-                GROUP BY COALESCE(NULLIF(s.cashier_name,''), NULLIF(u.full_name,''), NULLIF(u.username,''), 'Cashier #' || COALESCE(s.user_id::text,'Unknown'))
+                GROUP BY COALESCE(NULLIF(s.cashier_name,''), NULLIF(u.full_name,''), NULLIF(u.username,''),
+                         (SELECT s2.cashier_name FROM sales s2 WHERE s2.store_id = s.store_id AND s2.user_id = s.user_id AND COALESCE(s2.cashier_name,'') <> '' ORDER BY s2.sale_date DESC, s2.id DESC LIMIT 1),
+                         'Cashier #' || COALESCE(s.user_id::text,'Unknown'))
                 ORDER BY total_revenue DESC";
             if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
             var data = new List<object>();
@@ -912,7 +918,9 @@ public class DashboardController : ControllerBase
                     COALESCE(SUM(COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0) * si.quantity), 0) AS total_cost,
                     COALESCE(SUM(si.total_price), 0) - COALESCE(SUM(COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0) * si.quantity), 0) AS profit,
                     CASE WHEN COALESCE(SUM(si.total_price), 0) > 0 THEN ROUND((COALESCE(SUM(si.total_price), 0) - COALESCE(SUM(COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0) * si.quantity), 0)) / COALESCE(SUM(si.total_price), 0) * 100, 1) ELSE 0 END AS margin_pct,
-                    COALESCE(NULLIF(s.cashier_name,''), NULLIF(u.full_name,''), NULLIF(u.username,''), 'Cashier #' || COALESCE(s.user_id::text,'')) AS cashier,
+                    COALESCE(NULLIF(s.cashier_name,''), NULLIF(u.full_name,''), NULLIF(u.username,''),
+                      (SELECT s2.cashier_name FROM sales s2 WHERE s2.store_id = s.store_id AND s2.user_id = s.user_id AND COALESCE(s2.cashier_name,'') <> '' ORDER BY s2.sale_date DESC, s2.id DESC LIMIT 1),
+                      'Cashier #' || COALESCE(s.user_id::text,'')) AS cashier,
                     s.store_id
                 FROM sales s
                 LEFT JOIN sale_items si ON si.sale_id = s.pos_id AND si.store_id = s.store_id AND si.is_voided = false
@@ -1162,7 +1170,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.1.11" });
+            return Ok(new { version = "1.1.13" });
     }
 
     [HttpPost("crash-report")]
@@ -2768,6 +2776,117 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         return Ok(list);
     }
 
+    [HttpPost("warehouse/credit-pay")]
+    public IActionResult WhCreditPay([FromBody] WhCreditPayRequest? req)
+    {
+        if (req == null || req.CustomerId <= 0 || req.Amount <= 0)
+            return BadRequest(new { error = "Customer and amount required" });
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var tx = conn.BeginTransaction();
+        try
+        {
+            var currentBalance = 0m; var customerName = "";
+            using (var cu = conn.CreateCommand()) { cu.Transaction = tx;
+                cu.CommandText = "SELECT name, COALESCE(credit_balance, 0) FROM customers WHERE id = @cid";
+                cu.Parameters.AddWithValue("cid", req.CustomerId);
+                using var cr = cu.ExecuteReader();
+                if (!cr.Read()) return BadRequest(new { error = "Customer not found" });
+                customerName = cr.GetString(0); currentBalance = cr.GetDecimal(1);
+            }
+            if (req.Amount > currentBalance)
+                return BadRequest(new { error = $"Amount exceeds balance ({currentBalance:N2})" });
+
+            var newBalance = currentBalance - req.Amount;
+            using var upd = conn.CreateCommand(); upd.Transaction = tx;
+            upd.CommandText = "UPDATE customers SET credit_balance = @nb WHERE id = @cid";
+            upd.Parameters.AddWithValue("nb", newBalance);
+            upd.Parameters.AddWithValue("cid", req.CustomerId);
+            upd.ExecuteNonQuery();
+
+            using var ct = conn.CreateCommand(); ct.Transaction = tx;
+            ct.CommandText = @"INSERT INTO credit_transactions (pos_id, store_id, customer_id, sale_id, type, description, debit, credit, balance, payment_method, user_name, created_at, synced_at)
+                VALUES (-NEXTVAL('credit_transactions_id_seq'), '', @cid, NULL, 'Payment', @desc, 0, @amt, @nb, @pm, @un, NOW(), NOW()) RETURNING id";
+            ct.Parameters.AddWithValue("cid", req.CustomerId);
+            ct.Parameters.AddWithValue("desc", $"Payment - {customerName}");
+            ct.Parameters.AddWithValue("amt", req.Amount);
+            ct.Parameters.AddWithValue("nb", newBalance);
+            ct.Parameters.AddWithValue("pm", string.IsNullOrEmpty(req.Method) ? "Cash" : req.Method);
+            ct.Parameters.AddWithValue("un", req.CashierName ?? "");
+            var txnId = Convert.ToInt32(ct.ExecuteScalar());
+
+            tx.Commit();
+            return Ok(new { id = txnId, customerId = req.CustomerId, customerName, amount = req.Amount, method = string.IsNullOrEmpty(req.Method) ? "Cash" : req.Method, balance = newBalance });
+        }
+        catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
+    }
+
+    [HttpGet("warehouse/credit-billing")]
+    public IActionResult WhCreditBilling()
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"SELECT c.id, c.name, c.phone,
+                COALESCE((SELECT SUM(s.total_amount) FROM wh_walkin_sales s WHERE s.customer_id = c.id AND s.payment_method = 'Credit' AND COALESCE(s.is_voided, FALSE) = FALSE), 0) AS billed,
+                COALESCE((SELECT SUM(ct.credit) FROM credit_transactions ct WHERE ct.customer_id = c.id AND ct.type = 'Payment' AND ct.store_id = ''), 0) AS paid
+            FROM customers c
+            WHERE c.is_active = true
+            ORDER BY billed DESC LIMIT 300";
+        var list = new List<object>();
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            var billed = r.GetDecimal(3); var paid = r.GetDecimal(4);
+            var balance = Math.Max(0m, billed - paid);
+            if (balance <= 0m) continue;
+            list.Add(new { id = r.GetInt32(0), name = r.GetString(1), phone = r.IsDBNull(2) ? "" : r.GetString(2), wholesaleBalance = balance, billed, paid });
+        }
+        return Ok(list);
+    }
+
+    [HttpGet("warehouse/credit-breakdown")]
+    public IActionResult WhCreditBreakdown([FromQuery] int customerId)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"SELECT s.invoice_no, s.created_at, s.total_amount FROM wh_walkin_sales s
+            WHERE s.customer_id = @cid AND s.payment_method = 'Credit' AND COALESCE(s.is_voided, FALSE) = FALSE
+            ORDER BY s.created_at ASC, s.id ASC";
+        cmd.Parameters.AddWithValue("cid", customerId);
+        var receipts = new List<(string invoiceNo, DateTime created, decimal amount)>();
+        using (var r = cmd.ExecuteReader())
+            while (r.Read())
+                receipts.Add((r.GetString(0), r.GetDateTime(1), r.GetDecimal(2)));
+
+        decimal paidTotal = 0m;
+        using (var p = conn.CreateCommand())
+        {
+            p.CommandText = "SELECT COALESCE(SUM(credit), 0) FROM credit_transactions WHERE customer_id = @cid AND type = 'Payment' AND store_id = ''";
+            p.Parameters.AddWithValue("cid", customerId);
+            paidTotal = Convert.ToDecimal(p.ExecuteScalar());
+        }
+
+        var name = "";
+        using (var c = conn.CreateCommand())
+        {
+            c.CommandText = "SELECT name FROM customers WHERE id = @cid";
+            c.Parameters.AddWithValue("cid", customerId);
+            name = Convert.ToString(c.ExecuteScalar()) ?? "";
+        }
+
+        var pool = paidTotal;
+        var detail = new List<object>();
+        decimal totalBalance = 0m;
+        foreach (var rc in receipts)
+        {
+            var taken = Math.Min(pool, rc.amount);
+            var remaining = rc.amount - taken;
+            pool -= taken;
+            totalBalance += remaining;
+            detail.Add(new { invoiceNo = rc.invoiceNo, date = rc.created, amount = rc.amount, remaining });
+        }
+        return Ok(new { customerId, name, totalBalance, paidTotal, receipts = detail });
+    }
+
     [HttpPost("warehouse/sell")]
     public IActionResult WhSell([FromBody] WhWalkinSellRequest req)
     {
@@ -3367,8 +3486,10 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 COALESCE(SUM(CASE WHEN COALESCE(is_voided, FALSE) = FALSE AND payment_method = 'Cash' THEN total_amount ELSE 0 END), 0) AS total_cash,
                 COALESCE(SUM(CASE WHEN COALESCE(is_voided, FALSE) = FALSE AND payment_method = 'E-Wallet' THEN total_amount ELSE 0 END), 0) AS total_ewallet,
                 COALESCE(SUM(CASE WHEN COALESCE(is_voided, FALSE) = FALSE AND payment_method = 'Credit' THEN total_amount ELSE 0 END), 0) AS total_credit,
-                COALESCE(SUM(CASE WHEN COALESCE(is_voided, FALSE) = TRUE THEN total_amount ELSE 0 END), 0) AS total_voided,
-                COUNT(*) FILTER (WHERE COALESCE(is_voided, FALSE) = FALSE) AS sale_count
+                COALESCE((SELECT SUM(si.subtotal) FROM wh_walkin_sale_items si JOIN wh_walkin_sales sv ON sv.id = si.sale_id WHERE sv.created_at >= @since AND si.is_voided = TRUE), 0) AS total_voided,
+                COUNT(*) FILTER (WHERE COALESCE(is_voided, FALSE) = FALSE) AS sale_count,
+                COALESCE((SELECT SUM(ct.credit) FROM credit_transactions ct WHERE ct.type = 'Payment' AND ct.created_at >= @since), 0) AS credit_collected,
+                COALESCE((SELECT SUM(ct.credit) FROM credit_transactions ct WHERE ct.type = 'Payment' AND ct.payment_method = 'Cash' AND ct.created_at >= @since), 0) AS credit_collected_cash
                 FROM wh_walkin_sales WHERE created_at >= @since";
             totals.Parameters.AddWithValue("since", since);
 
@@ -3376,23 +3497,27 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             tr.Read();
             var totalSales = tr.GetDecimal(0); var totalCash = tr.GetDecimal(1); var totalEw = tr.GetDecimal(2);
             var totalCredit = tr.GetDecimal(3); var totalVoided = tr.GetDecimal(4); var saleCount = tr.GetInt32(5);
+            var creditCollected = tr.GetDecimal(6); var creditCollectedCash = tr.GetDecimal(7);
             tr.Close();
 
             if (req.Preview)
-                return Ok(new { preview = true, since, totalSales, totalCash, totalEw, totalCredit, totalVoided, saleCount });
+                return Ok(new { preview = true, since, totalSales, totalCash, totalEw, totalCredit, totalVoided, saleCount, creditCollected, expectedCash = totalCash + creditCollectedCash });
 
             var cashOnHand = req.Denom1000 * 1000m + req.Denom500 * 500m + req.Denom200 * 200m + req.Denom100 * 100m
                 + req.Denom50 * 50m + req.Denom20 * 20m + req.DenomCoins;
-            var diff = cashOnHand - totalCash;
+            var expectedCash = totalCash + creditCollectedCash;
+            var diff = cashOnHand - expectedCash;
 
             using var ins = conn.CreateCommand(); ins.Transaction = tx;
-            ins.CommandText = @"INSERT INTO wh_daily_closes (close_date, total_sales, total_cash, total_ewallet, total_credit, total_voided, cash_on_hand, difference, expenses, cashier_name, denom1000, denom500, denom200, denom100, denom50, denom20, denom_coins)
-                VALUES (NOW(), @ts, @tc, @te, @tcr, @tv, @ch, @d, @ex, @cn, @d1000, @d500, @d200, @d100, @d50, @d20, @dcoins) RETURNING id";
+            ins.CommandText = @"INSERT INTO wh_daily_closes (close_date, total_sales, total_cash, total_ewallet, total_credit, total_voided, sale_count, credit_collected, cash_on_hand, difference, expenses, cashier_name, denom1000, denom500, denom200, denom100, denom50, denom20, denom_coins)
+                VALUES (NOW(), @ts, @tc, @te, @tcr, @tv, @sc, @cc, @ch, @d, @ex, @cn, @d1000, @d500, @d200, @d100, @d50, @d20, @dcoins) RETURNING id";
             ins.Parameters.AddWithValue("ts", totalSales);
             ins.Parameters.AddWithValue("tc", totalCash);
             ins.Parameters.AddWithValue("te", totalEw);
             ins.Parameters.AddWithValue("tcr", totalCredit);
             ins.Parameters.AddWithValue("tv", totalVoided);
+            ins.Parameters.AddWithValue("sc", saleCount);
+            ins.Parameters.AddWithValue("cc", creditCollected);
             ins.Parameters.AddWithValue("ch", cashOnHand);
             ins.Parameters.AddWithValue("d", diff);
             ins.Parameters.AddWithValue("ex", req.Expenses ?? 0);
@@ -3407,7 +3532,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             var dcId = Convert.ToInt32(ins.ExecuteScalar());
 
             tx.Commit();
-            return Ok(new { id = dcId, totalSales, totalCash, totalEw, totalCredit, totalVoided, saleCount, cashOnHand, difference = diff, expenses = req.Expenses ?? 0, denom1000 = req.Denom1000, denom500 = req.Denom500, denom200 = req.Denom200, denom100 = req.Denom100, denom50 = req.Denom50, denom20 = req.Denom20, denomCoins = req.DenomCoins });
+            return Ok(new { id = dcId, totalSales, totalCash, totalEw, totalCredit, totalVoided, saleCount, creditCollected, expectedCash, cashOnHand, difference = diff, expenses = req.Expenses ?? 0, denom1000 = req.Denom1000, denom500 = req.Denom500, denom200 = req.Denom200, denom100 = req.Denom100, denom50 = req.Denom50, denom20 = req.Denom20, denomCoins = req.DenomCoins });
         }
         catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
     }
@@ -3417,12 +3542,12 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     {
         using var conn = Data.PgDatabaseHelper.GetConnection();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT id, close_date, total_sales, total_cash, total_ewallet, total_credit, total_voided, cash_on_hand, difference, expenses, cashier_name, created_at, denom1000, denom500, denom200, denom100, denom50, denom20, denom_coins FROM wh_daily_closes ORDER BY close_date DESC LIMIT @lmt";
+        cmd.CommandText = "SELECT id, close_date, total_sales, total_cash, total_ewallet, total_credit, total_voided, sale_count, credit_collected, cash_on_hand, difference, expenses, cashier_name, created_at, denom1000, denom500, denom200, denom100, denom50, denom20, denom_coins FROM wh_daily_closes ORDER BY close_date DESC LIMIT @lmt";
         cmd.Parameters.AddWithValue("lmt", limit);
         var list = new List<object>();
         using var r = cmd.ExecuteReader();
         while (r.Read())
-            list.Add(new { id = r.GetInt32(0), closeDate = r.GetDateTime(1), totalSales = r.GetDecimal(2), totalCash = r.GetDecimal(3), totalEw = r.GetDecimal(4), totalCredit = r.GetDecimal(5), totalVoided = r.GetDecimal(6), cashOnHand = r.GetDecimal(7), difference = r.GetDecimal(8), expenses = r.GetDecimal(9), cashierName = r.IsDBNull(10) ? "" : r.GetString(10), createdAt = r.GetDateTime(11), denom1000 = r.GetDecimal(12), denom500 = r.GetDecimal(13), denom200 = r.GetDecimal(14), denom100 = r.GetDecimal(15), denom50 = r.GetDecimal(16), denom20 = r.GetDecimal(17), denomCoins = r.GetDecimal(18) });
+            list.Add(new { id = r.GetInt32(0), closeDate = r.GetDateTime(1), totalSales = r.GetDecimal(2), totalCash = r.GetDecimal(3), totalEw = r.GetDecimal(4), totalCredit = r.GetDecimal(5), totalVoided = r.GetDecimal(6), saleCount = r.GetInt32(7), creditCollected = r.GetDecimal(8), cashOnHand = r.GetDecimal(9), difference = r.GetDecimal(10), expenses = r.GetDecimal(11), cashierName = r.IsDBNull(12) ? "" : r.GetString(12), createdAt = r.GetDateTime(13), denom1000 = r.GetDecimal(14), denom500 = r.GetDecimal(15), denom200 = r.GetDecimal(16), denom100 = r.GetDecimal(17), denom50 = r.GetDecimal(18), denom20 = r.GetDecimal(19), denomCoins = r.GetDecimal(20) });
         return Ok(list);
     }
 
@@ -3572,7 +3697,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         [HttpGet("agent/status")]
         public IActionResult AgentStatus()
         {
-            var latestVer = "1.1.37";
+            var latestVer = "1.1.38";
             var list = _agents.Select(a => new { storeId = a.Key, lastSeen = a.Value.lastSeen, ip = a.Value.ip, machine = a.Value.machine, appVersion = a.Value.appVersion, outdated = string.Compare(latestVer, a.Value.appVersion ?? "", StringComparison.Ordinal) > 0, hasError = a.Value.hasError, errorSummary = a.Value.errorSummary }).OrderBy(a => a.storeId);
             return Ok(list);
         }
@@ -3768,6 +3893,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         public decimal Denom20 { get; set; }
         public decimal DenomCoins { get; set; }
     }
+    public class WhCreditPayRequest { public int CustomerId { get; set; } public decimal Amount { get; set; } public string? Method { get; set; } public string? CashierName { get; set; } }
     public class ReceiptAuditRequest { public string? StoreId { get; set; } public string? StoreName { get; set; } public string? ShiftDate { get; set; } public int TotalReceipts { get; set; } public int VoidedCount { get; set; } public int DeletedCount { get; set; } public decimal LostValue { get; set; } public List<string>? VoidedInvoices { get; set; } public List<string>? MissingInvoices { get; set; } }
     public class WhWalkinSellItem
     {

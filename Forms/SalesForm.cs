@@ -1414,7 +1414,10 @@ public partial class SalesForm : Form
         {
             _lblPromo.Text = _promoText;
             _lblPromo.Location = new Point(m, ry);
-            _lblPromo.Size = new Size(pw, 36);
+            var availH = Math.Max(36, _pnlTotals.Height - ry - 8);
+            var neededH = TextRenderer.MeasureText(_promoText, _lblPromo.Font,
+                new Size(pw, availH), TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl).Height + 8;
+            _lblPromo.Size = new Size(pw, Math.Min(neededH, availH));
             _lblPromo.Visible = true;
         }
         else _lblPromo.Visible = false;

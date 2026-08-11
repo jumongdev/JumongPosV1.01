@@ -707,7 +707,9 @@ public static class PgDatabaseHelper
             ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS denom100 NUMERIC NOT NULL DEFAULT 0;
             ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS denom50 NUMERIC NOT NULL DEFAULT 0;
             ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS denom20 NUMERIC NOT NULL DEFAULT 0;
-            ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS denom_coins NUMERIC NOT NULL DEFAULT 0";
+            ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS denom_coins NUMERIC NOT NULL DEFAULT 0;
+            ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS sale_count INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS credit_collected NUMERIC NOT NULL DEFAULT 0";
         try { whDcDenoms.ExecuteNonQuery(); } catch { }
 
         using var raMig = conn.CreateCommand();
