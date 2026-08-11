@@ -58,9 +58,9 @@ catch (Exception ex)
     return;
 }
 
-if (string.IsNullOrEmpty(storeId) || storeId == "STORE-DEV-0001")
+if (string.IsNullOrEmpty(storeId))
 {
-    Console.WriteLine("Dev/demo store — agent not starting.");
+    Console.WriteLine("No store ID found — agent not starting.");
     Console.ReadLine();
     return;
 }
