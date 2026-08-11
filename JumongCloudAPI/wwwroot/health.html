@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JumongPOS Server Health</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0f172a; color:#e2e8f0; font-family:'Segoe UI',Arial,sans-serif; padding:20px; }
+  h1 { font-size:20px; margin-bottom:4px; }
+  .sub { color:#94a3b8; font-size:13px; margin-bottom:20px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-bottom:20px; }
+  .card { background:#1e293b; border-radius:10px; padding:16px; border:1px solid #334155; }
+  .card .label { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:#94a3b8; margin-bottom:8px; }
+  .card .value { font-size:22px; font-weight:700; }
+  .card .detail { font-size:12px; color:#94a3b8; margin-top:6px; }
+  .ok { color:#4ade80; } .bad { color:#f87171; } .warn { color:#fbbf24; }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+  .dot.g { background:#4ade80; } .dot.r { background:#f87171; }
+  .bar { height:6px; background:#334155; border-radius:3px; margin-top:10px; overflow:hidden; }
+  .bar > div { height:100%; border-radius:3px; }
+  table { width:100%; border-collapse:collapse; background:#1e293b; border-radius:10px; overflow:hidden; border:1px solid #334155; }
+  th,td { padding:10px 12px; text-align:left; font-size:13px; }
+  th { background:#334155; color:#cbd5e1; font-weight:600; text-transform:uppercase; font-size:11px; letter-spacing:.5px; }
+  tr:not(:last-child) td { border-bottom:1px solid #2d3b52; }
+  .stamp { position:fixed; bottom:10px; right:14px; font-size:11px; color:#64748b; }
+  .empty { color:#94a3b8; text-align:center; padding:20px; font-size:13px; }
+  .vbadge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; background:#334155; color:#cbd5e1; }
+  .vbadge.o { background:#7c2d12; color:#fdba74; }
+</style>
+</head>
+<body>
+  <h1>🩺 JumongPOS Server Health</h1>
+  <div class="sub" id="sub">Checking…</div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="label">API Service</div>
+      <div class="value" id="api">…</div>
+      <div class="detail" id="apiVer"></div>
+    </div>
+    <div class="card">
+      <div class="label">Database (PostgreSQL)</div>
+      <div class="value" id="db">…</div>
+      <div class="detail">data queries OK</div>
+    </div>
+    <div class="card">
+      <div class="label">Server Uptime</div>
+      <div class="value" id="up">…</div>
+      <div class="detail">since last reboot</div>
+    </div>
+    <div class="card">
+      <div class="label">Memory</div>
+      <div class="value" id="mem">…</div>
+      <div class="detail" id="memFree"></div>
+      <div class="bar"><div id="memBar" style="width:0%;background:#4ade80"></div></div>
+    </div>
+    <div class="card">
+      <div class="label">Disk (C:)</div>
+      <div class="value" id="disk">…</div>
+      <div class="detail" id="diskFree"></div>
+      <div class="bar"><div id="diskBar" style="width:0%;background:#4ade80"></div></div>
+    </div>
+    <div class="card">
+      <div class="label">Stores Connected</div>
+      <div class="value" id="stores">…</div>
+      <div class="detail" id="storesErr"></div>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>Store</th><th>Machine</th><th>IP</th><th>App</th><th>Last Seen</th><th>Status</th></tr></thead>
+    <tbody id="rows"><tr><td colspan="6" class="empty">Waiting…</td></tr></tbody>
+  </table>
+  <div class="stamp" id="stamp"></div>
+
+<script>
+function fmtUptime(s){
+  var d = Math.floor(s/86400), h = Math.floor((s%86400)/3600), m = Math.floor((s%3600)/60);
+  if (d>0) return d + 'd ' + h + 'h ' + m + 'm';
+  return h + 'h ' + m + 'm';
+}
+function ago(iso){
+  var diff = (Date.now() - new Date(iso).getTime())/1000;
+  if (diff < 10) return 'now';
+  if (diff < 60) return Math.floor(diff) + 's ago';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return Math.floor(diff/86400) + 'd ago';
+}
+function pct(free, total){ return total>0 ? Math.round(free/total*100) : 100; }
+function colorFor(p){ return p>20 ? '#4ade80' : (p>10 ? '#fbbf24' : '#f87171'); }
+function fmtMB(mb){ return mb>=1024 ? (mb/1024).toFixed(1)+' GB' : mb+' MB'; }
+
+async function tick(){
+  try {
+    var res = await fetch('/api/dashboard/health', { cache:'no-store' });
+    var h = await res.json();
+    var bad = h.db !== 'ok';
+    var alive = 0, errStores = 0, rows = '';
+    (h.agents || []).forEach(function(a){
+      var last = new Date(a.lastSeen).getTime();
+      var isAlive = (Date.now() - last) < 20000;
+      if (isAlive) alive++;
+      if (a.hasError) errStores++;
+      var out = isAlive && !a.hasError;
+      rows += '<tr><td>' + a.storeId + '</td><td>' + a.machine + '</td><td>' + a.ip + '</td>' +
+        '<td><span class="vbadge' + (a.outdated ? ' o' : '') + '">' + (a.appVersion || '?') + '</span></td>' +
+        '<td>' + ago(a.lastSeen) + '</td>' +
+        '<td><span class="dot ' + (out ? 'g' : 'r') + '"></span>' + (a.hasError ? 'ERROR' : (isAlive ? 'OK' : 'OFFLINE')) + '</td></tr>';
+    });
+    document.getElementById('rows').innerHTML = rows || '<tr><td colspan="6" class="empty">No agents connected yet</td></tr>';
+    document.getElementById('api').innerHTML = '<span class="dot g"></span>RUNNING';
+    document.getElementById('apiVer').textContent = 'version ' + h.version;
+    document.getElementById('db').innerHTML = bad ? '<span class="dot r"></span>DOWN' : '<span class="dot g"></span>OK';
+    document.getElementById('db').classList.toggle('bad', bad);
+    document.getElementById('up').textContent = fmtUptime(h.uptimeSeconds);
+    var mp = pct(h.memory.freeMb, h.memory.totalMb);
+    document.getElementById('mem').textContent = fmtMB(h.memory.freeMb) + ' free';
+    document.getElementById('memFree').textContent = 'of ' + fmtMB(h.memory.totalMb);
+    document.getElementById('memBar').style.width = mp + '%';
+    document.getElementById('memBar').style.background = colorFor(mp);
+    var dp = pct(h.disk.freeMb, h.disk.totalMb);
+    document.getElementById('disk').textContent = fmtMB(h.disk.freeMb) + ' free';
+    document.getElementById('diskFree').textContent = 'of ' + fmtMB(h.disk.totalMb);
+    document.getElementById('diskBar').style.width = dp + '%';
+    document.getElementById('diskBar').style.background = colorFor(dp);
+    document.getElementById('stores').textContent = alive + '/' + (h.agents || []).length + ' alive';
+    document.getElementById('storesErr').innerHTML = errStores>0 ? '<span class="warn">' + errStores + ' with errors</span>' : 'all healthy';
+    document.getElementById('stamp').textContent = 'Updated ' + new Date().toLocaleString('en-PH', { timeZone:'Asia/Manila' }) + ' PH';
+    document.title = (bad ? '⚠ ' : '✓ ') + 'JumongPOS Server Health';
+  } catch(e) {
+    document.getElementById('api').innerHTML = '<span class="dot r"></span>UNREACHABLE';
+    document.getElementById('db').textContent = '?';
+    document.getElementById('up').textContent = '?';
+    document.getElementById('stores').textContent = '?';
+    document.getElementById('rows').innerHTML = '<tr><td colspan="6" class="empty">Cannot reach API — server may be down or tunnel offline (' + e.message + ')</td></tr>';
+    document.title = '⚠ JumongPOS Server Health';
+  }
+}
+tick();
+setInterval(tick, 10000);
+</script>
+</body>
+</html>

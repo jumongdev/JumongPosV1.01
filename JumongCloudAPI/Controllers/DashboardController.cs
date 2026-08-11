@@ -1,4 +1,6 @@
 ﻿using System.Collections.Concurrent;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
@@ -1171,6 +1173,62 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     public IActionResult GetVersion()
     {
             return Ok(new { version = "1.1.13" });
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MemoryStatusEx
+    {
+        public uint dwLength;
+        public uint dwMemoryLoad;
+        public ulong ullTotalPhys;
+        public ulong ullAvailPhys;
+        public ulong ullTotalPageFile;
+        public ulong ullAvailPageFile;
+        public ulong ullTotalVirtual;
+        public ulong ullAvailVirtual;
+        public ulong ullAvailExtendedVirtual;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GlobalMemoryStatusEx(ref MemoryStatusEx lpBuffer);
+
+    [HttpGet("health")]
+    public IActionResult GetHealth()
+    {
+        ulong memTotal = 0, memFree = 0;
+        try
+        {
+            var ms = new MemoryStatusEx { dwLength = (uint)Marshal.SizeOf<MemoryStatusEx>() };
+            if (GlobalMemoryStatusEx(ref ms)) { memTotal = ms.ullTotalPhys; memFree = ms.ullAvailPhys; }
+        }
+        catch { }
+
+        long diskFree = 0, diskTotal = 0;
+        try { var d = new DriveInfo("C"); if (d.IsReady) { diskFree = d.TotalFreeSpace; diskTotal = d.TotalSize; } } catch { }
+
+        bool dbOk = false;
+        try { using var conn = Data.PgDatabaseHelper.GetConnection(); using var cmd = conn.CreateCommand(); cmd.CommandText = "SELECT 1"; cmd.ExecuteScalar(); dbOk = true; } catch { }
+
+        var agents = _agents.Select(a => new
+        {
+            storeId = a.Key,
+            lastSeen = a.Value.lastSeen,
+            machine = a.Value.machine,
+            ip = a.Value.ip,
+            appVersion = a.Value.appVersion,
+            hasError = a.Value.hasError
+        }).OrderBy(a => a.storeId);
+
+        return Ok(new
+        {
+            api = "ok",
+            version = "1.1.13",
+            db = dbOk ? "ok" : "down",
+            uptimeSeconds = Environment.TickCount64 / 1000,
+            memory = new { totalMb = (long)(memTotal / (1024 * 1024)), freeMb = (long)(memFree / (1024 * 1024)) },
+            disk = new { totalMb = diskTotal / (1024 * 1024), freeMb = diskFree / (1024 * 1024) },
+            agents
+        });
     }
 
     [HttpPost("crash-report")]
