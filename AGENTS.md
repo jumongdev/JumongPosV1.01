@@ -112,13 +112,15 @@ The batch file lives on the Desktop so it's easy to find. It must always be run 
 | Machine | Role | What lives there |
 |---|---|---|
 | `DESKTOP-I097OO9` @ `192.168.1.21` (Ethernet, 1 Gbps) + `192.168.1.41` (Wi-Fi) | **SERVER ONLY** (Cloud API host, no dev) | API service at `C:\JumongAPI\` (+ client drop `C:\JumongAPI\client\`), Cloudflare tunnel, PostgreSQL, Cloudflare config. Repo clone kept at `C:\Users\ADMIN\Desktop\JumongPosV1.01` (read-only reference — NO dev work here anymore) |
-| `DESKTOP-Q36S34R` @ `192.168.1.55` | **DEV PC (all development happens here)** | Cloned repo at **`C:\dev\JumongPosV1.01`**, non-git assets at `C:\dev\extras\`, client publish output `C:\dev\out\client`, Gradle at `C:\dev\gradle\gradle-8.14.3`, dev DB `C:\dev\JumongPosV1.01\JumongPos.db` (STORE-DEV-0001) |
+| `DESKTOP-Q36S34R` (DHCP — was `192.168.1.55`, now `192.168.1.35` as of 2026-08-12) | **DEV PC (all development happens here)** | Cloned repo at **`C:\dev\JumongPosV1.01`**, non-git assets at `C:\dev\extras\`, client publish output `C:\dev\out\client`, Gradle at `C:\dev\gradle\gradle-8.14.3`, dev DB `C:\dev\JumongPosV1.01\JumongPos.db` (STORE-DEV-0001) |
 | `DESKTOP-UU8E0D4` @ `192.168.1.26` | **HQ store (Andengs Superstore - HQ)** | POS client at **`C:\Users\ADMIN\Desktop\JumongPosHW\`** ← NOT in `C:\JumongAPI\client\` |
 | `DESKTOP-TK63MO6` @ `192.168.1.15` | HVR store | POS client at `C:\Users\Admin\Desktop\JumongPos\` (verified 2026-08-12) |
 | `DESKTOP-NISQ3Q7` @ `192.168.1.152` | U Got Minimart - Naic | (needs path verify) |
 | `DESKTOP-TK63MO6` @ `192.168.0.103` | ACGS - Naic Market | POS client at `C:\JumongPos\` (verified 2026-08-12) |
 
 > **GOTCHA:** `C:\JumongAPI\client\` is where the **newest client build gets published** on the dev/API host — it is NOT the running install on the HQ machine. The real HQ POS runs from `C:\Users\ADMIN\Desktop\JumongPosHW\` on the HQ machine. When diagnosing/fixing a store, always target the correct machine via the Agent (see Agent section), not the local `C:\JumongAPI\client\` folder.
+>
+> **IPs are DHCP-assigned and change** (dev PC went .55→.35, store IPs moved too). ALWAYS use **computer names** (`DESKTOP-Q36S34R`, `DESKTOP-I097OO9`, etc.) for WinRM/network targets — DNS resolves names to current IPs automatically, so name-based commands survive DHCP changes. IPs in the tables above are informational snapshots only.
 
 | Component | Path / Detail |
 |---|---|
@@ -128,7 +130,7 @@ The batch file lives on the Desktop so it's easy to find. It must always be run 
 | Client publish DROP (server, for stores' UPDATE APP) | `C:\JumongAPI\client\JumongPosV1.01.exe` |
 | HQ POS client (store machine) | `C:\Users\ADMIN\Desktop\JumongPosHW\JumongPosV1.01.exe` |
 | API port | `http://localhost:5000` |
-| LAN access | `http://192.168.1.39:5000` |
+| LAN access | `http://DESKTOP-I097OO9:5000` (use name, not IP — DHCP may change it) |
 | Service name | `JumongCloudAPI` (NSSM, Automatic start) |
 | Restart command | `Restart-Service JumongCloudAPI` |
 
@@ -139,8 +141,8 @@ Both machines can remote into each other over WinRM (LAN only). **The dev PC is 
 |---|---|
 | Dev PC → Server account | `DESKTOP-I097OO9\remotedev` / `Jum0ng!Dev55` (admin) |
 | Server → Dev PC account | `DESKTOP-Q36S34R\serverdev` / `Jum0ng!Dev55` (admin) |
-| Server TrustedHosts (as client) | `192.168.1.21,192.168.1.55` |
-| Dev PC TrustedHosts (as client) | `DESKTOP-I097OO9,192.168.1.21,192.168.1.55` |
+| Server TrustedHosts (as client) | `DESKTOP-Q36S34R` (names only — no IPs; DHCP changes don't break TrustedHosts) |
+| Dev PC TrustedHosts (as client) | `DESKTOP-I097OO9` (names only) |
 | Ports | WinRM 5985 both machines, ICMP enabled both ways |
 | Server Ethernet | **1 Gbps full duplex** (cable fixed 2026-08-11; was 10 Mbps) |
 
@@ -152,7 +154,7 @@ Copy-Item -ToSession $s -Path '...\publish\*' -Destination 'C:\JumongAPI\' -Recu
 Remove-PSSession $s
 
 # From the SERVER -> dev PC (diagnostics on the dev PC)
-$s = New-PSSession -ComputerName 192.168.1.55 -Credential DESKTOP-Q36S34R\serverdev
+$s = New-PSSession -ComputerName DESKTOP-Q36S34R -Credential DESKTOP-Q36S34R\serverdev
 Invoke-Command -Session $s -ScriptBlock { "OK on $env:COMPUTERNAME" }
 ```
 
