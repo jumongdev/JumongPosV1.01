@@ -89,24 +89,30 @@ C:\Users\ADMIN\Desktop\JumongPosV1.01\
 
 ## Deploying Cloud API (for AI Agent)
 
-**Use the batch file `C:\Users\ADMIN\Desktop\deploy_api.bat`** — double-click it and select **Run as administrator**. It will:
+**PRIMARY (from the DEV PC via WinRM — the dev PC is the deploy driver):**
+```powershell
+Set-Location C:\dev\JumongPosV1.01
+dotnet publish JumongCloudAPI\JumongCloudAPI.csproj -c Release -r win-x64 --self-contained true
+$s = New-PSSession -ComputerName DESKTOP-I097OO9 -Credential DESKTOP-I097OO9\remotedev
+Copy-Item -ToSession $s -Path 'JumongCloudAPI\bin\Release\net8.0\win-x64\publish\*' -Destination 'C:\JumongAPI\' -Recurse
+Invoke-Command -Session $s -ScriptBlock { net stop JumongCloudAPI; net start JumongCloudAPI }
+Remove-PSSession $s
+```
+
+**FALLBACK (on the server itself):** `C:\Users\ADMIN\Desktop\deploy_api.bat` — double-click and select **Run as administrator**. It will:
 1. Stop the NSSM service `JumongCloudAPI`
-2. Copy all publish files from `JumongCloudAPI\bin\Release\net8.0\win-x64\publish\*` to `C:\JumongAPI\`
+2. Copy all publish files from `C:\Users\ADMIN\Desktop\JumongPosV1.01\JumongCloudAPI\bin\Release\net8.0\win-x64\publish\*` to `C:\JumongAPI\`
 3. Restart the service
 
-The batch file lives on the Desktop so it's easy to find. You can only deploy via this batch file because the current PowerShell session is **non-admin** and cannot stop/start services. The batch must always be run **as administrator** (right-click → Run as administrator).
-
-**Build command (run before deploying):**
-```powershell
-Set-Location -LiteralPath "C:\Users\ADMIN\Desktop\JumongPosV1.01\JumongCloudAPI"; dotnet publish -c Release -r win-x64 --self-contained true
-```
+The batch file lives on the Desktop so it's easy to find. It must always be run **as administrator** (right-click → Run as administrator). Also available: `deploy_web.bat` (wwwroot) and `deploy_client.bat` (client drop) on the server Desktop.
 
 ## Local Server Infrastructure
 
 ### Machine Roles (IMPORTANT — WHERE IS WHAT)
 | Machine | Role | What lives there |
 |---|---|---|
-| `DESKTOP-I097OO9` @ `192.168.1.24` | **DEV machine + CLOUD API HOST** (this PC) | Source at `C:\Users\ADMIN\Desktop\JumongPosV1.01`, API service at `C:\JumongAPI\`, test `C:\JumongAPI\client\`, Cloudflare tunnel, PostgreSQL |
+| `DESKTOP-I097OO9` @ `192.168.1.21` (Ethernet, 1 Gbps) + `192.168.1.41` (Wi-Fi) | **SERVER ONLY** (Cloud API host, no dev) | API service at `C:\JumongAPI\` (+ client drop `C:\JumongAPI\client\`), Cloudflare tunnel, PostgreSQL, Cloudflare config. Repo clone kept at `C:\Users\ADMIN\Desktop\JumongPosV1.01` (read-only reference — NO dev work here anymore) |
+| `DESKTOP-Q36S34R` @ `192.168.1.55` | **DEV PC (all development happens here)** | Cloned repo at **`C:\dev\JumongPosV1.01`**, non-git assets at `C:\dev\extras\`, client publish output `C:\dev\out\client`, Gradle at `C:\dev\gradle\gradle-8.14.3`, dev DB `C:\dev\JumongPosV1.01\JumongPos.db` (STORE-DEV-0001) |
 | `DESKTOP-UU8E0D4` @ `192.168.1.37` | **HQ store (Andengs Superstore - HQ)** | POS client at **`C:\Users\ADMIN\Desktop\JumongPosHW\`** ← NOT in `C:\JumongAPI\client\` |
 | `DESKTOP-TK63MO6` @ `192.168.1.4` | HVR store | (needs path verify) |
 | `DESKTOP-NISQ3Q7` @ `192.168.1.152` | U Got Minimart - Naic | (needs path verify) |
@@ -124,6 +130,30 @@ Set-Location -LiteralPath "C:\Users\ADMIN\Desktop\JumongPosV1.01\JumongCloudAPI"
 | LAN access | `http://192.168.1.39:5000` |
 | Service name | `JumongCloudAPI` (NSSM, Automatic start) |
 | Restart command | `Restart-Service JumongCloudAPI` |
+
+### WinRM Remote Access (server ⇄ dev PC, added 2026-08-11)
+Both machines can remote into each other over WinRM (LAN only). **The dev PC is the deploy driver** — it pushes builds to the server and restarts the service.
+
+| Item | Detail |
+|---|---|
+| Dev PC → Server account | `DESKTOP-I097OO9\remotedev` / `Jum0ng!Dev55` (admin) |
+| Server → Dev PC account | `DESKTOP-Q36S34R\serverdev` / `Jum0ng!Dev55` (admin) |
+| Server TrustedHosts (as client) | `192.168.1.21,192.168.1.55` |
+| Dev PC TrustedHosts (as client) | `DESKTOP-I097OO9,192.168.1.21,192.168.1.55` |
+| Ports | WinRM 5985 both machines, ICMP enabled both ways |
+| Server Ethernet | **1 Gbps full duplex** (cable fixed 2026-08-11; was 10 Mbps) |
+
+```powershell
+# From the DEV PC -> server (standard pattern for all deploys)
+$s = New-PSSession -ComputerName DESKTOP-I097OO9 -Credential DESKTOP-I097OO9\remotedev
+Invoke-Command -Session $s -ScriptBlock { "OK on $env:COMPUTERNAME as $(whoami)" }
+Copy-Item -ToSession $s -Path '...\publish\*' -Destination 'C:\JumongAPI\' -Recurse
+Remove-PSSession $s
+
+# From the SERVER -> dev PC (diagnostics on the dev PC)
+$s = New-PSSession -ComputerName 192.168.1.55 -Credential DESKTOP-Q36S34R\serverdev
+Invoke-Command -Session $s -ScriptBlock { "OK on $env:COMPUTERNAME" }
+```
 
 ### Agent (remote diagnostic) version gotcha
 - The Agent reads `AppVersion` from the store DB **once at startup** (it caches the version). If the POS app updates while the Agent keeps running, heartbeats keep reporting the OLD version.
@@ -851,13 +881,18 @@ Sales, SaleItems, Expenses, DailyClose, StockTrails, Settings (per-PC operationa
 
 **IMPORTANT: After EVERY git push, build and deploy the cloud API to the local server** (unless the push only touched publish/ or client-only files like Forms/*.cs, Models/*.cs).
 
-### Client App
+### Client App (run on the DEV PC, `C:\dev\JumongPosV1.01`)
 ```powershell
 # Build
 dotnet publish -c Release -r win-x64 --self-contained true
 
-# Publish new release to C:\JumongAPI\client\
-dotnet publish -c Release -r win-x64 --self-contained true -o C:\JumongAPI\client
+# Publish new release to C:\dev\out\client
+dotnet publish -c Release -r win-x64 --self-contained true -o C:\dev\out\client
+
+# Deploy the client drop to the server (then stores update via UPDATE APP)
+$s = New-PSSession -ComputerName DESKTOP-I097OO9 -Credential DESKTOP-I097OO9\remotedev
+Copy-Item -ToSession $s -Path 'C:\dev\out\client\*' -Destination 'C:\JumongAPI\client\' -Recurse
+Remove-PSSession $s
 ```
 
 ### API URL Change
@@ -869,12 +904,14 @@ dotnet publish -c Release -r win-x64 --self-contained true -o C:\JumongAPI\clien
 
 ### Cloud API
 ```powershell
-# Build
+# Build (on the DEV PC)
 dotnet publish JumongCloudAPI\JumongCloudAPI.csproj -c Release -r win-x64 --self-contained true
 
-# Deploy to local server
-Copy-Item -Recurse "bin\Release\net8.0\win-x64\publish\*" "C:\JumongAPI\"
-Restart-Service JumongCloudAPI
+# Deploy to local server (via WinRM)
+$s = New-PSSession -ComputerName DESKTOP-I097OO9 -Credential DESKTOP-I097OO9\remotedev
+Copy-Item -ToSession $s -Path 'JumongCloudAPI\bin\Release\net8.0\win-x64\publish\*' -Destination 'C:\JumongAPI\' -Recurse
+Invoke-Command -Session $s -ScriptBlock { net stop JumongCloudAPI; net start JumongCloudAPI }
+Remove-PSSession $s
 ```
 
 ## Key Decisions / Rules
@@ -1179,6 +1216,19 @@ Compress-Archive -Force -Path "bin\Release\net8.0-windows\win-x64\publish\*" -De
 | AGENTS.md | Added Machine Roles table (dev/API host vs store machines), HQ POS path gotcha, Agent version-cache note, POS QR push procedure |
 
 **Impact:** Documented where each machine's POS actually lives and how QR pushes actually reach a store (DB value + physical file). Agent `lastSeen` within a few seconds means alive — version number on the dashboard may be stale until agent restart.
+
+### 2026-08-11 — Dev PC Migration (DESKTOP-Q36S34R @ 192.168.1.55)
+
+| Item | Detail |
+|---|---|
+| New DEV PC | `DESKTOP-Q36S34R` @ `192.168.1.55` — all development now happens here; repo cloned at `C:\dev\JumongPosV1.01`, non-git assets at `C:\dev\extras\`, publish output `C:\dev\out\client`, Gradle at `C:\dev\gradle\gradle-8.14.3` |
+| Server role change | `DESKTOP-I097OO9` @ `192.168.1.21` (Ethernet) + `.41` (Wi-Fi) is now **SERVER ONLY** (Cloud API host, no dev). Repo clone kept at `C:\Users\ADMIN\Desktop\JumongPosV1.01` as read-only reference |
+| WinRM both ways | Dev PC → server as `DESKTOP-I097OO9\remotedev` / `Jum0ng!Dev55`; server → dev PC as `DESKTOP-Q36S34R\serverdev` / `Jum0ng!Dev55`. TrustedHosts + `LocalAccountTokenFilterPolicy=1` on both machines. Ports 5985 + ICMP open both ways |
+| Ethernet fixed | Server NIC re-negotiated to **1 Gbps full duplex** (cable swap, 2026-08-11; was 10 Mbps) |
+| Deploy flow | Deploys now run **from the dev PC via WinRM** (push publish → `net stop/start JumongCloudAPI`). Server-side bats (`deploy_api.bat` / `deploy_web.bat` / `deploy_client.bat`) remain as fallback only |
+| AGENTS.md | Machine Roles table updated (server-only vs dev PC), WinRM access section added, Deploying Cloud API + Build & Deploy rewritten for the dev PC driver flow |
+
+**Impact:** The dev PC agent must use `C:\dev\JumongPosV1.01` for all builds/edits and push via WinRM to `DESKTOP-I097OO9`; the server clone is reference-only. Any agent on the dev PC that only knows server paths (`C:\Users\ADMIN\Desktop\JumongPosV1.01`, `C:\JumongAPI\`) is reading a stale AGENTS.md — pull after this push.
 
 
 ## Warehouse Mobile App (Android, WarehouseApp/)
