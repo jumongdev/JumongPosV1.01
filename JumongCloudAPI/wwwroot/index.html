@@ -2767,7 +2767,7 @@ tailwind.config = {
   const SESSION_TOKEN = 'jpos_web_token';
 
   function webSession() {
-    return { username: sessionStorage.getItem(SESSION_USER), token: sessionStorage.getItem(SESSION_TOKEN) };
+    return { username: localStorage.getItem(SESSION_USER), token: localStorage.getItem(SESSION_TOKEN) };
   }
 
   function enterApp(j) {
@@ -2822,8 +2822,8 @@ tailwind.config = {
       const r = await fetch(API + '/web/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error((j && j.error) || 'Login failed');
-      sessionStorage.setItem(SESSION_USER, username);
-      sessionStorage.setItem(SESSION_TOKEN, j.token);
+      localStorage.setItem(SESSION_USER, username);
+      localStorage.setItem(SESSION_TOKEN, j.token);
       enterApp(j);
     } catch (e) {
       err.textContent = e.message || 'Login failed';
@@ -2837,8 +2837,8 @@ tailwind.config = {
     if (s.username && s.token) {
       fetch(API + '/web/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) }).catch(() => {});
     }
-    sessionStorage.removeItem(SESSION_USER);
-    sessionStorage.removeItem(SESSION_TOKEN);
+    localStorage.removeItem(SESSION_USER);
+    localStorage.removeItem(SESSION_TOKEN);
     location.reload();
   }
 
