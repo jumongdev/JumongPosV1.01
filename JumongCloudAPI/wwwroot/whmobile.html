@@ -1654,7 +1654,7 @@
       t += 'ITEMS  (' + items.length + ')\n';
       items.forEach(c => {
         const nameLines = wrap(c.productName, W - 2);
-        nameLines.forEach((l, i) => t += (i === 0 ? '' : '  ') + l + '\n');
+        nameLines.forEach((l, i) => t += (i === 0 ? '<<BIG>>' : '<<BIG>>  ') + l + '\n');
         let unitLine = String(c.unitName || 'Piece') + ' x ' + c.qty;
         if ((c.qtyPerUnit || 1) > 1) unitLine += ' (' + (c.qty * (c.qtyPerUnit || 1)) + 'pcs)';
         t += pad(unitLine, money(c.price * c.qty)) + '\n';
@@ -1742,6 +1742,7 @@
         const data = await r.json();
         updateInvModeCounts(data);
         populateInvCatSel(data);
+        prodCache = data;
         invRows = invFilterRows(data);
         invPage = 1;
         renderInvPage();
@@ -1759,7 +1760,7 @@
         const low = p.stockQty <= 10;
         const div = document.createElement('div');
         div.className = 'card';
-        div.innerHTML = '<div class="flex items-center justify-between"><div><p class="text-white text-sm font-bold">' + p.name + '</p>' +
+        div.innerHTML = '<div class="flex items-center justify-between" onclick="showProductDetail(' + p.id + ')"><div><p class="text-white text-sm font-bold">' + p.name + '</p>' +
           '<p class="text-gray-500 text-[11px]">' + (p.barcode || 'no barcode') + (unitBoxQty(p) > 1 ? ' • ' + boxesText(p.stockQty, unitBoxQty(p), unitBoxLabel(p)) : '') + '</p></div>' +
           '<p class="text-lg font-bold ' + (p.stockQty === 0 ? 'text-red-400' : low ? 'text-orange-400' : 'text-emerald-400') + '">' + p.stockQty + '</p></div>';
         box.appendChild(div);
@@ -1973,6 +1974,14 @@
       const W = paperWidth <= 50 ? 32 : 48;
       const dash = '------------------------------------------------'.slice(0, W);
       const fit = s => { const str = String(s); return str.length > W ? str.slice(0, W - 1) + '~' : str; };
+      const wrap = (s, max) => {
+        const str = String(s);
+        const out = [];
+        let rest = str;
+        while (rest.length > max) { out.push(rest.slice(0, max)); rest = rest.slice(max); }
+        if (rest.length) out.push(rest);
+        return out.length ? out : [''];
+      };
       const pad = (label, amount) => {
         const l = fit(label); const a = fit(amount);
         const padN = W - l.length - a.length;
@@ -1992,7 +2001,7 @@
       if (h.customerName) t += '<<CENTER>>Customer: ' + fit(h.customerName) + '\n';
       t += dash + '\n';
       active.forEach(c => {
-        t += fit(c.productName) + '\n';
+        wrap(c.productName, W - 2).forEach((l, i) => t += (i === 0 ? '<<BIG>>' : '<<BIG>>  ') + l + '\n');
         const line = fit((c.unitName || 'Piece') + ' x ' + c.qty);
         const amt = money(Number(c.subtotal) || (c.price * c.qty));
         t += pad(line, amt) + '\n';

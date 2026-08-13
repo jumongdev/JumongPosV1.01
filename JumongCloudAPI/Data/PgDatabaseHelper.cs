@@ -283,6 +283,14 @@ public static class PgDatabaseHelper
         mobMig.CommandText = "ALTER TABLE users ADD COLUMN IF NOT EXISTS mobile_access BOOLEAN NOT NULL DEFAULT FALSE";
         try { mobMig.ExecuteNonQuery(); } catch { }
 
+        // Migration: add web_access to users for web dashboard (admin.jumongdev.com) login
+        using var webMig = conn.CreateCommand();
+        webMig.CommandText = "ALTER TABLE users ADD COLUMN IF NOT EXISTS web_access BOOLEAN NOT NULL DEFAULT FALSE";
+        try { webMig.ExecuteNonQuery(); } catch { }
+        using var webSeed = conn.CreateCommand();
+        webSeed.CommandText = "UPDATE users SET web_access = TRUE WHERE role = 'Admin'";
+        try { webSeed.ExecuteNonQuery(); } catch { }
+
         // Migration: create user_stores junction table for multi-store user access
         using var usMig = conn.CreateCommand();
         usMig.CommandText = @"

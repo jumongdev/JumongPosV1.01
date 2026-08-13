@@ -1,1 +1,1 @@
-{"version": "1.0.15", "changelog": "v1.0.15: All receipts print in BOLD (ESC E) - sale, reprint, receiving, end shift, credit payment, inventory."}
+{"version": "1.0.16", "changelog": "v1.0.16: Full item names always print on receipts (no more cutoff) + item names print DOUBLE HEIGHT (GS !) for readability. Mobile inventory search now opens product details + stock trail."}

@@ -497,6 +497,19 @@ public partial class MainForm : Form
         _connTimer.Tick += async (_, _) => await CheckApiConnectionAsync();
         _connTimer.Start();
 
+        // Startup flush: push every unsynced record (offline overnight) as soon as possible
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(3000);
+            try
+            {
+                var storeId = SyncService.StoreId;
+                if (string.IsNullOrEmpty(storeId) || storeId == "STORE-DEV-0001") return;
+                await SyncService.DrainAllUnsyncedAsync();
+            }
+            catch { }
+        });
+
         Resize += (_, _) =>
         {
             topPanel.Width = ClientSize.Width;
@@ -549,6 +562,7 @@ public partial class MainForm : Form
 
     private static readonly Color _connGreen = Color.FromArgb(0, 200, 83);
     private static readonly Color _connRed = Color.FromArgb(255, 82, 82);
+    private bool _wasConnected = true;
     private async Task CheckApiConnectionAsync()
     {
         var (ok, err) = await SyncService.CheckConnectionAsync();
@@ -556,6 +570,26 @@ public partial class MainForm : Form
         var invText = string.IsNullOrEmpty(serverUrl) ? "" : $" | INV: {serverUrl}";
         _lblConnStatus.Text = (ok ? "● Cloud: OK" : "● Cloud: OFF " + (err ?? "")) + invText;
         _lblConnStatus.ForeColor = ok ? _connGreen : _connRed;
+
+        // Offline -> online transition: immediately drain everything pending
+        if (ok && !_wasConnected)
+        {
+            _wasConnected = true;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var storeId = SyncService.StoreId;
+                    if (string.IsNullOrEmpty(storeId) || storeId == "STORE-DEV-0001") return;
+                    await SyncService.DrainAllUnsyncedAsync();
+                }
+                catch { }
+            });
+        }
+        else if (!ok)
+        {
+            _wasConnected = false;
+        }
     }
 
 }

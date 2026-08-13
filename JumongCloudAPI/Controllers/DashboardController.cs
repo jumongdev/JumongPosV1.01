@@ -276,19 +276,19 @@ public class DashboardController : ControllerBase
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = $@"
-                SELECT u.pos_id, u.username, u.role, u.full_name, u.is_active, u.password_hash, u.mobile_access,
+                SELECT u.pos_id, u.username, u.role, u.full_name, u.is_active, u.password_hash, u.mobile_access, u.web_access,
                        COALESCE((SELECT json_agg(us.store_id) FROM user_stores us WHERE us.user_pos_id = u.pos_id), '[]'::json) AS store_ids
                 FROM users u
                 WHERE u.is_active = true {StoreFilter(storeId, "u")}
-                GROUP BY u.pos_id, u.username, u.role, u.full_name, u.is_active, u.password_hash, u.mobile_access
+                GROUP BY u.pos_id, u.username, u.role, u.full_name, u.is_active, u.password_hash, u.mobile_access, u.web_access
                 ORDER BY u.username LIMIT 500";
             if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
             var data = new List<object>();
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
-                var storeIds = r.IsDBNull(7) ? new List<string>() : System.Text.Json.JsonSerializer.Deserialize<List<string>>(r.GetString(7)) ?? new();
-                data.Add(new { posId = r.GetInt32(0), username = r.GetString(1), role = r.GetString(2), fullName = r.IsDBNull(3) ? "" : r.GetString(3), isActive = r.GetBoolean(4), passwordHash = r.IsDBNull(5) ? "12345" : r.GetString(5), mobileAccess = r.GetBoolean(6), storeIds });
+                var storeIds = r.IsDBNull(8) ? new List<string>() : System.Text.Json.JsonSerializer.Deserialize<List<string>>(r.GetString(8)) ?? new();
+                data.Add(new { posId = r.GetInt32(0), username = r.GetString(1), role = r.GetString(2), fullName = r.IsDBNull(3) ? "" : r.GetString(3), isActive = r.GetBoolean(4), passwordHash = r.IsDBNull(5) ? "12345" : r.GetString(5), mobileAccess = r.GetBoolean(6), webAccess = r.IsDBNull(7) ? false : r.GetBoolean(7), storeIds });
             }
             return Ok(data);
         }
@@ -301,6 +301,7 @@ public class DashboardController : ControllerBase
             var role = body.TryGetProperty("role", out var rl) ? rl.GetString() ?? "Cashier" : "Cashier";
             var passwordHash = body.TryGetProperty("passwordHash", out var ph) ? ph.GetString() ?? "12345" : "12345";
             var mobileAccess = body.TryGetProperty("mobileAccess", out var ma) ? ma.GetBoolean() : false;
+            var webAccess = body.TryGetProperty("webAccess", out var wa) ? wa.GetBoolean() : false;
             var storeIds = body.TryGetProperty("storeIds", out var si) && si.ValueKind == JsonValueKind.Array
                 ? si.EnumerateArray().Select(x => x.GetString()).Where(s => !string.IsNullOrEmpty(s)).ToList()
                 : new List<string?>();
@@ -324,14 +325,15 @@ public class DashboardController : ControllerBase
 
             // Insert user (store_id = '' for cloud-managed users)
             using var insCmd = conn.CreateCommand();
-            insCmd.CommandText = @"INSERT INTO users (pos_id, store_id, username, role, full_name, is_active, password_hash, mobile_access, synced_at)
-                VALUES (@p, '', @u, @r, @fn, true, @ph, @ma, NOW()) RETURNING id";
+            insCmd.CommandText = @"INSERT INTO users (pos_id, store_id, username, role, full_name, is_active, password_hash, mobile_access, web_access, synced_at)
+                VALUES (@p, '', @u, @r, @fn, true, @ph, @ma, @wa, NOW()) RETURNING id";
             insCmd.Parameters.AddWithValue("p", newPosId);
             insCmd.Parameters.AddWithValue("u", username);
             insCmd.Parameters.AddWithValue("r", role);
             insCmd.Parameters.AddWithValue("fn", fullName);
             insCmd.Parameters.AddWithValue("ph", passwordHash);
             insCmd.Parameters.AddWithValue("ma", mobileAccess);
+            insCmd.Parameters.AddWithValue("wa", webAccess);
             insCmd.ExecuteNonQuery();
 
             // Insert user_stores entries
@@ -357,6 +359,7 @@ public class DashboardController : ControllerBase
             var isActive = body.TryGetProperty("isActive", out var ia) ? ia.GetBoolean() : true;
             var passwordHash = body.TryGetProperty("passwordHash", out var ph) ? ph.GetString() : null;
             var mobileAccess = body.TryGetProperty("mobileAccess", out var ma) ? ma.GetBoolean() : false;
+            var webAccess = body.TryGetProperty("webAccess", out var wa) ? wa.GetBoolean() : false;
             var storeIds = body.TryGetProperty("storeIds", out var si) && si.ValueKind == JsonValueKind.Array
                 ? si.EnumerateArray().Select(x => x.GetString()).Where(s => !string.IsNullOrEmpty(s)).ToList()
                 : new List<string?>();
@@ -366,7 +369,7 @@ public class DashboardController : ControllerBase
             using var conn = Data.PgDatabaseHelper.GetConnection();
 
             using var cmd = conn.CreateCommand();
-            var setClause = "username = @u, role = @r, full_name = @fn, is_active = @ia, mobile_access = @ma, synced_at = NOW()";
+            var setClause = "username = @u, role = @r, full_name = @fn, is_active = @ia, mobile_access = @ma, web_access = @wa, synced_at = NOW()";
             if (passwordHash != null) setClause += ", password_hash = @ph";
 
             cmd.CommandText = $"UPDATE users SET {setClause} WHERE pos_id = @pid";
@@ -376,6 +379,7 @@ public class DashboardController : ControllerBase
             cmd.Parameters.AddWithValue("fn", fullName);
             cmd.Parameters.AddWithValue("ia", isActive);
             cmd.Parameters.AddWithValue("ma", mobileAccess);
+            cmd.Parameters.AddWithValue("wa", webAccess);
             if (passwordHash != null) cmd.Parameters.AddWithValue("ph", passwordHash);
 
             var rows = cmd.ExecuteNonQuery();
@@ -671,6 +675,209 @@ public class DashboardController : ControllerBase
             return Ok(new { success = true });
         }
 
+        [HttpPost("web/login")]
+        public IActionResult WebLogin([FromBody] JsonElement body)
+        {
+            var username = body.TryGetProperty("username", out var u) ? u.GetString() ?? "" : "";
+            var password = body.TryGetProperty("password", out var p) ? p.GetString() ?? "" : "";
+
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+                return BadRequest(new { success = false, error = "Username and PIN are required" });
+
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT u.pos_id, u.username, u.role, u.full_name, u.web_access, u.store_id,
+                       COALESCE((SELECT json_agg(us.store_id) FROM user_stores us WHERE us.user_pos_id = u.pos_id), '[]'::json) AS store_ids
+                FROM users u
+                WHERE LOWER(u.username) = LOWER(@u) AND u.password_hash = @p AND u.is_active = true
+                LIMIT 1";
+            cmd.Parameters.AddWithValue("u", username);
+            cmd.Parameters.AddWithValue("p", password);
+
+            int posId = 0;
+            string uname = "", role = "Cashier", fullName = "", baseStoreId = "";
+            bool webAccess = false;
+            List<string> storeIds = new();
+            bool found = false;
+
+            using (var r = cmd.ExecuteReader())
+            {
+                if (r.Read())
+                {
+                    found = true;
+                    posId = r.GetInt32(0);
+                    uname = r.GetString(1);
+                    role = r.GetString(2);
+                    fullName = r.IsDBNull(3) ? "" : r.GetString(3);
+                    webAccess = r.IsDBNull(4) ? false : r.GetBoolean(4);
+                    baseStoreId = r.IsDBNull(5) ? "" : r.GetString(5);
+                    storeIds = r.IsDBNull(6) ? new List<string>() : System.Text.Json.JsonSerializer.Deserialize<List<string>>(r.GetString(6)) ?? new();
+                }
+            }
+
+            if (!found)
+                return Unauthorized(new { success = false, error = "Invalid username or PIN" });
+
+            if (!webAccess)
+                return Unauthorized(new { success = false, error = "No web access granted. Ask the admin to enable WEB ACCESS for this user." });
+
+            // Admin Ã¢â€ â€™ all stores; otherwise only the user's assigned stores
+            var allStoreIds = new List<string>();
+            if (role == "Admin")
+            {
+                using var scmd = conn.CreateCommand();
+                scmd.CommandText = "SELECT store_id FROM stores ORDER BY store_name";
+                using var sr = scmd.ExecuteReader();
+                while (sr.Read()) allStoreIds.Add(sr.GetString(0));
+            }
+            else
+            {
+                allStoreIds = storeIds.Count > 0 ? storeIds : (baseStoreId == "" ? new List<string>() : new List<string> { baseStoreId });
+            }
+
+            var storeNames = new Dictionary<string, string>();
+            if (allStoreIds.Count > 0)
+            {
+                using var scmd = conn.CreateCommand();
+                scmd.CommandText = "SELECT store_id, store_name FROM stores WHERE store_id = ANY(@ids)";
+                scmd.Parameters.AddWithValue("ids", allStoreIds.ToArray());
+                using var sr = scmd.ExecuteReader();
+                while (sr.Read()) storeNames[sr.GetString(0)] = sr.GetString(1);
+            }
+
+            // Session token (multi-device: keep last 5, same table as mobile)
+            var token = Guid.NewGuid().ToString("N");
+            using (var insTok = conn.CreateCommand())
+            {
+                insTok.CommandText = "INSERT INTO whapp_tokens (user_pos_id, token) VALUES (@pid, @tok)";
+                insTok.Parameters.AddWithValue("pid", posId);
+                insTok.Parameters.AddWithValue("tok", token);
+                insTok.ExecuteNonQuery();
+            }
+            using (var cleanTok = conn.CreateCommand())
+            {
+                cleanTok.CommandText = @"
+                    DELETE FROM whapp_tokens WHERE id IN (
+                        SELECT id FROM whapp_tokens WHERE user_pos_id = @pid
+                        ORDER BY created_at DESC OFFSET 5
+                    )";
+                cleanTok.Parameters.AddWithValue("pid", posId);
+                cleanTok.ExecuteNonQuery();
+            }
+
+            return Ok(new
+            {
+                success = true,
+                posId,
+                username = uname,
+                role,
+                fullName,
+                token,
+                allStores = role == "Admin",
+                stores = allStoreIds.Select(s => new { storeId = s, storeName = storeNames.TryGetValue(s, out var sn) ? sn : s })
+            });
+        }
+
+        [HttpGet("web/me")]
+        public IActionResult WebMe([FromQuery] string? username = null, [FromQuery] string? token = null)
+        {
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(token))
+                return Unauthorized(new { success = false, error = "Session expired. Please log in again." });
+
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            int posId = 0;
+            string uname = "", role = "Cashier", fullName = "", baseStoreId = "";
+            bool webAccess = false;
+            List<string> storeIds = new();
+            bool found = false;
+
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    SELECT u.pos_id, u.username, u.role, u.full_name, u.web_access, u.store_id,
+                           COALESCE((SELECT json_agg(us.store_id) FROM user_stores us WHERE us.user_pos_id = u.pos_id), '[]'::json) AS store_ids
+                    FROM users u
+                    JOIN whapp_tokens wt ON wt.user_pos_id = u.pos_id AND wt.token = @tok
+                    WHERE LOWER(u.username) = LOWER(@u) AND u.is_active = true
+                    LIMIT 1";
+                cmd.Parameters.AddWithValue("u", username);
+                cmd.Parameters.AddWithValue("tok", token);
+                using var r = cmd.ExecuteReader();
+                if (r.Read())
+                {
+                    found = true;
+                    posId = r.GetInt32(0);
+                    uname = r.GetString(1);
+                    role = r.GetString(2);
+                    fullName = r.IsDBNull(3) ? "" : r.GetString(3);
+                    webAccess = r.IsDBNull(4) ? false : r.GetBoolean(4);
+                    baseStoreId = r.IsDBNull(5) ? "" : r.GetString(5);
+                    storeIds = r.IsDBNull(6) ? new List<string>() : System.Text.Json.JsonSerializer.Deserialize<List<string>>(r.GetString(6)) ?? new();
+                }
+            }
+
+            if (!found)
+                return Unauthorized(new { success = false, error = "Session expired. Please log in again." });
+
+            if (!webAccess)
+                return Unauthorized(new { success = false, error = "Web access revoked. Please contact the admin." });
+
+            var allStoreIds = new List<string>();
+            if (role == "Admin")
+            {
+                using var scmd = conn.CreateCommand();
+                scmd.CommandText = "SELECT store_id FROM stores ORDER BY store_name";
+                using var sr = scmd.ExecuteReader();
+                while (sr.Read()) allStoreIds.Add(sr.GetString(0));
+            }
+            else
+            {
+                allStoreIds = storeIds.Count > 0 ? storeIds : (baseStoreId == "" ? new List<string>() : new List<string> { baseStoreId });
+            }
+
+            var storeNames = new Dictionary<string, string>();
+            if (allStoreIds.Count > 0)
+            {
+                using var scmd = conn.CreateCommand();
+                scmd.CommandText = "SELECT store_id, store_name FROM stores WHERE store_id = ANY(@ids)";
+                scmd.Parameters.AddWithValue("ids", allStoreIds.ToArray());
+                using var sr = scmd.ExecuteReader();
+                while (sr.Read()) storeNames[sr.GetString(0)] = sr.GetString(1);
+            }
+
+            return Ok(new
+            {
+                success = true,
+                posId,
+                username = uname,
+                role,
+                fullName,
+                token,
+                allStores = role == "Admin",
+                stores = allStoreIds.Select(s => new { storeId = s, storeName = storeNames.TryGetValue(s, out var sn) ? sn : s })
+            });
+        }
+
+        [HttpPost("web/logout")]
+        public IActionResult WebLogout([FromBody] JsonElement body)
+        {
+            var username = body.TryGetProperty("username", out var u) ? u.GetString() ?? "" : "";
+            var token = body.TryGetProperty("token", out var t) ? t.GetString() ?? "" : "";
+            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(token))
+                return BadRequest(new { success = false });
+
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"DELETE FROM whapp_tokens wt
+                USING users u
+                WHERE wt.token = @tok AND wt.user_pos_id = u.pos_id AND LOWER(u.username) = LOWER(@u)";
+            cmd.Parameters.AddWithValue("tok", token);
+            cmd.Parameters.AddWithValue("u", username);
+            cmd.ExecuteNonQuery();
+            return Ok(new { success = true });
+        }
+
         [HttpGet("expenses-summary")]
         public IActionResult GetExpensesSummary([FromQuery] string? storeId = null, [FromQuery] string? range = null)
         {
@@ -769,10 +976,26 @@ public class DashboardController : ControllerBase
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
+            var storeClause = StoreFilter(storeId, "p");
+            var whereClause = string.IsNullOrEmpty(storeId)
+                ? "WHERE p.is_active = true"
+                : "WHERE p.is_active = true " + storeClause;
             cmd.CommandText = $@"
                 SELECT name, barcode, category, stock_qty, price, cost, store_id
                 FROM products p
-                WHERE is_active = true {StoreFilter(storeId, "p")}
+                {whereClause}
+                {(string.IsNullOrEmpty(storeId) ? @"
+                UNION ALL
+                SELECT w.name,
+                       COALESCE(NULLIF(w.barcode,''), mp.barcode, '') AS barcode,
+                       COALESCE(NULLIF(w.category,''), mp.category, '') AS category,
+                       w.stock_qty,
+                       COALESCE(w.piece_price, w.box_price/NULLIF(w.box_qty,0), mp.price, 0) AS price,
+                       COALESCE(mp.cost, w.box_cost/NULLIF(w.box_qty,0), 0) AS cost,
+                       'STORE-WAREHOUSE' AS store_id
+                FROM wh_products w
+                LEFT JOIN master_products mp ON mp.id = w.master_product_id
+                WHERE w.is_active = true" : "")}
                 ORDER BY stock_qty ASC";
             if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
             var data = new List<object>();
@@ -1172,7 +1395,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.1.13" });
+            return Ok(new { version = "1.1.19" });
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -1222,7 +1445,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         return Ok(new
         {
             api = "ok",
-            version = "1.1.13",
+            version = "1.1.19",
             db = dbOk ? "ok" : "down",
             uptimeSeconds = Environment.TickCount64 / 1000,
             memory = new { totalMb = (long)(memTotal / (1024 * 1024)), freeMb = (long)(memFree / (1024 * 1024)) },
@@ -1315,7 +1538,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 WHERE store_id IN ('STORE-20260602-AA36','STORE-20260602-7159')
                   AND timestamp < '2026-06-14 00:00:00+00'::timestamptz";
             total += cmd.ExecuteNonQuery();
-            return Ok(new { @fixed = total, message = $"Fixed {total} records across both stores — added 8h to timestamps" });
+            return Ok(new { @fixed = total, message = $"Fixed {total} records across both stores Ã¢â‚¬â€ added 8h to timestamps" });
         }
 
         [HttpGet("fix-stock-trails-after-jun14")]
@@ -1345,7 +1568,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 WHERE store_id IN ('STORE-20260602-AA36','STORE-20260602-7159')
                   AND EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Manila') < 8";
             total += cmd.ExecuteNonQuery();
-            return Ok(new { @fixed = total, message = $"Fixed {total} records across both stores — added 8h to timestamps where Manila hour < 8" });
+            return Ok(new { @fixed = total, message = $"Fixed {total} records across both stores Ã¢â‚¬â€ added 8h to timestamps where Manila hour < 8" });
         }
 
         [HttpGet("fix-sync-table-times")]
@@ -1356,7 +1579,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             var total = 0;
             // SyncController.SyncTable used DateTime.TryParse with default styles,
             // which converted offset strings (+08:00) to server local time (UTC),
-            // then Npgsql (session Asia/Manila) double-converted them — stored 8h behind.
+            // then Npgsql (session Asia/Manila) double-converted them Ã¢â‚¬â€ stored 8h behind.
             // This fix adds 8h to ALL records affected (stored Manila hour >= 8,
             // since hour < 8 was already handled by fix-stock-trails-after-jun14).
             cmd.CommandText = @"
@@ -1396,7 +1619,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 WHERE store_id IN ('STORE-20260602-AA36','STORE-20260602-7159')
                   AND EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Manila') >= 8";
             total += cmd.ExecuteNonQuery();
-            return Ok(new { @fixed = total, message = $"Fixed {total} records — added 8h to all Maria hour >= 8 timestamps (SyncTable double-conversion fix)" });
+            return Ok(new { @fixed = total, message = $"Fixed {total} records Ã¢â‚¬â€ added 8h to all Maria hour >= 8 timestamps (SyncTable double-conversion fix)" });
         }
 
         [HttpGet("products/master")]
@@ -1704,7 +1927,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             return Ok(new { success = true });
         }
 
-        // ── Warehouse API ──
+        // Ã¢â€â‚¬Ã¢â€â‚¬ Warehouse API Ã¢â€â‚¬Ã¢â€â‚¬
         [HttpGet("warehouse/products")]
         public IActionResult WhGetProducts([FromQuery] bool activeOnly = true, [FromQuery] string? search = null, [FromQuery] bool noImage = false)
         {
@@ -2046,7 +2269,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
 
-            // Check if already imported — if so, update instead of duplicate
+            // Check if already imported Ã¢â‚¬â€ if so, update instead of duplicate
             cmd.CommandText = "SELECT id FROM wh_products WHERE master_product_id = @mid ORDER BY id LIMIT 1";
             cmd.Parameters.AddWithValue("mid", masterId);
             var existingId = cmd.ExecuteScalar();
@@ -2398,7 +2621,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     }
                     else
                     {
-                        // Shortage — restock warehouse
+                        // Shortage Ã¢â‚¬â€ restock warehouse
                         using var restock = conn.CreateCommand(); restock.Transaction = tx;
                         restock.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @qty WHERE id = @pid";
                         restock.Parameters.AddWithValue("qty", baseQty);
@@ -2439,9 +2662,9 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
         }
 
-        // ══════════════════════════════════════════════════════════════
-        // WAREHOUSE TRANSFERS (warehouse → POS store stock transfers)
-        // ══════════════════════════════════════════════════════════════
+        // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+        // WAREHOUSE TRANSFERS (warehouse Ã¢â€ â€™ POS store stock transfers)
+        // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 
         [HttpGet("warehouse/transfers")]
         public IActionResult WhGetTransfers([FromQuery] string? search = null, [FromQuery] string? date = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 30)
@@ -2515,7 +2738,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
 
                     foreach (var item in merged)
                     {
-                        // Validate stock exists (but don't deduct — held in pending until POS accepts)
+                        // Validate stock exists and is sufficient (don't deduct Ã¢â‚¬â€ held in pending until POS accepts)
                         using var checkCmd = new NpgsqlCommand(
                             "SELECT stock_qty FROM wh_products WHERE id = @pid AND is_active = true", conn, tx);
                         checkCmd.Parameters.AddWithValue("pid", item.ProductId);
@@ -2524,6 +2747,12 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                         {
                             tx.Rollback();
                             return BadRequest(new { error = $"Product not found: {item.ProductName}" });
+                        }
+                        var stockOnHand = Convert.ToInt32(available);
+                        if (stockOnHand < item.Qty)
+                        {
+                            tx.Rollback();
+                            return BadRequest(new { error = $"Insufficient stock for {item.ProductName}: only {stockOnHand} available, {item.Qty} requested. Receive stock first." });
                         }
 
                         using var icmd = new NpgsqlCommand(
@@ -2601,11 +2830,44 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 }
 
                 var shortages = new List<object>();
-                var transferOut = new List<object>();
                 foreach (var (productId, productName, baseQty, barcode) in itemsList)
                 {
                     var accepted = body?.Items == null || receivedIds.Contains(productId);
-                    var receivedQty = accepted ? baseQty : 0;
+                    var receivedQty = 0;
+
+                    if (accepted)
+                    {
+                        // Deduct stock from warehouse NOW (was held pending until POS accepts).
+                        // Guarded UPDATE Ã¢â‚¬â€ if 0 rows affected, stock is insufficient Ã¢â€ â€™ treat as shortage.
+                        using var deduct = conn.CreateCommand(); deduct.Transaction = tx;
+                        deduct.CommandText = "UPDATE wh_products SET stock_qty = stock_qty - @bq WHERE id = @pid AND stock_qty >= @bq";
+                        deduct.Parameters.AddWithValue("bq", baseQty);
+                        deduct.Parameters.AddWithValue("pid", productId);
+                        if (deduct.ExecuteNonQuery() > 0)
+                        {
+                            receivedQty = baseQty;
+
+                            // Log transfer_out trail (only when deduction actually succeeded)
+                            using var trail = conn.CreateCommand(); trail.Transaction = tx;
+                            trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) VALUES (@pid, @pn, @bc, @qty, @ref, 'transfer_out')";
+                            trail.Parameters.AddWithValue("pid", productId);
+                            trail.Parameters.AddWithValue("pn", productName);
+                            trail.Parameters.AddWithValue("bc", barcode);
+                            trail.Parameters.AddWithValue("qty", -baseQty);
+                            trail.Parameters.AddWithValue("ref", $"Transfer #{id} Ã¢â€ â€™ {clientName}");
+                            trail.ExecuteNonQuery();
+                        }
+                        else
+                        {
+                            // Insufficient stock Ã¢â‚¬â€ nothing deducted, item stays in warehouse
+                            shortages.Add(new { productId, productName, baseQty });
+                        }
+                    }
+                    else
+                    {
+                        // Unchecked item Ã¢â‚¬â€ stock stays in warehouse
+                        shortages.Add(new { productId, productName, baseQty });
+                    }
 
                     using var upd = conn.CreateCommand(); upd.Transaction = tx;
                     upd.CommandText = "UPDATE wh_transfer_items SET received_qty = @rq WHERE transfer_id = @tid AND product_id = @pid";
@@ -2613,31 +2875,6 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     upd.Parameters.AddWithValue("tid", id);
                     upd.Parameters.AddWithValue("pid", productId);
                     upd.ExecuteNonQuery();
-
-                    if (accepted)
-                    {
-                        // Deduct stock from warehouse NOW (was held pending until POS accepts)
-                        using var deduct = conn.CreateCommand(); deduct.Transaction = tx;
-                        deduct.CommandText = "UPDATE wh_products SET stock_qty = stock_qty - @bq WHERE id = @pid AND stock_qty >= @bq";
-                        deduct.Parameters.AddWithValue("bq", baseQty);
-                        deduct.Parameters.AddWithValue("pid", productId);
-                        deduct.ExecuteNonQuery();
-
-                        // Log transfer_out trail
-                        using var trail = conn.CreateCommand(); trail.Transaction = tx;
-                        trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) VALUES (@pid, @pn, @bc, @qty, @ref, 'transfer_out')";
-                        trail.Parameters.AddWithValue("pid", productId);
-                        trail.Parameters.AddWithValue("pn", productName);
-                        trail.Parameters.AddWithValue("bc", barcode);
-                        trail.Parameters.AddWithValue("qty", -baseQty);
-                        trail.Parameters.AddWithValue("ref", $"Transfer #{id} → {clientName}");
-                        trail.ExecuteNonQuery();
-                    }
-                    else
-                    {
-                        // Shortage: stock was never deducted, stays in warehouse
-                        shortages.Add(new { productId, productName, baseQty });
-                    }
                 }
 
                 var finalStatus = shortages.Count > 0 ? "partial" : "completed";
@@ -2666,7 +2903,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 var status = checkCmd.ExecuteScalar()?.ToString();
                 if (status != "pending") return BadRequest(new { error = "Only pending transfers can be cancelled" });
 
-                // Just mark as cancelled — stock was never deducted (held pending until POS receives)
+                // Just mark as cancelled Ã¢â‚¬â€ stock was never deducted (held pending until POS receives)
                 using var updateCmd = conn.CreateCommand(); updateCmd.Transaction = tx;
                 updateCmd.CommandText = "UPDATE wh_transfers SET status = 'cancelled', updated_at = NOW() WHERE id = @id";
                 updateCmd.Parameters.AddWithValue("id", id);
@@ -2700,7 +2937,36 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         [HttpPost("warehouse/stock-snapshot")]
         public IActionResult WhStockSnapshot([FromBody] WhStockSnapshotRequest req)
         {
-            return Ok(new { ok = true });
+            if (req?.Items == null || req.Items.Count == 0)
+                return Ok(new { ok = true, updated = 0 });
+            if (string.IsNullOrEmpty(req.StoreId))
+                return Ok(new { ok = true, updated = 0, skipped = "storeId missing (old POS client - update app)" });
+
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            int updated = 0;
+            using (var tx = conn.BeginTransaction())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = @"UPDATE products
+                    SET stock_qty = @q, name = @n, barcode = @b, synced_at = NOW()
+                    WHERE store_id = @sid AND pos_id = @pid";
+                var pSid = cmd.Parameters.AddWithValue("sid", req.StoreId);
+                var pPid = cmd.Parameters.AddWithValue("pid", 0);
+                var pQ = cmd.Parameters.AddWithValue("q", 0);
+                var pN = cmd.Parameters.AddWithValue("n", "");
+                var pB = cmd.Parameters.AddWithValue("b", "");
+                foreach (var it in req.Items)
+                {
+                    pPid.Value = it.ProductId;
+                    pQ.Value = it.CurrentStock;
+                    pN.Value = it.ProductName ?? "";
+                    pB.Value = it.Barcode ?? "";
+                    updated += cmd.ExecuteNonQuery();
+                }
+                tx.Commit();
+            }
+            return Ok(new { ok = true, updated });
         }
 
         [HttpGet("warehouse/inventory-activity")]
@@ -2767,7 +3033,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             // Step 1: Insert missing stock trails with destination name
             using var trailCmd = conn.CreateCommand(); trailCmd.Transaction = tx;
             trailCmd.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) " +
-                "SELECT ti.product_id, ti.product_name, ti.barcode, -ti.qty, 'Transfer #' || ti.transfer_id || CASE WHEN c.name IS NOT NULL THEN ' → ' || c.name ELSE '' END, 'transfer_out' " +
+                "SELECT ti.product_id, ti.product_name, ti.barcode, -ti.qty, 'Transfer #' || ti.transfer_id || CASE WHEN c.name IS NOT NULL THEN ' Ã¢â€ â€™ ' || c.name ELSE '' END, 'transfer_out' " +
                 "FROM wh_transfer_items ti JOIN wh_transfers t ON t.id = ti.transfer_id LEFT JOIN wh_clients c ON c.id = t.client_id " +
                 "WHERE t.status IN ('completed','partial') AND NOT EXISTS (SELECT 1 FROM wh_stock_trails st WHERE st.reference LIKE 'Transfer #' || ti.transfer_id || '%' AND st.product_id = ti.product_id)";
             trailCount = trailCmd.ExecuteNonQuery();
@@ -3322,8 +3588,8 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
 
                 using var ct = conn.CreateCommand(); ct.Transaction = tx;
                 ct.CommandText = @"INSERT INTO credit_transactions (pos_id, store_id, customer_id, sale_id, type, description, debit, credit, balance, payment_method, user_name, created_at, synced_at)
-                    VALUES (@pos, '', @cid, @sid, 'Void', @desc, 0, @amt, (SELECT COALESCE(credit_balance, 0) FROM customers WHERE id = @cid), 'Credit', @un, NOW(), NOW())";
-                ct.Parameters.AddWithValue("pos", id);
+                    VALUES (-NEXTVAL('credit_transactions_id_seq'), '', @cid, @sid, 'Void', @desc, 0, @amt, (SELECT COALESCE(credit_balance, 0) FROM customers WHERE id = @cid), 'Credit', @un, NOW(), NOW())";
+                ct.Parameters.AddWithValue("cid", customerId);
                 ct.Parameters.AddWithValue("cid", customerId);
                 ct.Parameters.AddWithValue("sid", id);
                 ct.Parameters.AddWithValue("desc", $"Void Invoice {invoiceNo} - {voidedCount} item(s)");
@@ -3736,11 +4002,12 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         return Ok(new { url = "/assets/" + fileName, fullUrl = "https://admin.jumongdev.com/assets/" + fileName });
     }
 
-    // ── Agent (remote diagnostic) ──
+    // Ã¢â€â‚¬Ã¢â€â‚¬ Agent (remote diagnostic) Ã¢â€â‚¬Ã¢â€â‚¬
 
     private static readonly ConcurrentDictionary<string, Queue<AgentCommand>> _cmdQueues = new();
     private static readonly ConcurrentDictionary<string, List<AgentResult>> _results = new();
     private static readonly ConcurrentDictionary<string, (DateTime lastSeen, string ip, string machine, string appVersion, bool hasError, string errorSummary)> _agents = new();
+    private static readonly ConcurrentDictionary<string, (DateTime updatedAt, Dictionary<string, int> pending)> _posStatus = new();
     private static int _cmdCounter = 0;
 
         [HttpPost("agent/heartbeat")]
@@ -3801,6 +4068,21 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             using var stream = new FileStream(path, FileMode.Create);
             await file.CopyToAsync(stream);
             return Ok(new { url = "/assets/" + file.FileName, fullUrl = "https://admin.jumongdev.com/assets/" + file.FileName });
+        }
+
+        [HttpPost("pos-status")]
+        public IActionResult PosStatus([FromBody] PosStatusRequest req)
+        {
+            if (string.IsNullOrEmpty(req.StoreId)) return BadRequest("StoreId required");
+            _posStatus[req.StoreId] = (DateTime.UtcNow, req.Pending ?? new Dictionary<string, int>());
+            return Ok(new { ok = true });
+        }
+
+        [HttpGet("pos-status")]
+        public IActionResult PosStatusAll()
+        {
+            var list = _posStatus.Select(kv => new { storeId = kv.Key, pending = kv.Value.pending, updatedAt = kv.Value.updatedAt }).OrderBy(x => x.storeId);
+            return Ok(list);
         }
 
         [HttpPost("suspect-1pc")]
@@ -3917,6 +4199,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
 
     public class WhStockSnapshotRequest
     {
+        public string? StoreId { get; set; }
         public List<WhStockSnapshotItem>? Items { get; set; }
     }
     public class WhStockSnapshotItem
@@ -4016,5 +4299,11 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         public int CommandId { get; set; }
         public string Output { get; set; } = "";
         public string Error { get; set; } = "";
+    }
+
+    public class PosStatusRequest
+    {
+        public string StoreId { get; set; } = "";
+        public Dictionary<string, int>? Pending { get; set; }
     }
 

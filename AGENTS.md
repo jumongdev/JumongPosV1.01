@@ -1578,6 +1578,23 @@ Copy JumongWarehouse.apk to JumongCloudAPI\wwwroot\updates\ AND JumongCloudAPI\b
 
 **Impact:** The AGENTS dashboard no longer shows stale red ERROR badges for hours after recovery. Root cause of the 2026-08-11 badges: HQ/HVR/ACGS had real sync failures (DNS "No such host is known" + TCP connect timeouts on `FetchPromoMessageAsync`/`DownloadCustomersAsync`, last FAILs 19:47/18:44/18:43 PH) — those were transient (store internet/DNS outage window), all stores reconnected and synced OK afterwards (Naic never had recent failures). Agent-only change — no POS client or API deploy needed; stores with the new agent.zip already updated.
 
+### v1.1.40 (POS) + v1.0.16 (APK) — Full Item Names on Receipts (Wrap Not Truncate) + Double-Height Mobile Item Names + Mobile Inventory Stock Trail
+
+| File | Change |
+|---|---|
+| `Services/PrinterService.cs:958-967` | **Wholesale receipt fix** — removed `name[..(chars - 11)] + "..."` truncation. Long item names now WRAP onto continuation lines (indented `"  "`) via existing `WrapText()` helper — full name always prints. |
+| `Services/PrinterService.cs:154-166` | **Retail receipt fix** (`BuildReceiptLines`) — same: removed `name[..(lineChars - 2)] + ".."`, wrapped names via `WrapText()` with indented continuations. |
+| `JumongCloudAPI/wwwroot/whmobile.html:1972-2013` | **Mobile reprint fix** — `buildReceiptTextReprint()` replaced `fit()` truncation (48 chars + `~`) with `wrap()` — full names on reprints. |
+| `JumongCloudAPI/wwwroot/whmobile.html:1655-1661` | **Mobile sale receipt** — item-name lines now prefixed `<<BIG>>` (first line) / `<<BIG>>  ` (continuation) for double-height printing. |
+| `WarehouseApp/.../BluetoothPrinter.kt` | **`<<BIG>>` marker support** — `printText()` detects `<<BIG>>` prefix, sends `GS ! 0x10` (double-height, same width) before the line + `GS ! 0x00` after. Item names print ~2× taller for readability. |
+| `WarehouseApp/app/build.gradle` | versionCode 17, versionName `"1.0.16"` |
+| `JumongCloudAPI/wwwroot/updates/warehouse-version.json` | `"1.0.16"` changelog; rebuilt + signed APK (same jumong_sign keystore) deployed to all update folders, no BOM |
+| `JumongCloudAPI/wwwroot/whmobile.html:1745` | **Mobile inventory search → stock trail** — `searchInventory()` now sets `prodCache = data` so the detail modal can find searched products. |
+| `JumongCloudAPI/wwwroot/whmobile.html:1762` | **Mobile inventory cards now tappable** — `onclick="showProductDetail(p.id)"` added to inventory search results (same as Products tab) → opens detail modal → **📜 STOCK TRAIL** button → `loadStockTrail()` (was unreachable from Inventory tab; endpoint `/dashboard/warehouse/stock-trails?productId=` already existed). |
+| `Services/AppVersion.cs` | Current bumped to `"1.1.40"` |
+
+**Impact:** Long wholesale/retail item names (e.g. `LUCKY ME! INSTANT PANCIT CANTON KALAMANSI 80G (BY 6)`) now print IN FULL everywhere — POS wholesale + retail receipts wrap to continuation lines instead of `...` cut-off, and mobile sale/reprint receipts wrap + print item names DOUBLE-HEIGHT (GS !) for readability. Mobile inventory search items can now be tapped to view product details + full stock trail (receive/sale/void/transfer/manual set with qty change and before→after stock). Deployed: web `whmobile.html` + version json to live `C:\JumongAPI\wwwroot\` + server repo copy; POS client `v1.1.40` to `C:\JumongAPI\client\` (stores via UPDATE APP); APK v1.0.16 signed + live (verified 200, 2.6 MB). No cloud API change (endpoint already existed).
+
 ### 2026-08-12 — Store IP + POS Path Verification (via agents)
 
 | Item | Detail |
@@ -1587,3 +1604,78 @@ Copy JumongWarehouse.apk to JumongCloudAPI\wwwroot\updates\ AND JumongCloudAPI\b
 | ACGS | `DESKTOP-TK63MO6` @ `192.168.0.103` (was .100, DHCP change), POS at `C:\JumongPos\`, agent at `C:\JumongPos\Agent\Agent.exe` |
 | Naic | `DESKTOP-NISQ3Q7` @ `192.168.1.152` (unchanged) |
 | Note | Machine Roles table + Stores table in AGENTS.md updated to verified IPs/paths. All 4 stores confirmed on app v1.1.38, all CloudApiUrl = `https://admin.jumongdev.com/api`. |
+
+### v1.1.15 (Cloud API) — Wholesale Void Fix for Credit Sales (500 on void)
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs:3324-3326` | **`WhVoidSale` credit reversal pos_id collision fixed** — voiding a **Credit** sale inserted a `credit_transactions` reversal row with `pos_id = saleId, store_id = ''`, which collides with the original `Sale` row (`UNIQUE(store_id, pos_id)` on `credit_transactions`). Result: **all wholesale voids of credit sales failed with 500** and the whole void transaction rolled back — stock NOT restored, sale NOT marked voided. Affected both POS client (WarehouseSellForm VOID/VOID ITEM) and mobile app (`whmobile.html` VOID SALE / item void) since they share the endpoint. Fix: pos_id now uses `-NEXTVAL('credit_transactions_id_seq')` (same pattern as the credit-pay endpoint). |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1175,1225` | Version bumped to `"1.1.15"`. |
+| — | **Diagnosis via WinRM**: dry-run of the exact INSERT on the live DB confirmed `duplicate key value violates unique constraint "credit_transactions_store_id_pos_id_key"` for sale 475. After fix, same insert returns `INSERT 0 1`. Non-destructive (rolled back). |
+
+**Impact:** Void now works for wholesale Credit sales again (POS + mobile). Cash sale voids were never affected (no credit reversal row). Deployed via WinRM (`net stop` → copy publish → `net start`), live API version verified `1.1.15`, `/dashboard/health` = `db: ok`. Interestingly, void log audit shows the reversal was silently skipped pre-v1.1.37 when the constraint didn't exist — the collision only bites since `credit_transactions_store_id_pos_id_key` was (re)created by the startup migration block in PgDatabaseHelper.cs:347-349.
+
+### v1.1.16 (Cloud API) — Transfer Stock Guard (no more negative stock / silent skipped deductions)
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs:2519-2546` | **`WhCreateTransfer` now BLOCKS insufficient stock** — the product check previously validated existence only. Now reads `stock_qty` and returns `BadRequest "Insufficient stock for {name}: only {X} available, {Y} requested. Receive stock first."` if `stock_qty < qty` (transaction rolled back, transfer not created). Manager must receive stock into the system before creating a transfer. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:2603-2660` | **`WhReceiveTransfer` now honors the deduction guard** — the guarded UPDATE (`... WHERE id = @pid AND stock_qty >= @bq`) previously had its `ExecuteNonQuery()` result DISCARDED: when stock was insufficient (0 rows affected) the code still wrote the `transfer_out` trail (−qty), set `received_qty = qty`, and marked the transfer `completed`. This is what caused the "negative stock" trail story (e.g., Mighty Green Menthol id 5: transfer #630 asked 100, only 10 in system → trail replayed to −90 while the stock column stayed 10). Now: 0 rows affected → item treated as **shortage** (`received_qty = 0`, **no trail row written**, added to `shortages`, transfer status `partial`). Trail is only ever written when the deduction actually succeeded. Also removed dead `transferOut` variable. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1175,1225` | Version bumped to `"1.1.16"`. |
+| PostgreSQL data (2026-08-13) | **Mighty Green Menthol (id 5) corrected**: stock column was 510 (10 recorded + 500 RECEIVE by jovani) while the trail replay was 410 (−90 + 500) — the transfer #630 −100 deduction never landed on the column because of the guard bug. Applied `UPDATE wh_products SET stock_qty = stock_qty - 100 WHERE id = 5` (no trail row — the −100 was already in the trail). View = trail = 410 verified via live API. Left as-is per owner: Transfer #630 (100 pcs to ACGS from an unrecorded new delivery) is a real movement, ACGS store stock untouched, +500 receiving record untouched. |
+
+**Impact:** Transfer creation beyond system stock is now rejected with a clear message, and any stock that runs out between transfer creation and POS receive is reported as a PARTIAL shortage with a correct trail — silent negative stock is impossible. Post-fix integrity scan note: several OTHER products still show column vs trail-replay divergence (e.g., id 65 +432, id 20 +360, etc.) — pre-existing, created by the earlier agent snapshot cleanup / stock recalcs — NOT touched (owner aware; only id 5 was in scope). WinRM deploy note: `Copy-Item -ToSession` while the service is running fails on locked System*.dll files — always `net stop` BEFORE copying, then `net start` (verified: fresh exe timestamp + `/dashboard/version` = 1.1.16).
+
+### Web-only (2026-08-13) — Dashboard menu rename: Products → Master Products
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/index.html:54` | Sidebar nav item `{ id:'products', label:'Products' }` → `'Master Products'` (the main section = master catalog; warehouse subpage `Product` unchanged). |
+| `JumongCloudAPI/wwwroot/index.html:214` | Dashboard summary card label `'Products / Customers'` → `'Master Products / Customers'` for consistency. |
+
+**Impact:** Dashboard sidebar now says **Master Products** for the master catalog section. Web-only change — copied to live `C:\JumongAPI\wwwroot\index.html`, verified live (`Master Products` present). No API rebuild/deploy needed.
+
+### Web-only (2026-08-13) — Warehouse Product EDIT/DEL removed (read-only from master)
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/index.html:1173-1176` | **Warehouse → Product subpage Actions column: EDIT and DEL buttons REMOVED** — replaced with a single read-only **TRAIL** button (`showTrail(x.id)`). Employees can no longer change warehouse product details (name/barcode/price/cost/units); all detail edits must be done on the **Master Products** section, which auto-syncs to warehouse + POS clients. Stock changes still happen via Inventory subpage ADJUST/+RETURN and RECEIVE. Client EDIT/DEL in Online Order subpage untouched; master catalog EDIT/DEL untouched. |
+
+**Impact:** No more employee-driven divergence between `wh_products` and `master_products` from the web dashboard. Owner decision: warehouse product editing was "walang kwenta" — the master catalog is the single source of truth. Web-only change — copied to live `C:\JumongAPI\wwwroot\index.html`, verified live (`openEdit(x.id)` now appears only once = clients table).
+
+### v1.1.17 (Cloud API) + web-only — Web Dashboard Login (Username + PIN, per-user WEB ACCESS)
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs` | Migration: `ALTER TABLE users ADD COLUMN IF NOT EXISTS web_access BOOLEAN NOT NULL DEFAULT FALSE` + seed `UPDATE users SET web_access = TRUE WHERE role = 'Admin'` (all admins get access on startup). |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **3 new endpoints**: `POST /web/login` (username + password_hash match, `is_active` + `web_access=true` required; Admin → ALL stores, non-admin → only `user_stores`; token in `whapp_tokens`, keep last 5), `GET /web/me` (token validation for page reloads), `POST /web/logout`. Users GET now returns `webAccess`; CreateUser/UpdateUser read/write `web_access`. Version bumped `"1.1.16"` → `"1.1.17"`. |
+| `JumongCloudAPI/wwwroot/index.html` | **Full-screen login screen** (`#loginScreen`) shown until valid session; session in sessionStorage (`jpos_web_user`/`jpos_web_token`); auto-validate via `/web/me` on load; **LOGOUT** button in header; sidebar + app body hidden until login (`#appRoot`). Store selector: Admin → "All Stores" + all stores (as before); non-admin → only assigned stores, auto-selected first store (no "All Stores" option). |
+| `JumongCloudAPI/wwwroot/components.js` + `index.html` | User Manager: `webAccess` added to `openAdd`/`openEdit`/`save` form + **WEB** badge (green) in users table + **Web Access (admin.jumongdev.com)** checkbox in user modal. |
+| PostgreSQL | `web_access` column added; all existing Admin users flagged. |
+
+**Impact:** `admin.jumongdev.com` now requires username + the user's POS PIN to open. Only users ticked **Web Access** in User Manager can log in (Admin users get it automatically = all access to all stores). Sessions last until the browser tab closes; LOGOUT kills the token server-side. This is a page-level gate — the API endpoints stay open for POS clients/agents/mobile (no auth there yet, so a technical user could still call the API directly). Deployed: API rebuilt (WinRM stop → copy → start, live version verified `1.1.17`), `index.html`/`components.js` copied live. Verified: admin login OK (6 stores, allStores=true), wrong PIN → 401, cashier without WEB ACCESS → 401, logout → token invalidated (`/web/me` → 401).
+
+### v1.1.18 (Cloud API) + v1.1.41 (POS) — Stock Snapshot Pipeline Restored + Stock Status Warehouse Merge + Sidebar Restructure
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs:2921-2950` | **`WhStockSnapshot` implemented (was a no-op `return Ok`)**: POS clients were already sending full stock every 30s (`PushAllUnsyncedAsync`) + delta snapshots, but the endpoint discarded everything → server `products.stock_qty` only updated opportunistically via SyncProduct (sale/receiving) → server vs client stock mismatch (e.g. HVR). Now reads `storeId` from body and `UPDATE products SET stock_qty=@q, name=@n, barcode=@b, synced_at=NOW() WHERE store_id=@sid AND pos_id=@pid` (transactional; **never touches `wh_products`** — the reason it was neutered; skips rows that don't exist yet — SyncProduct creates them). Old clients without storeId → `skipped` message, no crash. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:974-1012` | **`/stock-status` warehouse merge** — when NO store filter: `UNION ALL` of per-store `products` + `wh_products` rows (LEFT JOIN `master_products` via `master_product_id` for per-pc price/cost fallbacks, `storeId='STORE-WAREHOUSE'`). Specific store → store-only as before. `ORDER BY stock_qty ASC` across the union. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | Version bumped `"1.1.17"` → `"1.1.18"`. |
+| `Services/SyncService.cs:1280` | `SyncStockSnapshotAsync` payload now includes `storeId = StoreId` (both the 30s full push and the 5s-debounce delta push use this method). |
+| `Services/AppVersion.cs` | Bumped to `"1.1.41"` — **stores must UPDATE APP** so snapshots carry storeId; otherwise the server skips their snapshots (guard message says "update app"). |
+| `JumongCloudAPI/wwwroot/index.html` | **Sidebar restructured**: `POS CLIENT` header with `Reports` sub-header (Sales Report / Inventory Cost / Shift History), `Master Products`, `Inventory` sub-header (renamed from STOCK; Recent Receiving / Stock Status). New `isSub` + `item.indent` support in the nav template. Warehouse group unchanged (owner: "ok na"). Stock section header text `STOCK —` → `INVENTORY —`. |
+
+**Impact:** Server stock now equals each POS client's live stock within ~30s (full push every 30s + delta on change) — the HVR-style server-vs-client mismatch is fixed at the source. Stock Status with All Stores shows every location including Warehouse (394 wh rows in the live view). Sidebar groups everything POS-related under POS CLIENT with Reports/Inventory sub-headers. Deployed: API rebuilt (WinRM, version `1.1.18` verified), web files copied live, POS client published to `C:\JumongAPI\client\` (stores via UPDATE APP). Verified: snapshot probe `updated:1` on real product (idempotent echo), missing-storeId → skipped message, stock-status union returns warehouse rows, per-store filter excludes warehouse, menu renders POS CLIENT/Reports/Inventory.
+
+### v1.1.19 (Cloud API) + v1.1.42 (POS) — Startup/Reconnect Auto-Drain + POS Sync Status on Dashboard
+
+| File | Change |
+|---|---|
+| `Services/SyncService.cs` | **`GetPendingCounts()`** — single SQL with subselects counting unsynced rows in Sales (non-voided), StockTrail, VoidLog, CreditTransactions, DailyClose, Expenses + SyncQueue. **`PostPosStatusAsync()`** — POSTs `{storeId, pending}` to `/dashboard/pos-status` after every `PushAllUnsyncedAsync` (so ~every 30s per store). **`DrainAllUnsyncedAsync()`** — loops `RetryFailedAsync` (drains SyncQueue) + `PushAllUnsyncedAsync` up to 10 passes until nothing pending, then posts status. |
+| `Forms/MainForm.cs` | **Startup flush** — 3s after MainForm loads, background task runs `DrainAllUnsyncedAsync()` (offline-overnight stores now push EVERYTHING — sales, closes, expenses, queued failures — automatically on open; no manual SYNC ALL). **Reconnect trigger** — `_wasConnected` field: when the 10s connection check transitions OFF→ON, instantly runs `DrainAllUnsyncedAsync()` (covers mid-day outages). |
+| `Services/AppVersion.cs` | Bumped to `"1.1.42"`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **`POST /dashboard/pos-status`** (stores pending counts in memory per storeId) + **`GET /dashboard/pos-status`** (list for dashboard). `_posStatus` ConcurrentDictionary next to `_agents`. Version bumped `"1.1.18"` → `"1.1.19"`. |
+| `JumongCloudAPI/wwwroot/index.html` + `components.js` | **AGENTS cards now show a sync chip**: 🟢 **SYNC OK** (0 pending, posted < 90s ago) / 🟠 **N PENDING** (with breakdown tooltip) / gray **offline** or **—** (no status yet). `agentsPanel` fetches `/pos-status` on load + every 15s while the section is open. |
+
+**Impact:** Converts passive "background pushes whenever the timer ticks" into active draining — startup flush + reconnect trigger eliminate the HVR 2026-08-12 scenario (98 sales stranded until a manual 22:37 SYNC) and the 2097-item SyncQueue backlog (auto-retried, no manual button needed). Dashboard AGENTS tab shows each store's live sync health at a glance — no more digging through SQL to find unsynced records. DailyClose was never broken: it syncs immediately on creation (verified: HVR 08-12 close created 06:52:17, arrived server 06:52:35 — 18s gap; total 661.00 = exact sum of the 98 sales). Deployed: API v1.1.19 live (verified), web files live (syncChip + pos-status present), POS client published to `C:\JumongAPI\client\` (stores via UPDATE APP). EXCEPTION: `STORE-DEV-0001` (dev PC) never posts pos-status.

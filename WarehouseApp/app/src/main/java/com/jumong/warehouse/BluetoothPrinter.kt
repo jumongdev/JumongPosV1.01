@@ -407,14 +407,20 @@ object BluetoothPrinter {
                 // Peso sign (U+20B1) is outside 7-bit ASCII - print "P" instead of "?"
                 .replace('\u20B1', 'P')
 
+            // Double-height marker (GS ! 0x10) - item names on receipts
+            val big = content.startsWith("<<BIG>>")
+            val text = if (big) content.removePrefix("<<BIG>>") else content
+
             when (align) {
                 "center" -> out.write(ESC_ALIGN_CENTER)
                 "right" -> out.write(ESC_ALIGN_RIGHT)
                 else -> out.write(ESC_ALIGN_LEFT)
             }
             out.write(ESC_BOLD_ON)
-            out.write(content.toByteArray(Charsets.US_ASCII))
+            if (big) out.write(GS_DOUBLE_HEIGHT)
+            out.write(text.toByteArray(Charsets.US_ASCII))
             out.write('\n'.code)
+            if (big) out.write(GS_NORMAL)
         }
         // Cut paper + feed
         out.write(ESC_FEED_3)
@@ -455,6 +461,8 @@ object BluetoothPrinter {
     private val ESC_ALIGN_RIGHT = byteArrayOf(ESC, 0x61, 0x02)
     private val ESC_NL = byteArrayOf(ESC, 0x64, 0x01)
     private val ESC_BOLD_ON = byteArrayOf(ESC, 0x45, 0x01)
+    private val GS_DOUBLE_HEIGHT = byteArrayOf(GS, 0x21, 0x10)
+    private val GS_NORMAL = byteArrayOf(GS, 0x21, 0x00)
     private val ESC_FEED_3 = byteArrayOf(ESC, 0x64, 0x03)
     private val ESC_CUT = byteArrayOf(GS, 0x56, 0x42, 0x00)
 }

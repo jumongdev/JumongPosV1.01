@@ -153,10 +153,9 @@ public class PrinterService
 
         foreach (var item in sale.Items)
         {
-            var name = item.ProductName;
-            if (name.Length > lineChars)
-                name = name[..(lineChars - 2)] + "..";
-            lines.Add(new LineEntry { Text = name, Bold = true, Spacing = 14 });
+            var nameLines = WrapText(item.ProductName, lineChars);
+            for (int i = 0; i < nameLines.Count; i++)
+                lines.Add(new LineEntry { Text = i == 0 ? nameLines[i] : "  " + nameLines[i], Bold = true, Spacing = 14 });
             lines.Add(new LineEntry
             {
                 Text = $"  {item.Quantity}x {item.Price:N2}",
@@ -958,8 +957,9 @@ public class PrinterService
         foreach (var item in items)
         {
             var name = item.ProductName + " (" + item.UnitName + ")";
-            if (name.Length > chars - 8) name = name[..(chars - 11)] + "...";
-            AddLine(name);
+            var nameLines = WrapText(name, chars);
+            for (int i = 0; i < nameLines.Count; i++)
+                AddLine(i == 0 ? nameLines[i] : "  " + nameLines[i]);
             var qtyLine = $"  {item.Qty} x ₱{item.Price:N2}";
             var sub = $"₱{item.Subtotal:N2}";
             var pad = Math.Max(0, chars - qtyLine.Length - sub.Length);

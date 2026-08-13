@@ -608,6 +608,8 @@ public static class SyncService
             catch { }
         }
         catch (Exception ex) { ErrorLogger.Log("SyncService.PushAllUnsynced", ex); }
+
+        await PostPosStatusAsync();
     }
 
     public static async Task PushStockSnapshotAsync()
@@ -651,6 +653,68 @@ public static class SyncService
             var newJson = System.Text.Json.JsonSerializer.Serialize(
                 stocks.ToDictionary(s => s.productId.ToString(), s => s.currentStock));
             DatabaseHelper.SaveSetting("LastStockSnapshot", newJson);
+        }
+        catch { }
+    }
+
+    public static Dictionary<string, int> GetPendingCounts()
+    {
+        var c = new Dictionary<string, int>
+        {
+            ["sales"] = 0, ["trails"] = 0, ["voids"] = 0, ["credits"] = 0, ["closes"] = 0, ["expenses"] = 0, ["queue"] = 0
+        };
+        try
+        {
+            using var conn = DatabaseHelper.GetConnection();
+            conn.Open();
+            using var cmd = new SQLiteCommand(
+                "SELECT (SELECT COUNT(*) FROM Sales WHERE Synced = 0 AND IsVoided = 0), " +
+                "(SELECT COUNT(*) FROM StockTrail WHERE Synced = 0), " +
+                "(SELECT COUNT(*) FROM VoidLog WHERE Synced = 0), " +
+                "(SELECT COUNT(*) FROM CreditTransactions WHERE Synced = 0), " +
+                "(SELECT COUNT(*) FROM DailyClose WHERE Synced = 0), " +
+                "(SELECT COUNT(*) FROM Expenses WHERE Synced = 0), " +
+                "(SELECT COUNT(*) FROM SyncQueue)", conn);
+            using var r = cmd.ExecuteReader();
+            if (r.Read())
+            {
+                c["sales"] = Convert.ToInt32(r[0]);
+                c["trails"] = Convert.ToInt32(r[1]);
+                c["voids"] = Convert.ToInt32(r[2]);
+                c["credits"] = Convert.ToInt32(r[3]);
+                c["closes"] = Convert.ToInt32(r[4]);
+                c["expenses"] = Convert.ToInt32(r[5]);
+                c["queue"] = Convert.ToInt32(r[6]);
+            }
+        }
+        catch { }
+        return c;
+    }
+
+    public static int PendingTotal() => GetPendingCounts().Values.Sum();
+
+    public static async Task DrainAllUnsyncedAsync()
+    {
+        for (var i = 0; i < 10; i++)
+        {
+            try { await RetryFailedAsync(); } catch { }
+            var before = PendingTotal();
+            if (before == 0) break;
+            try { await PushAllUnsyncedAsync(); } catch (Exception ex) { ErrorLogger.Log("SyncService.DrainAll", ex); }
+            var after = PendingTotal();
+            if (after == 0 || after >= before) break;
+        }
+        await PostPosStatusAsync();
+    }
+
+    private static async Task PostPosStatusAsync()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(StoreId) || StoreId == "STORE-DEV-0001") return;
+            var data = new { storeId = StoreId, pending = GetPendingCounts() };
+            using var content = new StringContent(JsonSerializer.Serialize(data, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }), Encoding.UTF8, "application/json");
+            using var resp = await _client.PostAsync(ApiUrl.TrimEnd('/') + "/dashboard/pos-status", content);
         }
         catch { }
     }
@@ -1277,7 +1341,7 @@ public static class SyncService
         try
         {
             var url = ApiUrl.TrimEnd('/') + "/dashboard/warehouse/stock-snapshot";
-            var body = JsonSerializer.Serialize(new { items = stocks.Select(s => new { s.productId, s.productName, s.barcode, currentStock = s.currentStock }) });
+            var body = JsonSerializer.Serialize(new { storeId = StoreId, items = stocks.Select(s => new { s.productId, s.productName, s.barcode, currentStock = s.currentStock }) });
             var content = new StringContent(body, Encoding.UTF8, "application/json");
             await _client.PostAsync(url, content);
         }

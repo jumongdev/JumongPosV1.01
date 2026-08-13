@@ -1004,7 +1004,7 @@ Alpine.store('app', {
 
     openAdd() {
       this.editingId = null;
-      this.form = { username: '', fullName: '', role: 'Cashier', passwordHash: '12345', storeIds: [], isActive: true, mobileAccess: false };
+      this.form = { username: '', fullName: '', role: 'Cashier', passwordHash: '12345', storeIds: [], isActive: true, mobileAccess: false, webAccess: false };
       this.modalTitle = 'NEW USER';
       this.modalOpen = true;
     },
@@ -1018,7 +1018,8 @@ Alpine.store('app', {
         passwordHash: '',
         storeIds: (x.storeIds || []).slice(),
         isActive: x.isActive !== false,
-        mobileAccess: !!x.mobileAccess
+        mobileAccess: !!x.mobileAccess,
+        webAccess: !!x.webAccess
       };
       this.modalTitle = 'EDIT: ' + x.username;
       this.modalOpen = true;
@@ -1044,7 +1045,8 @@ Alpine.store('app', {
           role: this.form.role,
           storeIds: this.form.storeIds,
           isActive: this.form.isActive,
-          mobileAccess: !!this.form.mobileAccess
+          mobileAccess: !!this.form.mobileAccess,
+          webAccess: !!this.form.webAccess
         };
         if (this.form.passwordHash) body.passwordHash = this.form.passwordHash;
         const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -1257,12 +1259,22 @@ Alpine.store('app', {
 
   // AGENTS remote diagnostic panel
   Alpine.data('agentsPanel', () => ({
-    d: [], loading: false, selectedStore: '', cmdType: 'sql', cmdPayload: '', results: '', sending: false,
+    d: [], loading: false, selectedStore: '', cmdType: 'sql', cmdPayload: '', results: '', sending: false, pos: {},
     async init() {
       if (Alpine.store('app').section === 'agents') await this.load();
       this.$watch('$store.app.section', v => { if (v === 'agents') this.load(); });
+      setInterval(() => { if (Alpine.store('app').section === 'agents') this.load(); }, 15000);
     },
-    async load() { this.loading = true; try { this.d = await fetchJSON(API + '/agent/status') } catch (e) { this.d = [] }; this.loading = false },
+    async load() { this.loading = true; try { this.d = await fetchJSON(API + '/agent/status') } catch (e) { this.d = [] }; try { const ps = await fetchJSON(API + '/pos-status'); this.pos = {}; (ps || []).forEach(x => this.pos[x.storeId] = x); } catch (e) { }; this.loading = false },
+    syncChip(ps) {
+      if (!ps) return { cls: 'bg-gray-200 dark:bg-[#222255] text-gray-500 dark:text-[#7878aa]', txt: '—' };
+      var fresh = (Date.now() - new Date(ps.updatedAt).getTime()) < 90000;
+      if (!fresh) return { cls: 'bg-gray-200 dark:bg-[#222255] text-gray-500 dark:text-[#7878aa]', txt: 'offline' };
+      var total = 0, parts = [];
+      for (var k in ps.pending) { if (ps.pending[k] > 0) { total += ps.pending[k]; parts.push(k + ':' + ps.pending[k]); } }
+      if (total === 0) return { cls: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400', txt: 'SYNC OK' };
+      return { cls: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400', txt: total + ' PENDING' };
+    },
     async send() {
       if (!this.selectedStore || !this.cmdPayload.trim()) return;
       this.sending = true; this.results = 'Sending...';

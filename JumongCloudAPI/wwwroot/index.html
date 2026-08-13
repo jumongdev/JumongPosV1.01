@@ -27,11 +27,34 @@ tailwind.config = {
 </head>
 <body class="bg-gray-50 dark:bg-[#080816] text-gray-900 dark:text-slate-200 min-h-screen" x-data x-cloak>
 
-  <!-- ΓöÇΓöÇ Toast Container ΓöÇΓöÇ -->
+  <!-- Login Screen (only users with WEB ACCESS can log in) -->
+  <div id="loginScreen" class="fixed inset-0 z-[100] flex items-center justify-center bg-gradient-to-b from-[#0b0b24] to-[#16163a]">
+    <div class="w-[92%] max-w-sm bg-white dark:bg-[#12123a] border border-gray-200 dark:border-[#222255] rounded-2xl shadow-2xl p-8">
+      <div class="text-center mb-6">
+        <div class="text-3xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 dark:from-cyan-400 dark:to-blue-400 bg-clip-text text-transparent">JUMONG POS</div>
+        <div class="text-xs text-gray-400 dark:text-[#7878aa] mt-1">Admin Dashboard &middot; Secure Access</div>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">USERNAME</label>
+          <input id="loginUsername" autocomplete="username" class="w-full text-sm bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2.5 text-gray-700 dark:text-slate-200 focus:outline-none focus:border-cyan-500" placeholder="Enter username">
+        </div>
+        <div>
+          <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">PIN</label>
+          <input id="loginPin" type="password" autocomplete="current-password" class="w-full text-sm bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2.5 text-gray-700 dark:text-slate-200 focus:outline-none focus:border-cyan-500" placeholder="Enter PIN" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <div id="loginError" class="hidden text-xs text-red-400"></div>
+        <button id="loginBtn" onclick="doLogin()" class="w-full text-sm font-bold py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white transition-colors">LOGIN</button>
+      </div>
+      <div class="text-[10px] text-gray-400 dark:text-[#4a4a7a] text-center mt-5">Only users with WEB ACCESS can log in.</div>
+    </div>
+  </div>
+
+  <!-- ── Toast Container ── -->
   <div id="toastContainer" class="fixed top-20 right-4 z-70 flex flex-col gap-2 no-print"></div>
 
-  <!-- ΓöÇΓöÇ Sidebar ΓöÇΓöÇ -->
-  <aside id="sidebar" class="sidebar fixed top-0 left-0 bottom-0 w-[220px] z-40 flex flex-col border-r border-gray-200 dark:border-[#222255] bg-white dark:bg-gradient-to-b dark:from-[#10102a] dark:to-[#16163a] no-print overflow-hidden"
+  <!-- ── Sidebar ── -->
+  <aside id="sidebar" class="hidden sidebar fixed top-0 left-0 bottom-0 w-[220px] z-40 flex flex-col border-r border-gray-200 dark:border-[#222255] bg-white dark:bg-gradient-to-b dark:from-[#10102a] dark:to-[#16163a] no-print overflow-hidden"
     :class="{ 'collapsed': !$store.app._sidebarOpen }"
     @click.outside="if(window.innerWidth<768 && $store.app._sidebarOpen)$store.app._sidebarOpen=false"
     x-effect="localStorage.setItem('sidebar', $store.app._sidebarOpen ? 'open' : 'collapsed')">
@@ -47,20 +70,21 @@ tailwind.config = {
     <nav class="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
       <template x-for="item in [
         { id:'dashboard', icon:'📊', label:'Dashboard' },
-        { id:'rpt-header', label:'REPORTS', isHeader:true },
-        { id:'rpt-sales', icon:'📈', label:'Sales Report' },
-        { id:'rpt-invcost', icon:'💰', label:'Inventory Cost' },
-        { id:'rpt-shifts', icon:'🕐', label:'Shift History' },
-        { id:'products', icon:'📦', label:'Products' },
-        { id:'st-header', label:'STOCK', isHeader:true },
-        { id:'st-receiving', icon:'📥', label:'Recent Receiving' },
-        { id:'st-status', icon:'📊', label:'Stock Status' },
+        { id:'pc-header', label:'POS CLIENT', isHeader:true },
+        { id:'rpt-sub', label:'Reports', isSub:true },
+        { id:'rpt-sales', icon:'📈', label:'Sales Report', indent:true },
+        { id:'rpt-invcost', icon:'💰', label:'Inventory Cost', indent:true },
+        { id:'rpt-shifts', icon:'🕐', label:'Shift History', indent:true },
+        { id:'products', icon:'📦', label:'Master Products', indent:true },
+        { id:'inv-sub', label:'Inventory', isSub:true },
+        { id:'st-receiving', icon:'📥', label:'Recent Receiving', indent:true },
+        { id:'st-status', icon:'📊', label:'Stock Status', indent:true },
         { id:'wh-header', label:'WAREHOUSE', isHeader:true },
-        { id:'wh-product', icon:'📦', label:'Product' },
-        { id:'wh-inventory', icon:'📊', label:'Inventory' },
-        { id:'wh-sales', icon:'💰', label:'Sales' },
-        { id:'wh-onlineorder', icon:'🛒', label:'Online Order' },
-        { id:'wh-transfer', icon:'🔄', label:'Transfer' },
+        { id:'wh-product', icon:'📦', label:'Product', indent:true },
+        { id:'wh-inventory', icon:'📊', label:'Inventory', indent:true },
+        { id:'wh-sales', icon:'💰', label:'Sales', indent:true },
+        { id:'wh-onlineorder', icon:'🛒', label:'Online Order', indent:true },
+        { id:'wh-transfer', icon:'🔄', label:'Transfer', indent:true },
         { id:'agents', icon:'🖥', label:'AGENTS' },
         { id:'health', icon:'🩺', label:'Server Health' },
         { id:'customers', icon:'👥', label:'Customers' },
@@ -78,16 +102,21 @@ tailwind.config = {
             class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-[#4a4a7a]">
             <span x-text="item.label"></span>
           </div>
+          <!-- Sub header (group label under a section) -->
+          <div x-show="item.isSub && $store.app._sidebarOpen"
+            class="pl-4 pr-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-[#4a4a7a]">
+            <span x-text="item.label"></span>
+          </div>
           <!-- Nav item -->
-          <a x-show="!item.isHeader" href="#"
+          <a x-show="!item.isHeader && !item.isSub" href="#"
             @click.prevent="$store.app.switchSection(item.id)"
             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200"
             :class="$store.app.isActive(item.id)
               ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-400 font-semibold border-l-2 border-cyan-500'
               : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] hover:text-gray-700 dark:hover:text-slate-200'"
-            :style="item.id.startsWith('wh-') || item.id.startsWith('st-') || item.id.startsWith('rpt-') ? 'padding-left: 32px' : ''">
-            <span class="text-base shrink-0" x-show="item.id.startsWith('wh-') || item.id.startsWith('st-') || item.id.startsWith('rpt-')" style="opacity:0.5">└</span>
-            <span class="text-lg shrink-0" x-show="!item.id.startsWith('wh-') && !item.id.startsWith('st-') && !item.id.startsWith('rpt-')" x-text="item.icon"></span>
+            :style="item.indent ? 'padding-left: 32px' : ''">
+            <span class="text-base shrink-0" x-show="item.indent" style="opacity:0.5">└</span>
+            <span class="text-lg shrink-0" x-show="!item.indent" x-text="item.icon"></span>
             <span class="nav-label text-xs" x-show="$store.app._sidebarOpen" x-text="item.label"></span>
             <span class="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
               x-show="item.id==='wh-transfer' && $store.app._sidebarOpen"
@@ -101,12 +130,12 @@ tailwind.config = {
     </div>
   </aside>
 
-  <!-- ΓöÇΓöÇ Mobile Sidebar Backdrop ΓöÇΓöÇ -->
-  <div class="mobile-backdrop collapsed no-print" :class="{ 'collapsed': !$store.app._sidebarOpen }"
+  <!-- ── Mobile Sidebar Backdrop ── -->
+  <div class="hidden mobile-backdrop collapsed no-print" :class="{ 'collapsed': !$store.app._sidebarOpen }"
     @click="$store.app._sidebarOpen = false" @touchmove.prevent x-show="window.innerWidth < 768"></div>
 
-  <!-- ΓöÇΓöÇ Main Content ΓöÇΓöÇ -->
-  <div class="min-h-screen transition-all duration-250"
+  <!-- ── Main Content ── -->
+  <div id="appRoot" class="hidden min-h-screen transition-all duration-250"
     :style="'margin-left: ' + ($store.app._sidebarOpen ? '220px' : '64px')">
 
     <!-- ΓöÇΓöÇ Header ΓöÇΓöÇ -->
@@ -131,6 +160,7 @@ tailwind.config = {
             <option value="">All Stores</option>
           </select>
           <button @click="$store.app.toggleDark()" class="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-[#181848] transition-colors" x-html="$store.app.darkMode ? '&#9788;' : '&#9790;'"></button>
+          <button id="logoutBtn" onclick="doLogout()" class="hidden text-xs px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/40 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">LOGOUT</button>
           <button @click="$store.app.refreshAll()" class="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-[#181848] transition-colors" title="Refresh">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
           </button>
@@ -211,7 +241,7 @@ tailwind.config = {
               { label:'Cash Sales', val:'₱'+fmt(d.totalCashSales), sub:'', icon:'💵' },
               { label:'E-Wallet Sales', val:'₱'+fmt(d.totalEwalletSales), sub:'', icon:'📱' },
               { label:'Credit Sales', val:'₱'+fmt(d.totalCreditSales), sub:'', icon:'📋', cls:'text-amber-600 dark:text-amber-400' },
-              { label:'Products / Customers', val:fmtInt(d.totalProducts)+' / '+fmtInt(d.totalCustomers), sub:'', icon:'📦' },
+              { label:'Master Products / Customers', val:fmtInt(d.totalProducts)+' / '+fmtInt(d.totalCustomers), sub:'', icon:'📦' },
               { label:'Voided Amount', val:'₱'+fmt(d.totalVoided), sub:'', icon:'⚠️', cls:'text-red-600 dark:text-red-400' },
               { label:'Short / Over', val:'₱'+fmt(Math.abs(d.todayVariance)), sub:d.todayVariance>=0?'OVER':'SHORT', icon:d.todayVariance>=0?'✅':'❌', cls:d.todayVariance>=0?'text-emerald-500':'text-red-500' }
             ]" :key="i">
@@ -959,7 +989,7 @@ tailwind.config = {
           <!-- Section Header -->
           <div class="px-4 py-3 border-b border-gray-100 dark:border-[#222255]">
             <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">
-              STOCK — <span x-text="$store.app.stockSubpage==='receiving' ? 'Recent Receiving' : 'Stock Status'"></span>
+              INVENTORY — <span x-text="$store.app.stockSubpage==='receiving' ? 'Recent Receiving' : 'Stock Status'"></span>
             </h3>
           </div>
 
@@ -1171,8 +1201,7 @@ tailwind.config = {
                           <span x-show="!x.units || !x.units.length" class="text-gray-400">—</span>
                         </td>
                         <td class="px-3 py-2">
-                          <button @click="openEdit(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">EDIT</button>
-                          <button @click="deleteItem(x.id)" class="text-[10px] px-2 py-1 rounded border border-red-200 dark:border-red-900/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">DEL</button>
+                          <button @click="showTrail(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">TRAIL</button>
                         </td>
                       </tr>
                     </template>
@@ -2114,7 +2143,8 @@ tailwind.config = {
                       <td class="px-3 py-2"><span :class="x.isActive ? 'text-emerald-500' : 'text-red-500'" x-text="x.isActive ? 'Active' : 'Inactive'"></span></td>
                       <td class="px-3 py-2">
                         <span x-show="x.mobileAccess" class="text-[10px] bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded font-medium">MOBILE APP</span>
-                        <span x-show="!x.mobileAccess" class="text-gray-400">—</span>
+                        <span x-show="x.webAccess" class="text-[10px] bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded font-medium">WEB</span>
+                        <span x-show="!x.mobileAccess && !x.webAccess" class="text-gray-400">—</span>
                       </td>
                       <td class="px-3 py-2">
                         <template x-for="sid in (x.storeIds || [])" :key="sid">
@@ -2163,6 +2193,7 @@ tailwind.config = {
                 </div>
                 <div class="flex items-center"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] flex items-center gap-2"><input type="checkbox" x-model="form.isActive" class="rounded"> Active</label></div>
                 <div class="flex items-center"><label class="text-[11px] text-purple-500 dark:text-purple-400 flex items-center gap-2"><input type="checkbox" x-model="form.mobileAccess" class="rounded"> Mobile App Access</label></div>
+                <div class="flex items-center"><label class="text-[11px] text-emerald-500 dark:text-emerald-400 flex items-center gap-2"><input type="checkbox" x-model="form.webAccess" class="rounded"> Web Access (admin.jumongdev.com)</label></div>
               </div>
               <div class="flex justify-end gap-2 pt-3 mt-3 border-t border-gray-200 dark:border-[#222255]">
                 <button @click="closeModal()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa]">CANCEL</button>
@@ -2566,6 +2597,7 @@ tailwind.config = {
                     <span class="w-2 h-2 rounded-full" :class="a.hasError ? 'bg-red-500' : 'bg-green-500'"></span>
                     <span class="text-[10px]" :class="a.hasError ? 'text-red-500' : 'text-green-500'" x-text="a.hasError ? 'ERROR' : 'OK'"></span>
                   </span>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded-full font-bold" :class="syncChip(pos[a.storeId]).cls" x-text="syncChip(pos[a.storeId]).txt"></span>
                 </div>
                 <div class="text-[10px] text-gray-500 dark:text-[#7878aa] space-y-1">
                   <div>🖥 <span x-text="a.machine"></span></div>
@@ -2730,20 +2762,93 @@ tailwind.config = {
   <script src="app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script>
-  (async () => {
-    try {
-      const stores = await fetchJSON(API + '/stores');
-      Alpine.store('app').stores = stores;
-      stores.forEach(s => Alpine.store('app').storeMap[s.storeId] = s.storeName || '');
-      const sel = document.getElementById('storeSelect');
-      if (sel) {
-        sel.innerHTML = '<option value="">All Stores</option>' +
-          stores.filter(s => s.storeId !== 'STORE-WAREHOUSE').map(s => '<option value="' + esc(s.storeId) + '">' + esc(s.storeName || s.storeId) + '</option>').join('');
-      }
-    } catch (e) {}
+  /* ── Web login gating (username + PIN, WEB ACCESS only) ── */
+  const SESSION_USER = 'jpos_web_user';
+  const SESSION_TOKEN = 'jpos_web_token';
 
-    // ── Agents panel ──
+  function webSession() {
+    return { username: sessionStorage.getItem(SESSION_USER), token: sessionStorage.getItem(SESSION_TOKEN) };
+  }
+
+  function enterApp(j) {
+    const stores = j.stores || [];
+    Alpine.store('app').stores = stores;
+    stores.forEach(s => Alpine.store('app').storeMap[s.storeId] = s.storeName || '');
+    const isAdmin = j.role === 'Admin';
+    const sel = document.getElementById('storeSelect');
+    if (sel) {
+      const opts = stores.filter(s => s.storeId !== 'STORE-WAREHOUSE');
+      if (isAdmin) {
+        sel.innerHTML = '<option value="">All Stores</option>' +
+          opts.map(s => '<option value="' + esc(s.storeId) + '">' + esc(s.storeName || s.storeId) + '</option>').join('');
+        Alpine.store('app').storeId = '';
+      } else {
+        sel.innerHTML = opts.map(s => '<option value="' + esc(s.storeId) + '">' + esc(s.storeName || s.storeId) + '</option>').join('');
+        Alpine.store('app').storeId = opts.length ? opts[0].storeId : '';
+      }
+    }
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('sidebar').classList.remove('hidden');
+    const bd = document.querySelector('.mobile-backdrop');
+    if (bd) bd.classList.remove('hidden');
+    document.getElementById('appRoot').classList.remove('hidden');
+    const lb = document.getElementById('logoutBtn');
+    if (lb) lb.classList.remove('hidden');
+    window.dispatchEvent(new CustomEvent('refresh-data'));
+  }
+
+  async function tryAutoLogin() {
+    const s = webSession();
+    if (!s.username || !s.token) return false;
+    try {
+      const r = await fetch(API + '/web/me?username=' + encodeURIComponent(s.username) + '&token=' + encodeURIComponent(s.token));
+      if (!r.ok) return false;
+      const j = await r.json();
+      if (!j.success) return false;
+      enterApp(j);
+      return true;
+    } catch (e) { return false; }
+  }
+
+  async function doLogin() {
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPin').value;
+    const err = document.getElementById('loginError');
+    if (!username || !password) { err.textContent = 'Enter username and PIN'; err.classList.remove('hidden'); return; }
+    err.classList.add('hidden');
+    const btn = document.getElementById('loginBtn');
+    btn.disabled = true; btn.textContent = 'SIGNING IN...';
+    try {
+      const r = await fetch(API + '/web/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error((j && j.error) || 'Login failed');
+      sessionStorage.setItem(SESSION_USER, username);
+      sessionStorage.setItem(SESSION_TOKEN, j.token);
+      enterApp(j);
+    } catch (e) {
+      err.textContent = e.message || 'Login failed';
+      err.classList.remove('hidden');
+      btn.disabled = false; btn.textContent = 'LOGIN';
+    }
+  }
+
+  function doLogout() {
+    const s = webSession();
+    if (s.username && s.token) {
+      fetch(API + '/web/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s) }).catch(() => {});
+    }
+    sessionStorage.removeItem(SESSION_USER);
+    sessionStorage.removeItem(SESSION_TOKEN);
+    location.reload();
+  }
+
+  (async () => {
     document.documentElement.classList.toggle('dark', Alpine.store('app').darkMode);
+    const ok = await tryAutoLogin();
+    if (!ok) {
+      const s = webSession();
+      if (s.username) document.getElementById('loginUsername').value = s.username;
+    }
   })();
   </script>
 </body>
