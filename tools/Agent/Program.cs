@@ -89,6 +89,12 @@ while (true)
 {
     try
     {
+        // Refresh config every heartbeat — the POS may have updated (new AppVersion)
+        // or CloudApiUrl changed since startup (e.g. LAN switch). No restart needed.
+        var cfg = RefreshConfig(dbPath, apiUrl);
+        if (!string.IsNullOrEmpty(cfg.ApiUrl)) apiUrl = cfg.ApiUrl;
+        if (!string.IsNullOrEmpty(cfg.AppVersion)) appVersion = cfg.AppVersion;
+
         // Send heartbeat
         try
         {
@@ -250,7 +256,11 @@ static string GetErrorSummary(string baseDir)
             var line = lines[i];
             if (!line.StartsWith("[") || line.Length < 20) continue;
             if (DateTime.TryParse(line.Substring(1, 19), out var ts) && ts < cutoff) break;
-            recent.Add(line);
+            // Only real errors have a "Type:" detail line right after the header
+            // (ErrorLogger.Log(source, ex)). INFO entries (Startup:/btnWhSell:/Constructor
+            // etc.) are single-line and must not count as errors.
+            if (i + 1 < lines.Length && lines[i + 1].TrimStart().StartsWith("Type:"))
+                recent.Add(line);
         }
         return string.Join(" | ", recent);
     }
@@ -262,6 +272,20 @@ static string? DatabaseHelperGetSetting(SQLiteConnection conn, string key)
     using var cmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = @key", conn);
     cmd.Parameters.AddWithValue("@key", key);
     return cmd.ExecuteScalar()?.ToString();
+}
+
+static (string ApiUrl, string AppVersion) RefreshConfig(string dbPath, string fallbackUrl)
+{
+    try
+    {
+        using var conn = new SQLiteConnection($"Data Source={dbPath}");
+        conn.Open();
+        var ver = DatabaseHelperGetSetting(conn, "AppVersion") ?? "";
+        var url = DatabaseHelperGetSetting(conn, "CloudApiUrl") ?? fallbackUrl;
+        if (!url.EndsWith("/api")) url = url.TrimEnd('/') + "/api";
+        return (url, ver);
+    }
+    catch { return (fallbackUrl, ""); }
 }
 
 static string WriteFile(string payload, string baseDir)

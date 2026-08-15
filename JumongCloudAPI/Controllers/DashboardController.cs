@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 using NpgsqlTypes;
 using System.Data;
+using JumongCloudAPI.Data;
 
 namespace JumongCloudAPI.Controllers
 {
@@ -722,7 +723,7 @@ public class DashboardController : ControllerBase
             if (!webAccess)
                 return Unauthorized(new { success = false, error = "No web access granted. Ask the admin to enable WEB ACCESS for this user." });
 
-            // Admin Ã¢â€ â€™ all stores; otherwise only the user's assigned stores
+            // Admin ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ all stores; otherwise only the user's assigned stores
             var allStoreIds = new List<string>();
             if (role == "Admin")
             {
@@ -1395,7 +1396,494 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.1.19" });
+            return Ok(new { version = "1.1.34" });
+    }
+
+    private static readonly HttpClient _ollamaClient = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
+    private static readonly ConcurrentDictionary<string, Queue<DateTime>> _chatRate = new ConcurrentDictionary<string, Queue<DateTime>>();
+    private static readonly ConcurrentQueue<ChatLogEntry> _chatLog = new ConcurrentQueue<ChatLogEntry>();
+
+    [HttpPost("chat")]
+    public async Task<IActionResult> PostChat([FromBody] ChatRequest req)
+    {
+        var msg = (req?.Message ?? "").Trim();
+        if (msg.Length == 0) return BadRequest(new { error = "Empty message" });
+        if (msg.Length > 500) return BadRequest(new { error = "Message too long (max 500)" });
+
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var now = DateTime.UtcNow;
+        var q = _chatRate.GetOrAdd(ip, _ => new Queue<DateTime>());
+        lock (q)
+        {
+            while (q.Count > 0 && (now - q.Peek()).TotalMinutes > 1) q.Dequeue();
+            if (q.Count >= 5) return StatusCode(429, new { error = "Rate limit: 5 messages per minute" });
+            q.Enqueue(now);
+        }
+
+        var facts = new List<string>();
+        var sources = new List<string>();
+
+        try
+        {
+            using var conn = PgDatabaseHelper.GetConnection();
+            
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT id, question, answer FROM chat_kb
+                WHERE active = true AND answer <> ''
+                ORDER BY id DESC LIMIT 200";
+            using var rd = cmd.ExecuteReader();
+            var kbList = new List<(int Id, string Question, string Answer)>();
+            while (rd.Read()) kbList.Add((rd.GetInt32(0), rd.GetString(1), rd.GetString(2)));
+            rd.Close();
+
+            var ml = msg.ToLowerInvariant();
+            var scored = kbList.Select(k => (K: k, Score:
+                (k.Question.Length > 0 && k.Answer.Length > 0 && ml.Contains(k.Question.ToLowerInvariant()) ? 3 : 0) +
+                (k.Answer.Length > 0 && ml.Contains(k.Answer.ToLowerInvariant().Split(' ').FirstOrDefault(w => w.Length > 3) ?? "") ? 1 : 0)
+            )).OrderByDescending(x => x.Score).Take(3).ToArray();
+            var hits = scored.Where(x => x.Score > 0).Select(x => x.K).ToList();
+
+            if (hits.Count == 0)
+            {
+                foreach (var kw in new[] { "bukas", "oras", "close", "sarado", "operasyon", "hours", "delivery", "deliver", "contact", "tawag", "phone", "numero", "branch", "saan", "payment", "bayad", "gcash", "cod", "ewallet", "order", "pickup", "return", "refund", "ibalik", "website", "site", "online", "promo", "price", "presyo", "magkano", "stock", "available", "meron" })
+                {
+                    if (ml.Contains(kw))
+                    {
+                        var kwMatch = kbList.Where(k => k.Answer.Length > 0 && (k.Question + " " + k.Answer).ToLowerInvariant().Contains(kw)).Take(2).ToList();
+                        hits.AddRange(kwMatch);
+                        if (hits.Count >= 3) break;
+                    }
+                }
+                hits = hits.Distinct().Take(3).ToList();
+            }
+
+            foreach (var h in hits)
+            {
+                facts.Add($"- {h.Question}: {h.Answer}");
+                sources.Add($"kb:{h.Id}");
+            }
+
+            bool promoAsk = ml.Contains("promo") || ml.Contains("sale") || ml.Contains("discount") || ml.Contains("free");
+            if (promoAsk)
+            {
+                try
+                {
+                    using var pc = conn.CreateCommand();
+                    pc.CommandText = "SELECT message FROM pos_promo WHERE id = 1";
+                    var promoMsg = pc.ExecuteScalar()?.ToString() ?? "";
+                    if (!string.IsNullOrEmpty(promoMsg))
+                    {
+                        facts.Add($"- Kasalukuyang mga promo ng tindahan:\n{promoMsg}");
+                        sources.Add("promo");
+                    }
+                }
+                catch { }
+            }
+
+            bool productAsk = ml.Contains("magkano") || ml.Contains("presyo") || ml.Contains("price") || ml.Contains("stock") || ml.Contains("available") || ml.Contains("meron") || ml.Contains("bili") || ml.Contains("bumili") || ml.Contains("cost");
+            if (productAsk)
+            {
+                try
+                {
+                    var stopwords = new[] { "magkano", "presyo", "price", "stock", "available", "meron", "bili", "bumili", "cost", "anong", "ang", "ng", "kayo", "ba", "may", "po", "mo", "ninyo", "niyo", "saan", "pwede", "ano", "paano", "nyo", "namin", "kami", "gusto", "ko", "akin", "yung", "mga", "na", "sa", "at" };
+                    var tokens = msg.ToLowerInvariant()
+                        .Split(new[] { ' ', ',', '.', '?', '!', ';', ':', '(', ')', '-', '/' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Where(t => t.Length >= 3 && !stopwords.Contains(t))
+                        .Distinct()
+                        .Take(6)
+                        .ToArray();
+                    if (tokens.Length > 0)
+                    {
+                        using var pc = conn.CreateCommand();
+                        var sql = @"
+                            SELECT mp.name, mp.price,
+                                   COALESCE((SELECT json_agg(json_build_object('unit', u.unit_name, 'price', u.price, 'qtyPerUnit', u.qty_per_unit, 'isDefault', u.is_default))
+                                             FROM master_product_units u WHERE u.product_id = mp.id), '[]'::json) AS units,
+                                   (SELECT COALESCE(SUM(p.stock_qty), 0) FROM products p WHERE p.store_id = 'STORE-20260602-7159' AND p.barcode = mp.barcode AND p.is_active = true) AS hq_stock
+                            FROM master_products mp
+                            WHERE mp.is_active = true AND mp.sell_online = true
+                              AND (";
+                        for (int ti = 0; ti < tokens.Length; ti++)
+                        {
+                            if (ti > 0) sql += " AND ";
+                            sql += $"(mp.name ILIKE '%' || @t{ti} || '%' OR mp.barcode ILIKE '%' || @t{ti} || '%')";
+                            pc.Parameters.AddWithValue($"t{ti}", tokens[ti]);
+                        }
+                        sql += ") ORDER BY mp.name LIMIT 3";
+                        pc.CommandText = sql;
+                        using var rd2 = pc.ExecuteReader();
+                        var prodHits = new List<string>();
+                        while (rd2.Read())
+                        {
+                            var name = rd2.GetString(0);
+                            var price = rd2.GetDecimal(1);
+                            var units = rd2.IsDBNull(2) ? "" : rd2.GetString(2);
+                            var stock = rd2.GetInt64(3);
+                            var status = stock > 0 ? "may stock" : "out of stock";
+                            prodHits.Add($"- {name}: ₱{price:0.00} ({(stock > 0 ? $"{stock} pcs {status}" : status)}){(units.Length > 0 && units != "[]" ? $" | units: {units}" : "")}");
+                        }
+                        rd2.Close();
+                        foreach (var p in prodHits.Take(3))
+                        {
+                            facts.Add(p);
+                            sources.Add("product");
+                        }
+                    }
+                }
+                catch { }
+            }
+        }
+        catch { }
+
+        var sysContent = "Ikaw ay AI assistant ng Andengs Superstore online shop (shop.jumongdev.com). Sumagot sa natural na Taglish, maikli, magalang at kapaki-pakinabang. IMPORTANTE: Huwag mag-imbento ng oras, presyo, o impormasyon na wala sa mga binigay na facts. Kung walang kaalaman tungkol sa tanong (hal. oras ng bukas, delivery), sabihin na 'Wala pa pong nakarekord na sagot dito — pakimessage po kami sa tindahan o sa Facebook page namin.' at banggitin ang shop.jumongdev.com.";
+        if (facts.Count > 0)
+        {
+            sysContent += "\n\nMga totoong impormasyon (gawing batayan ng sagot mo, huwag mag-imbento ng iba):\n" + string.Join("\n", facts);
+        }
+
+        var messages = new List<object>
+        {
+            new { role = "system", content = sysContent }
+        };
+        if (req.History != null)
+        {
+            foreach (var h in req.History.Take(10))
+            {
+                var role = (h.Role == "assistant" || h.Role == "user") ? h.Role : "user";
+                var content = (h.Content ?? "").Trim();
+                if (content.Length == 0) continue;
+                if (content.Length > 500) content = content.Substring(0, 500);
+                messages.Add(new { role, content });
+            }
+        }
+        messages.Add(new { role = "user", content = msg });
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        string backend = "server";
+        try
+        {
+            var body = new { model = "llama3.1:8b", messages, stream = false, options = new { num_predict = 300, temperature = 0.7 } };
+            var json = JsonSerializer.Serialize(body);
+            using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+            var devClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+            try
+            {
+                var devResp = await devClient.PostAsync("http://DESKTOP-Q36S34R:11434/api/chat", content);
+                if (devResp.IsSuccessStatusCode)
+                {
+                    sw.Stop();
+                    using var doc = JsonDocument.Parse(await devResp.Content.ReadAsStringAsync());
+                    var reply = doc.RootElement.GetProperty("message").GetProperty("content").GetString() ?? "";
+                    _chatLog.Enqueue(new ChatLogEntry { At = now, Ms = sw.ElapsedMilliseconds, Ok = true, ReplyLen = reply.Length, Err = "", Backend = "dev" });
+                    TrimChatLog();
+                    return Ok(new { reply = reply.Trim(), backend = "dev", sources });
+                }
+            }
+            catch { }
+
+            var resp = await _ollamaClient.PostAsync("http://localhost:11434/api/chat", content);
+            sw.Stop();
+            if (!resp.IsSuccessStatusCode)
+            {
+                _chatLog.Enqueue(new ChatLogEntry { At = now, Ms = sw.ElapsedMilliseconds, Ok = false, ReplyLen = 0, Err = $"Ollama {(int)resp.StatusCode}", Backend = "server" });
+                TrimChatLog();
+                return StatusCode(502, new { error = $"Ollama error {(int)resp.StatusCode}" });
+            }
+            using var doc2 = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+            var reply2 = doc2.RootElement.GetProperty("message").GetProperty("content").GetString() ?? "";
+            _chatLog.Enqueue(new ChatLogEntry { At = now, Ms = sw.ElapsedMilliseconds, Ok = true, ReplyLen = reply2.Length, Err = "", Backend = "server" });
+            TrimChatLog();
+            return Ok(new { reply = reply2.Trim(), backend = "server", sources });
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            _chatLog.Enqueue(new ChatLogEntry { At = now, Ms = sw.ElapsedMilliseconds, Ok = false, ReplyLen = 0, Err = ex.Message, Backend = backend });
+            TrimChatLog();
+            return StatusCode(502, new { error = "Ollama unavailable: " + ex.Message });
+        }
+    }
+
+    private static void TrimChatLog()
+    {
+        while (_chatLog.Count > 500) { _chatLog.TryDequeue(out _); }
+    }
+
+    [HttpGet("chat/stats")]
+    public IActionResult GetChatStats()
+    {
+        var since = DateTime.UtcNow.AddMinutes(-60);
+        var entries = _chatLog.Where(e => e.At >= since).ToArray();
+        var ok = entries.Count(e => e.Ok);
+        var fail = entries.Count(e => !e.Ok);
+        var recent = entries.OrderByDescending(e => e.At).Take(30).Select(e => new
+        {
+            at = e.At.ToString("HH:mm:ss"),
+            ms = e.Ms,
+            ok = e.Ok,
+            err = e.Err ?? "",
+            replyLen = e.ReplyLen,
+            backend = e.Backend
+        }).ToArray();
+        return Ok(new
+        {
+            total = entries.Length,
+            ok,
+            fail,
+            avgMs = entries.Length > 0 ? (long)Math.Round(entries.Average(e => e.Ms)) : 0,
+            maxMs = entries.Length > 0 ? entries.Max(e => e.Ms) : 0,
+            recent
+        });
+    }
+
+    [HttpGet("chat/kb")]
+    public IActionResult GetKb([FromQuery] string? category = null, [FromQuery] string? q = null)
+    {
+        try
+        {
+            using var conn = PgDatabaseHelper.GetConnection();
+            
+            using var cmd = conn.CreateCommand();
+            var sql = "SELECT id, category, keywords, question, answer, active, source, created_at, updated_at FROM chat_kb WHERE 1=1";
+            if (!string.IsNullOrEmpty(category)) { sql += " AND category = @cat"; cmd.Parameters.AddWithValue("cat", category); }
+            if (!string.IsNullOrEmpty(q)) { sql += " AND (question ILIKE '%' || @q || '%' OR answer ILIKE '%' || @q || '%')"; cmd.Parameters.AddWithValue("q", q); }
+            sql += " ORDER BY id DESC LIMIT 500";
+            cmd.CommandText = sql;
+            using var rd = cmd.ExecuteReader();
+            var list = new List<object>();
+            while (rd.Read())
+            {
+                list.Add(new
+                {
+                    id = rd.GetInt32(0),
+                    category = rd.GetString(1),
+                    keywords = rd.GetString(2),
+                    question = rd.GetString(3),
+                    answer = rd.GetString(4),
+                    active = rd.GetBoolean(5),
+                    source = rd.GetString(6),
+                    createdAt = rd.GetDateTime(7).ToString("yyyy-MM-dd HH:mm"),
+                    updatedAt = rd.GetDateTime(8).ToString("yyyy-MM-dd HH:mm")
+                });
+            }
+            return Ok(list);
+        }
+        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+    }
+
+    public class KbEntryRequest { public string? Category { get; set; } public string? Keywords { get; set; } public string? Question { get; set; } public string? Answer { get; set; } public bool? Active { get; set; } }
+
+    [HttpPost("chat/kb")]
+    public IActionResult CreateKb([FromBody] KbEntryRequest req)
+    {
+        try
+        {
+            var cat = (req?.Category ?? "business").Trim();
+            var kw = (req?.Keywords ?? "").Trim();
+            var question = (req?.Question ?? "").Trim();
+            var answer = (req?.Answer ?? "").Trim();
+            if (answer.Length == 0) return BadRequest(new { error = "Answer is required" });
+            using var conn = PgDatabaseHelper.GetConnection();
+            
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "INSERT INTO chat_kb (category, keywords, question, answer, active, source) VALUES (@cat, @kw, @q, @a, @active, 'manual') RETURNING id";
+            cmd.Parameters.AddWithValue("cat", cat);
+            cmd.Parameters.AddWithValue("kw", kw);
+            cmd.Parameters.AddWithValue("q", question);
+            cmd.Parameters.AddWithValue("a", answer);
+            cmd.Parameters.AddWithValue("active", req?.Active ?? true);
+            var id = Convert.ToInt32(cmd.ExecuteScalar());
+            return Ok(new { id });
+        }
+        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+    }
+
+    [HttpPut("chat/kb/{id}")]
+    public IActionResult UpdateKb(int id, [FromBody] KbEntryRequest req)
+    {
+        try
+        {
+            using var conn = PgDatabaseHelper.GetConnection();
+            
+            using var cmd = conn.CreateCommand();
+            var sets = new List<string>();
+            if (req?.Category != null) sets.Add("category = @cat");
+            if (req?.Keywords != null) sets.Add("keywords = @kw");
+            if (req?.Question != null) sets.Add("question = @q");
+            if (req?.Answer != null) sets.Add("answer = @a");
+            if (req?.Active != null) sets.Add("active = @active");
+            if (sets.Count == 0) return BadRequest(new { error = "Nothing to update" });
+            sets.Add("updated_at = NOW()");
+            cmd.CommandText = "UPDATE chat_kb SET " + string.Join(", ", sets) + " WHERE id = @id";
+            if (req?.Category != null) cmd.Parameters.AddWithValue("cat", req.Category);
+            if (req?.Keywords != null) cmd.Parameters.AddWithValue("kw", req.Keywords);
+            if (req?.Question != null) cmd.Parameters.AddWithValue("q", req.Question);
+            if (req?.Answer != null) cmd.Parameters.AddWithValue("a", req.Answer);
+            if (req?.Active != null) cmd.Parameters.AddWithValue("active", req.Active.Value);
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.ExecuteNonQuery();
+            return Ok(new { ok = true });
+        }
+        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+    }
+
+    [HttpDelete("chat/kb/{id}")]
+    public IActionResult DeleteKb(int id)
+    {
+        try
+        {
+            using var conn = PgDatabaseHelper.GetConnection();
+            
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM chat_kb WHERE id = @id";
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.ExecuteNonQuery();
+            return Ok(new { ok = true });
+        }
+        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+    }
+
+    public class ChatReviewRequest { public string? UserMessage { get; set; } public string? BotReply { get; set; } public string? Verdict { get; set; } public string? CorrectedAnswer { get; set; } }
+
+    [HttpPost("chat/kb/review")]
+    public IActionResult ReviewChat([FromBody] ChatReviewRequest req)
+    {
+        try
+        {
+            var verdict = (req?.Verdict ?? "approved").Trim();
+            var userMsg = (req?.UserMessage ?? "").Trim();
+            var botReply = (req?.BotReply ?? "").Trim();
+            var corrected = (req?.CorrectedAnswer ?? "").Trim();
+
+            int kbId = 0;
+            if (verdict == "approved" && botReply.Length > 0)
+            {
+                var ans = botReply;
+                using var conn = PgDatabaseHelper.GetConnection();
+                
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO chat_kb (category, keywords, question, answer, active, source)
+                    VALUES ('approved-reply', '', @q, @a, true, 'approved-reply') RETURNING id";
+                cmd.Parameters.AddWithValue("q", userMsg.Length > 80 ? userMsg.Substring(0, 80) : userMsg);
+                cmd.Parameters.AddWithValue("a", ans.Length > 2000 ? ans.Substring(0, 2000) : ans);
+                kbId = Convert.ToInt32(cmd.ExecuteScalar());
+            }
+            else if (verdict == "corrected" && corrected.Length > 0)
+            {
+                using var conn = PgDatabaseHelper.GetConnection();
+                
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO chat_kb (category, keywords, question, answer, active, source)
+                    VALUES ('approved-reply', '', @q, @a, true, 'approved-reply') RETURNING id";
+                cmd.Parameters.AddWithValue("q", userMsg.Length > 80 ? userMsg.Substring(0, 80) : userMsg);
+                cmd.Parameters.AddWithValue("a", corrected.Length > 2000 ? corrected.Substring(0, 2000) : corrected);
+                kbId = Convert.ToInt32(cmd.ExecuteScalar());
+            }
+
+            using var conn2 = PgDatabaseHelper.GetConnection();
+            
+            using var cmd2 = conn2.CreateCommand();
+            cmd2.CommandText = "INSERT INTO chat_review_log (user_message, bot_reply, verdict, corrected_answer, kb_entry_id) VALUES (@um, @br, @v, @ca, @kid)";
+            cmd2.Parameters.AddWithValue("um", userMsg);
+            cmd2.Parameters.AddWithValue("br", botReply);
+            cmd2.Parameters.AddWithValue("v", verdict);
+            cmd2.Parameters.AddWithValue("ca", corrected);
+            cmd2.Parameters.AddWithValue("kid", kbId);
+            cmd2.ExecuteNonQuery();
+
+            return Ok(new { ok = true, kbEntryId = kbId });
+        }
+        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+    }
+
+    [HttpGet("chat/kb/reviews")]
+    public IActionResult GetReviews([FromQuery] int limit = 100)
+    {
+        try
+        {
+            using var conn = PgDatabaseHelper.GetConnection();
+            
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT id, user_message, bot_reply, verdict, corrected_answer, kb_entry_id, created_at FROM chat_review_log ORDER BY id DESC LIMIT @lim";
+            cmd.Parameters.AddWithValue("lim", limit);
+            using var rd = cmd.ExecuteReader();
+            var list = new List<object>();
+            while (rd.Read())
+            {
+                list.Add(new
+                {
+                    id = rd.GetInt32(0),
+                    userMessage = rd.GetString(1),
+                    botReply = rd.GetString(2),
+                    verdict = rd.GetString(3),
+                    correctedAnswer = rd.GetString(4),
+                    kbEntryId = rd.GetInt32(5),
+                    createdAt = rd.GetDateTime(6).ToString("yyyy-MM-dd HH:mm")
+                });
+            }
+            return Ok(list);
+        }
+        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+    }
+
+    [HttpPost("chat/kb/ingest-project")]
+    public IActionResult IngestProjectKb()
+    {
+        try
+        {
+            var paths = new[]
+            {
+                @"C:\Users\ADMIN\Desktop\JumongPosV1.01\AGENTS.md",
+                @"C:\dev\JumongPosV1.01\AGENTS.md"
+            };
+            var path = paths.FirstOrDefault(p => System.IO.File.Exists(p));
+            if (path == null) return StatusCode(404, new { error = "AGENTS.md not found on server" });
+
+            var content = System.IO.File.ReadAllText(path);
+            var lines = content.Split('\n');
+            var sections = new List<(string Title, string Body)>();
+            string? curTitle = null;
+            var curBody = new System.Text.StringBuilder();
+            foreach (var raw in lines)
+            {
+                var line = raw.TrimEnd('\r');
+                if (line.StartsWith("## ") || line.StartsWith("### "))
+                {
+                    if (curTitle != null) sections.Add((curTitle, curBody.ToString().Trim()));
+                    curTitle = line.TrimStart('#', ' ').Trim();
+                    curBody = new System.Text.StringBuilder();
+                }
+                else if (curTitle != null && line.Trim().Length > 0)
+                {
+                    curBody.AppendLine(line.Trim());
+                }
+            }
+            if (curTitle != null) sections.Add((curTitle, curBody.ToString().Trim()));
+
+            int added = 0;
+            using var conn = PgDatabaseHelper.GetConnection();
+            
+            foreach (var s in sections)
+            {
+                if (s.Title.Length == 0 || s.Body.Length < 30) continue;
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO chat_kb (category, keywords, question, answer, active, source)
+                    VALUES ('project', @kw, @q, @a, true, 'project-ingest')
+                    ON CONFLICT DO NOTHING";
+                cmd.Parameters.AddWithValue("kw", s.Title);
+                cmd.Parameters.AddWithValue("q", s.Title);
+                cmd.Parameters.AddWithValue("a", s.Body.Length > 3000 ? s.Body.Substring(0, 3000) : s.Body);
+                cmd.ExecuteNonQuery();
+                added++;
+            }
+            return Ok(new { ok = true, sections = added, path = path });
+        }
+        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -1445,7 +1933,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         return Ok(new
         {
             api = "ok",
-            version = "1.1.19",
+            version = "1.1.34",
             db = dbOk ? "ok" : "down",
             uptimeSeconds = Environment.TickCount64 / 1000,
             memory = new { totalMb = (long)(memTotal / (1024 * 1024)), freeMb = (long)(memFree / (1024 * 1024)) },
@@ -1538,7 +2026,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 WHERE store_id IN ('STORE-20260602-AA36','STORE-20260602-7159')
                   AND timestamp < '2026-06-14 00:00:00+00'::timestamptz";
             total += cmd.ExecuteNonQuery();
-            return Ok(new { @fixed = total, message = $"Fixed {total} records across both stores Ã¢â‚¬â€ added 8h to timestamps" });
+            return Ok(new { @fixed = total, message = $"Fixed {total} records across both stores ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â added 8h to timestamps" });
         }
 
         [HttpGet("fix-stock-trails-after-jun14")]
@@ -1568,7 +2056,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 WHERE store_id IN ('STORE-20260602-AA36','STORE-20260602-7159')
                   AND EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Manila') < 8";
             total += cmd.ExecuteNonQuery();
-            return Ok(new { @fixed = total, message = $"Fixed {total} records across both stores Ã¢â‚¬â€ added 8h to timestamps where Manila hour < 8" });
+            return Ok(new { @fixed = total, message = $"Fixed {total} records across both stores ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â added 8h to timestamps where Manila hour < 8" });
         }
 
         [HttpGet("fix-sync-table-times")]
@@ -1579,7 +2067,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             var total = 0;
             // SyncController.SyncTable used DateTime.TryParse with default styles,
             // which converted offset strings (+08:00) to server local time (UTC),
-            // then Npgsql (session Asia/Manila) double-converted them Ã¢â‚¬â€ stored 8h behind.
+            // then Npgsql (session Asia/Manila) double-converted them ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â stored 8h behind.
             // This fix adds 8h to ALL records affected (stored Manila hour >= 8,
             // since hour < 8 was already handled by fix-stock-trails-after-jun14).
             cmd.CommandText = @"
@@ -1619,7 +2107,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 WHERE store_id IN ('STORE-20260602-AA36','STORE-20260602-7159')
                   AND EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Manila') >= 8";
             total += cmd.ExecuteNonQuery();
-            return Ok(new { @fixed = total, message = $"Fixed {total} records Ã¢â‚¬â€ added 8h to all Maria hour >= 8 timestamps (SyncTable double-conversion fix)" });
+            return Ok(new { @fixed = total, message = $"Fixed {total} records ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â added 8h to all Maria hour >= 8 timestamps (SyncTable double-conversion fix)" });
         }
 
         [HttpGet("products/master")]
@@ -1628,7 +2116,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
-                SELECT id, name, barcode, category, price, cost, stock_qty, image_data, is_active, points_exempt, points_per_unit
+                SELECT id, name, barcode, category, price, cost, stock_qty, image_data, is_active, points_exempt, points_per_unit, sell_online
                 FROM master_products WHERE is_active = true ORDER BY name";
             using var reader = cmd.ExecuteReader();
             var products = new List<object>();
@@ -1642,8 +2130,10 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     cost = reader.GetDecimal(5),
                     stockQty = reader.GetInt32(6),
                     imageData = reader.IsDBNull(7) ? "" : reader.GetString(7),
+                    isActive = reader.GetBoolean(8),
                     pointsExempt = reader.GetBoolean(9),
-                    pointsPerUnit = reader.GetInt32(10)
+                    pointsPerUnit = reader.GetInt32(10),
+                    sellOnline = reader.GetBoolean(11)
                 });
             return Ok(products);
         }
@@ -1698,7 +2188,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             }
             cmd.CommandText = $@"
                 SELECT mp.id, mp.name, mp.barcode, mp.category, mp.price, mp.cost, mp.stock_qty, mp.image_data,
-                       mp.points_exempt, mp.points_per_unit, mp.is_active,
+                       mp.points_exempt, mp.points_per_unit, mp.is_active, mp.sell_online,
                        COALESCE(json_agg(
                            json_build_object('unitName', mpu.unit_name, 'price', mpu.price, 'cost', mpu.cost, 'qtyPerUnit', mpu.qty_per_unit, 'isDefault', mpu.is_default, 'pointsPerUnit', mpu.points_per_unit)
                            ORDER BY mpu.is_default DESC, mpu.unit_name
@@ -1722,7 +2212,8 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     pointsExempt = reader.GetBoolean(8),
                     pointsPerUnit = reader.GetInt32(9),
                     isActive = reader.GetBoolean(10),
-                    units = reader.IsDBNull(11) ? null : System.Text.Json.JsonSerializer.Deserialize<object>(reader.GetString(11))
+                    sellOnline = reader.GetBoolean(11),
+                    units = reader.IsDBNull(12) ? null : System.Text.Json.JsonSerializer.Deserialize<object>(reader.GetString(12))
                 });
             return Ok(products);
         }
@@ -1802,8 +2293,8 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 }
 
                 using var cmd = new NpgsqlCommand(@"
-                    INSERT INTO master_products (name, barcode, category, price, cost, stock_qty, image_data, points_exempt, points_per_unit, updated_at)
-                    VALUES (@n, @b, @c, @p, @co, 0, @img, @pe, @ppu, NOW()) RETURNING id", conn, tx);
+                    INSERT INTO master_products (name, barcode, category, price, cost, stock_qty, image_data, points_exempt, points_per_unit, sell_online, updated_at)
+                    VALUES (@n, @b, @c, @p, @co, 0, @img, @pe, @ppu, @so, NOW()) RETURNING id", conn, tx);
                 cmd.Parameters.AddWithValue("n", p.Name);
                 cmd.Parameters.AddWithValue("b", (object?)p.Barcode ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("c", p.Category ?? "");
@@ -1812,6 +2303,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 cmd.Parameters.AddWithValue("img", p.ImageData ?? "");
                 cmd.Parameters.AddWithValue("pe", p.PointsExempt);
                 cmd.Parameters.AddWithValue("ppu", p.PointsPerUnit);
+                cmd.Parameters.AddWithValue("so", p.SellOnline);
                 var id = Convert.ToInt32(cmd.ExecuteScalar());
 
                 if (p.Units != null)
@@ -1855,7 +2347,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 }
 
                 using var cmd = new NpgsqlCommand(@"
-                    UPDATE master_products SET name=@n, barcode=@b, category=@c, price=@p, cost=@co, image_data=@img, points_exempt=@pe, points_per_unit=@ppu, is_active=@ia, updated_at=NOW()
+                    UPDATE master_products SET name=@n, barcode=@b, category=@c, price=@p, cost=@co, image_data=@img, points_exempt=@pe, points_per_unit=@ppu, is_active=@ia, sell_online=@so, updated_at=NOW()
                     WHERE id=@id", conn, tx);
                 cmd.Parameters.AddWithValue("ia", p.IsActive);
                 cmd.Parameters.AddWithValue("n", p.Name);
@@ -1866,6 +2358,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 cmd.Parameters.AddWithValue("img", p.ImageData ?? "");
                 cmd.Parameters.AddWithValue("pe", p.PointsExempt);
                 cmd.Parameters.AddWithValue("ppu", p.PointsPerUnit);
+                cmd.Parameters.AddWithValue("so", p.SellOnline);
                 cmd.Parameters.AddWithValue("id", id);
                 cmd.ExecuteNonQuery();
 
@@ -1927,7 +2420,26 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             return Ok(new { success = true });
         }
 
-        // Ã¢â€â‚¬Ã¢â€â‚¬ Warehouse API Ã¢â€â‚¬Ã¢â€â‚¬
+        [HttpPatch("products/master/{id}/flags")]
+        public IActionResult PatchMasterProductFlags(int id, [FromBody] MasterProductFlagsDto f)
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            var sets = new List<string>();
+            if (f.SellOnline.HasValue) sets.Add("sell_online = @so");
+            if (f.IsActive.HasValue) sets.Add("is_active = @ia");
+            if (f.PointsExempt.HasValue) sets.Add("points_exempt = @pe");
+            if (sets.Count == 0) return Ok(new { success = true });
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = $"UPDATE master_products SET {string.Join(", ", sets)}, updated_at = NOW() WHERE id = @id";
+            cmd.Parameters.AddWithValue("id", id);
+            if (f.SellOnline.HasValue) cmd.Parameters.AddWithValue("so", f.SellOnline.Value);
+            if (f.IsActive.HasValue) cmd.Parameters.AddWithValue("ia", f.IsActive.Value);
+            if (f.PointsExempt.HasValue) cmd.Parameters.AddWithValue("pe", f.PointsExempt.Value);
+            cmd.ExecuteNonQuery();
+            return Ok(new { success = true });
+        }
+
+        // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Warehouse API ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
         [HttpGet("warehouse/products")]
         public IActionResult WhGetProducts([FromQuery] bool activeOnly = true, [FromQuery] string? search = null, [FromQuery] bool noImage = false)
         {
@@ -2129,15 +2641,22 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         }
 
         [HttpGet("warehouse/receivings")]
-        public IActionResult WhGetReceivings()
+        public IActionResult WhGetReceivings([FromQuery] string? from, [FromQuery] string? to, [FromQuery] int? limit)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
+            var sql = @"
                 SELECT reference, MIN(created_at) AS created_at, COUNT(*) AS item_count, SUM(qty_change) AS total_qty
                 FROM wh_stock_trails
-                WHERE reference_type = 'manual_receive' AND reference LIKE 'RECV-%'
-                GROUP BY reference ORDER BY created_at DESC LIMIT 100";
+                WHERE reference_type = 'manual_receive'";
+            if (!string.IsNullOrEmpty(from) && DateTime.TryParse(from, out var fd))
+                sql += " AND created_at >= @from";
+            if (!string.IsNullOrEmpty(to) && DateTime.TryParse(to, out var td))
+                sql += " AND created_at < @to";
+            sql += " GROUP BY reference ORDER BY created_at DESC LIMIT " + Math.Min(limit ?? 100, 1000);
+            cmd.CommandText = sql;
+            if (!string.IsNullOrEmpty(from) && DateTime.TryParse(from, out var f2)) cmd.Parameters.AddWithValue("from", f2);
+            if (!string.IsNullOrEmpty(to) && DateTime.TryParse(to, out var t2)) cmd.Parameters.AddWithValue("to", t2.Date.AddDays(1));
             var list = new List<object>();
             using var r = cmd.ExecuteReader();
             while (r.Read())
@@ -2269,7 +2788,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
 
-            // Check if already imported Ã¢â‚¬â€ if so, update instead of duplicate
+            // Check if already imported ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â if so, update instead of duplicate
             cmd.CommandText = "SELECT id FROM wh_products WHERE master_product_id = @mid ORDER BY id LIMIT 1";
             cmd.Parameters.AddWithValue("mid", masterId);
             var existingId = cmd.ExecuteScalar();
@@ -2621,7 +3140,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     }
                     else
                     {
-                        // Shortage Ã¢â‚¬â€ restock warehouse
+                        // Shortage ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â restock warehouse
                         using var restock = conn.CreateCommand(); restock.Transaction = tx;
                         restock.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @qty WHERE id = @pid";
                         restock.Parameters.AddWithValue("qty", baseQty);
@@ -2662,9 +3181,9 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
         }
 
-        // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
-        // WAREHOUSE TRANSFERS (warehouse Ã¢â€ â€™ POS store stock transfers)
-        // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+        // ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
+        // WAREHOUSE TRANSFERS (warehouse ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ POS store stock transfers)
+        // ÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚ÂÃƒÂ¢Ã¢â‚¬Â¢Ã‚Â
 
         [HttpGet("warehouse/transfers")]
         public IActionResult WhGetTransfers([FromQuery] string? search = null, [FromQuery] string? date = null, [FromQuery] int page = 1, [FromQuery] int pageSize = 30)
@@ -2738,7 +3257,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
 
                     foreach (var item in merged)
                     {
-                        // Validate stock exists and is sufficient (don't deduct Ã¢â‚¬â€ held in pending until POS accepts)
+                        // Validate stock exists and is sufficient (don't deduct ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â held in pending until POS accepts)
                         using var checkCmd = new NpgsqlCommand(
                             "SELECT stock_qty FROM wh_products WHERE id = @pid AND is_active = true", conn, tx);
                         checkCmd.Parameters.AddWithValue("pid", item.ProductId);
@@ -2838,7 +3357,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     if (accepted)
                     {
                         // Deduct stock from warehouse NOW (was held pending until POS accepts).
-                        // Guarded UPDATE Ã¢â‚¬â€ if 0 rows affected, stock is insufficient Ã¢â€ â€™ treat as shortage.
+                        // Guarded UPDATE ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â if 0 rows affected, stock is insufficient ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ treat as shortage.
                         using var deduct = conn.CreateCommand(); deduct.Transaction = tx;
                         deduct.CommandText = "UPDATE wh_products SET stock_qty = stock_qty - @bq WHERE id = @pid AND stock_qty >= @bq";
                         deduct.Parameters.AddWithValue("bq", baseQty);
@@ -2854,18 +3373,18 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                             trail.Parameters.AddWithValue("pn", productName);
                             trail.Parameters.AddWithValue("bc", barcode);
                             trail.Parameters.AddWithValue("qty", -baseQty);
-                            trail.Parameters.AddWithValue("ref", $"Transfer #{id} Ã¢â€ â€™ {clientName}");
+                            trail.Parameters.AddWithValue("ref", $"Transfer #{id} ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ {clientName}");
                             trail.ExecuteNonQuery();
                         }
                         else
                         {
-                            // Insufficient stock Ã¢â‚¬â€ nothing deducted, item stays in warehouse
+                            // Insufficient stock ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â nothing deducted, item stays in warehouse
                             shortages.Add(new { productId, productName, baseQty });
                         }
                     }
                     else
                     {
-                        // Unchecked item Ã¢â‚¬â€ stock stays in warehouse
+                        // Unchecked item ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â stock stays in warehouse
                         shortages.Add(new { productId, productName, baseQty });
                     }
 
@@ -2903,7 +3422,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 var status = checkCmd.ExecuteScalar()?.ToString();
                 if (status != "pending") return BadRequest(new { error = "Only pending transfers can be cancelled" });
 
-                // Just mark as cancelled Ã¢â‚¬â€ stock was never deducted (held pending until POS receives)
+                // Just mark as cancelled ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â stock was never deducted (held pending until POS receives)
                 using var updateCmd = conn.CreateCommand(); updateCmd.Transaction = tx;
                 updateCmd.CommandText = "UPDATE wh_transfers SET status = 'cancelled', updated_at = NOW() WHERE id = @id";
                 updateCmd.Parameters.AddWithValue("id", id);
@@ -3033,7 +3552,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             // Step 1: Insert missing stock trails with destination name
             using var trailCmd = conn.CreateCommand(); trailCmd.Transaction = tx;
             trailCmd.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) " +
-                "SELECT ti.product_id, ti.product_name, ti.barcode, -ti.qty, 'Transfer #' || ti.transfer_id || CASE WHEN c.name IS NOT NULL THEN ' Ã¢â€ â€™ ' || c.name ELSE '' END, 'transfer_out' " +
+                "SELECT ti.product_id, ti.product_name, ti.barcode, -ti.qty, 'Transfer #' || ti.transfer_id || CASE WHEN c.name IS NOT NULL THEN ' ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ ' || c.name ELSE '' END, 'transfer_out' " +
                 "FROM wh_transfer_items ti JOIN wh_transfers t ON t.id = ti.transfer_id LEFT JOIN wh_clients c ON c.id = t.client_id " +
                 "WHERE t.status IN ('completed','partial') AND NOT EXISTS (SELECT 1 FROM wh_stock_trails st WHERE st.reference LIKE 'Transfer #' || ti.transfer_id || '%' AND st.product_id = ti.product_id)";
             trailCount = trailCmd.ExecuteNonQuery();
@@ -3117,6 +3636,61 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 if (!cr.Read()) return BadRequest(new { error = "Customer not found" });
                 customerName = cr.GetString(0); currentBalance = cr.GetDecimal(1);
             }
+
+            string? invoiceNo = string.IsNullOrWhiteSpace(req.InvoiceNo) ? null : req.InvoiceNo.Trim();
+            if (invoiceNo != null)
+            {
+                // Validate the receipt belongs to this customer and amount is within the receipt's current remaining
+                var amount = 0m;
+                using (var rc = conn.CreateCommand()) { rc.Transaction = tx;
+                    rc.CommandText = "SELECT total_amount, created_at FROM wh_walkin_sales WHERE invoice_no = @inv AND customer_id = @cid AND payment_method = 'Credit' AND COALESCE(is_voided, FALSE) = FALSE";
+                    rc.Parameters.AddWithValue("inv", invoiceNo);
+                    rc.Parameters.AddWithValue("cid", req.CustomerId);
+                    using var rr = rc.ExecuteReader();
+                    if (!rr.Read()) return BadRequest(new { error = $"Receipt {invoiceNo} not found for this customer" });
+                    amount = rr.GetDecimal(0);
+                }
+
+                // paid against this receipt = allocated payments (invoice_no match) + FIFO pool share that reaches it.
+                // Must mirror WhCreditBreakdown's sweep (pool consumes balances oldest-first) so the displayed
+                // remaining == the validated remaining.
+                decimal pool = 0m;
+                using (var pp = conn.CreateCommand()) { pp.Transaction = tx;
+                    pp.CommandText = "SELECT COALESCE(SUM(credit), 0) FROM credit_transactions WHERE customer_id = @cid AND type = 'Payment' AND store_id = '' AND invoice_no = ''";
+                    pp.Parameters.AddWithValue("cid", req.CustomerId);
+                    pool = Convert.ToDecimal(pp.ExecuteScalar());
+                }
+
+                decimal remaining = 0m;
+                using (var all = conn.CreateCommand()) { all.Transaction = tx;
+                    all.CommandText = @"WITH alloc AS (
+                            SELECT ct.invoice_no, SUM(ct.credit) AS pa FROM credit_transactions ct
+                            WHERE ct.customer_id = @cid AND ct.type = 'Payment' AND ct.store_id = '' AND ct.invoice_no <> ''
+                            GROUP BY ct.invoice_no
+                        )
+                        SELECT s.invoice_no, s.total_amount, COALESCE(a.pa, 0) FROM wh_walkin_sales s
+                        LEFT JOIN alloc a ON a.invoice_no = s.invoice_no
+                        WHERE s.customer_id = @cid AND s.payment_method = 'Credit' AND COALESCE(s.is_voided, FALSE) = FALSE
+                        ORDER BY s.created_at ASC, s.id ASC";
+                    all.Parameters.AddWithValue("cid", req.CustomerId);
+                    var poolCopy = pool;
+                    using var ar = all.ExecuteReader();
+                    while (ar.Read())
+                    {
+                        var inv = ar.GetString(0);
+                        var amt = ar.GetDecimal(1);
+                        var alloc = ar.GetDecimal(2);
+                        var bal = amt - Math.Min(alloc, amt);
+                        var share = Math.Min(poolCopy, Math.Max(0m, bal));
+                        poolCopy -= share;
+                        if (inv == invoiceNo) { remaining = Math.Max(0m, bal - share); break; }
+                    }
+                }
+                if (remaining <= 0) return BadRequest(new { error = $"Receipt {invoiceNo} is already fully paid" });
+                if (req.Amount > remaining)
+                    return BadRequest(new { error = $"Amount exceeds remaining of {invoiceNo} ({remaining:N2})" });
+            }
+
             if (req.Amount > currentBalance)
                 return BadRequest(new { error = $"Amount exceeds balance ({currentBalance:N2})" });
 
@@ -3128,18 +3702,19 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             upd.ExecuteNonQuery();
 
             using var ct = conn.CreateCommand(); ct.Transaction = tx;
-            ct.CommandText = @"INSERT INTO credit_transactions (pos_id, store_id, customer_id, sale_id, type, description, debit, credit, balance, payment_method, user_name, created_at, synced_at)
-                VALUES (-NEXTVAL('credit_transactions_id_seq'), '', @cid, NULL, 'Payment', @desc, 0, @amt, @nb, @pm, @un, NOW(), NOW()) RETURNING id";
+            ct.CommandText = @"INSERT INTO credit_transactions (pos_id, store_id, customer_id, sale_id, type, description, debit, credit, balance, payment_method, user_name, invoice_no, created_at, synced_at)
+                VALUES (-NEXTVAL('credit_transactions_id_seq'), '', @cid, NULL, 'Payment', @desc, 0, @amt, @nb, @pm, @un, @inv, NOW(), NOW()) RETURNING id";
             ct.Parameters.AddWithValue("cid", req.CustomerId);
-            ct.Parameters.AddWithValue("desc", $"Payment - {customerName}");
+            ct.Parameters.AddWithValue("desc", invoiceNo != null ? $"Payment - {customerName} ({invoiceNo})" : $"Payment - {customerName}");
             ct.Parameters.AddWithValue("amt", req.Amount);
             ct.Parameters.AddWithValue("nb", newBalance);
             ct.Parameters.AddWithValue("pm", string.IsNullOrEmpty(req.Method) ? "Cash" : req.Method);
             ct.Parameters.AddWithValue("un", req.CashierName ?? "");
+            ct.Parameters.AddWithValue("inv", invoiceNo ?? "");
             var txnId = Convert.ToInt32(ct.ExecuteScalar());
 
             tx.Commit();
-            return Ok(new { id = txnId, customerId = req.CustomerId, customerName, amount = req.Amount, method = string.IsNullOrEmpty(req.Method) ? "Cash" : req.Method, balance = newBalance });
+            return Ok(new { id = txnId, customerId = req.CustomerId, customerName, amount = req.Amount, method = string.IsNullOrEmpty(req.Method) ? "Cash" : req.Method, balance = newBalance, invoiceNo = invoiceNo ?? "" });
         }
         catch (Exception ex) { tx.Rollback(); return StatusCode(500, new { error = ex.Message }); }
     }
@@ -3181,12 +3756,40 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             while (r.Read())
                 receipts.Add((r.GetString(0), r.GetDateTime(1), r.GetDecimal(2)));
 
-        decimal paidTotal = 0m;
+        // allocated payments per receipt (invoice_no linked)
+        var allocated = new Dictionary<string, decimal>();
         using (var p = conn.CreateCommand())
         {
-            p.CommandText = "SELECT COALESCE(SUM(credit), 0) FROM credit_transactions WHERE customer_id = @cid AND type = 'Payment' AND store_id = ''";
+            p.CommandText = "SELECT invoice_no, COALESCE(SUM(credit), 0) FROM credit_transactions WHERE customer_id = @cid AND type = 'Payment' AND store_id = '' AND invoice_no <> '' GROUP BY invoice_no";
             p.Parameters.AddWithValue("cid", customerId);
-            paidTotal = Convert.ToDecimal(p.ExecuteScalar());
+            using var r = p.ExecuteReader();
+            while (r.Read()) allocated[r.GetString(0)] = r.GetDecimal(1);
+        }
+
+        // unallocated pool (general payments, no receipt) applied FIFO over remaining balances
+        decimal pool = 0m;
+        using (var pp = conn.CreateCommand())
+        {
+            pp.CommandText = "SELECT COALESCE(SUM(credit), 0) FROM credit_transactions WHERE customer_id = @cid AND type = 'Payment' AND store_id = '' AND invoice_no = ''";
+            pp.Parameters.AddWithValue("cid", customerId);
+            pool = Convert.ToDecimal(pp.ExecuteScalar());
+        }
+
+        // payment trail per receipt
+        var trail = new Dictionary<string, List<object>>();
+        using (var tr = conn.CreateCommand())
+        {
+            tr.CommandText = @"SELECT invoice_no, id, COALESCE(credit, 0), COALESCE(payment_method, ''), COALESCE(user_name, ''), created_at
+                FROM credit_transactions WHERE customer_id = @cid AND type = 'Payment' AND store_id = '' AND invoice_no <> ''
+                ORDER BY created_at ASC";
+            tr.Parameters.AddWithValue("cid", customerId);
+            using var r = tr.ExecuteReader();
+            while (r.Read())
+            {
+                var inv = r.GetString(0);
+                if (!trail.TryGetValue(inv, out var list)) { list = new List<object>(); trail[inv] = list; }
+                list.Add(new { id = r.GetInt32(1), amount = r.GetDecimal(2), method = r.GetString(3), cashier = r.GetString(4), date = r.GetDateTime(5) });
+            }
         }
 
         var name = "";
@@ -3197,18 +3800,42 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             name = Convert.ToString(c.ExecuteScalar()) ?? "";
         }
 
-        var pool = paidTotal;
+        // pass 1: apply allocated payments per receipt
+        var balances = receipts.Select(rc => new
+        {
+            rc.invoiceNo,
+            rc.created,
+            rc.amount,
+            allocatedPaid = allocated.TryGetValue(rc.invoiceNo, out var ap) ? Math.Min(ap, rc.amount) : 0m
+        }).ToList();
+
+        // pass 2: FIFO pool sweeps remaining balances oldest-first
+        var poolCopy = pool;
+        var remainingAlloc = new Dictionary<string, decimal>();
+        foreach (var b in balances)
+        {
+            var bal = b.amount - b.allocatedPaid;
+            var poolShare = Math.Min(poolCopy, Math.Max(0, bal));
+            poolCopy -= poolShare;
+            remainingAlloc[b.invoiceNo] = Math.Max(0, bal - poolShare);
+        }
+
         var detail = new List<object>();
         decimal totalBalance = 0m;
-        foreach (var rc in receipts)
+        foreach (var b in balances)
         {
-            var taken = Math.Min(pool, rc.amount);
-            var remaining = rc.amount - taken;
-            pool -= taken;
+            var remaining = remainingAlloc[b.invoiceNo];
             totalBalance += remaining;
-            detail.Add(new { invoiceNo = rc.invoiceNo, date = rc.created, amount = rc.amount, remaining });
+            detail.Add(new {
+                invoiceNo = b.invoiceNo,
+                date = b.created,
+                amount = b.amount,
+                remaining,
+                paid = b.amount - remaining,
+                trail = trail.TryGetValue(b.invoiceNo, out var t) ? t : new List<object>()
+            });
         }
-        return Ok(new { customerId, name, totalBalance, paidTotal, receipts = detail });
+        return Ok(new { customerId, name, totalBalance, paidTotal = pool, receipts = detail });
     }
 
     [HttpPost("warehouse/sell")]
@@ -3832,6 +4459,9 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             var expectedCash = totalCash + creditCollectedCash;
             var diff = cashOnHand - expectedCash;
 
+            if (cashOnHand <= 0 && expectedCash > 0)
+                return BadRequest(new { error = "Cash on hand is 0 while expected cash is " + expectedCash.ToString("N2") + ". Enter the actual denominations (or confirm) before saving the shift." });
+
             using var ins = conn.CreateCommand(); ins.Transaction = tx;
             ins.CommandText = @"INSERT INTO wh_daily_closes (close_date, total_sales, total_cash, total_ewallet, total_credit, total_voided, sale_count, credit_collected, cash_on_hand, difference, expenses, cashier_name, denom1000, denom500, denom200, denom100, denom50, denom20, denom_coins)
                 VALUES (NOW(), @ts, @tc, @te, @tcr, @tv, @sc, @cc, @ch, @d, @ex, @cn, @d1000, @d500, @d200, @d100, @d50, @d20, @dcoins) RETURNING id";
@@ -3872,6 +4502,462 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         using var r = cmd.ExecuteReader();
         while (r.Read())
             list.Add(new { id = r.GetInt32(0), closeDate = r.GetDateTime(1), totalSales = r.GetDecimal(2), totalCash = r.GetDecimal(3), totalEw = r.GetDecimal(4), totalCredit = r.GetDecimal(5), totalVoided = r.GetDecimal(6), saleCount = r.GetInt32(7), creditCollected = r.GetDecimal(8), cashOnHand = r.GetDecimal(9), difference = r.GetDecimal(10), expenses = r.GetDecimal(11), cashierName = r.IsDBNull(12) ? "" : r.GetString(12), createdAt = r.GetDateTime(13), denom1000 = r.GetDecimal(14), denom500 = r.GetDecimal(15), denom200 = r.GetDecimal(16), denom100 = r.GetDecimal(17), denom50 = r.GetDecimal(18), denom20 = r.GetDecimal(19), denomCoins = r.GetDecimal(20) });
+        return Ok(list);
+    }
+
+    [HttpGet("shop/catalog")]
+    public IActionResult ShopCatalog([FromQuery] string storeId = "STORE-20260602-7159", [FromQuery] string? category = null, [FromQuery] bool withImages = true)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT mp.id, mp.name, mp.barcode, mp.category, mp.price, mp.cost, " +
+            (withImages ? "mp.image_data," : "'' AS image_data,") + @"
+                   COALESCE(p.stock_qty, 0) AS hq_stock,
+                   COALESCE(w.stock_qty, 0) AS wh_stock,
+                   COALESCE(w.box_qty, 0) AS wh_box_qty,
+                   COALESCE(w.box_price, 0) AS wh_box_price,
+                   COALESCE((SELECT json_agg(json_build_object('id', mpu.id, 'unitName', mpu.unit_name, 'price', mpu.price, 'qtyPerUnit', mpu.qty_per_unit, 'isDefault', mpu.is_default))
+                             FROM master_product_units mpu WHERE mpu.product_id = mp.id), '[]'::json) AS units
+            FROM master_products mp
+            LEFT JOIN LATERAL (SELECT stock_qty FROM products
+                               WHERE store_id = @sid AND barcode = mp.barcode AND is_active = true
+                               ORDER BY pos_id LIMIT 1) p ON true
+            LEFT JOIN wh_products w ON w.master_product_id = mp.id AND w.is_active = true
+            WHERE mp.is_active = true AND mp.sell_online = true";
+        if (!string.IsNullOrEmpty(category)) { cmd.CommandText += " AND mp.category = @cat"; cmd.Parameters.AddWithValue("cat", category); }
+        cmd.CommandText += @"
+            ORDER BY mp.name";
+        cmd.Parameters.AddWithValue("sid", storeId);
+        using var reader = cmd.ExecuteReader();
+        var list = new List<object>();
+        while (reader.Read())
+            list.Add(new {
+                id = reader.GetInt32(0),
+                name = reader.GetString(1),
+                barcode = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                category = reader.IsDBNull(3) ? "" : reader.GetString(3),
+                price = reader.GetDecimal(4),
+                cost = reader.GetDecimal(5),
+                imageData = reader.IsDBNull(6) ? "" : reader.GetString(6),
+                hqStock = reader.GetInt32(7),
+                whStock = reader.GetInt32(8),
+                whBoxQty = reader.GetInt32(9),
+                whBoxPrice = reader.GetDecimal(10),
+                units = reader.IsDBNull(11) ? new object[0] : JsonSerializer.Deserialize<object[]>(reader.GetString(11)) ?? new object[0]
+            });
+        return Ok(list);
+    }
+
+    [HttpGet("shop/product/{id}")]
+    public IActionResult ShopProduct(int id, [FromQuery] string storeId = "STORE-20260602-7159")
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT mp.id, mp.name, mp.barcode, mp.category, mp.price, mp.cost, mp.image_data,
+                   COALESCE(p.stock_qty, 0) AS hq_stock,
+                   COALESCE(w.stock_qty, 0) AS wh_stock,
+                   COALESCE(w.box_qty, 0) AS wh_box_qty,
+                   COALESCE(w.box_price, 0) AS wh_box_price,
+                   COALESCE((SELECT json_agg(json_build_object('id', mpu.id, 'unitName', mpu.unit_name, 'price', mpu.price, 'qtyPerUnit', mpu.qty_per_unit, 'isDefault', mpu.is_default))
+                             FROM master_product_units mpu WHERE mpu.product_id = mp.id), '[]'::json) AS units
+            FROM master_products mp
+            LEFT JOIN LATERAL (SELECT stock_qty FROM products
+                               WHERE store_id = @sid AND barcode = mp.barcode AND is_active = true
+                               ORDER BY pos_id LIMIT 1) p ON true
+            LEFT JOIN wh_products w ON w.master_product_id = mp.id AND w.is_active = true
+            WHERE mp.id = @id AND mp.is_active = true AND mp.sell_online = true";
+        cmd.Parameters.AddWithValue("sid", storeId);
+        cmd.Parameters.AddWithValue("id", id);
+        using var reader = cmd.ExecuteReader();
+        if (!reader.Read()) return NotFound(new { message = "Product not found" });
+        var p = new {
+            id = reader.GetInt32(0),
+            name = reader.GetString(1),
+            barcode = reader.IsDBNull(2) ? "" : reader.GetString(2),
+            category = reader.IsDBNull(3) ? "" : reader.GetString(3),
+            price = reader.GetDecimal(4),
+            cost = reader.GetDecimal(5),
+            imageData = reader.IsDBNull(6) ? "" : reader.GetString(6),
+            hqStock = reader.GetInt32(7),
+            whStock = reader.GetInt32(8),
+            whBoxQty = reader.GetInt32(9),
+            whBoxPrice = reader.GetDecimal(10),
+            units = reader.IsDBNull(11) ? new object[0] : JsonSerializer.Deserialize<object[]>(reader.GetString(11)) ?? new object[0]
+        };
+        return Ok(p);
+    }
+
+    [HttpGet("shop/catalog/search")]
+    public IActionResult ShopCatalogSearch([FromQuery] string? q = null, [FromQuery] int limit = 30)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT id, name, barcode, category, price
+            FROM master_products
+            WHERE is_active = true AND sell_online = true
+              AND (@q IS NULL OR @q = '' OR name ILIKE '%' || @q || '%' OR barcode ILIKE '%' || @q || '%')
+            ORDER BY name LIMIT @lmt";
+        cmd.Parameters.AddWithValue("q", (object?)q ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("lmt", limit);
+        using var reader = cmd.ExecuteReader();
+        var list = new List<object>();
+        while (reader.Read())
+            list.Add(new {
+                id = reader.GetInt32(0),
+                name = reader.GetString(1),
+                barcode = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                category = reader.IsDBNull(3) ? "" : reader.GetString(3),
+                price = reader.GetDecimal(4)
+            });
+        return Ok(list);
+    }
+
+    [HttpGet("shop/categories")]
+    public IActionResult ShopCategories()
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT DISTINCT category FROM master_products WHERE is_active = true AND sell_online = true AND category <> '' ORDER BY category";
+        var list = new List<string>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read()) list.Add(reader.GetString(0));
+        return Ok(new { categories = list });
+    }
+
+    [HttpPost("shop/orders")]
+    public IActionResult ShopCreateOrder([FromBody] ShopOrderRequest req)
+    {
+        if (req == null || string.IsNullOrWhiteSpace(req.CustomerName) || req.Items == null || req.Items.Count == 0)
+            return BadRequest(new { message = "Customer name and at least one item are required" });
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var tx = conn.BeginTransaction();
+        try
+        {
+            decimal total = 0;
+            foreach (var it in req.Items) total += it.Total;
+            var deliveryFee = req.DeliveryFee ?? 0;
+            if (deliveryFee < 0) return BadRequest(new { message = "Delivery fee cannot be negative" });
+            total += deliveryFee;
+
+            int orderId;
+            using (var insCmd = conn.CreateCommand())
+            {
+                insCmd.Transaction = tx;
+                insCmd.CommandText = @"
+                    INSERT INTO online_orders (order_no, customer_name, phone, address, payment_method, gcash_ref, delivery_note, status, total, delivery_fee)
+                    VALUES ('', @cn, @ph, @ad, @pm, @gr, @dn, 'pending', @tot, @df) RETURNING id";
+                insCmd.Parameters.AddWithValue("cn", req.CustomerName.Trim());
+                insCmd.Parameters.AddWithValue("ph", req.Phone ?? "");
+                insCmd.Parameters.AddWithValue("ad", req.Address ?? "");
+                insCmd.Parameters.AddWithValue("pm", (req.PaymentMethod ?? "COD").ToUpperInvariant() == "GCASH" ? "GCash" : "COD");
+                insCmd.Parameters.AddWithValue("gr", req.GcashRef ?? "");
+                insCmd.Parameters.AddWithValue("dn", req.DeliveryNote ?? "");
+                insCmd.Parameters.AddWithValue("tot", total);
+                insCmd.Parameters.AddWithValue("df", deliveryFee);
+                orderId = Convert.ToInt32(insCmd.ExecuteScalar());
+            }
+
+            var no = $"SHOP-{DateTime.Now:yyyyMMdd}-{orderId:D4}";
+            using (var upCmd = conn.CreateCommand())
+            {
+                upCmd.Transaction = tx;
+                upCmd.CommandText = "UPDATE online_orders SET order_no = @no WHERE id = @id";
+                upCmd.Parameters.AddWithValue("no", no);
+                upCmd.Parameters.AddWithValue("id", orderId);
+                upCmd.ExecuteNonQuery();
+            }
+
+            foreach (var it in req.Items)
+            {
+                using var itemCmd = conn.CreateCommand();
+                itemCmd.Transaction = tx;
+                itemCmd.CommandText = @"
+                    INSERT INTO online_order_items (order_id, product_id, product_name, unit_name, qty, price, total)
+                    VALUES (@oid, @pid, @pn, @un, @q, @pr, @tot)";
+                itemCmd.Parameters.AddWithValue("oid", orderId);
+                itemCmd.Parameters.AddWithValue("pid", it.ProductId);
+                itemCmd.Parameters.AddWithValue("pn", it.ProductName ?? "");
+                itemCmd.Parameters.AddWithValue("un", it.UnitName ?? "PC");
+                itemCmd.Parameters.AddWithValue("q", it.Qty);
+                itemCmd.Parameters.AddWithValue("pr", it.Price);
+                itemCmd.Parameters.AddWithValue("tot", it.Total);
+                itemCmd.ExecuteNonQuery();
+            }
+
+            tx.Commit();
+            return Ok(new { id = orderId, orderNo = no, status = "pending", total });
+        }
+        catch (Exception ex)
+        {
+            tx.Rollback();
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("shop/orders")]
+    public IActionResult ShopGetOrders([FromQuery] string? phone = null, [FromQuery] string? status = null, [FromQuery] int limit = 50)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT id, order_no, customer_name, phone, address, payment_method, gcash_ref, delivery_note, status, total, delivery_fee, created_at
+            FROM online_orders
+            WHERE 1 = 1";
+        if (!string.IsNullOrEmpty(phone)) { cmd.CommandText += " AND phone = @ph"; cmd.Parameters.AddWithValue("ph", phone); }
+        if (!string.IsNullOrEmpty(status)) { cmd.CommandText += " AND status = @st"; cmd.Parameters.AddWithValue("st", status); }
+        cmd.CommandText += " ORDER BY id DESC LIMIT @lmt";
+        cmd.Parameters.AddWithValue("lmt", limit);
+        using var reader = cmd.ExecuteReader();
+        var list = new List<object>();
+        while (reader.Read())
+            list.Add(new {
+                id = reader.GetInt32(0),
+                orderNo = reader.GetString(1),
+                customerName = reader.GetString(2),
+                phone = reader.GetString(3),
+                address = reader.IsDBNull(4) ? "" : reader.GetString(4),
+                paymentMethod = reader.GetString(5),
+                gcashRef = reader.IsDBNull(6) ? "" : reader.GetString(6),
+                deliveryNote = reader.IsDBNull(7) ? "" : reader.GetString(7),
+                status = reader.GetString(8),
+                total = reader.GetDecimal(9),
+                deliveryFee = reader.GetDecimal(10),
+                createdAt = reader.GetDateTime(11)
+            });
+        return Ok(list);
+    }
+
+    [HttpGet("shop/orders/{id}")]
+    public IActionResult ShopGetOrder(int id)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT id, order_no, customer_name, phone, address, payment_method, gcash_ref, delivery_note, status, total, delivery_fee, created_at FROM online_orders WHERE id = @id";
+        cmd.Parameters.AddWithValue("id", id);
+        using var reader = cmd.ExecuteReader();
+        if (!reader.Read()) return NotFound(new { message = "Order not found" });
+        var order = new {
+            id = reader.GetInt32(0),
+            orderNo = reader.GetString(1),
+            customerName = reader.GetString(2),
+            phone = reader.GetString(3),
+            address = reader.IsDBNull(4) ? "" : reader.GetString(4),
+            paymentMethod = reader.GetString(5),
+            gcashRef = reader.IsDBNull(6) ? "" : reader.GetString(6),
+            deliveryNote = reader.IsDBNull(7) ? "" : reader.GetString(7),
+            status = reader.GetString(8),
+            total = reader.GetDecimal(9),
+            deliveryFee = reader.GetDecimal(10),
+            createdAt = reader.GetDateTime(11)
+        };
+        reader.Close();
+
+        using var itemsCmd = conn.CreateCommand();
+        itemsCmd.CommandText = "SELECT id, product_id, product_name, unit_name, qty, price, total FROM online_order_items WHERE order_id = @oid";
+        itemsCmd.Parameters.AddWithValue("oid", id);
+        var items = new List<object>();
+        using var itemReader = itemsCmd.ExecuteReader();
+        while (itemReader.Read())
+            items.Add(new {
+                id = itemReader.GetInt32(0),
+                productId = itemReader.GetInt32(1),
+                productName = itemReader.GetString(2),
+                unitName = itemReader.GetString(3),
+                qty = itemReader.GetInt32(4),
+                price = itemReader.GetDecimal(5),
+                total = itemReader.GetDecimal(6)
+            });
+        return Ok(new { order, items });
+    }
+
+    [HttpPut("shop/orders/{id}/status")]
+    public IActionResult ShopUpdateOrderStatus(int id, [FromBody] ShopStatusRequest req)
+    {
+        var allowed = new[] { "pending", "confirmed", "shipped", "delivered", "cancelled" };
+        var status = (req?.Status ?? "").ToLowerInvariant();
+        if (!allowed.Contains(status)) return BadRequest(new { message = "Invalid status" });
+        const string hqStore = "STORE-20260602-7159";
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var tx = conn.BeginTransaction();
+        try
+        {
+            using var curCmd = conn.CreateCommand();
+            curCmd.Transaction = tx;
+            curCmd.CommandText = "SELECT status FROM online_orders WHERE id = @id";
+            curCmd.Parameters.AddWithValue("id", id);
+            var curStatus = curCmd.ExecuteScalar() as string;
+            if (curStatus == null) return NotFound(new { message = "Order not found" });
+            if (curStatus == status) return Ok(new { id, status });
+
+            if (status == "confirmed" && curStatus != "pending")
+                return BadRequest(new { message = "Only pending orders can be confirmed" });
+            if (status == "cancelled" && curStatus == "delivered")
+                return BadRequest(new { message = "Delivered orders cannot be cancelled" });
+
+            var pcsChange = 0; // +reserve, -restore
+            if (status == "confirmed") pcsChange = 1;
+            else if (status == "cancelled" && curStatus != "pending") pcsChange = -1;
+
+            if (pcsChange != 0)
+            {
+                using var itemsCmd = conn.CreateCommand();
+                itemsCmd.Transaction = tx;
+                itemsCmd.CommandText = "SELECT product_id, unit_name, qty FROM online_order_items WHERE order_id = @oid";
+                itemsCmd.Parameters.AddWithValue("oid", id);
+                using var itemReader = itemsCmd.ExecuteReader();
+                var shortages = new List<string>();
+                var itemRows = new List<(int pid, string unit, int qty)>();
+                while (itemReader.Read())
+                    itemRows.Add((itemReader.GetInt32(0), itemReader.GetString(1), itemReader.GetInt32(2)));
+                itemReader.Close();
+
+                foreach (var (pid, unit, qty) in itemRows)
+                {
+                    using var prodCmd = conn.CreateCommand();
+                    prodCmd.Transaction = tx;
+                    prodCmd.CommandText = "SELECT barcode FROM master_products WHERE id = @pid";
+                    prodCmd.Parameters.AddWithValue("pid", pid);
+                    var barcode = prodCmd.ExecuteScalar() as string;
+                    if (string.IsNullOrEmpty(barcode)) continue;
+
+                    int qtyPerUnit = 1;
+                    using var unitCmd = conn.CreateCommand();
+                    unitCmd.Transaction = tx;
+                    unitCmd.CommandText = "SELECT qty_per_unit FROM master_product_units WHERE product_id = @pid AND unit_name = @un ORDER BY is_default DESC LIMIT 1";
+                    unitCmd.Parameters.AddWithValue("pid", pid);
+                    unitCmd.Parameters.AddWithValue("un", unit);
+                    var qpu = unitCmd.ExecuteScalar();
+                    if (qpu != null && Convert.ToInt32(qpu) > 0) qtyPerUnit = Convert.ToInt32(qpu);
+                    var pcs = qty * qtyPerUnit;
+
+                    if (pcsChange > 0)
+                    {
+                        using var updCmd = conn.CreateCommand();
+                        updCmd.Transaction = tx;
+                        updCmd.CommandText = @"
+                            UPDATE products SET stock_qty = stock_qty - @pcs
+                            WHERE id = (SELECT id FROM products
+                                WHERE store_id = @sid AND barcode = @b AND is_active = true AND stock_qty >= @pcs
+                                ORDER BY pos_id LIMIT 1)";
+                        updCmd.Parameters.AddWithValue("pcs", pcs);
+                        updCmd.Parameters.AddWithValue("sid", hqStore);
+                        updCmd.Parameters.AddWithValue("b", barcode);
+                        if (updCmd.ExecuteNonQuery() == 0)
+                            shortages.Add($"{unit} x{qty} ({barcode})");
+                    }
+                    else
+                    {
+                        using var updCmd = conn.CreateCommand();
+                        updCmd.Transaction = tx;
+                        updCmd.CommandText = @"
+                            UPDATE products SET stock_qty = stock_qty + @pcs
+                            WHERE id = (SELECT id FROM products
+                                WHERE store_id = @sid AND barcode = @b AND is_active = true
+                                ORDER BY pos_id LIMIT 1)";
+                        updCmd.Parameters.AddWithValue("pcs", pcs);
+                        updCmd.Parameters.AddWithValue("sid", hqStore);
+                        updCmd.Parameters.AddWithValue("b", barcode);
+                        updCmd.ExecuteNonQuery();
+                    }
+                }
+                if (shortages.Count > 0)
+                    return BadRequest(new { message = "Insufficient HQ stock: " + string.Join(", ", shortages) });
+            }
+
+            using var cmd = conn.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = "UPDATE online_orders SET status = @st, updated_at = NOW() WHERE id = @id";
+            cmd.Parameters.AddWithValue("st", status);
+            cmd.Parameters.AddWithValue("id", id);
+            cmd.ExecuteNonQuery();
+            tx.Commit();
+            return Ok(new { id, status });
+        }
+        catch (Exception ex)
+        {
+            tx.Rollback();
+            return StatusCode(500, new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("shop/orders/new-count")]
+    public IActionResult ShopNewOrderCount([FromQuery] string? since = null)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM online_orders WHERE status = 'pending'";
+        if (!string.IsNullOrEmpty(since) && DateTime.TryParse(since, out var sinceDt))
+        {
+            cmd.CommandText += " AND created_at > @since";
+            cmd.Parameters.AddWithValue("since", sinceDt);
+        }
+        var count = Convert.ToInt32(cmd.ExecuteScalar());
+        return Ok(new { pending = count });
+    }
+
+    [HttpGet("shop/settings")]
+    public IActionResult ShopGetSettings()
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT delivery_fee, free_delivery_min FROM shop_settings WHERE id = 1";
+        using var reader = cmd.ExecuteReader();
+        if (!reader.Read()) return Ok(new { deliveryFee = 0m, freeDeliveryMin = 0m });
+        return Ok(new { deliveryFee = reader.GetDecimal(0), freeDeliveryMin = reader.GetDecimal(1) });
+    }
+
+    [HttpPost("shop/settings")]
+    public IActionResult ShopSaveSettings([FromBody] ShopSettingsRequest req)
+    {
+        if (req == null) return BadRequest(new { message = "Body is required" });
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            INSERT INTO shop_settings (id, delivery_fee, free_delivery_min, updated_at)
+            VALUES (1, @df, @fd, NOW())
+            ON CONFLICT (id) DO UPDATE SET delivery_fee = @df, free_delivery_min = @fd, updated_at = NOW()";
+        cmd.Parameters.AddWithValue("df", Math.Max(0, req.DeliveryFee ?? 0));
+        cmd.Parameters.AddWithValue("fd", Math.Max(0, req.FreeDeliveryMin ?? 0));
+        cmd.ExecuteNonQuery();
+        return Ok(new { success = true });
+    }
+
+    [HttpPost("shop/notify")]
+    public IActionResult ShopNotify([FromBody] ShopNotifyRequest req)
+    {
+        if (req == null || string.IsNullOrWhiteSpace(req.Message))
+            return BadRequest(new { message = "Message is required" });
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "INSERT INTO shop_notifications (store_id, message) VALUES (@sid, @msg)";
+        cmd.Parameters.AddWithValue("sid", req.StoreId ?? "");
+        cmd.Parameters.AddWithValue("msg", req.Message.Trim());
+        cmd.ExecuteNonQuery();
+        return Ok(new { success = true });
+    }
+
+    [HttpGet("shop/notifications/{storeId}")]
+    public IActionResult ShopGetNotifications(string storeId, [FromQuery] string? since = null)
+    {
+        using var conn = Data.PgDatabaseHelper.GetConnection();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT id, message, created_at FROM shop_notifications
+            WHERE (store_id = @sid OR store_id = '')";
+        cmd.Parameters.AddWithValue("sid", storeId);
+        if (!string.IsNullOrEmpty(since) && DateTime.TryParse(since, out var sinceDt))
+        {
+            cmd.CommandText += " AND created_at > @since";
+            cmd.Parameters.AddWithValue("since", sinceDt);
+        }
+        cmd.CommandText += " ORDER BY id DESC LIMIT 20";
+        var list = new List<object>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            list.Add(new { id = reader.GetInt32(0), message = reader.GetString(1), createdAt = reader.GetDateTime(2) });
         return Ok(list);
     }
 
@@ -4002,7 +5088,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         return Ok(new { url = "/assets/" + fileName, fullUrl = "https://admin.jumongdev.com/assets/" + fileName });
     }
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬ Agent (remote diagnostic) Ã¢â€â‚¬Ã¢â€â‚¬
+    // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Agent (remote diagnostic) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
 
     private static readonly ConcurrentDictionary<string, Queue<AgentCommand>> _cmdQueues = new();
     private static readonly ConcurrentDictionary<string, List<AgentResult>> _results = new();
@@ -4022,7 +5108,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         [HttpGet("agent/status")]
         public IActionResult AgentStatus()
         {
-            var latestVer = "1.1.38";
+            var latestVer = "1.1.42";
             var list = _agents.Select(a => new { storeId = a.Key, lastSeen = a.Value.lastSeen, ip = a.Value.ip, machine = a.Value.machine, appVersion = a.Value.appVersion, outdated = string.Compare(latestVer, a.Value.appVersion ?? "", StringComparison.Ordinal) > 0, hasError = a.Value.hasError, errorSummary = a.Value.errorSummary }).OrderBy(a => a.storeId);
             return Ok(list);
         }
@@ -4163,6 +5249,36 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
 
     public class PosPromoRequest { public string Message { get; set; } = ""; }
     public class CrashReportRequest { public string App { get; set; } = ""; public string? Version { get; set; } public string? Device { get; set; } public string Type { get; set; } = "crash"; public string? Log { get; set; } }
+
+    public class ShopOrderRequest
+    {
+        public string CustomerName { get; set; } = "";
+        public string? Phone { get; set; }
+        public string? Address { get; set; }
+        public string? PaymentMethod { get; set; }
+        public string? GcashRef { get; set; }
+        public string? DeliveryNote { get; set; }
+        public decimal? DeliveryFee { get; set; }
+        public List<ShopOrderItemRequest> Items { get; set; } = new();
+    }
+
+    public class ShopOrderItemRequest
+    {
+        public int ProductId { get; set; }
+        public string? ProductName { get; set; }
+        public string? UnitName { get; set; }
+        public int Qty { get; set; }
+        public decimal Price { get; set; }
+        public decimal Total { get; set; }
+    }
+
+    public class ShopStatusRequest { public string? Status { get; set; } }
+    public class ShopSettingsRequest { public decimal? DeliveryFee { get; set; } public decimal? FreeDeliveryMin { get; set; } }
+
+    public class ShopNotifyRequest { public string? StoreId { get; set; } public string? Message { get; set; } }
+    public class ChatRequest { public string Message { get; set; } = ""; public List<ChatMessage>? History { get; set; } }
+    public class ChatMessage { public string Role { get; set; } = "user"; public string Content { get; set; } = ""; }
+    public class ChatLogEntry { public DateTime At { get; set; } public long Ms { get; set; } public bool Ok { get; set; } public int ReplyLen { get; set; } public string Err { get; set; } = ""; public string Backend { get; set; } = ""; }
     public class BrandingConfig { public string AppTitle { get; set; } = ""; public string LogoUrl { get; set; } = ""; public string SplashBg { get; set; } = ""; public string LoginBg { get; set; } = ""; public string PrimaryColor { get; set; } = ""; public string IconKey { get; set; } = ""; }
     public class Suspect1PcRequest { public string? StoreId { get; set; } public string? StoreName { get; set; } public string InvoiceNo { get; set; } = ""; public string? Cashier { get; set; } public string? SaleDate { get; set; } public List<Suspect1PcItem>? Items { get; set; } }
     public class Suspect1PcItem { public string ProductName { get; set; } = ""; public string UnitName { get; set; } = ""; public decimal Price { get; set; } public int Quantity { get; set; } }
@@ -4234,7 +5350,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         public decimal Denom20 { get; set; }
         public decimal DenomCoins { get; set; }
     }
-    public class WhCreditPayRequest { public int CustomerId { get; set; } public decimal Amount { get; set; } public string? Method { get; set; } public string? CashierName { get; set; } }
+    public class WhCreditPayRequest { public int CustomerId { get; set; } public decimal Amount { get; set; } public string? Method { get; set; } public string? CashierName { get; set; } public string? InvoiceNo { get; set; } }
     public class ReceiptAuditRequest { public string? StoreId { get; set; } public string? StoreName { get; set; } public string? ShiftDate { get; set; } public int TotalReceipts { get; set; } public int VoidedCount { get; set; } public int DeletedCount { get; set; } public decimal LostValue { get; set; } public List<string>? VoidedInvoices { get; set; } public List<string>? MissingInvoices { get; set; } }
     public class WhWalkinSellItem
     {
@@ -4256,6 +5372,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         public bool PointsExempt { get; set; }
         public int PointsPerUnit { get; set; }
         public bool IsActive { get; set; } = true;
+        public bool SellOnline { get; set; } = true;
         public List<SeedProductUnitDto>? Units { get; set; }
     }
 
@@ -4267,6 +5384,13 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         public int QtyPerUnit { get; set; } = 1;
         public bool IsDefault { get; set; }
         public int PointsPerUnit { get; set; }
+    }
+
+    public class MasterProductFlagsDto
+    {
+        public bool? SellOnline { get; set; }
+        public bool? IsActive { get; set; }
+        public bool? PointsExempt { get; set; }
     }
 
     public class RenameStoreRequest

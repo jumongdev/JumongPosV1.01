@@ -1,5 +1,241 @@
 ﻿# JumongPOS — Full Project Guide for AI Agents
 
+## Latest Change (2026-08-15) — v1.1.34 (Cloud API): OUTDATED Badge Fixed + Store Rollout Completed
+
+**Request:** "everythings should be same across the board" / "dont fix per shop" — final piece of the all-stores-uniform rollout: the AGENTS dashboard OUTDATED badge compared against a stale hardcoded `latestVer = "1.1.38"`, so a store still on 1.1.38 (Naic) would NOT show as outdated once back online.
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs:5111` | `latestVer` `"1.1.38"` → `"1.1.42"` — OUTDATED badge now truthful (HQ/ACGS 1.1.42 = not outdated; HVR shows True until next cashier login writes 1.1.42 to the DB, then self-corrects). |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1399,1936` | Version bumped `"1.1.33"`→`"1.1.34"` (2 places). |
+
+**Rollout status (all done via the global agent fix — no per-shop hacks):** HQ 1.1.42 + new agent + sync chip LIVE; ACGS 1.1.42 + new agent + chip LIVE; HVR 1.1.42 exe remotely swapped (agent download 211,748,284 bytes → kill → copy → start; DB version + chip appear after next cashier login since Program.cs:90-106 writes AppVersion post-login); Naic still 1.1.38 + old agent (PC off — UPDATE APP + agent push when back); DEV PC agent still old build until next reboot (SYSTEM task can't be replaced from a non-elevated shell — functional, cosmetic `v?`). GitHub release v1.1.42 with exe asset is the store update source. Deployed via WinRM (stop → copy → start), live version verified `1.1.34`, outdated flags verified live.
+
+## Previous Change (2026-08-15) — v1.1.33 (Cloud API) + web: Online Orders Admin Panel, HQ Stock Reservation, Delivery Fee
+
+**Request:** "what else we need in ecommerce" — Phase 1 of the e-commerce buildout: the dashboard had NO way to see/process online orders (they only sat in `online_orders`), orders never touched stock, and checkout had no delivery fee. Now: full admin order management UI, stock reserved from HQ on confirm (returned on cancel), configurable delivery fee + free-delivery minimum charged at checkout.
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs` | Migration: `ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS delivery_fee NUMERIC NOT NULL DEFAULT 0` + new `shop_settings` table (id PK, delivery_fee, free_delivery_min, updated_at) with id=1 seed (0/0). |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **`ShopCreateOrder`** — accepts `DeliveryFee` (≥0), stores it, `total = items + delivery_fee`. **`ShopGetOrders`/`ShopGetOrder`** — return `deliveryFee` (SELECT + reader indices shifted: total idx 9, delivery_fee idx 10, created_at idx 11). **`ShopUpdateOrderStatus`** — **stock reservation**: CONFIRM (pending→confirmed) deducts `products.stock_qty` at HQ (`STORE-20260602-7159`) per item: barcode via `master_products.id`, pcs = `qty × qty_per_unit` (from `master_product_units` by `unit_name` — NOTE the column is `unit_name`, NOT `name`; wrong column = 42703 500). Guarded UPDATE (`stock_qty >= pcs`); any item short → 400 `"Insufficient HQ stock: <unit> x<qty> (<barcode>)"`, whole tx rolled back. CANCEL (from confirmed/shipped) restores the reserved pcs. Delivered orders can't be cancelled; only pending can be confirmed. **New `GET/POST /shop/settings`** — delivery fee config upsert. Version bumped `"1.1.32"`→`"1.1.33"` (2 places). |
+| `JumongCloudAPI/wwwroot/index.html` | Sidebar: **🛒 Online Orders** item in `grp-pos` (after Master Products) with red pending-count badge on the standalone-item row (`_shopBadge`). New section `online-orders`: status filter pills (ALL/pending/confirmed/shipped/delivered/cancelled), orders table (order no/customer/phone/payment+GCash ref/total/status/date/VIEW), **DELIVERY SETTINGS** card (fee + free-over inputs + SAVE), order detail modal (customer, address, note, payment, items with unit price, Subtotal/Delivery Fee/TOTAL, contextual action buttons: pending→✔ CONFIRM + ✕ CANCEL, confirmed→🚚 SHIP + ✕ CANCEL, shipped→✅ DELIVER). |
+| `JumongCloudAPI/wwwroot/components.js` | `_shopBadge: 0` state + `groupParents['online-orders']='grp-pos'` + grp-pos active check. New `onlineOrdersPanel` Alpine component: `load()` (limit 200, status filter), `setFilter`, `filtered` (client search on orderNo/name/phone), `openDetail` (fetch order+items), `subtotal()`, `setStatus` (confirm() prompts; raw `fetch` + JSON error body parsing since `fetchJSON` only surfaces `HTTP <code>`; toast on error — e.g. insufficient stock message), `loadSettings`/`saveSettings`, `loadBadge()` (new-count every 30s + on load). |
+| `JumongCloudAPI/wwwroot/shop.html` | **Delivery fee at checkout**: `loadShopSettings()` on init, `feeFor(subtotal)` (0 fee if configured 0, or subtotal ≥ free_delivery_min → FREE); cart drawer now shows Subtotal/Delivery/Total rows; checkout summary adds Delivery Fee line (FREE in green when waived); `placeOrder()` sends `deliveryFee`; success modal total includes it. |
+| — | **Verified live (test orders cleaned up):** v1.1.33; settings round-trip 50/1000; order `SHOP-20260815-0001` total 112 = 62 item + 50 fee; CONFIRM reserved stock (product 431: 1→0), CANCEL restored (0→1); qty-2 confirm → 400 "Insufficient HQ stock: pack x2 (4800092112782)"; test orders deleted, `setval('online_orders_id_seq', 1, false)` so next real order = `SHOP-…-0001`, settings reset 0/0. |
+
+**GOTCHA hit:** (1) `master_product_units` column is `unit_name` not `name` — first deploy of the confirm path 500'd `42703: column "name" does not exist`; (2) psql `-c` with multiple statements runs as ONE implicit transaction — if any statement errors, EVERYTHING (including an earlier DELETE) rolls back. Run destructive ops as separate `-c` calls. Deployed via WinRM (net stop → copy → start), live version verified 1.1.33, web files live (nav item, onlineOrdersPanel, loadShopSettings present). Next phases (not started): customer notifications (SMS/email), Messenger bot key, payment gateway, product photos for the 582 imageless products.
+
+## Previous Change (2026-08-15) — v1.0.17 (APK) + web-only: Warehouse Mobile App White Screen Fixed (Render-Blocking Tailwind CDN)
+
+**Request:** "when i load the app the screen is white" (mobile app) — opening the warehouse app showed a **plain white screen** (sometimes several seconds) before the dark login screen appeared.
+
+**Root cause:** `whmobile.html` loaded `https://cdn.tailwindcss.com` as a **synchronous render-blocking `<script>` in `<head>`**. The WebView cannot paint ANYTHING (and the end-of-body `init()` never runs) until that ~400KB JIT-compiler script downloads AND compiles on the phone's network — during which the WebView's default background (WHITE) shows through. The HTML loading screen itself was never white — it just never rendered until the CDN finished. Native splash + `windowBackground` were already dark (`#10102a`, `themes.xml`).
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/whmobile.html:8` | Tailwind CDN script → `<script src="https://cdn.tailwindcss.com" defer></script>` — no longer blocks first paint; page paints dark instantly from the inline `<style>`. |
+| `JumongCloudAPI/wwwroot/whmobile.html:9-17` | Added `#critical-css` block (`.flex/.flex-1/.flex-col/.items-center/.justify-center/.text-center/.hidden`) so the loading/login/store screens render centered on dark bg even before Tailwind compiles. |
+| `WarehouseApp/.../MainActivity.kt:91-92` | `webView.setBackgroundColor(android.graphics.Color.rgb(16, 16, 42))` — WebView area dark from the first frame, so no white flash under ANY network condition (pre-first-paint gap now matches the native splash). |
+| `WarehouseApp/app/build.gradle` | versionCode 17→18, versionName `"1.0.16"`→`"1.0.17"`. |
+| `JumongCloudAPI/wwwroot/updates/warehouse-version.json` | `"1.0.17"` — changelog "Dark WebView background - no more white screen while loading" (ASCII only, no BOM — `WriteAllText` + `UTF8Encoding($false)`). |
+
+**Deployed:** web files copied live (`C:\JumongAPI\wwwroot\`) + publish copy; APK built + signed on the SERVER (`C:\Users\ADMIN\Desktop\JumongPosV1.01\WarehouseApp`, JAVA_HOME = Android Studio jbr, `apksigner` + `jumong_sign.keystore`) and copied to live `C:\JumongAPI\wwwroot\updates\` + dev repo + publish. Verified: `versionCode='18' versionName='1.0.17'` via aapt2 badging, `setBackgroundColor` present in classes.dex (index 4943115), V3.0 signer cert OK, public URLs 200. **Users get it via SETUP → UPDATE APP.**
+
+**GOTCHAS hit:** (1) PowerShell `Set-Content -Encoding UTF8` writes a **BOM** → Groovy fails parsing build.gradle ("Unexpected character: ''") — always `[System.IO.File]::WriteAllText` with `UTF8Encoding($false)` for gradle/json files; (2) apksigner.bat needs `$env:JAVA_HOME` set in the SAME session; (3) a stale `JumongWarehouse.apk` left in the repo folder silently masked a failed sign (delete before signing); (4) aapt2 output can come back empty when piped through WinRM `Select-String` — use `Out-String` + full output. NOTE: the exact 2632258-byte size match with v1.0.16 was a coincidence; the dex + badging prove the new build is live.
+
+## Previous Change (2026-08-15) — v1.1.32 (Cloud API): Mobile Credit Pay Per-Receipt "Exceeds Remaining" False Rejection Fixed
+
+**Request:** "kindly check mobile credit pay credit there is a problem when paying exceed amount warning" — paying a specific receipt's FULL displayed remaining on the mobile app was rejected with "Amount exceeds remaining (0.00)" / "already fully paid".
+
+**Root cause:** `WhCreditPay`'s per-receipt remaining formula was **inconsistent with `WhCreditBreakdown`'s FIFO sweep**. Breakdown sweeps the unallocated payment pool across ALL receipts oldest-first (each receipt's displayed remaining = amount − allocated − pool share LEFT AFTER older receipts). WhCreditPay computed `remaining = amount − allocated − min(pool, olderUnpaid)` — subtracting the pool consumed by OLDER receipts from EVERY receipt. Result: (1) newer receipts were understated (pool already eaten by older ones counted against them → paying the displayed remaining always rejected, e.g. B displayed 110 but validated as 60); (2) the OLDEST receipt ignored the pool assigned to it (overpay allowed up to full amount even though UI showed less).
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs:3654-3691` | `WhCreditPay` per-receipt validation replaced with the **exact same FIFO sweep as `WhCreditBreakdown`** (CTE `alloc` per-receipt allocated sums + `wh_walkin_sales` ordered by created_at/id + poolCopy sweep, `remaining = bal − share` for the target invoice). Removed the old `poolBefore`/`poolAllocatedToOlder` CTE + unused `created` var. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1399,1936` | Version bumped `"1.1.31"`→`"1.1.32"` (2 places). |
+
+**Verified live (scratch customer id 1208, cleaned up after):** receipts A=110 (oldest) + B=110, general pool pay 50 → breakdown showed A remaining **60** (pool hit it first), B remaining **110**. OLD code would have rejected `PAY B 110` ("exceeds remaining (60.00)") and wrongly allowed `PAY A 70`; NEW code: `PAY B 110` → **200 OK**, `PAY A 70` → **400 "Amount exceeds remaining of ... (60.00)"**, `PAY A 60` → **200 OK**, final balance 0 + both receipts remaining 0 (breakdown consistent). Test data deleted (stock restored 204→200, 350→169, trails/credit txns/sales/customer removed). Deployed via WinRM (net stop → copy → start, stop BEFORE copy to avoid locked System*.dll). NOTE: psql lives at `C:\Program Files\PostgreSQL\18\bin\psql.exe` on the server (NOT on PATH); connection = `Host=localhost;Database=jumongpos;Username=postgres;Password=postgres` (appsettings.json). The web client (`whmobile.html`) was already correct — its checks use the breakdown's `remaining`, so no web change needed.
+
+## Previous Change (2026-08-15) — v1.1.31 (Cloud API) + web: Warehouse Receiving History (Date Filter Fix) + Expandable Sidebar Groups
+
+**Request:** "check during august 6 what was received product in warehouse i cannot see your date picker does not work" + "pwede gawin sila expandable pang click sa Report expand and close? lahat sana my icon para cute" — warehouse receiving history now visible on the dashboard with a WORKING date filter; sidebar groups are now click-to-expand/collapse with icons everywhere.
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs:2643-2666` | **`WhGetReceivings` fixed** — removed the `AND reference LIKE 'RECV-%'` filter (that's why old receivings with cashier-name references like "aira"/"jnj"/"chaknu" NEVER showed) + new optional `from`/`to`/`limit` query params (DateTime-parsed, `to` = next day, LIMIT capped 1000). Version bumped `"1.1.30"`→`"1.1.31"` (2 places). |
+| `JumongCloudAPI/wwwroot/index.html` | **Warehouse → new 📥 Receiving subpage** (sidebar `wh-receiving` in grp-wh + tab button): date picker (From→To) + TODAY/FILTER/ALL buttons, table (Reference/Items/Total Qty/Date/VIEW), items modal (`recvViewOpen`, product/barcode/qty). |
+| `JumongCloudAPI/wwwroot/components.js` | `warehousePanel` — new `recvData`/`recvFrom`/`recvTo`/`recvView*` state + `loadReceivings()`/`recvToday()`/`viewReceiving()`/`closeReceivingView()`; `load()` handles `sp==='receiving'`. `groupParents` + `'wh-receiving': 'grp-wh'`. |
+| `JumongCloudAPI/wwwroot/app.js` | CSV export for `wh-receiving` (Reference,Items,TotalQty,Date). |
+| `JumongCloudAPI/wwwroot/index.html` + `components.js` | **Sidebar restructure** — nav is now GROUP-BASED (`group:true, items:[...]`, 3 levels max): `grp-ai` (AI Chat/AI Knowledge), `grp-system` (Server Health/1PC CHECK), `grp-pos` → `grp-reports` (Sales/Inventory Cost/Shift History/**Analytics** moved here) + Master Products + `grp-inv` (Recent Receiving/Stock Status), `grp-wh`, `grp-settings` (Settings/POS Promo/POS QR/Branding). Every group + item has an emoji icon; groups render with ▸/▾ chevron (rotates on expand). **Collapsed by default** (`groupOpen={}`); `toggleGroup(id)`/`isGroupOpen(id)`/`isGroupActive(id)`; **auto-expand ancestors** via `openAncestors(id)` in `switchSection` (so clicking a wh-transfer badge opens grp-wh). `_whBadge` shows on grp-wh header too. Old `isHeader`/`isSub`/`indent` flat nav REMOVED. NOTE: plain `x-show` (no Alpine collapse plugin loaded). |
+
+**Verified live:** v1.1.31 — `GET /warehouse/receivings?from=2026-08-06&to=2026-08-06` → 4 batches (jnj +2484, brew +200, bimboy ombet lalad +240, aira +1000 = **3,924 pcs** Aug 6); sidebar live with `'wh-receiving'` + `loadReceivings()` present. Deployed via WinRM (stop → copy → start) + web copy. **Data answer:** chaknu (Jul 21: Marlboro Red 1500 + Gold 500) & jovani (Jul 30: Chesterfield 450; Aug 13: Mighty Green 500 + Camel Yellow 500).
+
+## Previous Change (2026-08-14) — v1.1.30 (Cloud API) + web: AI Knowledge Bank (RAG) + shop.jumongdev.com Subdomain + Shop QR
+
+**Request:** "gawa ka nalang ng mga sasagotan ko sa dashboard" + "ang kailangan nyan yung messenger bot ipakita sa customer either they go to webaddress or scan the qrcode" — AI chat now answers from REAL business info (Knowledge Bank RAG with ✅ TAMA / ✏️ I-CORRECT review flow); shop moved to clean URL `shop.jumongdev.com`; shop QR hosted for Messenger bot.
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs:798-855` | **2 new tables**: `chat_kb` (id, category business/project/approved-reply, keywords, question, answer, active, source manual/seed/approved-reply/project-ingest, timestamps) + `chat_review_log` (user_message, bot_reply, verdict approved/corrected, corrected_answer, kb_entry_id, created_at). **Seed migration** (idempotent via `WHERE NOT EXISTS question = exact`) — 10 entries: website (answered, active) + 9 blank business questions (hours/delivery/contact/branch/payment/order/tracking/pickup/returns) with `active=false` → dashboard shows **SAGUTIN** badge until user answers. GOTCHA: first seed used `LIKE '%pickup%'` etc. which didn't match "pick-up"/"makokontak" → duplicated on each restart; fixed with exact-question match. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **RAG in `POST /chat`**: (1) KB retrieval — exact-question match (score 3) + answer-first-word match (score 1), fallback keyword loop; **blank answers NEVER injected** (prevents hallucination on unanswered questions); (2) promo questions → live `pos_promo` row; (3) product questions → `master_products` filtered `sell_online=true AND is_active=true` with **token-based search** (stopwords stripped, ALL tokens must match name/barcode, LIMIT 3) + HQ stock via barcode join — **cost NEVER exposed**. Facts injected into system prompt; response includes `sources[]` (`kb:N`, `promo`, `product`). System prompt hardened: "Huwag mag-imbento... sabihin 'Wala pa pong nakarekord na sagot dito'". |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **8 new endpoints**: `GET/POST/PUT/DELETE /chat/kb`, `POST /chat/kb/review` (approved → saves bot reply as KB entry source=approved-reply; corrected → saves corrected answer; logs to chat_review_log), `GET /chat/kb/reviews`, `POST /chat/kb/ingest-project` (parses server `C:\Users\ADMIN\Desktop\JumongPosV1.01\AGENTS.md` sections → project KB entries). |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1398,1919` | Version bumped `"1.1.29"`→`"1.1.30"`. |
+| `JumongCloudAPI/wwwroot/index.html` | AI CHAT panel: **✅ TAMA / ✏️ I-CORRECT** buttons under each bot reply (I-CORRECT → textarea → SAVE CORRECTED ANSWER), reviewed-state label, sources line (📚 kb:1 · product · promo), subtitle fixed to "llama3.1:8b · dev PC → server failover · Knowledge Bank". Sidebar **📚 AI KNOWLEDGE** item + full section: KB table (category filter, SAGUTIN/ACTIVE/OFF badges, EDIT/ACTIVATE/DEL, + ADD ENTRY, 📥 INGEST PROJECT), Review Log table, editor modal. |
+| `JumongCloudAPI/wwwroot/components.js` | `aiChatPanel` — `review(m, verdict)` + `startCorrect(m)` post to `/chat/kb/review`; `sources` state. New `kbPanel` Alpine component (load/review/CRUD/toggle/ingest). |
+| `JumongCloudAPI/Program.cs` | **Clean URL rewrite middleware** — host `shop.jumongdev.com` path `/` or `/index.html` → serve `/shop.html`. |
+| `JumongCloudAPI/wwwroot/assets/shop_qrcode_300.png` + `shop_qrcode_1000.png` | Shop QR images (300px for Messenger attachment, 1000px for print) generated with node `qrcode` pkg → `https://admin.jumongdev.com/assets/shop_qrcode_300.png` (verified 200). For the Messenger bot to attach: `attachment:{type:"image", payload:{url:"https://admin.jumongdev.com/assets/shop_qrcode_300.png"}}` alongside shop.jumongdev.com text (Phase 2 — pending Messenger key). |
+| — | **Server tunnel:** `C:\Users\ADMIN\.cloudflared\config.yml` added ingress `shop.jumongdev.com → http://localhost:5000`. **cloudflared now runs as SYSTEM scheduled task `cloudflared-tunnel`** (was a plain background process that died when the WinRM session closed → Cloudflare 530 errors). DNS: user added `CNAME shop → 0b400db6-d379-464b-82d2-eb1149afeffc.cfargotunnel.com` (Proxied) in Cloudflare dashboard. |
+| — | **DB data:** duplicate seed rows cleaned (DELETE ... NOT IN (SELECT MIN(id) GROUP BY question)), test review entries + review log cleared. |
+
+**Verified live:** v1.1.30 — `shop.jumongdev.com` serves "Andengs Online Shop" (clean URL, no login); `admin.jumongdev.com` still serves admin login; KB endpoint 200 with 10 entries; chat RAG: "anong website nyo?" → "Website namin ay shop.jumongdev.com!" (source kb:1); "magkano zonrox 225ml?" → "₱26.50 ... 34 pcs" (source product — token search now matches "ZONROX BLEACH COLORSAFE (VIOLET) 225ML"; was hallucinating ₱35); "may promo ba ngayon?" → "Coke mismo 60+1, Kopiko all flavors 1460, C2 solo 312" (source promo, from live pos_promo); "bukas ba kayo ngayon?" → "Wala pa pong nakarekord na sagot dito" (no hallucination — entry still SAGUTIN). Review flow: approved → KB entry created; corrected → corrected answer saved. GOTCHAS FIXED: (1) `PgDatabaseHelper.GetConnection()` ALREADY opens the connection — extra `.Open()` throws "Connection already open" (removed all 9); (2) `ExecuteScalar()` returns Int32 not Int64 — use `Convert.ToInt32`; (3) interpolated string with newline inside `$")` breaks compile. Deployed via WinRM (stop → copy → start), live version verified 1.1.30.
+
+## Previous Change (2026-08-14) — v1.1.29 (Cloud API) + web: Hybrid Chat Backend (Dev PC Primary, Server Failover)
+
+**Request:** "tuloy na natin ang llama dito sa dev pc tapos ito muna ang first option sa chat tapos pag nag fail sa server na ang talon" — dev PC Ollama (GPU-capable) serves chat when online; server takes over when unreachable.
+
+| File | Change |
+|---|---|
+| — | **Dev PC:** `ollama pull llama3.1:8b` (4.9GB, same model as server). `OLLAMA_HOST=0.0.0.0:11434` set (User env var) + inbound firewall rule **Ollama LAN** (TCP 11434, Private). Ollama now listens on `0.0.0.0:11434` (was 127.0.0.1). |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **`POST /chat` failover** — tries `http://DESKTOP-Q36S34R:11434/api/chat` (dev PC, 30s timeout) first → on any failure falls back to `http://localhost:11434` (server). Response now includes `backend: "dev"\|"server"`; `ChatLogEntry` gained `Backend` field; `/chat/stats` recent[] includes `backend`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1398,1546` | Version bumped `"1.1.28"`→`"1.1.29"`. |
+| `JumongCloudAPI/wwwroot/index.html:2710` | Recent-response chips show backend tag: **DEV** (cyan bold) / **SRV** (amber bold); tooltip shows "chars via backend". |
+
+**Verified live:** v1.1.29 — dev PC online → `backend: dev` (27.5s cold load, first llama load on dev PC); dev Ollama stopped → `backend: server` (43.8s cold server load); stats recent[] show `backend=dev` / `backend=server`. Deployed via WinRM (stop → copy → start) + web copy. NOTE: `ollama app` tray relaunches the server at logon; user-level `OLLAMA_HOST` is picked up then (current session uses `Start-Process` with `$env:OLLAMA_HOST` set manually after edits).
+
+## Previous Change (2026-08-14) — v1.1.28 (Cloud API): Chat Model Switched to Llama 3.1 8b (Qwen 7b Deleted)
+
+**Request:** user na-test ang dalawang models side-by-side at pinili ang Llama. Qwen 7b tinanggal sa server.
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs:1441` | `POST /chat` model changed `"qwen2.5:7b-instruct"` → `"llama3.1:8b"`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1398,1546` | Version bumped `"1.1.27"`→`"1.1.28"`. |
+| — | **Server:** `ollama rm qwen2.5:7b-instruct` — Qwen deleted, only `llama3.1:8b` (4.9GB) remains. |
+
+**Model comparison test (direct to Ollama API, same 3 questions, system prompt = Taglish assistant):** Llama won — warmer 2.6s vs 3.7s avg, more structured/confident answers. Both hallucinate store facts (24/7, delivery fees, website) — next step is real store info sa system prompt. **Verified live:** v1.1.28, `POST /chat` → Llama reply 5.5s warm, accurate system-prompt info (admin.jumongdev.com/shop.html). Deployed via WinRM.
+
+## Previous Change (2026-08-14) — v1.1.27 (Cloud API) + web: AI Chat Performance Monitoring
+
+**Request:** "malalaman mo ba kung may problema sa slowdown sa chat?" — nagdagdag ng per-request logging + stats para mamonitor ang chat speed.
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **`POST /chat` now logs every call** — `_chatLog` ConcurrentQueue (cap 500) records timestamp, duration ms, success/fail, reply length, error message. Logged sa 3 exit paths: Ollama non-200, success, exception. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **New `GET /chat/stats`** — last 60 min window: `{total, ok, fail, avgMs, maxMs, recent:[{at, ms, ok, err, replyLen}]}` (recent = last 30). In-memory lang — nagre-reset pag restart ang service. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1398,1546` | Version bumped `"1.1.26"`→`"1.1.27"`. |
+| `JumongCloudAPI/wwwroot/index.html` | AI CHAT panel: stats line (⚡ Avg/Max/ok/fail) + recent-response chips (time + duration, green ok / red fail, hover = error detail). |
+| `JumongCloudAPI/wwwroot/components.js` | `aiChatPanel` — `loadStats()` sa init + after bawat send + every 15s habang nasa section. |
+
+**Verified live:** version 1.1.27; 2 test chats → stats `total=2 ok=2 fail=0 avg=5964ms max=8142ms`; recent chips show per-request `09:13:28 | 8142ms | ok`. Deployed via WinRM (net stop → copy → net start) + web copy.
+
+## Previous Change (2026-08-14) — v1.1.26 (Cloud API) + web: AI Chat Test (Ollama 7b-instruct sa Server) + Ollama Server Install
+
+**Request:** test kung kaya sumagot ng AI at gumawa ng sample chat sa dashboard. Nag-install ng **Ollama sa server** (portable zip + NSSM service, hindi installer exe — na-stuck sa hidden UAC prompt sa WinRM session) at nag-pull ng `qwen2.5:7b-instruct`. Bagong **AI CHAT** section sa dashboard para ma-test ang bot.
+
+| File | Change |
+|---|---|
+| — | **Server:** `C:\Ollama\` (ollama.exe + lib), NSSM service **Ollama** (Automatic, `serve`), `OLLAMA_KEEP_ALIVE=5m` (RAM guard — model unloads pag 5 min idle; RAM free 7.8GB lang, model ~4.7GB). Model `qwen2.5:7b-instruct` pulled. Test: first run 13.7s (model load), warm 2.6s. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1395-1466` | **New `POST /chat`** — body `{message, history[]}` (max 500 chars/msg, history ≤ 10) → forward sa `http://localhost:11434/api/chat` (model `qwen2.5:7b-instruct`, system prompt = Taglish assistant ng Andengs Superstore) → returns `{reply}`. **Rate limit 5 msg/min/IP** (in-memory ConcurrentDictionary, 429 kapag lumampas). Timeout 120s, 502 kapag down ang Ollama. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:4659-4661` | `ChatRequest` + `ChatMessage` DTO classes. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1398,1448` | Version bumped `"1.1.25"`→`"1.1.26"`. |
+| `JumongCloudAPI/wwwroot/index.html` | Sidebar: **AI CHAT** nav item (🤖, after AGENTS) + panel: 420px scrollable message list (user right cyan / bot left), typing indicator, input + SEND + CLEAR. |
+| `JumongCloudAPI/wwwroot/components.js` | `aiChatPanel` Alpine component — `msgs[]`, `send()` (posts history, pushes reply), `clearChat()`. |
+
+**Verified live:** version 1.1.26; `POST /api/dashboard/chat` → 200 "Bukas kami mula 8:00 AM hanggang 10:00 PM..." (14.7s cold / 9.2s semi-warm); rate limit 429 sa ika-4+ msg sa loob ng 1 min. Deployed via WinRM (net stop → copy → net start) + web copy. NOTE: dashboard login (web_access) ang gate para sa UI, pero ang `/chat` endpoint mismo ay open (walang auth) — rate-limited lang; fine para sa test phase.
+
+## Previous Change (2026-08-14) — v1.1.25 (Cloud API) + web: Master Products Quick Toggles (Sell Online / Active / Exempt)
+
+**Request:** "per item if he will be displayed in online? lagyan ng checkbox sa master catalog table para madali pag setup" — 3 checkbox columns sa Master Products table, direktang tick/untick na auto-save, walang editor.
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs:563-566` | Migration: `ALTER TABLE master_products ADD COLUMN IF NOT EXISTS sell_online BOOLEAN NOT NULL DEFAULT TRUE` — default TRUE = lahat ng items ay nananatiling visible sa online shop pagkatapos i-deploy. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **New `PATCH /products/master/{id}/flags`** — body `{sellOnline?, isActive?, pointsExempt?}` (nullable booleans, tanging mga ipinadala lang ang ina-update, `updated_at=NOW()`). Ginamit ng table checkboxes. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | `SeedProductDto` + `SellOnline` (default true); `CreateMasterProduct`/`UpdateMasterProduct` INSERT/UPDATE kasama `sell_online`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | `GetMasterProducts` + `DownloadMasterCatalog` — ibinabalik na ang `sellOnline` (at `isActive` sa GetMasterProducts). |
+| `JumongCloudAPI/Controllers/DashboardController.cs:4013,4056,4086,4109` | `ShopCatalog` / `ShopProduct` / `ShopCatalogSearch` / `ShopCategories` — `AND mp.sell_online = true` (active AND sell-online lang ang lumalabas sa ecommerce). |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1398,1448` | Version bumped `"1.1.24"`→`"1.1.25"`. |
+| `JumongCloudAPI/wwwroot/index.html` | Master Products table: **Sell Online / Active / Exempt** checkbox columns (accent cyan/emerald/amber) + editor SELL ONLINE checkbox. |
+| `JumongCloudAPI/wwwroot/components.js` | `masterProducts.toggleFlag(x, field, val)` — optimistic update, PATCH sa flags endpoint, revert + toast sa fail. `productEditor` + `sellOnline` state (load/save/reset). |
+
+**Verified live:** version 1.1.25; product 431 toggled off → hidden from `/shop/catalog`; toggled back on → visible again; pointsExempt true/false round-trip; isActive false → download shows `isActive:false`, restored true. Web files live (toggleFlag + Sell Online present). Deployed via WinRM (net stop → copy → net start) + web copy. POS clients unaffected (sell_online = shop-only; points/active changes propagate via existing UPDATE MASTER flow).
+
+
+**Bug:** AGENTS dashboard cards showed `⚠` + ERROR with nonsense like `WhSellForm: Constructor end | Startup: App v1.1.41 started by bella`. Root cause: `GetErrorSummary` (tools/Agent/Program.cs) grabbed the **last 3 timestamped lines** of error.log regardless of whether they were real errors — error.log also contains INFO entries (`ErrorLogger.Log(source, message)`) interleaved with exceptions.
+
+**Fix:** only count a line as an error if the **next line starts with `Type:`** (exception entries always have `  Type: ...` right after the header — ErrorLogger.cs:38; INFO entries are single-line).
+
+| File | Change |
+|---|---|
+| `tools/Agent/Program.cs:251-253` | Added `if (i + 1 < lines.Length && lines[i + 1].TrimStart().StartsWith("Type:")) recent.Add(line);` — INFO lines skipped. |
+| — | Rebuilt agent, refreshed `agent.zip` (34.7 MB, live 200), pushed to HQ (`C:\Users\ADMIN\Desktop\JumongPosHW\agent`), HVR (`C:\Users\Admin\Desktop\JumongPos\Agent`), ACGS (`C:\JumongPos\Agent`) via `ps` command (download → kill → expand → start). All verified heartbeating. Naic (`STORE-20260622-E174`) has NO agent running. |
+
+**Also explained (not a bug):** HQ `hasError=True` at 11:38–11:40 was `FetchPromoMessage` 502s — the API service was stopped for the v1.1.24 deploy (Cloudflare → 502 while origin down). `HasRecentErrors` = SyncLog failures in the last hour → auto-clears ~12:40 PM; `errorSummary` = last 2h window → auto-clears ~13:40 PM.
+
+## Previous Change (2026-08-14) — v1.1.24 (Cloud API): Online Shop Stock Fix (barcode JOIN)
+
+**Bug:** lahat ng products sa shop.html ay nagpakita ng OUT OF STOCK kahit may stock ang HQ. Root cause: `ShopCatalog`/`ShopProduct` nag-JOIN ng `products p ON p.store_id = @sid AND p.pos_id = mp.id` — pero `products.pos_id` ay ang **local SQLite ID ng store** (in-assign via `last_insert_rowid()`/barcode-match sa SyncService.cs:1124), HINDI ang master catalog ID. 0/693 ang nag-match → lahat `hqStock=0`.
+
+**Fix:** barcode ang linkage (689/693 match, nagsi-sync from cloud v1.0.48):
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs:4009,4050` | `LEFT JOIN products p ON p.store_id = @sid AND p.pos_id = mp.id` → `LEFT JOIN LATERAL (SELECT stock_qty FROM products WHERE store_id = @sid AND barcode = mp.barcode AND is_active = true ORDER BY pos_id LIMIT 1) p ON true` sa parehong `ShopCatalog` at `ShopProduct`. LATERAL+LIMIT 1 = proteksyon sa duplicate barcode (hal. "10014"). |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1398,1448` | Version bumped `"1.1.23"`→`"1.1.24"`. |
+
+**Verified live:** version 1.1.24, catalog 693 rows → 518 na may hqStock>0 (dati 0 lahat), tugma sa `stock-status` per barcode (ZONROX 225ML=37, 1000ML=23, 450ML=0 — totoong 0 sa HQ). Deployed via WinRM (net stop → copy → net start). No schema change, no data fix. NOTE: `stock-status` joins `products` directly (correct); `wh_products` may tamang `master_product_id` linkage kaya warehouse stock (whStock) ay hindi naapektuhan ng bug.
+
+## Previous Change (2026-08-14) — v1.1.23 (Cloud API) + web-only: Online Shop Frontend (shop.html)
+
+Customer-facing e-commerce page for the shop backend (v1.1.21). Accessible at `https://admin.jumongdev.com/shop.html` (also via dashboard sidebar **ONLINE SHOP** → opens in new tab). Mobile-first design (Tailwind CDN + vanilla JS), HQ store `STORE-20260602-7159`.
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **`ShopCatalog`** — bagong `withImages` query param (default `true`, backward compatible): `withImages=false` → `imageData` replaced by `''` (column position kept so reader indices unchanged). Shop page uses it to keep the 693-product grid payload small (~60KB vs ~7MB). |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **New `GET /shop/product/{id}`** — single product row (same shape as catalog + imageData + hq/wh stock + units). Used by the shop page for LAZY image loading per product (IntersectionObserver + per-id cache; only 111 of 693 products have images, avg 60KB each). |
+| `JumongCloudAPI/wwwroot/shop.html` | **New file** — modern mobile-first storefront: sticky header (branding via `/dashboard/branding` — title/logo/primary color, fallback violet + "Andengs Online Shop"), promo banner (latest `shop_notifications` for a 30-day window), search (debounced 200ms), category chips (36 categories), 2-col mobile / 5-col desktop product grid with OUT OF STOCK overlay + LOW STOCK badge, per-unit pricing (default unit from `units[]`, qtyPerUnit-aware stock math), cart drawer (localStorage-persisted, steppers, subtotal), checkout sheet (name/phone validation, address, note, COD vs GCash + ref number), order success modal (order no, payment, total), order tracking by phone (`GET /shop/orders?phone=` → status chips pending/confirmed/shipped/delivered/cancelled + item detail). `fetchT(url, opts, ms)` helper = AbortController timeout wrapper (standard `{timeout}` option is NOT a fetch option). Images lazy-load via `/shop/product/{id}` only when scrolled into view. |
+| `JumongCloudAPI/wwwroot/index.html` | Sidebar nav: `{ id:'shop', icon:'🛍️', label:'ONLINE SHOP' }` after Server Health. |
+| `JumongCloudAPI/wwwroot/components.js:71` | `switchSection` — `if (section === 'shop') { window.open('shop.html', '_blank'); return; }`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1398,1448` | Version bumped `"1.1.22"`→`"1.1.23"`. |
+
+**Gotchas/notes:** (1) fetch `{timeout}` option is silently ignored by browsers — AbortController wrapper required; (2) base64 `imageData` may lack the `data:` prefix — page prepends `data:image/jpeg;base64,` when needed; (3) stock checks use default unit qtyPerUnit (e.g. 1 BY 6 = 6 pcs) so cart qty never exceeds `hqStock / qtyPerUnit`; (4) order `order_no` = `SHOP-yyyyMMdd-NNNN` (RETURNING id → padded). **Verified live:** catalog 693 w/o images (imageData len 0), `/shop/product/1` returns image+stock, 36 categories, full order loop (create SHOP-20260814-0001 → detail → PUT status confirmed) — test order deleted + sequence reset (`setval` → next real order = `SHOP-20260814-0001`). Deployed via WinRM (net stop → copy → net start), live `1.1.23`. Admin order management UI (dashboard) = next phase; payments are COD/GCash-ref only (no online payment gateway yet).
+
+## Latest Change (2026-08-13) — v1.1.22 (Cloud API) + web-only: Per-Resibo Credit Payment (Mobile)
+
+User request: "paki ayos ng mobile credit pwede per resibo ang payment" — pwede na magbayad ng CREDIT per resibo, hindi lang general amount.
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs:370-372` | Migration: `ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS invoice_no TEXT DEFAULT ''` + index `idx_credit_transactions_invoice_no`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **`WhCreditPay`** — tatanggap ng optional `invoiceNo`: kapag may resibo, i-validate na (1) umiiral ang resibo at sa tamang customer, (2) hindi lalampas sa *remaining* nito (allocated payments + FIFO pool share na pumapasok sa mas lumang resibo). Description ng txn nagiging `Payment - {name} ({invoiceNo})`. Backward compatible — walang invoiceNo = general pool payment (FIFO sa pinakalumang resibo). |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **`WhCreditBreakdown`** — rewrite: per-receipt `remaining` = amount − allocated (invoice_no match) − FIFO pool share; bagong `trail[]` field per resibo (payment id/amount/method/cashier/date); `paidTotal` ngayon = unallocated pool lang. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | `WhCreditPayRequest` + `InvoiceNo` property. Version bumped `"1.1.21"`→`"1.1.22"`. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | **Breakdown list** — clickable rows (tap resibo): `openReceiptDetail(inv)` shows invoice, date, total/paid/remaining, **Payment Trail**, `💵 PAY THIS RECEIPT`. PATAGO button per row para sa hindi pa bayad. **Pay modal** — dagdag `Receipt` line + `creditPayInvoice`; `openCreditPayForReceipt(inv)` pre-fills amount = remaining (editable para sa partial); `submitCreditPay` may client-side remaining check + `invoiceNo` sa body. Voucher print may `Invoice W#` line. After pay: auto-refresh billing + breakdown. General COLLECT PAYMENT (customer-level) hindi ginagalaw. |
+
+**Gotchas fixed during verification:** (1) trail query nag-quote ng `amount` column na wala sa credit_transactions (dapat `credit`) — 500; (2) off-by-one sa reader index matapos tanggalin ang column — `GetDecimal(3)` binasa ang `payment_method` (text) → `InvalidCastException`. Na-verify live: 2 test receipts (500+300) — bayad 300 sa PALABAGONG resibo → nanatili 500 ang natitira sa luma (proof na hindi lump FIFO), negative 501 → 400, partial 200 E-Wallet → heart, general 100 → FIFO sa natitira, totalBal 200, trail per resibo tama. Deployed via WinRM (net stop → copy → net start), live `1.1.22` + `whmobile.html` na verify (openReceiptDetail/PAY THIS RECEIPT present). Test data (scratch customer `ZZZ CREDIT TEST`) nilinis pagkatapos.
+
+## Latest Change (2026-08-13) — v1.1.21 (Cloud API): E-Commerce Shop Backend
+
+Backend-only phase ng online shop module. Orders mula sa customer-facing shop (future web/POS) ay dito pumapasok.
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs:458-489` | **3 new tables**: `online_orders` (order_no, customer_name, phone, address, payment_method COD/GCash, gcash_ref, delivery_note, status pending→confirmed→shipped→delivered/cancelled, total, timestamps), `online_order_items` (product_id, product_name, unit_name, qty, price, total — CASCADE on order), `shop_notifications` (store_id, message — para sa POS banner pushes). Indexes sa phone/status/created_at/order_id/store_id. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **9 new shop endpoints** (route `api/dashboard/shop/…`): |
+| — | `GET /shop/catalog?storeId=&category=` — master catalog na may **HQ stock** (LEFT JOIN products per-store, pos_id = master id) + **Warehouse stock** (`wh_products` via master_product_id: whStock/whBoxQty/whBoxPrice) + units JSON. Default storeId = HQ `STORE-20260602-7159`. |
+| — | `GET /shop/catalog/search?q=&limit=` — name/barcode ILIKE (server-side, for POS search popup) |
+| — | `GET /shop/categories` — distinct categories |
+| — | `POST /shop/orders` — customer checkout (tx: INSERT order → order_no `SHOP-yyyyMMdd-NNNN` via RETURNING id → items). Returns `{id, orderNo, status, total}`. |
+| — | `GET /shop/orders?phone=&status=&limit=` — order list; `GET /shop/orders/{id}` — order + items |
+| — | `PUT /shop/orders/{id}/status` — valid statuses only (pending/confirmed/shipped/delivered/cancelled) |
+| — | `GET /shop/orders/new-count?since=` — pending count (POS update banner); `POST /shop/notify` + `GET /shop/notifications/{storeId}?since=` — store notification push |
+| — | `ShopOrderRequest/ShopOrderItemRequest/ShopStatusRequest/ShopNotifyRequest` DTO classes. Version bumped `"1.1.20"`→`"1.1.21"`. |
+
+**Gotcha fixed during verification:** Npgsql rejects `DBNull.Value` params in mixed-context ORs (`could not determine data type of parameter $N` / `timestamp with time zone > text`). Followed the existing `StoreFilter` pattern — build SQL conditionally, bind params ONLY when non-empty (`since` parsed to `DateTime`). Test data cleaned (sequences reset so first real order = `SHOP-…-0001`). Deployed via WinRM (net stop → copy → net start), live version verified `1.1.21`, all 9 endpoints verified live (catalog 692 rows, coffee filter 15, order create/detail/status, notify + fetch).
+
+**Stock semantics (owner decision):** retail/by-6 availability = **HQ store stock** (`products` table); per-box = **Warehouse** (`wh_products`). UI (shop page) na lang ang kulang — next phase.
+
 ## Project Structure
 ```
 C:\dev\JumongPosV1.01\          # DEV PC repo (primary). Server keeps a read-only clone at C:\Users\ADMIN\Desktop\JumongPosV1.01
@@ -113,7 +349,7 @@ The batch file lives on the Desktop so it's easy to find. It must always be run 
 |---|---|---|
 | `DESKTOP-I097OO9` @ `192.168.1.21` (Ethernet, 1 Gbps) + `192.168.1.41` (Wi-Fi) | **SERVER ONLY** (Cloud API host, no dev) | API service at `C:\JumongAPI\` (+ client drop `C:\JumongAPI\client\`), Cloudflare tunnel, PostgreSQL, Cloudflare config. Repo clone kept at `C:\Users\ADMIN\Desktop\JumongPosV1.01` (read-only reference — NO dev work here anymore) |
 | `DESKTOP-Q36S34R` (DHCP — was `192.168.1.55`, now `192.168.1.35` as of 2026-08-12) | **DEV PC (all development happens here)** | Cloned repo at **`C:\dev\JumongPosV1.01`**, non-git assets at `C:\dev\extras\`, client publish output `C:\dev\out\client`, Gradle at `C:\dev\gradle\gradle-8.14.3`, dev DB `C:\dev\JumongPosV1.01\JumongPos.db` (STORE-DEV-0001) |
-| `DESKTOP-UU8E0D4` @ `192.168.1.26` | **HQ store (Andengs Superstore - HQ)** | POS client at **`C:\Users\ADMIN\Desktop\JumongPosHW\`** ← NOT in `C:\JumongAPI\client\` |
+| `DESKTOP-UU8E0D4` @ `192.168.1.25` (verified 2026-08-15; was .26) | **HQ store (Andengs Superstore - HQ)** | POS client at **`C:\Users\ADMIN\Desktop\JumongPosHW\`** ← NOT in `C:\JumongAPI\client\` |
 | `DESKTOP-TK63MO6` @ `192.168.1.15` | HVR store | POS client at `C:\Users\Admin\Desktop\JumongPos\` (verified 2026-08-12) |
 | `DESKTOP-NISQ3Q7` @ `192.168.1.152` | U Got Minimart - Naic | (needs path verify) |
 | `DESKTOP-TK63MO6` @ `192.168.0.103` | ACGS - Naic Market | POS client at `C:\JumongPos\` (verified 2026-08-12) |
@@ -134,17 +370,22 @@ The batch file lives on the Desktop so it's easy to find. It must always be run 
 | Service name | `JumongCloudAPI` (NSSM, Automatic start) |
 | Restart command | `Restart-Service JumongCloudAPI` |
 
-### WinRM Remote Access (server ⇄ dev PC, added 2026-08-11)
-Both machines can remote into each other over WinRM (LAN only). **The dev PC is the deploy driver** — it pushes builds to the server and restarts the service.
+### WinRM Remote Access (server ⇄ dev PC + HQ, added 2026-08-11 / HQ 2026-08-15)
+Both machines can remote into each other over WinRM (LAN only). **The dev PC is the deploy driver** — it pushes builds to the server and restarts the service. **HQ is now also WinRM-reachable from the dev PC** (2026-08-15, agent-assisted setup — see note below).
 
 | Item | Detail |
 |---|---|
 | Dev PC → Server account | `DESKTOP-I097OO9\remotedev` / `Jum0ng!Dev55` (admin) |
 | Server → Dev PC account | `DESKTOP-Q36S34R\serverdev` / `Jum0ng!Dev55` (admin) |
+| Dev PC → **HQ** account | `DESKTOP-UU8E0D4\remotedev` / `Jum0ng!Dev55` (admin, created 2026-08-15) |
 | Server TrustedHosts (as client) | `DESKTOP-Q36S34R` (names only — no IPs; DHCP changes don't break TrustedHosts) |
-| Dev PC TrustedHosts (as client) | `DESKTOP-I097OO9` (names only) |
-| Ports | WinRM 5985 both machines, ICMP enabled both ways |
+| Dev PC TrustedHosts (as client) | `DESKTOP-I097OO9, DESKTOP-UU8E0D4` (names only) |
+| Ports | WinRM 5985 both machines + HQ, ICMP enabled |
 | Server Ethernet | **1 Gbps full duplex** (cable fixed 2026-08-11; was 10 Mbps) |
+
+> **HQ WinRM setup (2026-08-15, via agent + one UAC click):** HQ's firewall blocked ALL inbound (no WinRM/SMB/RDP; UAC enabled → the agent's PowerShell runs with a FILTERED token, so even `netsh`/`net user`/`schtasks /rl highest` fail silently with "Access is denied"). Fix applied by (1) writing `lanfix.ps1` to HQ via agent `writefile`, (2) agent `ps`: `Start-Process powershell -Verb RunAs` → staff clicked Yes on the UAC dialog once → script ran elevated: `winrm quickconfig` + `Enable-PSRemoting -Force -SkipNetworkProfileCheck`, firewall rules `WinRM HTTP LAN` (TCP 5985, any profile) + `ICMPv4 Ping LAN`, created `remotedev` admin user, `LocalAccountTokenFilterPolicy=1`. Temp files deleted after. **Verified from dev PC:** `New-PSSession -ComputerName DESKTOP-UU8E0D4 -Credential DESKTOP-UU8E0D4\remotedev` → OK (host/agent/POS exe confirmed). ALSO verified: **HQ → server LAN `DESKTOP-I097OO9:5000` = reachable** (the API is on the LAN; only HQ's own inbound was blocked). Note: on THIS dev PC the WSMan client `TrustedHosts` edit must be done via the dev PC agent (runs as SYSTEM) — a plain non-elevated shell gets "Access is denied".
+>
+> **HQ → server LAN API switch (2026-08-15, COMPLETE):** HQ POS `CloudApiUrl` = **`http://DESKTOP-I097OO9:5000/api`** (LAN, no internet/Cloudflare hop) — owner's plan: HQ hosts ALL stock (retail + wholesale + e-commerce) in one DB; warehouse to be retired. The POS reads the setting per sync call, so the flip is zero-downtime (verified: SyncLog all-OK after flip). **Phase 2 done 2026-08-15 20:31** — HQ updated to v1.1.42 via GitHub release (pos-status now posts → dashboard sync chip live) and the agent was restarted so it also uses the LAN URL (it caches at startup). **GitHub release v1.1.42 created 2026-08-15** with the exe asset (the release had been created WITHOUT the asset earlier → stores got "DOWNLOAD FAILED" 404s until the 211 MB upload finished via curl). Rollback anytime: `UPDATE Settings SET Value='https://admin.jumongdev.com/api' WHERE Key='CloudApiUrl'` + restart. The startup URL-fix migrations only rewrite `%railway%`/`%digitalocean%` values → the LAN URL survives restarts. No auto-failover: if the LAN drops, HQ sync pauses (POS keeps selling offline, auto-drains on reconnect) — same as an internet outage. Store rollout 2026-08-15: HQ 1.1.42 ✅, ACGS 1.1.42 ✅ (tapped UPDATE APP), HVR 1.1.42 ✅ (remote exe swap; version/chip show after next cashier login), Naic still 1.1.38 (PC off — UPDATE APP when back online).
 
 ```powershell
 # From the DEV PC -> server (standard pattern for all deploys)
@@ -158,9 +399,9 @@ $s = New-PSSession -ComputerName DESKTOP-Q36S34R -Credential DESKTOP-Q36S34R\ser
 Invoke-Command -Session $s -ScriptBlock { "OK on $env:COMPUTERNAME" }
 ```
 
-### Agent (remote diagnostic) version gotcha
-- The Agent reads `AppVersion` from the store DB **once at startup** (it caches the version). If the POS app updates while the Agent keeps running, heartbeats keep reporting the OLD version.
-- To refresh: restart the Agent (or the whole POS app, which restarts the Agent). On the dashboard, an agent showing e.g. `v1.1.27` while the app is really `v1.1.33` just means its cached value is stale — restart it. Heartbeats are every 3s, so a `lastSeen` within a few seconds means the agent is alive (not asleep).
+### Agent (remote diagnostic) version gotcha — FIXED 2026-08-15
+- **Old behavior:** the Agent read `AppVersion` (and `CloudApiUrl`) **once at startup** and cached them — after a POS app update the heartbeat kept reporting the OLD version until the agent was restarted.
+- **Fix (agent.zip rebuilt 2026-08-15):** the agent now re-reads `AppVersion` + `CloudApiUrl` from the DB on **every heartbeat (3s)** — version and API URL changes self-correct within seconds, no restarts needed anywhere. Deploy = update `agent.zip` on the server + per-store download→kill→expand→start (already done for HQ/HVR/ACGS; Naic pending — PC off; dev PC agent still old build until next reboot — it runs as a SYSTEM task that can't be replaced from a non-elevated shell).
 - Agent DB resolution: `baseDir\JumongPos.db` (Agent folder), else parent folder. Agent commands: `sql`, `ps`, `readfile`, `writefile`, `update`, `restart`.
 
 ### POS QR codes (v1.0.85+)
@@ -182,17 +423,13 @@ Invoke-Command -Session $s -ScriptBlock { "OK on $env:COMPUTERNAME" }
 | Binary | `cloudflared.exe` (runs as background process, no window) |
 
 ## Cloud API
-- **DigitalOcean URL:** https://jumong-pos-api-p285q.ondigitalocean.app/api — **NO LONGER IN USE. Verified 2026-08-06: all 4 POS clients already sync to the local server** (all stores show sales + agent heartbeats on `admin.jumongdev.com` that day). DO can be decommissioned.
-- **Local URL:** https://admin.jumongdev.com/api (via Cloudflare Tunnel) — ALL 4 POS clients on this
+- **Local URL:** https://admin.jumongdev.com/api (via Cloudflare Tunnel) — HVR, Naic, ACGS on this; **HQ uses `http://DESKTOP-I097OO9:5000/api` (LAN, since 2026-08-15)**
 - **DB connection:** `DATABASE_URL` env var (PostgreSQL, default `localhost:5432`), or check Helpers/CloudDatabaseHelper.cs
-- **DO App ID:** `1bc1369e-6ece-4645-be57-1a7fcf7e90b8` (ready for cancellation)
-- **DO DB ID:** `c6bababf-6a01-418a-9244-a830526f83b3` (ready for cancellation)
-- **DO API Token:** `dop_v1_...` (decommissioned, no longer active)
 
 ## Stores (in Cloud / Local PG)
 | Store ID | Name | Machine | IP |
 |---|---|---|---|
-| `STORE-20260602-7159` | Andengs Superstore - HQ | DESKTOP-UU8E0D4 | 192.168.1.26 |
+| `STORE-20260602-7159` | Andengs Superstore - HQ | DESKTOP-UU8E0D4 | 192.168.1.25 |
 | `STORE-20260602-AA36` | Andengs Superstore - HVR | DESKTOP-TK63MO6 | 192.168.1.15 |
 | `STORE-20260622-E174` | U Got Minimart - Naic | DESKTOP-NISQ3Q7 | 192.168.1.152 |
 | `STORE-20260626-A80C` | ACGS - Naic Market | DESKTOP-TK63MO6 | 192.168.0.103 |
@@ -899,11 +1136,7 @@ Remove-PSSession $s
 ```
 
 ### API URL Change
-**When distributing the new client to POS machines, also change the API URL:**
-1. Open Settings → CLOUD SYNC
-2. Change `CloudApiUrl` from `https://jumong-pos-api-p285q.ondigitalocean.app/api` to `https://admin.jumongdev.com/api`
-3. Click **Save** at the bottom of Settings
-4. Click **SYNC ALL TO CLOUD** to upload all data to the new local server
+`CloudApiUrl` lives in each machine's SQLite `Settings` (Settings → CLOUD SYNC). All stores: `https://admin.jumongdev.com/api` (internet) — **except HQ: `http://DESKTOP-I097OO9:5000/api` (LAN, since 2026-08-15)**. The startup migrations only rewrite stale `railway`/`digitalocean` values — LAN URLs survive restarts. Rollback = change the value back + restart the POS (the agent caches the URL at startup).
 
 ### Cloud API
 ```powershell
@@ -1679,3 +1912,13 @@ Copy JumongWarehouse.apk to JumongCloudAPI\wwwroot\updates\ AND JumongCloudAPI\b
 | `JumongCloudAPI/wwwroot/index.html` + `components.js` | **AGENTS cards now show a sync chip**: 🟢 **SYNC OK** (0 pending, posted < 90s ago) / 🟠 **N PENDING** (with breakdown tooltip) / gray **offline** or **—** (no status yet). `agentsPanel` fetches `/pos-status` on load + every 15s while the section is open. |
 
 **Impact:** Converts passive "background pushes whenever the timer ticks" into active draining — startup flush + reconnect trigger eliminate the HVR 2026-08-12 scenario (98 sales stranded until a manual 22:37 SYNC) and the 2097-item SyncQueue backlog (auto-retried, no manual button needed). Dashboard AGENTS tab shows each store's live sync health at a glance — no more digging through SQL to find unsynced records. DailyClose was never broken: it syncs immediately on creation (verified: HVR 08-12 close created 06:52:17, arrived server 06:52:35 — 18s gap; total 661.00 = exact sum of the 98 sales). Deployed: API v1.1.19 live (verified), web files live (syncChip + pos-status present), POS client published to `C:\JumongAPI\client\` (stores via UPDATE APP). EXCEPTION: `STORE-DEV-0001` (dev PC) never posts pos-status.
+
+### v1.1.20 (Cloud API) + web-only — Mobile End Shift: Zero-Cash Save Guard + Expected Cash Breakdown
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **`WhEndShift` save guard** — `cashOnHand <= 0 && expectedCash > 0` → `400` rejection (no INSERT). Fixes the 2026-08-12 warehouse close #4 that was SAVED with `cash_on_hand=0` → bogus `difference=-325,314`. Version bumped `"1.1.19"` → `"1.1.20"`. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | **Expected Cash breakdown line** — `Cash Sales ₱X + Credit Collected ₱Y` under Expected Cash (removes the "why is expected so big" confusion; e.g. today: 11,701 cash sales + 86,776 CHOICHAI credit payment = 98,477). **Save block** — client-side rejects SAVE when entered cash = 0 and expected > 0; **large-discrepancy confirm** (>₱50k asks "Continue saving?"). JS validated with node --check. |
+| — | **Diagnosis:** "-98,477" seen on mobile was the SHORT line (cash entered = 0) vs expected 98,477 — correct math (cash sales 11,701 + 86,776 credit collected today as Cash). Real bug was the DUAL issue: (1) close #4 saved with 0 denominations; (2) expected cash includes big credit payments that shocked the cashier. Verified live: guard returns 400 + message, no close row created. |
+
+**Impact:** No more zero-cash end shifts at the warehouse. Cashiers now see WHY expected cash is big (credit collections counted). Deployed: API v1.1.20 live (WinRM, verified), whmobile.html live. NOTE: historical close #4 (2026-08-12) still has the wrong `-325,314` — pending owner input for actual drawer cash to correct.
