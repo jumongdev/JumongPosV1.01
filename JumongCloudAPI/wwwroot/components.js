@@ -33,6 +33,41 @@ Alpine.store('app', {
     salePaymentMethod: '', saleReferenceNo: '', saleEwPaid: 0, saleGrandTotal: 0,
     _sidebarOpen: window.innerWidth < 768 ? false : localStorage.getItem('sidebar') !== 'collapsed',
     _whBadge: 0,
+    _shopBadge: 0,
+    groupOpen: {},
+    groupParents: {
+      'ai-chat': 'grp-ai', 'ai-kb': 'grp-ai',
+      'health': 'grp-system', 'suspect1pc': 'grp-system',
+      'rpt-sales': 'grp-reports', 'rpt-invcost': 'grp-reports', 'rpt-shifts': 'grp-reports', 'analytics': 'grp-reports',
+      'grp-reports': 'grp-pos', 'products': 'grp-pos', 'grp-inv': 'grp-pos', 'online-orders': 'grp-pos',
+      'st-receiving': 'grp-inv', 'st-trail': 'grp-inv',
+      'wh-product': 'grp-wh', 'wh-inventory': 'grp-wh', 'wh-sales': 'grp-wh', 'wh-onlineorder': 'grp-wh', 'wh-transfer': 'grp-wh', 'wh-receiving': 'grp-wh',
+      'settings': 'grp-settings', 'pospromo': 'grp-settings', 'posqr': 'grp-settings', 'branding': 'grp-settings'
+    },
+    toggleGroup(id) {
+      this.groupOpen[id] = !this.groupOpen[id];
+    },
+    isGroupOpen(id) {
+      return !!this.groupOpen[id];
+    },
+    isGroupActive(id) {
+      if (id === 'grp-pos' || id === 'grp-reports' || id === 'grp-inv') {
+        if (id === 'grp-reports') return ['rpt-sales', 'rpt-invcost', 'rpt-shifts', 'analytics'].includes(this.section);
+        if (id === 'grp-inv') return this.section === 'stock' || ['st-receiving', 'st-trail'].includes(this.section);
+        return this.section === 'products' || this.section === 'stock' || this.section === 'rpt-sales' || this.section === 'rpt-invcost' || this.section === 'rpt-shifts' || this.section === 'analytics' || this.section === 'online-orders';
+      }
+      if (id === 'grp-wh' && this.section === 'warehouse') return true;
+      if (id === 'grp-inv' && this.section === 'stock') return true;
+      const parent = this.groupParents[this.section];
+      return parent ? (parent === id || this.groupParents[parent] === id) : false;
+    },
+    openAncestors(id) {
+      let p = this.groupParents[id];
+      while (p) {
+        this.groupOpen[p] = true;
+        p = this.groupParents[p];
+      }
+    },
 
     toggleDark() {
       this.darkMode = !this.darkMode;
@@ -66,8 +101,10 @@ Alpine.store('app', {
     saleProfitClass(v) { return v > 0 ? 'text-emerald-400' : 'text-red-400' },
     saleMarginClass(v) { const m = parseFloat(v); return m > 20 ? 'text-emerald-400' : m > 0 ? 'text-amber-400' : 'text-red-400' },
     switchSection(section) {
+      this.openAncestors(section);
       document.getElementById('sidebar')?.classList.remove('open');
       if (section === 'health') { window.open('health.html', '_blank'); return; }
+      if (section === 'shop') { window.open('shop.html', '_blank'); return; }
       if (section.startsWith('wh-')) {
         this.section = 'warehouse';
         this.whSubpage = section.replace('wh-', '');
@@ -321,35 +358,6 @@ Alpine.store('app', {
     next() { if (this.page < this.pages - 1) this.page++ }
   }));
 
-  /* ΓöÇΓöÇ Stock Status ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
-  Alpine.data('stockStatus', () => ({
-    d: [], loading: false, search: '', catFilter: '', page: 0,
-    async init() { await this.load(); window.addEventListener('refresh-data', () => this.load()); window.addEventListener('load-stock', () => this.load()) },
-    async load() {
-      this.loading = true;
-      try {
-        this.d = await fetchJSON(API + '/stock-status?' + Alpine.store('app').filterParams.replace('&', ''));
-        Alpine.store('app').cache.stock = this.d;
-      } catch (e) { this.d = [] }
-      this.loading = false;
-      this.page = 0;
-    },
-    setFilter(c) { this.catFilter = c; this.page = 0 },
-    get categories() { const c = []; this.d.forEach(x => { if (x.category && !c.includes(x.category)) c.push(x.category) }); return c.sort() },
-    get filtered() {
-      let items = this.d;
-      if (this.search) { const q = this.search.toLowerCase(); items = items.filter(x => (x.name || '').toLowerCase().includes(q) || (x.barcode || '').toLowerCase().includes(q)) }
-      if (this.catFilter) items = items.filter(x => x.category === this.catFilter);
-      return items;
-    },
-    get total() { return this.filtered.length },
-    get pages() { return Math.ceil(this.total / PAGE_SIZE) },
-    get paged() { return this.filtered.slice(this.page * PAGE_SIZE, (this.page + 1) * PAGE_SIZE) },
-    prev() { if (this.page > 0) this.page-- },
-    next() { if (this.page < this.pages - 1) this.page++ },
-    stockClass(qty) { return qty === 0 ? 'text-red-400' : qty < 10 ? 'text-amber-400' : '' }
-  }));
-
   /* ΓöÇΓöÇ Stock Receiving ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('receivingPanel', () => ({
     d: [], loading: false, limit: 100,
@@ -365,20 +373,138 @@ Alpine.store('app', {
     setLimit(v) { this.limit = v; this.load() }
   }));
 
+  /* ── Store Stock Trail (POS client LOCAL DB via agent) ─────────────────────── */
+  Alpine.data('storeTrailPanel', () => ({
+    stores: [], store: '', cats: [], cat: '', products: [], prodSearch: '',
+    trail: null, trailProduct: '', trailRows: [], loading: false, status: '',
+    async init() {
+      await this.refreshStores();
+      window.addEventListener('refresh-data', () => this.refreshStores());
+      window.addEventListener('load-stock', () => this.refreshStores());
+    },
+    async refreshStores() {
+      try { this.stores = await fetchJSON(API + '/agent/status') } catch (e) { this.stores = [] }
+    },
+    esc(v) { return String(v == null ? '' : v).replace(/'/g, "''") },
+    parseTSV(out) {
+      const lines = (out || '').replace(/\r/g, '').split('\n').filter(l => l.trim() !== '');
+      if (lines.length === 0) return [];
+      const cols = lines[0].split('\t');
+      return lines.slice(1).map(l => {
+        const v = l.split('\t'); const o = {};
+        cols.forEach((c, i) => o[c] = v[i] !== undefined ? v[i] : '');
+        return o;
+      });
+    },
+    async query(sql) {
+      if (!this.store) return [];
+      this.loading = true; this.status = 'Querying ' + this.store + '...';
+      try {
+        const r = await fetchJSON(API + '/agent/send/' + encodeURIComponent(this.store),
+          { method: 'POST', body: JSON.stringify({ type: 'sql', payload: sql }), headers: { 'Content-Type': 'application/json' } });
+        const cmdId = r.commandId;
+        var tries = 0;
+        while (tries < 20) {
+          await new Promise(res => setTimeout(res, 2000));
+          try {
+            const list = await fetchJSON(API + '/agent/results/' + encodeURIComponent(this.store));
+            const found = list.find(x => x.commandId === cmdId);
+            if (found) {
+              if (found.error) { this.status = 'ERROR: ' + found.error; return [] }
+              const rows = this.parseTSV(found.output || '');
+              this.status = 'OK — ' + rows.length + ' row(s) from local DB';
+              return rows;
+            }
+          } catch (e) { }
+          tries++;
+          this.status = 'Waiting for store... (' + tries + '/20)';
+        }
+        this.status = 'Timeout — agent may be offline.';
+      } catch (e) { this.status = 'Error: ' + e.message }
+      finally { this.loading = false }
+      return [];
+    },
+    async onStore() {
+      this.cat = ''; this.products = []; this.trail = null; this.trailRows = []; this.cats = [];
+      if (!this.store) return;
+      const rows = await this.query("SELECT DISTINCT Category FROM Products WHERE IsActive=1 AND TRIM(Category)<>'' ORDER BY Category");
+      this.cats = rows.map(r => r.Category).filter(Boolean);
+    },
+    async onCat() {
+      this.products = []; this.trail = null; this.trailRows = [];
+      if (!this.store) return;
+      const sql = this.cat === '__ALL__' || !this.cat
+        ? "SELECT Id, Name, Barcode, StockQty FROM Products WHERE IsActive=1 ORDER BY Name LIMIT 500"
+        : "SELECT Id, Name, Barcode, StockQty FROM Products WHERE IsActive=1 AND Category='" + this.esc(this.cat) + "' ORDER BY Name LIMIT 500";
+      this.products = await this.query(sql);
+    },
+    get filteredProducts() {
+      if (!this.prodSearch) return this.products;
+      const q = this.prodSearch.toLowerCase();
+      return this.products.filter(p => (p.Name || '').toLowerCase().includes(q) || (p.Barcode || '').toLowerCase().includes(q));
+    },
+    async showTrail(p) {
+      this.trail = p;
+      this.trailProduct = p.Name;
+      this.trailRows = await this.query("SELECT CreatedAt, QuantityAdded, StockBefore, StockAfter, Reference, UserName, InvoiceNo, Synced FROM StockTrail WHERE ProductId=" + this.esc(p.Id) + " ORDER BY Id DESC LIMIT 200");
+    },
+    backToList() { this.trail = null; this.trailRows = []; this.trailProduct = '' },
+    backToCats() { this.products = []; this.prodSearch = ''; this.trail = null; this.trailRows = [] },
+    trailType(r) {
+      if (r.InvoiceNo) return 'Sale';
+      if ((r.Reference || '').includes('void')) return 'Void/Return';
+      const ref = (r.Reference || '').toUpperCase();
+      if (ref.startsWith('RECV') || ref.startsWith('RR-') || ref.startsWith('WH-TRANSFER') || ref.startsWith('TRANSFER')) return 'Receiving';
+      return '—';
+    },
+    typeCls(t) {
+      if (t === 'Sale') return 'bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300';
+      if (t === 'Void/Return') return 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300';
+      if (t === 'Receiving') return 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300';
+      return 'bg-gray-100 dark:bg-[#222255] text-gray-500 dark:text-[#7878aa]';
+    },
+    fmtTrailDate(v) {
+      const d = new Date(String(v).replace(' ', 'T'));
+      return isNaN(d) ? String(v) : d.toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' });
+    },
+    qtyCls(v) { const n = Number(v); return n > 0 ? 'text-emerald-500 font-semibold' : n < 0 ? 'text-red-500 font-semibold' : 'text-gray-400' },
+    qtyTxt(v) { const n = Number(v); return (n > 0 ? '+' : '') + n },
+    exportTrail() {
+      if (!this.trailRows.length) return;
+      const head = 'Date,Qty,Before,After,Type,Reference,Cashier,Invoice,Synced';
+      const rows = this.trailRows.map(r => [r.CreatedAt, r.QuantityAdded, r.StockBefore, r.StockAfter, this.trailType(r), r.Reference, r.UserName, r.InvoiceNo, r.Synced]
+        .map(v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"').join(','));
+      const blob = new Blob([head + '\n' + rows.join('\n')], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'stock-trail_' + this.store + '_' + (this.trailProduct || 'product').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') + '.csv';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+  }));
+
   /* ΓöÇΓöÇ Master Products ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('masterProducts', () => ({
-    d: [], loading: true, search: '', catFilter: '',
-    async init() { window.addEventListener('load-products', () => this.load()); await this.load() },
-    async load() {
+    d: [], loading: true, search: '', catFilter: '', status: 'active',
+    async init() { window.addEventListener('load-products', () => this.load()); if (Alpine.store('app').section === 'products') await this.load() },
+    async load(force) {
+      if (!force) {
+        const c = Alpine.store('app').cache.master;
+        if (c && Date.now() - c.t < 15000) { this.d = c.data; this.loading = false; return }
+      }
       this.loading = true;
       try {
         this.d = await fetchJSON(API + '/products/master/download');
+        Alpine.store('app').cache.master = { data: this.d, t: Date.now() };
       } catch (e) { this.d = [] }
       this.loading = false;
     },
     get categories() { const c = []; this.d.forEach(x => { if (x.category && !c.includes(x.category)) c.push(x.category) }); return c.sort() },
+    get inactiveCount() { return this.d.filter(x => x.isActive === false).length },
     get filtered() {
       let items = this.d;
+      if (this.status === 'active') items = items.filter(x => x.isActive !== false);
+      else if (this.status === 'inactive') items = items.filter(x => x.isActive === false);
       if (this.search) { const q = this.search.toLowerCase(); items = items.filter(x => (x.name || '').toLowerCase().includes(q) || (x.barcode || '').toLowerCase().includes(q) || (x.category || '').toLowerCase().includes(q)) }
       if (this.catFilter) items = items.filter(x => x.category === this.catFilter);
       return items;
@@ -391,6 +517,11 @@ Alpine.store('app', {
       Alpine.store('app').editorOpen = true;
     },
     closeEditor() { Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null; Alpine.store('app').editingProductData = null },
+    openStock(x) {
+      Alpine.store('app').stockProduct = x;
+      Alpine.store('app').stockOpen = true;
+      dispatchEvent(new CustomEvent('stock-dialog-open'));
+    },
     async deleteProduct(id) {
       const p = this.d.find(x => x.id === id); if (!p) return;
       if (!confirm('Delete "' + p.name + '"?')) return;
@@ -398,16 +529,83 @@ Alpine.store('app', {
         const r = await fetch(API + '/products/master/' + id, { method: 'DELETE' });
         if (!r.ok) throw new Error('Failed');
         toast('Product deleted', 'success');
-        this.load();
+        Alpine.store('app').cache.master = null;
+        this.load(true);
       } catch (e) { toast('Delete failed: ' + e.message, 'error') }
     },
-    get editingProduct() { const id = Alpine.store('app').editingId; return id ? this.d.find(x => x.id === id) : null }
+    get editingProduct() { const id = Alpine.store('app').editingId; return id ? this.d.find(x => x.id === id) : null },
+    async toggleFlag(x, field, val) {
+      const prev = x[field];
+      x[field] = val;
+      try {
+        const body = {};
+        body[field] = val;
+        const r = await fetch(API + '/products/master/' + x.id + '/flags', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (!r.ok) throw new Error('Failed');
+        toast((val ? 'ON' : 'OFF') + ' — ' + (x.name || '') + (field === 'sellOnline' ? ' (online shop)' : field === 'isActive' ? ' (active)' : ' (points exempt)'), 'success');
+        Alpine.store('app').cache.master = null;
+        dispatchEvent(new CustomEvent('load-products'));
+      } catch (e) { x[field] = prev; toast('Update failed: ' + e.message, 'error') }
+    }
+  }));
+
+  /* ΓöÇΓöÇ Product Stock Dialog (server-only: PG stock pushed by each POS) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
+  Alpine.data('productStockDialog', () => ({
+    open: false, product: null, rows: [], status: '', loading: false, _autoTimer: null,
+    async init() {
+      window.addEventListener('stock-dialog-open', () => this.load());
+      window.addEventListener('refresh-data', () => { if (this.open) this.load() });
+    },
+    async load() {
+      const p = Alpine.store('app').stockProduct;
+      if (!p) return;
+      this.product = p;
+      this.open = true;
+      this.loading = true;
+      this.rows = [];
+      await this.refresh();
+      this.loading = false;
+      if (this._autoTimer) clearInterval(this._autoTimer);
+      this._autoTimer = setInterval(() => this.autoRefresh(), 20000);
+    },
+    async autoRefresh() {
+      if (!this.open || this.loading || !this.product) return;
+      await this.refresh();
+    },
+    async refresh() {
+      try {
+        const all = await fetchJSON(API + '/stock-status');
+        const bc = this.product.barcode || '';
+        const seen = {};
+        this.rows = all.filter(x => x.barcode === bc && !seen[x.storeId] && (seen[x.storeId] = true));
+        const order = ['STORE-20260602-7159', 'STORE-20260602-AA36', 'STORE-20260626-A80C', 'STORE-20260622-E174', 'STORE-WAREHOUSE', 'STORE-DEV-0001'];
+        this.rows.sort((a, b) => {
+          const ia = order.indexOf(a.storeId), ib = order.indexOf(b.storeId);
+          return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+        });
+        this.status = 'Refreshed ' + new Date().toLocaleTimeString('en-PH') + ' · auto-refresh 20s';
+      } catch (e) { this.status = 'Error: ' + e.message }
+    },
+    storeLabel(sid) {
+      const m = Alpine.store('app').storeMap || {};
+      if (sid === 'STORE-20260602-7159') return 'Main — HQ';
+      return m[sid] || sid;
+    },
+    isMain(sid) { return sid === 'STORE-20260602-7159' },
+    qtyCls(q) { return q === 0 ? 'text-red-500' : q < 10 ? 'text-amber-500' : 'text-emerald-500' },
+    close() {
+      this.open = false;
+      if (this._autoTimer) { clearInterval(this._autoTimer); this._autoTimer = null }
+      Alpine.store('app').stockOpen = false;
+      Alpine.store('app').stockProduct = null
+    },
+    fmtN(v) { const n = Number(v); return isNaN(n) ? '0.00' : n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
   }));
 
   /* ΓöÇΓöÇ Product Editor ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('productEditor', () => ({
     name: '', barcode: '', category: '', price: 0, cost: 0, imageData: '',
-    pointsExempt: false, pointsPerUnit: 0, isActive: true,
+    pointsExempt: false, pointsPerUnit: 0, isActive: true, sellOnline: true,
     units: [], productId: null, categories: [],
     async init() {
       this.$watch('$store.app.section', () => { if (this.$store.app.section !== 'products') this.reset() });
@@ -417,10 +615,10 @@ Alpine.store('app', {
     open(id) {
       this.productId = id || null;
       const p = Alpine.store('app').editingProductData;
-      if (id && p) { this.name = p.name; this.barcode = p.barcode || ''; this.category = p.category || ''; this.price = p.price; this.cost = p.cost; this.imageData = p.imageData || ''; this.pointsExempt = p.pointsExempt || false; this.pointsPerUnit = p.pointsPerUnit || 0; this.isActive = p.isActive !== false; this.units = (p.units || []).map(u => ({ ...u })) }
-      else { this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.units = [] }
+      if (id && p) { this.name = p.name; this.barcode = p.barcode || ''; this.category = p.category || ''; this.price = p.price; this.cost = p.cost; this.imageData = p.imageData || ''; this.pointsExempt = p.pointsExempt || false; this.pointsPerUnit = p.pointsPerUnit || 0; this.isActive = p.isActive !== false; this.sellOnline = p.sellOnline !== false; this.units = (p.units || []).map(u => ({ ...u })) }
+      else { this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.sellOnline = true; this.units = [] }
     },
-    reset() { this.productId = null; this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.units = []; Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null; Alpine.store('app').editingProductData = null },
+    reset() { this.productId = null; this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.sellOnline = true; this.units = []; Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null; Alpine.store('app').editingProductData = null },
     addCategory() {
       var name = prompt('Enter new category name:');
       if (!name || !name.trim()) return;
@@ -433,12 +631,19 @@ Alpine.store('app', {
     },
     addUnit() { this.units.push({ unitName: '', price: 0, qtyPerUnit: 1, isDefault: false, pointsPerUnit: 0 }) },
     removeUnit(i) { this.units.splice(i, 1) },
+    get profit() { return (parseFloat(this.price) || 0) - (parseFloat(this.cost) || 0) },
+    get profitPct() {
+      const p = parseFloat(this.price) || 0;
+      if (p <= 0) return 0;
+      return ((p - (parseFloat(this.cost) || 0)) / p) * 100;
+    },
     async save() {
       if (!this.name) { toast('Name required', 'error'); return }
       const data = {
         name: this.name, barcode: this.barcode, category: this.category,
         price: parseFloat(this.price) || 0, cost: parseFloat(this.cost) || 0,
         imageData: this.imageData, isActive: this.isActive,
+        sellOnline: this.sellOnline,
         pointsExempt: this.pointsExempt, pointsPerUnit: parseInt(this.pointsPerUnit) || 0,
         units: this.units.filter(u => u.unitName).map(u => ({ ...u, cost: (u.qtyPerUnit || 1) * (parseFloat(this.cost) || 0), pointsPerUnit: parseInt(u.pointsPerUnit) || 0 }))
       };
@@ -450,6 +655,7 @@ Alpine.store('app', {
         if (!r.ok) { const j = await r.json(); throw new Error(j.error || 'Failed') }
         toast(this.productId ? 'Product updated' : 'Product created', 'success');
         this.reset();
+        Alpine.store('app').cache.master = null;
         dispatchEvent(new CustomEvent('load-products'));
       } catch (e) { toast(e.message, 'error') }
     },
@@ -467,8 +673,9 @@ Alpine.store('app', {
     salesData: [], saleFrom: '', saleTo: '', saleViewOpen: false, saleViewItems: [], saleSummary: null,
     invActivity: [], invSearch: '', invFrom: '', invTo: '', invExpanded: true, invActivityLoading: false,
     inventorySummary: null,
+    recvData: [], recvFrom: '', recvTo: '', recvLoading: false, recvViewOpen: false, recvViewItems: [], recvViewRef: '',
     transferPage: 1, transferPageSize: 30, transferTotal: 0, transferFilterDate: '', transferFilterSearch: '',
-    async init() { window.addEventListener('load-warehouse', () => this.load()); await this.load(); this.startPoll() },
+    async init() { window.addEventListener('load-warehouse', () => this.load()); if (Alpine.store('app').section === 'warehouse') await this.load(); this.startPoll() },
     async load() {
       this.loading = true;
       try {
@@ -477,6 +684,7 @@ Alpine.store('app', {
         else if (sp === 'onlineorder') { this.clientsData = await fetchJSON(API + '/warehouse/clients'); this.orders = await fetchJSON(API + '/warehouse/orders') }
         else if (sp === 'transfer') await this.loadTransfers();
         else if (sp === 'sales') await this.loadSales();
+        else if (sp === 'receiving') await this.loadReceivings();
         if (sp === 'inventory') await this.loadInventorySummary();
       } catch (e) { this.products = []; this.clientsData = []; this.orders = []; this.transfers = [] }
       this.loading = false;
@@ -574,6 +782,26 @@ Alpine.store('app', {
       } catch (e) { toast('Error loading items', 'error') }
     },
     closeSaleView() { this.saleViewOpen = false; this.saleViewItems = [] },
+    async loadReceivings() {
+      this.recvLoading = true;
+      try {
+        const p = [];
+        if (this.recvFrom) p.push('from=' + this.recvFrom);
+        if (this.recvTo) p.push('to=' + this.recvTo);
+        const qs = p.length ? '?' + p.join('&') : '';
+        this.recvData = await fetchJSON(API + '/warehouse/receivings' + qs);
+      } catch (e) { this.recvData = [] }
+      this.recvLoading = false;
+    },
+    recvToday() { this.recvFrom = new Date().toISOString().slice(0, 10); this.recvTo = this.recvFrom; this.loadReceivings() },
+    async viewReceiving(ref) {
+      try {
+        this.recvViewItems = await fetchJSON(API + '/warehouse/receivings/' + encodeURIComponent(ref) + '/items');
+        this.recvViewRef = ref;
+        this.recvViewOpen = true;
+      } catch (e) { toast('Error loading items', 'error') }
+    },
+    closeReceivingView() { this.recvViewOpen = false; this.recvViewItems = [] },
     editId: null, editItems: [], editingSale: false,
     async editSaleItems(id) {
       this.editId = id; this.editingSale = true;
@@ -1257,6 +1485,107 @@ Alpine.store('app', {
     }
   }));
 
+  // Online shop orders (admin management + delivery settings)
+  Alpine.data('onlineOrdersPanel', () => ({
+    data: [], search: '', filter: '', loading: false, pendingCount: 0,
+    detailOpen: false, detail: null, detailItems: [], detailLoading: false,
+    settings: { deliveryFee: 0, freeDeliveryMin: 0 }, settingsSaved: '',
+    init() {
+      if (Alpine.store('app').section === 'online-orders') { this.load(); this.loadSettings(); }
+      this.$watch('$store.app.section', v => { if (v === 'online-orders') { this.load(); this.loadSettings(); } });
+      this.loadBadge();
+      setInterval(() => this.loadBadge(), 30000);
+    },
+    async loadBadge() {
+      try {
+        const r = await fetchJSON(API + '/shop/orders/new-count');
+        this.pendingCount = r.pending || 0;
+        Alpine.store('app')._shopBadge = this.pendingCount;
+      } catch (e) { }
+    },
+    async load() {
+      this.loading = true;
+      try {
+        let url = API + '/shop/orders?limit=200';
+        if (this.filter) url += '&status=' + this.filter;
+        this.data = await fetchJSON(url);
+      } catch (e) { this.data = [] }
+      this.loading = false;
+      this.loadBadge();
+    },
+    setFilter(s) { this.filter = s; this.load(); },
+    get filtered() {
+      const q = this.search.trim().toLowerCase();
+      if (!q) return this.data;
+      return this.data.filter(o => (o.orderNo + ' ' + o.customerName + ' ' + o.phone).toLowerCase().includes(q));
+    },
+    statusCls(s) {
+      switch (s) {
+        case 'pending': return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400';
+        case 'confirmed': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400';
+        case 'shipped': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400';
+        case 'delivered': return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400';
+        case 'cancelled': return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400';
+        default: return 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400';
+      }
+    },
+    statusBtnCls(s) {
+      switch (s) {
+        case 'pending': return 'bg-yellow-500 text-white border-yellow-500';
+        case 'confirmed': return 'bg-blue-600 text-white border-blue-600';
+        case 'shipped': return 'bg-purple-600 text-white border-purple-600';
+        case 'delivered': return 'bg-green-600 text-white border-green-600';
+        case 'cancelled': return 'bg-red-600 text-white border-red-600';
+        default: return '';
+      }
+    },
+    async openDetail(o) {
+      this.detail = o;
+      this.detailOpen = true;
+      this.detailItems = [];
+      this.detailLoading = true;
+      try {
+        const r = await fetchJSON(API + '/shop/orders/' + o.id);
+        this.detail = r.order;
+        this.detailItems = r.items || [];
+      } catch (e) { this.detailItems = [] }
+      this.detailLoading = false;
+    },
+    subtotal() { return (this.detailItems || []).reduce((s, it) => s + it.total, 0) },
+    async setStatus(st) {
+      if (!this.detail) return;
+      const no = this.detail.orderNo;
+      const msg = st === 'cancelled' ? 'Cancel ' + no + '? Reserved stock will be returned to HQ.'
+        : st === 'confirmed' ? 'Confirm ' + no + '? Items will be reserved from HQ stock.' : '';
+      if (msg && !confirm(msg)) return;
+      try {
+        const r = await fetch(API + '/shop/orders/' + this.detail.id + '/status', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: st }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.message || ('HTTP ' + r.status));
+        this.detail.status = st;
+        toast(st.toUpperCase() + ' OK', 'success');
+        this.load();
+      } catch (e) {
+        toast(e.message || 'Error updating status', 'error');
+      }
+    },
+    async loadSettings() {
+      try {
+        const r = await fetchJSON(API + '/shop/settings');
+        this.settings.deliveryFee = r.deliveryFee || 0;
+        this.settings.freeDeliveryMin = r.freeDeliveryMin || 0;
+      } catch (e) { }
+    },
+    async saveSettings() {
+      this.settingsSaved = '';
+      try {
+        await fetchJSON(API + '/shop/settings', { method: 'POST', body: JSON.stringify({ deliveryFee: this.settings.deliveryFee || 0, freeDeliveryMin: this.settings.freeDeliveryMin || 0 }), headers: { 'Content-Type': 'application/json' } });
+        this.settingsSaved = 'Delivery settings saved!';
+        setTimeout(() => this.settingsSaved = '', 3000);
+      } catch (e) { this.settingsSaved = 'Error saving delivery settings.' }
+    }
+  }));
+
   // AGENTS remote diagnostic panel
   Alpine.data('agentsPanel', () => ({
     d: [], loading: false, selectedStore: '', cmdType: 'sql', cmdPayload: '', results: '', sending: false, pos: {},
@@ -1471,6 +1800,121 @@ Alpine.store('app', {
         price: x.price || x.Price || 0
       })); } catch (e) { this.itemViewList = []; }
       this.itemModalOpen = true;
+    }
+  }));
+
+  Alpine.data('aiChatPanel', () => ({
+    msgs: [], input: '', sending: false, typing: false, error: '',
+    stats: null, statsTimer: null, sources: [],
+    async init() {
+      await this.loadStats();
+      this.statsTimer = setInterval(() => { if (Alpine.store('app').section === 'ai-chat') this.loadStats(); }, 15000);
+    },
+    async loadStats() {
+      try { this.stats = await fetchJSON(API + '/chat/stats'); } catch (e) { }
+    },
+    async send() {
+      const m = this.input.trim();
+      if (!m || this.sending) return;
+      this.msgs.push({ role: 'user', content: m });
+      this.input = '';
+      this.sending = true;
+      this.typing = true;
+      this.error = '';
+      this.sources = [];
+      try {
+        const hist = this.msgs.slice(0, -1).map(x => ({ role: x.role, content: x.content }));
+        const r = await fetchJSON(API + '/chat', { method: 'POST', body: JSON.stringify({ message: m, history: hist }), headers: { 'Content-Type': 'application/json' } });
+        this.msgs.push({ role: 'assistant', content: r.reply, reviewed: '', correctOpen: false, correctText: '' });
+        this.sources = (r.sources || []).map(s => s.startsWith('kb:') ? 'KB#' + s.slice(3) : s.charAt(0).toUpperCase() + s.slice(1));
+      } catch (e) {
+        this.error = e.message || 'Failed to reach Ollama';
+        this.msgs.push({ role: 'assistant', content: '(error: ' + this.error + ')', reviewed: '', correctOpen: false, correctText: '' });
+      }
+      this.sending = false;
+      this.typing = false;
+      await this.loadStats();
+    },
+    startCorrect(m) { m.correctOpen = true; m.correctText = m.correctText || ''; },
+    async review(m, verdict) {
+      if (verdict === 'corrected' && !(m.correctText || '').trim()) return;
+      try {
+        await fetchJSON(API + '/chat/kb/review', {
+          method: 'POST',
+          body: JSON.stringify({
+            userMessage: this.msgs[this.msgs.indexOf(m) - 1]?.content || '',
+            botReply: m.content,
+            verdict,
+            correctedAnswer: verdict === 'corrected' ? m.correctText.trim() : ''
+          }),
+          headers: { 'Content-Type': 'application/json' }
+        });
+        m.reviewed = verdict;
+        m.correctOpen = false;
+      } catch (e) {
+        this.error = e.message || 'Review failed';
+      }
+    },
+    clearChat() { this.msgs = []; this.error = ''; this.sources = []; }
+  }));
+
+  Alpine.data('kbPanel', () => ({
+    entries: [], reviews: [], filterCategory: '',
+    editorOpen: false, editingId: null,
+    form: { category: 'business', keywords: '', question: '', answer: '', active: true },
+    async init() { await this.load(); await this.loadReviews(); },
+    async load() {
+      try {
+        const url = API + '/chat/kb' + (this.filterCategory ? '?category=' + encodeURIComponent(this.filterCategory) : '');
+        this.entries = await fetchJSON(url);
+      } catch (e) { this.entries = []; }
+    },
+    async loadReviews() {
+      try { this.reviews = await fetchJSON(API + '/chat/kb/reviews?limit=50'); } catch (e) { this.reviews = []; }
+    },
+    openAdd() {
+      this.editingId = null;
+      this.form = { category: 'business', keywords: '', question: '', answer: '', active: true };
+      this.editorOpen = true;
+    },
+    openEdit(k) {
+      this.editingId = k.id;
+      this.form = { category: k.category, keywords: k.keywords, question: k.question, answer: k.answer, active: k.active };
+      this.editorOpen = true;
+    },
+    async save() {
+      try {
+        const body = JSON.stringify(this.form);
+        if (this.editingId) {
+          await fetchJSON(API + '/chat/kb/' + this.editingId, { method: 'PUT', body, headers: { 'Content-Type': 'application/json' } });
+        } else {
+          await fetchJSON(API + '/chat/kb', { method: 'POST', body, headers: { 'Content-Type': 'application/json' } });
+        }
+        this.editorOpen = false;
+        await this.load();
+      } catch (e) {
+        toast(e.message || 'Save failed');
+      }
+    },
+    async toggleActive(k) {
+      try {
+        await fetchJSON(API + '/chat/kb/' + k.id, { method: 'PUT', body: JSON.stringify({ active: !k.active }), headers: { 'Content-Type': 'application/json' } });
+        await this.load();
+      } catch (e) { toast(e.message || 'Toggle failed'); }
+    },
+    async remove(k) {
+      if (!confirm('Delete KB entry: ' + (k.question || k.answer.slice(0, 50)) + '?')) return;
+      try {
+        await fetchJSON(API + '/chat/kb/' + k.id, { method: 'DELETE' });
+        await this.load();
+      } catch (e) { toast(e.message || 'Delete failed'); }
+    },
+    async ingestProject() {
+      try {
+        const r = await fetchJSON(API + '/chat/kb/ingest-project', { method: 'POST' });
+        toast('Ingested ' + (r.sections || 0) + ' project sections');
+        await this.load();
+      } catch (e) { toast(e.message || 'Ingest failed'); }
     }
   }));
 

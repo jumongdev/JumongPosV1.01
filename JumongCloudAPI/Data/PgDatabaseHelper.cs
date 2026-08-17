@@ -369,6 +369,8 @@ public static class PgDatabaseHelper
 
         using var idxCmd = conn.CreateCommand();
         idxCmd.CommandText = @"
+            ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS invoice_no TEXT DEFAULT '';
+            CREATE INDEX IF NOT EXISTS idx_credit_transactions_invoice_no ON credit_transactions(invoice_no);
             CREATE INDEX IF NOT EXISTS idx_sales_sale_date ON sales(sale_date);
             CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON sale_items(sale_id);
             CREATE INDEX IF NOT EXISTS idx_daily_closes_close_date ON daily_closes(close_date);
@@ -455,6 +457,41 @@ public static class PgDatabaseHelper
             CREATE INDEX IF NOT EXISTS idx_wh_orders_client ON wh_orders(client_id);
             CREATE INDEX IF NOT EXISTS idx_wh_orders_status ON wh_orders(status);
             CREATE INDEX IF NOT EXISTS idx_wh_order_items_order ON wh_order_items(order_id);
+            CREATE TABLE IF NOT EXISTS online_orders (
+                id SERIAL PRIMARY KEY,
+                order_no TEXT NOT NULL DEFAULT '',
+                customer_name TEXT NOT NULL,
+                phone TEXT NOT NULL DEFAULT '',
+                address TEXT DEFAULT '',
+                payment_method TEXT NOT NULL DEFAULT 'COD',
+                gcash_ref TEXT DEFAULT '',
+                delivery_note TEXT DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                total NUMERIC NOT NULL DEFAULT 0,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE TABLE IF NOT EXISTS online_order_items (
+                id SERIAL PRIMARY KEY,
+                order_id INTEGER NOT NULL REFERENCES online_orders(id) ON DELETE CASCADE,
+                product_id INTEGER NOT NULL,
+                product_name TEXT NOT NULL,
+                unit_name TEXT NOT NULL DEFAULT 'PC',
+                qty INTEGER NOT NULL DEFAULT 1,
+                price NUMERIC NOT NULL DEFAULT 0,
+                total NUMERIC NOT NULL DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_online_orders_phone ON online_orders(phone);
+            CREATE INDEX IF NOT EXISTS idx_online_orders_status ON online_orders(status);
+            CREATE INDEX IF NOT EXISTS idx_online_orders_created ON online_orders(created_at);
+            CREATE INDEX IF NOT EXISTS idx_online_order_items_order ON online_order_items(order_id);
+            CREATE TABLE IF NOT EXISTS shop_notifications (
+                id SERIAL PRIMARY KEY,
+                store_id TEXT NOT NULL DEFAULT '',
+                message TEXT NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS idx_shop_notifications_store ON shop_notifications(store_id);
         ";
         whCmd.ExecuteNonQuery();
 
@@ -522,6 +559,26 @@ public static class PgDatabaseHelper
             ALTER TABLE master_products ADD COLUMN IF NOT EXISTS points_per_unit INTEGER NOT NULL DEFAULT 0;
         ";
         try { ptMig.ExecuteNonQuery(); } catch { }
+
+        // Migration: add sell_online flag to master products (online shop visibility)
+        using var soMig = conn.CreateCommand();
+        soMig.CommandText = "ALTER TABLE master_products ADD COLUMN IF NOT EXISTS sell_online BOOLEAN NOT NULL DEFAULT TRUE";
+        try { soMig.ExecuteNonQuery(); } catch { }
+
+        // Migration: online shop delivery fee + settings table
+        using var shopMig = conn.CreateCommand();
+        shopMig.CommandText = @"
+            ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS delivery_fee NUMERIC NOT NULL DEFAULT 0;
+            CREATE TABLE IF NOT EXISTS shop_settings (
+                id INTEGER PRIMARY KEY,
+                delivery_fee NUMERIC NOT NULL DEFAULT 0,
+                free_delivery_min NUMERIC NOT NULL DEFAULT 0,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            INSERT INTO shop_settings (id, delivery_fee, free_delivery_min)
+            VALUES (1, 0, 0)
+            ON CONFLICT (id) DO NOTHING";
+        try { shopMig.ExecuteNonQuery(); } catch { }
 
         // Migration: add points_per_unit to master product units
         using var puMig = conn.CreateCommand();
@@ -752,5 +809,65 @@ public static class PgDatabaseHelper
         using var whTrailSrcMig = conn.CreateCommand();
         whTrailSrcMig.CommandText = "ALTER TABLE wh_stock_trails ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT ''";
         try { whTrailSrcMig.ExecuteNonQuery(); } catch { }
+
+        // Migration: AI chat knowledge bank + review log (RAG)
+        using var kbMig = conn.CreateCommand();
+        kbMig.CommandText = @"
+            CREATE TABLE IF NOT EXISTS chat_kb (
+                id SERIAL PRIMARY KEY,
+                category TEXT NOT NULL DEFAULT 'business',
+                keywords TEXT NOT NULL DEFAULT '',
+                question TEXT NOT NULL DEFAULT '',
+                answer TEXT NOT NULL DEFAULT '',
+                active BOOLEAN NOT NULL DEFAULT FALSE,
+                source TEXT NOT NULL DEFAULT 'manual',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS idx_chat_kb_active ON chat_kb (active);
+            CREATE TABLE IF NOT EXISTS chat_review_log (
+                id SERIAL PRIMARY KEY,
+                user_message TEXT NOT NULL DEFAULT '',
+                bot_reply TEXT NOT NULL DEFAULT '',
+                verdict TEXT NOT NULL DEFAULT 'approved',
+                corrected_answer TEXT NOT NULL DEFAULT '',
+                kb_entry_id INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )";
+        try { kbMig.ExecuteNonQuery(); } catch { }
+
+        using var kbSeed = conn.CreateCommand();
+        kbSeed.CommandText = @"
+            INSERT INTO chat_kb (category, keywords, question, answer, active, source)
+            SELECT 'business', 'website, site, online, order', 'Ano ang website ng tindahan?', 'Pwede pong mag-order online sa https://shop.jumongdev.com', true, 'seed'
+            WHERE NOT EXISTS (SELECT 1 FROM chat_kb WHERE source = 'seed' AND question = 'Ano ang website ng tindahan?');
+            INSERT INTO chat_kb (category, keywords, question, answer, active, source)
+            SELECT 'business', 'oras, bukas, close, sarado, hours', 'Anong oras kayo bukas?', '', false, 'seed'
+            WHERE NOT EXISTS (SELECT 1 FROM chat_kb WHERE source = 'seed' AND question = 'Anong oras kayo bukas?');
+            INSERT INTO chat_kb (category, keywords, question, answer, active, source)
+            SELECT 'business', 'delivery, deliver, fee, shipping', 'May delivery ba kayo? Magkano ang delivery fee?', '', false, 'seed'
+            WHERE NOT EXISTS (SELECT 1 FROM chat_kb WHERE source = 'seed' AND question = 'May delivery ba kayo? Magkano ang delivery fee?');
+            INSERT INTO chat_kb (category, keywords, question, answer, active, source)
+            SELECT 'business', 'contact, tawag, phone, number, fb, messenger', 'Paano kayo makokontak? Ano ang number ninyo?', '', false, 'seed'
+            WHERE NOT EXISTS (SELECT 1 FROM chat_kb WHERE source = 'seed' AND question = 'Paano kayo makokontak? Ano ang number ninyo?');
+            INSERT INTO chat_kb (category, keywords, question, answer, active, source)
+            SELECT 'business', 'saan, branch, location, located, address', 'Saan ang branch ninyo?', '', false, 'seed'
+            WHERE NOT EXISTS (SELECT 1 FROM chat_kb WHERE source = 'seed' AND question = 'Saan ang branch ninyo?');
+            INSERT INTO chat_kb (category, keywords, question, answer, active, source)
+            SELECT 'business', 'payment, bayad, gcash, cod, ewallet, maya', 'Anong mga payment ang tinatanggap ninyo?', '', false, 'seed'
+            WHERE NOT EXISTS (SELECT 1 FROM chat_kb WHERE source = 'seed' AND question = 'Anong mga payment ang tinatanggap ninyo?');
+            INSERT INTO chat_kb (category, keywords, question, answer, active, source)
+            SELECT 'business', 'order, paano bumili, cart, checkout', 'Paano mag-order online?', '', false, 'seed'
+            WHERE NOT EXISTS (SELECT 1 FROM chat_kb WHERE source = 'seed' AND question = 'Paano mag-order online?');
+            INSERT INTO chat_kb (category, keywords, question, answer, active, source)
+            SELECT 'business', 'track, tracking, status, order status', 'Paano ma-track ang order ko?', '', false, 'seed'
+            WHERE NOT EXISTS (SELECT 1 FROM chat_kb WHERE source = 'seed' AND question = 'Paano ma-track ang order ko?');
+            INSERT INTO chat_kb (category, keywords, question, answer, active, source)
+            SELECT 'business', 'pickup, pick up, kunin', 'Pwede bang pick-up? Saan?', '', false, 'seed'
+            WHERE NOT EXISTS (SELECT 1 FROM chat_kb WHERE source = 'seed' AND question = 'Pwede bang pick-up? Saan?');
+            INSERT INTO chat_kb (category, keywords, question, answer, active, source)
+            SELECT 'business', 'return, refund, ibalik, sira', 'Pwede bang mag-return o mag-refund?', '', false, 'seed'
+            WHERE NOT EXISTS (SELECT 1 FROM chat_kb WHERE source = 'seed' AND question = 'Pwede bang mag-return o mag-refund?');";
+        try { kbSeed.ExecuteNonQuery(); } catch { }
     }
 }

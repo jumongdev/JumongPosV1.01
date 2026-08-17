@@ -88,6 +88,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         webView = WebView(this)
+        // Dark WebView background so the pre-first-paint gap matches the native
+        // splash — no white flash while the page downloads (was white before).
+        webView.setBackgroundColor(android.graphics.Color.rgb(16, 16, 42))
         val pullToRefresh = androidx.swiperefreshlayout.widget.SwipeRefreshLayout(this)
         pullToRefresh.addView(
             webView,

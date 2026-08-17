@@ -1,6 +1,65 @@
 ﻿# JumongPOS — Full Project Guide for AI Agents
 
-## Latest Change (2026-08-15) — v1.1.34 (Cloud API): OUTDATED Badge Fixed + Store Rollout Completed
+## Latest Change (2026-08-17) — v1.1.44 (POS client): Pay Double-Submit Guard (no more duplicate same-cart sales)
+
+**Request:** user pasted 3 identical HVR sales (INV-AA36-20260816-0002/0003/0004, all ₱1,085, Cash, Walk-in, 13:10) from the dashboard and asked what happened. **Investigation (server PG):** all 4 sales 0001-0004 (13:09:28→13:10:20, ~10s apart) were REAL distinct rows — each with its own `sale_items` (Camel Yellow 1×145 + Marlboro Red 2×176 + Mountain Dew by-12 3×196) AND its own stock-trail deductions; the cashier (Vangie Asi) voided 0002/0003/0004 at 13:14:30-49 (VoidSale + per-item logs, stock restored, `is_voided=t`). Records were consistent — the root cause was the same cart being paid 4× in under a minute: `btnPay_Click` (and the F4 shortcut) had **no re-entry guard**, so Pay could re-fire while the payment flow was already running. (NOTE: sale_items links via `si.sale_id = s.pos_id`, NOT `s.id` — first join attempt returned 0 rows.)
+
+| File | Change |
+|---|---|
+| `Forms/SalesForm.cs` | `btnPay_Click` — added `_paying` guard: `if (_paying) return;` + `btnPay.Enabled=false` right after the cart-empty check; restored on BOTH exit paths (payment form cancelled, sale complete). F4 shortcut (line ~1259) calls `btnPay_Click` directly so it's covered by the same guard. New field `private bool _paying;` next to `btnPay`. |
+| `Services/AppVersion.cs` | `"1.1.43"` → `"1.1.44"`. |
+
+**Impact:** repeating Pay (double-tap, stuck key, or F4 spam) can no longer create duplicate sales of the same cart. Single-machine accounting stays clean (HVR's 4×-charge was self-corrected by voids; other identical-total clusters across stores are normal same-price retail). **Deployed:** Release publish (0 errors) → `C:\dev\out\client\` → WinRM push to `C:\JumongAPI\client\` (exe 211,752,380 B; `Copy-Item -Recurse` needs `-Force` or subdirs like Agent/ throw "already exists"). **GitHub release v1.1.44 created (2026-08-17)** with exe asset (id 517099243, `state: uploaded`, sha256 `8005d339…`), download URL verified HTTP 206. GOTCHAS this session: (1) curl `-d` with a JSON string literal can 400 "Problems parsing JSON" — write the body to a file and use `--data-binary "@file"`; (2) 211MB upload exceeds the 15-min tool timeout AND `Start-Process` mangles `-H` headers containing spaces (→ `Invalid Content-Type'`) — run the upload as a background `powershell -File script.ps1` (script reads PAT via `git credential fill` itself) and poll the release assets until `state:"uploaded"`; (3) a killed upload leaves a `starter`-state asset — `DELETE /releases/assets/{id}` before retrying. Stores get it via UPDATE APP (auto-picks `releases/latest`).
+
+## Previous Change (2026-08-16) — web-only: VIEW STOCK dialog now SERVER-ONLY (agent live reads removed)
+
+**Request:** "mas ok ba sa server nalang tayo mag hugot kasi live naman nag se-send ang mga pos?" — the per-product VIEW STOCK dialog (added earlier today) read "Live (POS now)" via per-store agent `sql` commands. The user verified the server snapshot pipeline is healthy (each POS pushes its full stock every 30s + per-sale SyncProduct updates), so the agent read was redundant — same source (the POS's own SQLite), only seconds fresher, at the cost of 10-30s dialog-open delay + TIMEOUT/ERROR/NOT IN STORE failure states. Dialog now shows **server stock only** (`/stock-status`, includes warehouse), auto-refreshing every 20s while open.
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/components.js` | `productStockDialog` stripped: removed `agents`/`live`/`busy`/`_lastLive`, `fetchLive()`, `queryOne()`, `liveQty()`, `liveBadge()`, `esc()`, `parseTSV()`, and the 45s live auto-refresh. `load()`/`refresh()` now just fetch `/stock-status` → filter/dedupe by barcode → sort HQ→HVR→ACGS→Naic→Warehouse→DEV; 20s auto-refresh timer while open; status shows "Refreshed HH:MM:SS · auto-refresh 20s". `storeLabel` no longer consults agents. |
+| `JumongCloudAPI/wwwroot/index.html` | Dialog table drops the **Live (POS now)** column + **REFRESH LIVE** button; columns now Store \| Stock \| Price \| Cost; legend "Server stock = pushed by each POS every ~30s · auto-refresh 20s". |
+
+**Verified live:** `node --check` OK; tag balance 611/611 divs; live server serves new code (liveBadge/REFRESH LIVE gone, dialog present). No API change, no client release, no version bump. Agents untouched and still used by AGENTS tab + Stock Trail panel (their `agent/status` refs remain in `storeTrailPanel`/`agentsPanel`). Caveat unchanged: POS app closed (ACGS/Naic) → server keeps last pushed stock until the POS reopens.
+
+## Previous Change (2026-08-16) — web-only: Stock Status subpage REMOVED → per-product VIEW STOCK dialog (server PG stock + live POS stock via agents)
+
+**Request:** "inventory lets remove the stock status replace this inside the master catalog list view there is column view stock then in dialog this what we see: Main (server) = get in server stock, pos client available = fetch using current in the pos client using agents" — the old Inventory → **Stock Status** subpage (flat per-store product list, redundant with Recent Receiving/Stock Trail) is gone; Master Products now has a **VIEW STOCK** button per row opening a dialog showing that product's stock **per store** two ways: **Server** (PG `products.stock_qty`, snapshot pipeline ~30s) and **Live (POS now)** (direct SQLite read via the store's agent `sql` command).
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/index.html` | Removed `st-status` nav leaf, its tab button + header ternary branch, and the whole Stock Status subpage block. Master Products Actions column gains **VIEW STOCK** button (`openStock(x)`). New `productStockDialog` modal: header (product name + barcode), legend "Server = synced snapshot (~30s) · Live = read directly from the store PC via agent", table `Store | Server Stock | Live (POS now) | Price | Cost`, HQ row bold + `MAIN` badge + cyan tint, REFRESH LIVE button, CLOSE. |
+| `JumongCloudAPI/wwwroot/components.js` | Deleted `stockStatus` component; `'st-status'` dropped from `groupParents` + grp-inv active check. New `productStockDialog` component: `load()` on `stock-dialog-open` event (fetches `/stock-status` once ~1,600 rows, filters client-side by **barcode**, dedupes per store — dup-barcode gotcha, sorts HQ→HVR→ACGS→Naic→Warehouse→DEV); `fetchLive()` sends **parallel** agent sql per live agent (`SELECT Name, Barcode, StockQty, IsActive FROM Products WHERE Barcode='<escaped>' LIMIT 5`, poll 2s × 15 = 30s cap, reuses esc/parseTSV pattern); `liveQty()` encodes states (value / NOT IN STORE / TIMEOUT / ERROR); `liveBadge()` returns colored badges (red 0 / amber <10 / green). `masterProducts.openStock(x)` sets `stockProduct`+`stockOpen` store state + dispatches the event. |
+| `JumongCloudAPI/wwwroot/app.js` | `'stock'` removed from `exportAllCSV` cache list (cache.stock no longer populated). |
+
+**Verified live:** deployed `index.html`/`components.js`/`app.js` → `C:\JumongAPI\wwwroot\` + publish wwwroot; live fetch checks pass (modal + VIEW STOCK present, Stock Status/stockStatus gone); `node --check` OK; tag balance 612/612 divs. No API change, no version bump. GOTCHAS: local product id ≠ master id (barcode is the linkage — never use ids); agents only reachable when store PC on (Naic shows server stock only, "no live agents" note when none respond); warehouse has no agent (server stock only).
+
+## Previous Change (2026-08-16) — POS client: End-Shift Receipt Inventory Reconciliation No Longer Mismatches (Void Returns + Adjustments Down accounted)
+
+**Request:** "fix when it is printing so no mismatch data given to us in report receipt" — the end-shift receipt/email **INVENTORY RECONCILIATION** printed numbers that didn't add up. Root causes (verified vs live HQ data, current shift was `-₱41` off = 0.005%): (1) "+ Stock Received" was labeled receiving but actually summed **ALL positive trails** incl. void returns and adjust-ups; (2) **manual −adjustments (down) were never subtracted** → phantom SHORT variance; (3) mixed cost bases (received/actual at current `Products.Cost`, previous/COGS at old costs) — no cost history in SQLite, accepted as inherent.
+
+| File | Change |
+|---|---|
+| `Services/DailyCloseService.cs` | `GetShiftTotals()` tuple now **12 elements**: + `TotalVoidReturns` + `TotalAdjustDown`. Received query restricted to `QuantityAdded > 0 AND Reference NOT LIKE '%void%'` (receiving-only semantics — also what's stored in `TotalStockReceivedCost` going forward); void returns = positive `LIKE '%void%'`; adjust-down = `QuantityAdded < 0 AND Reference NOT LIKE 'INV-%'` (INV- = sale deductions; adjustments write `Reference = "Adjustment: <reason>"`). |
+| `Forms/EndShiftForm.cs` | New fields `_voidReturns`/`_adjustDown`; 12-tuple destructure; print + both email call sites pass the new values. |
+| `Services/PrinterService.cs` | `PrintAuditEndShiftReport`/`BuildAuditEndShiftReportLines` gain optional `voidReturns = 0, adjustDown = 0` (defaults keep **history reprints** compiling/passing stored values only). Reconciliation: `Expected = Previous + Stock Received + Void Returns − COGS − Adjustments/Loss`; new conditional lines `+ Void Returns` and `- Adjustments / Loss`; BALANCED/OVER/SHORT label unchanged. |
+| `Services/EmailService.cs` | Same optional params + HTML table rows (Void Returns, Adjustments/Loss) and corrected formula. |
+| `Forms/MainForm.cs` | 12-tuple discard fix (was 10). |
+
+**Verified:** Release build 0 errors; `Services/AppVersion.cs` → `"1.1.43"`; exe (211,752,380 B) published to `C:\dev\out\client` + pushed to server drop `C:\JumongAPI\client\` (5:52 PM). **GitHub release v1.1.43 created (2026-08-16)** with the exe asset (uploaded via curl using the PAT from Windows Credential Manager — `git credential fill`; GOTCHA: the extracted token carries a trailing `\r` — must `.Trim()` or the API returns "Bad credentials"). Download URL verified HTTP 206. Stores update via UPDATE APP (auto-picks latest via `releases/latest`). NOTE: history rows in `DailyCloses` keep OLD semantics (stored received included returns) — reprints of old closes print stored values, new live closes store receiving-only.
+
+## Previous Change (2026-08-16) — web-only: Store Stock Trail Panel (POS client LOCAL DB via agents)
+
+**Request:** "pick store → pick category → show the list → click item → see the trail" — new **🛤️ Stock Trail** subpage under POS CLIENT → Inventory that drills into each store's **local SQLite `StockTrail`** remotely through the store's agent (`sql` command). No API/agent changes — all machinery (send → poll) already existed in `agentsPanel`.
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/components.js` | New `storeTrailPanel` Alpine component: store dropdown (from `/agent/status` — only stores with live agents), category dropdown (local DB `SELECT DISTINCT Category ...`), product list (`Id, Name, Barcode, StockQty`, client-side search, LIMIT 500), trail detail (`SELECT CreatedAt, QuantityAdded, StockBefore, StockAfter, Reference, UserName, InvoiceNo, Synced FROM StockTrail WHERE ProductId=<LOCAL id> ORDER BY Id DESC LIMIT 200` — **local Id**, not master id!). `query()` helper reuses the agentsPanel send→poll pattern (2s × 20 tries); single-quote-escaped SQL values; TSV→objects parsing; Type badge (Sale if InvoiceNo / Void-return if ref contains 'void' / Receiving if ref starts RECV-, RR-, WH-TRANSFER / —), amber **NOT SYNCED** badge when `Synced=0`, +green/−red qty, inline CSV export, back navigation. Wiring: `groupParents['st-trail']='grp-inv'` + grp-inv active check. |
+| `JumongCloudAPI/wwwroot/index.html` | Nav leaf `{ id:'st-trail', icon:'🛤️', label:'Stock Trail' }` in the Inventory group (under POS CLIENT); header title ternary + third tab button **🛤️ Stock Trail**; panel markup (`st-` prefix routing needed zero extra code). |
+
+**Verified live end-to-end (ACGS):** categories list → products in 'alcohol' (CLVB EMPERADOR = local id 108, stock 301) → trail shows today's `WH-Transfer #717` +180 receiving (12:02) then 8 sales −2/−6/−12/−18 down to 301, all `Synced=1`. Cloud `stock-status` matches local (301) — snapshot pipeline healthy (an earlier 325 was pre-sale timing, not a bug). Deployed: `index.html` + `components.js` → live `C:\JumongAPI\wwwroot\` + publish wwwroot (verified 200 with new content). **Caveats:** Naic has no agent → not listed; offline agent → 40s poll timeout message; agent caps at 500 rows (queries LIMIT 200-500). GOTCHA hit during verification: local product Id ≠ cloud master id (ACGS CLVB = 108 local vs 106 master) — the panel must always use the id from the products query, never a master id.
+
+## Previous Change (2026-08-15) — v1.1.34 (Cloud API): OUTDATED Badge Fixed + Store Rollout Completed
 
 **Request:** "everythings should be same across the board" / "dont fix per shop" — final piece of the all-stores-uniform rollout: the AGENTS dashboard OUTDATED badge compared against a stale hardcoded `latestVer = "1.1.38"`, so a store still on 1.1.38 (Naic) would NOT show as outdated once back online.
 

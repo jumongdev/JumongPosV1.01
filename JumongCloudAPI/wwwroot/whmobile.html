@@ -5,7 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#10102a">
 <title>Jumong Pos</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.tailwindcss.com" defer></script>
+<style id="critical-css">
+  .flex { display: flex; }
+  .flex-1 { flex: 1 1 0%; }
+  .flex-col { flex-direction: column; }
+  .items-center { align-items: center; }
+  .justify-center { justify-content: center; }
+  .text-center { text-align: center; }
+  .hidden { display: none !important; }
+</style>
 <style>
   * { -webkit-tap-highlight-color: transparent; }
   html, body { padding: 0; margin: 0; }
@@ -370,7 +379,7 @@
         <!-- Who's logged in -->
         <div class="card mb-3">
           <p class="text-white text-sm font-bold" id="menuUserName"></p>
-          <p class="text-[10px] text-[#5a5a8a] mt-0.5">Jumong Pos v<span id="menuVersion"></span></p>
+          <p class="text-[10px] text-[#5a5a8a] mt-0.5">Jumong Pos v<span id="menuVersion"></span> · Web <span id="webVer"></span></p>
           <button onclick="doLogout()" class="btn-danger w-full mt-3">LOGOUT</button>
         </div>
 
@@ -408,6 +417,7 @@
         <p class="text-[10px] text-[#5a5a8a] uppercase tracking-wider font-bold mb-1.5 mt-4">Settings</p>
         <div class="space-y-1">
           <div class="menu-row" onclick="goSetup()"><span>🖨️</span>Setup</div>
+          <div class="menu-row" onclick="location.reload()"><span>🔄</span>Reload App</div>
         </div>
       </div>
     </div>
@@ -481,6 +491,7 @@
         <div class="card mb-3">
           <div class="flex justify-between text-sm"><span class="text-gray-400">Customer</span><span class="text-white font-bold" id="creditPayCustomer">—</span></div>
           <div class="flex justify-between text-sm mt-1"><span class="text-gray-400">Current Balance</span><span class="text-orange-400 font-bold" id="creditPayBalance">—</span></div>
+          <div class="flex justify-between text-sm mt-1 hidden" id="creditPayReceiptRow"><span class="text-gray-400">Receipt</span><span class="text-amber-400 font-bold" id="creditPayReceipt">—</span></div>
         </div>
         <div class="space-y-3 mb-4">
           <select id="creditPayMethod" class="input-field">
@@ -584,6 +595,7 @@
         <div class="card mb-3">
           <div class="flex justify-between text-sm"><span class="text-gray-400">Cash on Hand</span><span class="text-white font-bold" id="esCashOnHand">₱0.00</span></div>
           <div class="flex justify-between text-sm mt-1"><span class="text-gray-400">Expected Cash</span><span class="text-white font-bold" id="esExpectedCash">—</span></div>
+          <div class="text-[10px] text-[#5a5a8a] mt-1" id="esExpectedBreakdown"></div>
           <div class="flex justify-between text-sm mt-1"><span class="text-gray-400">Difference</span><span class="font-bold" id="esDiff">—</span></div>
         </div>
 
@@ -633,6 +645,7 @@
   <script>
     const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
     const IN_APP = typeof AndroidPrinter !== 'undefined';
+    const WEB_VER = '20260813-2';
 
     // ─── Crash reporting: send any native crash.log (from the uncaught-exception
     // handler in MainActivity) to the server on the next successful launch. Also
@@ -791,6 +804,7 @@
       const isWh = session.storeId === 'STORE-WAREHOUSE';
       document.getElementById('menuUserName').textContent = (session.fullName || session.username) + ' • ' + (session.role || '');
       document.getElementById('menuVersion').textContent = IN_APP ? (AndroidApp.getVersion() || '?') : 'web';
+      document.getElementById('webVer').textContent = WEB_VER;
       document.getElementById('menuStoreName').textContent = (isWh ? '🏭 ' : '🏬 ') + (session.storeName || session.storeId || '');
       document.getElementById('menuStoreIcon').textContent = isWh ? '🏭' : '🏬';
       setScreen('main');
@@ -1466,6 +1480,8 @@
     function openCreditPay(id) {
       const c = creditTarget = (creditCustomers.find(x => x.id === id)) || null;
       if (!c) { toast('Customer not loaded', 'error'); return; }
+      creditPayInvoice = null;
+      document.getElementById('creditPayReceiptRow').classList.add('hidden');
       const bal = Number(c.wholesaleBalance != null ? c.wholesaleBalance : c.creditBalance);
       document.getElementById('creditPayTitle').textContent = '💳 PAYMENT';
       document.getElementById('creditPayCustomer').textContent = c.name;
@@ -1478,6 +1494,10 @@
     function closeCreditBreakdown() { hide(document.getElementById('creditBreakdownModal')); }
 
     let creditBreakdownCustomer = null;
+    let creditBreakdownReceipts = [];
+    let creditPayInvoice = null;
+
+    function findReceipt(inv) { return creditBreakdownReceipts.find(x => x.invoiceNo === inv); }
 
     async function openCreditBreakdown(id) {
       const c = creditCustomers.find(x => x.id === id);
@@ -1497,14 +1517,16 @@
         document.getElementById('creditBreakdownSub').textContent = '₱' + Number(j.paidTotal).toFixed(2) + ' paid so far';
         box.innerHTML = '';
         if (!j.receipts || !j.receipts.length) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">No receipts</p>'; }
+        creditBreakdownReceipts = j.receipts || [];
         j.receipts.forEach(x => {
           const dt = new Date(x.date);
           const cls = Number(x.remaining) <= 0 ? 'text-emerald-400' : 'text-orange-400';
           const d = document.createElement('div');
-          d.className = 'cart-item';
-          d.innerHTML = '<div class="flex-1"><p class="text-white text-xs font-bold">' + x.invoiceNo + '</p>' +
+          d.className = 'cart-item cursor-pointer';
+          d.innerHTML = '<div class="flex-1" onclick="openReceiptDetail(\'' + x.invoiceNo + '\')"><p class="text-white text-xs font-bold">' + x.invoiceNo + '</p>' +
             '<p class="text-gray-500 text-[10px]">' + dt.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: '2-digit' }) + ' • ' + fmtMoney(x.amount) + '</p></div>' +
-            '<div class="text-right"><p class="text-xs font-bold ' + cls + '">' + (Number(x.remaining) <= 0 ? 'PAID' : fmtMoney(x.remaining)) + '</p></div>';
+            '<div class="text-right"><p class="text-xs font-bold ' + cls + '">' + (Number(x.remaining) <= 0 ? 'PAID' : fmtMoney(x.remaining)) + '</p>' +
+            (Number(x.remaining) > 0 ? '<button class="btn-green px-2 py-1 text-[9px] mt-0.5" onclick="event.stopPropagation();openCreditPayForReceipt(\'' + x.invoiceNo + '\')">PAY</button>' : '') + '</div>';
           box.appendChild(d);
         });
       } catch (e) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Failed: ' + e.message + '</p>'; }
@@ -1515,10 +1537,53 @@
       return c ? c.wholesaleBalance : 0;
     }
 
+    function openReceiptDetail(inv) {
+      const x = findReceipt(inv);
+      if (!x) { toast('Receipt not found', 'error'); return; }
+      const box = document.getElementById('creditBreakdownList');
+      const remaining = Number(x.remaining);
+      const dt = new Date(x.date);
+      let trailHtml = '<p class="text-gray-600 text-[10px] py-1">No payments recorded</p>';
+      if (x.trail && x.trail.length) {
+        trailHtml = x.trail.map(t => {
+          const td = new Date(t.date);
+          return '<div class="flex justify-between text-[11px] py-1 border-b border-[#222255]/50"><span class="text-gray-400">' + fmtMoney(t.amount) + ' • ' + (t.method || '') + '</span><span class="text-gray-500">' + td.toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }) + '</span></div>';
+        }).join('');
+      }
+      box.innerHTML =
+        '<button class="btn-ghost px-3 py-1 text-[10px] mb-2" onclick="openCreditBreakdown(' + creditBreakdownCustomer.id + ')">← BACK</button>' +
+        '<div class="card mb-2 text-center"><p class="text-white font-bold text-sm">' + x.invoiceNo + '</p>' +
+          '<p class="text-gray-500 text-[10px]">' + dt.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: '2-digit' }) + '</p>' +
+          '<p class="text-orange-400 font-bold text-2xl my-1">' + fmtMoney(remaining) + '</p>' +
+          '<p class="text-gray-500 text-[10px]">' + fmtMoney(x.amount) + ' total • ' + fmtMoney(x.paid) + ' paid</p></div>' +
+        '<p class="text-[10px] text-[#5a5a8a] uppercase tracking-wider font-bold mb-1">Payment Trail</p>' + trailHtml +
+        (remaining > 0 ? '<button class="btn-green w-full mt-3" onclick="openCreditPayForReceipt(\'' + x.invoiceNo + '\')">💵 PAY THIS RECEIPT</button>' : '<p class="text-emerald-400 text-center text-xs font-bold mt-3">✓ FULLY PAID</p>');
+    }
+
+    function openCreditPayForReceipt(inv) {
+      const x = findReceipt(inv);
+      if (!x) { toast('Receipt not found', 'error'); return; }
+      const c = creditBreakdownCustomer;
+      if (!c) { toast('Customer not loaded', 'error'); return; }
+      creditTarget = c;
+      creditPayInvoice = inv;
+      const remaining = Number(x.remaining);
+      document.getElementById('creditPayTitle').textContent = '💵 PAY ' + inv;
+      document.getElementById('creditPayCustomer').textContent = c.name;
+      document.getElementById('creditPayBalance').textContent = '₱' + remaining.toFixed(2);
+      document.getElementById('creditPayReceipt').textContent = inv + ' • remaining ₱' + remaining.toFixed(2);
+      document.getElementById('creditPayReceiptRow').classList.remove('hidden');
+      document.getElementById('creditPayAmount').value = remaining > 0 ? remaining.toFixed(2) : '';
+      show(document.getElementById('creditPayModal'));
+      setTimeout(() => document.getElementById('creditPayAmount').focus(), 100);
+    }
+
     function openCreditPayFromBreakdown() {
       const c = creditBreakdownCustomer;
       if (!c) { toast('Customer not loaded', 'error'); return; }
       creditTarget = c;
+      creditPayInvoice = null;
+      document.getElementById('creditPayReceiptRow').classList.add('hidden');
       const bal = Number(c.wholesaleBalance != null ? c.wholesaleBalance : c.creditBalance);
       document.getElementById('creditPayTitle').textContent = '💳 PAYMENT';
       document.getElementById('creditPayCustomer').textContent = c.name;
@@ -1529,13 +1594,18 @@
     }
 
     async function submitCreditPay() {
-      if (!creditTarget) return;
+      if (!creditTarget) { toast('Customer not loaded', 'error'); reportError('submitCreditPay', 'creditTarget missing for invoice ' + creditPayInvoice, {}); return; }
       const amt = Math.max(0, Number(document.getElementById('creditPayAmount').value || 0));
       if (amt <= 0) { toast('Enter amount', 'error'); return; }
       const maxBal = Number(creditTarget.wholesaleBalance != null ? creditTarget.wholesaleBalance : creditTarget.creditBalance);
       if (amt > maxBal) { toast('Amount exceeds balance', 'error'); return; }
+      const inv = creditPayInvoice;
+      if (inv) {
+        const x = findReceipt(inv);
+        if (x && amt > Number(x.remaining)) { toast('Amount exceeds remaining (' + fmtMoney(x.remaining) + ')', 'error'); return; }
+      }
       const method = document.getElementById('creditPayMethod').value;
-      const body = { customerId: creditTarget.id, amount: amt, method, cashierName: session.fullName || session.username || '' };
+      const body = { customerId: creditTarget.id, amount: amt, method, cashierName: session.fullName || session.username || '', invoiceNo: inv || '' };
       try {
         const r = await fetch(API + '/dashboard/warehouse/credit-pay', {
           method: 'POST',
@@ -1543,19 +1613,43 @@
           body: JSON.stringify(body)
         });
         const j = await r.json();
-        if (!r.ok) { toast(j.error || 'Payment failed', 'error'); return; }
-        toast('Payment recorded: ₱' + amt.toFixed(2) + ' from ' + j.customerName);
+        if (!r.ok) {
+          const msg = j.error || 'Payment failed';
+          toast(msg, 'error');
+          reportError('credit-pay http ' + r.status, msg, body);
+          return;
+        }
+        toast('Payment recorded: ₱' + amt.toFixed(2) + (inv ? ' on ' + inv : '') + ' from ' + j.customerName);
+        const customerId = creditBreakdownCustomer ? creditBreakdownCustomer.id : creditTarget.id;
         closeCreditPay();
         loadCreditBilling();
+        if (document.getElementById('creditBreakdownModal') && !document.getElementById('creditBreakdownModal').classList.contains('hidden')) {
+          openCreditBreakdown(customerId);
+        }
         if (IN_APP && AndroidPrinter.isConnected()) {
           const bal = Number(j.balance || 0);
           const t = '<<CENTER>>JUMONG POS\n<<CENTER>>' + fit(session.storeName || '') + '\n<<CENTER>>─── CREDIT PAYMENT ───\n' +
-            padDL('Customer', j.customerName) + padDL('Method', method) + padDL('Amount', '₱' + amt.toFixed(2)) +
+            (inv ? padDL('Invoice', inv) : '') + padDL('Customer', j.customerName) + padDL('Method', method) + padDL('Amount', '₱' + amt.toFixed(2)) +
             padDL('Remaining', '₱' + bal.toFixed(2)) + '\n<<CENTER>>' + new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) + '\n<<CENTER>>THANK YOU!\n';
           const pr = AndroidPrinter.print(t);
           if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
         }
-      } catch (e) { toast('Failed: ' + e.message, 'error'); }
+      } catch (e) {
+        toast('Failed: ' + e.message, 'error');
+        reportError('credit-pay exception', e.message, body);
+      }
+    }
+
+    function reportError(tag, message, extra) {
+      try {
+        const lines = [('[' + new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) + '] ' + tag + ': ' + message)];
+        if (extra) lines.push(JSON.stringify(extra).slice(0, 500));
+        fetch(API + '/dashboard/crash-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ app: 'whmobile', version: WEB_VER, device: IN_APP ? 'android ' + (AndroidApp.getVersion ? AndroidApp.getVersion() : '') : navigator.platform || 'web', type: 'web-error', log: lines.join('\n').slice(0, 20000) })
+        }).catch(function () { });
+      } catch (err) { }
     }
 
     function padDL(label, amount) {
@@ -2774,6 +2868,9 @@
         document.getElementById('esTotalCredit').textContent = fmtMoney(p.totalCredit);
         document.getElementById('esTotalVoided').textContent = fmtMoney(p.totalVoided);
         document.getElementById('esExpectedCash').textContent = fmtMoney(p.expectedCash || p.totalCash);
+        const bd = document.getElementById('esExpectedBreakdown');
+        if (Number(p.creditCollected) > 0) bd.textContent = 'Cash Sales ' + fmtMoney(p.totalCash) + ' + Credit Collected ' + fmtMoney(p.creditCollected);
+        else bd.textContent = 'Cash Sales ' + fmtMoney(p.totalCash);
         const gapEl = document.getElementById('esGapBanner');
         if (p.since) {
           const sinceUtc = new Date(p.since);
@@ -2828,6 +2925,15 @@
         expenses: Math.max(0, Number(document.getElementById('esExpenses').value || 0)),
         cashierName: session.fullName || session.username || ''
       };
+      const d1000 = body.denom1000 * 1000, d500 = body.denom500 * 500, d200 = body.denom200 * 200,
+        d100 = body.denom100 * 100, d50 = body.denom50 * 50, d20 = body.denom20 * 20;
+      const clientCash = d1000 + d500 + d200 + d100 + d50 + d20 + body.denomCoins;
+      const clientExpected = Number(p.expectedCash || p.totalCash || 0);
+      if (clientCash <= 0 && clientExpected > 0) {
+        toast('Enter the actual cash denominations first (expected cash is ' + fmtMoney(clientExpected) + ').', 'error');
+        return;
+      }
+      if (Math.abs(clientCash - clientExpected) > 50000 && !confirm('Malaking discrepancy (' + fmtMoney(clientCash - clientExpected) + '). Continue saving the shift?')) return;
       try {
         const r = await fetch(API + '/dashboard/warehouse/end-shift', {
           method: 'POST',

@@ -685,6 +685,9 @@ public partial class SalesForm : Form
             MessageBox.Show("Cart is empty.", "No Items", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
+        if (_paying) return;
+        _paying = true;
+        btnPay.Enabled = false;
 
         var subTotal = _cart.Sum(x => x.TotalPrice);
         _discountPercent = 0; // discount disabled — prices locked to master catalog
@@ -693,7 +696,7 @@ public partial class SalesForm : Form
         var taxAmt = afterDiscount * _taxRate / 100;
         var grandTotal = afterDiscount + taxAmt;
         using var payForm = new PaymentForm(grandTotal, _selectedCustomer);
-        if (payForm.ShowDialog() != DialogResult.OK) return;
+        if (payForm.ShowDialog() != DialogResult.OK) { _paying = false; btnPay.Enabled = true; return; }
 
         var sale = new Sale
         {
@@ -783,6 +786,8 @@ public partial class SalesForm : Form
         _orderType = "Walk-in";
         UpdateCustomerDisplay();
         PromptNextTransaction();
+        _paying = false;
+        btnPay.Enabled = true;
     }
 
     private void InitializeComponent()
@@ -1539,6 +1544,7 @@ public partial class SalesForm : Form
     private Button btnClear = null!;
     private Button btnHold = null!;
     private Button btnRetrieve = null!;
+    private bool _paying;
     private Button btnPay = null!;
     private PictureBox _pbQr = null!;
     private Label _lblQrHeader = null!;

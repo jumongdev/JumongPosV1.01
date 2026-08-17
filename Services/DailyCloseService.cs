@@ -27,7 +27,7 @@ public class DailyCloseService
 
     public static (decimal TotalSales, decimal TotalCash, decimal TotalEWallet, decimal TotalCredit,
         decimal TotalVoided, decimal CreditPayCash, decimal CreditPayEWallet, decimal TotalExpenses,
-        decimal TotalCostSold, decimal TotalStockReceivedCost) GetShiftTotals()
+        decimal TotalCostSold, decimal TotalStockReceivedCost, decimal TotalVoidReturns, decimal TotalAdjustDown) GetShiftTotals()
     {
         var since = GetLastCloseTime();
         using var conn = DatabaseHelper.GetConnection();
@@ -61,7 +61,7 @@ public class DailyCloseService
             }
             else
             {
-                return (0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+                return (0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m);
             }
         }
 
@@ -120,9 +120,9 @@ public class DailyCloseService
             cogsCmd.Parameters.AddWithValue("@since", since);
         var totalCostSold = Convert.ToDecimal(cogsCmd.ExecuteScalar());
 
-        // Total Stock Received cost (today)
+        // Total Stock Received cost (receivings + adjustments up; void returns reported separately)
         var recvSql = "SELECT COALESCE(SUM(p.Cost * st.QuantityAdded), 0) FROM StockTrail st " +
-                      "LEFT JOIN Products p ON st.ProductId = p.Id WHERE st.QuantityAdded > 0";
+                      "LEFT JOIN Products p ON st.ProductId = p.Id WHERE st.QuantityAdded > 0 AND st.Reference NOT LIKE '%void%'";
         if (!string.IsNullOrEmpty(since))
             recvSql += " AND st.CreatedAt > @since_recv";
         using var recvCmd = new SQLiteCommand(recvSql, conn);
@@ -130,8 +130,28 @@ public class DailyCloseService
             recvCmd.Parameters.AddWithValue("@since_recv", since);
         var totalStockReceivedCost = Convert.ToDecimal(recvCmd.ExecuteScalar());
 
+        // Void/return restocks (refunded items returned to shelf — stock went back up)
+        var voidRetSql = "SELECT COALESCE(SUM(p.Cost * st.QuantityAdded), 0) FROM StockTrail st " +
+                         "LEFT JOIN Products p ON st.ProductId = p.Id WHERE st.QuantityAdded > 0 AND st.Reference LIKE '%void%'";
+        if (!string.IsNullOrEmpty(since))
+            voidRetSql += " AND st.CreatedAt > @since_vr";
+        using var voidRetCmd = new SQLiteCommand(voidRetSql, conn);
+        if (!string.IsNullOrEmpty(since))
+            voidRetCmd.Parameters.AddWithValue("@since_vr", since);
+        var totalVoidReturns = Convert.ToDecimal(voidRetCmd.ExecuteScalar());
+
+        // Manual adjustments down (loss / spoilage / stock corrections — not sales)
+        var adjDownSql = "SELECT COALESCE(SUM(p.Cost * st.QuantityAdded), 0) FROM StockTrail st " +
+                         "LEFT JOIN Products p ON st.ProductId = p.Id WHERE st.QuantityAdded < 0 AND st.Reference NOT LIKE 'INV-%'";
+        if (!string.IsNullOrEmpty(since))
+            adjDownSql += " AND st.CreatedAt > @since_ad";
+        using var adjDownCmd = new SQLiteCommand(adjDownSql, conn);
+        if (!string.IsNullOrEmpty(since))
+            adjDownCmd.Parameters.AddWithValue("@since_ad", since);
+        var totalAdjustDown = Convert.ToDecimal(adjDownCmd.ExecuteScalar());
+
         return (total, cash, ewallet, credit, voided, creditPayCash, creditPayEWallet, totalExpenses,
-            totalCostSold, totalStockReceivedCost);
+            totalCostSold, totalStockReceivedCost, totalVoidReturns, totalAdjustDown);
     }
 
     public static string? SaveClose(DailyClose dc)

@@ -70,57 +70,124 @@ tailwind.config = {
     <nav class="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
       <template x-for="item in [
         { id:'dashboard', icon:'📊', label:'Dashboard' },
-        { id:'pc-header', label:'POS CLIENT', isHeader:true },
-        { id:'rpt-sub', label:'Reports', isSub:true },
-        { id:'rpt-sales', icon:'📈', label:'Sales Report', indent:true },
-        { id:'rpt-invcost', icon:'💰', label:'Inventory Cost', indent:true },
-        { id:'rpt-shifts', icon:'🕐', label:'Shift History', indent:true },
-        { id:'products', icon:'📦', label:'Master Products', indent:true },
-        { id:'inv-sub', label:'Inventory', isSub:true },
-        { id:'st-receiving', icon:'📥', label:'Recent Receiving', indent:true },
-        { id:'st-status', icon:'📊', label:'Stock Status', indent:true },
-        { id:'wh-header', label:'WAREHOUSE', isHeader:true },
-        { id:'wh-product', icon:'📦', label:'Product', indent:true },
-        { id:'wh-inventory', icon:'📊', label:'Inventory', indent:true },
-        { id:'wh-sales', icon:'💰', label:'Sales', indent:true },
-        { id:'wh-onlineorder', icon:'🛒', label:'Online Order', indent:true },
-        { id:'wh-transfer', icon:'🔄', label:'Transfer', indent:true },
+        { id:'grp-ai', icon:'🤖', label:'AI', items:[
+            { id:'ai-chat', icon:'💬', label:'AI Chat' },
+            { id:'ai-kb', icon:'📚', label:'AI Knowledge' }
+        ]},
+        { id:'grp-system', icon:'🖥️', label:'SYSTEM', items:[
+            { id:'health', icon:'🩺', label:'Server Health' },
+            { id:'suspect1pc', icon:'⚠️', label:'1PC CHECK' }
+        ]},
         { id:'agents', icon:'🖥', label:'AGENTS' },
-        { id:'health', icon:'🩺', label:'Server Health' },
+        { id:'grp-pos', icon:'📋', label:'POS CLIENT', items:[
+            { id:'grp-reports', icon:'📈', label:'Reports', items:[
+                { id:'rpt-sales', icon:'🧾', label:'Sales Report' },
+                { id:'rpt-invcost', icon:'💰', label:'Inventory Cost' },
+                { id:'rpt-shifts', icon:'🕐', label:'Shift History' },
+                { id:'analytics', icon:'📊', label:'Analytics' }
+            ]},
+            { id:'products', icon:'📦', label:'Master Products' },
+            { id:'online-orders', icon:'🛒', label:'Online Orders' },
+            { id:'grp-inv', icon:'📦', label:'Inventory', items:[
+                { id:'st-receiving', icon:'📥', label:'Recent Receiving' },
+                { id:'st-trail', icon:'🛤️', label:'Stock Trail' }
+            ]}
+        ]},
+        { id:'grp-wh', icon:'🏬', label:'WAREHOUSE', items:[
+            { id:'wh-product', icon:'📦', label:'Product' },
+            { id:'wh-inventory', icon:'📊', label:'Inventory' },
+            { id:'wh-receiving', icon:'📥', label:'Receiving' },
+            { id:'wh-sales', icon:'💰', label:'Sales' },
+            { id:'wh-onlineorder', icon:'🛒', label:'Online Order' },
+            { id:'wh-transfer', icon:'🔄', label:'Transfer' }
+        ]},
+        { id:'shop', icon:'🛍️', label:'ONLINE SHOP' },
+        { id:'grp-settings', icon:'⚙️', label:'SETTINGS', items:[
+            { id:'settings', icon:'🔧', label:'Settings' },
+            { id:'pospromo', icon:'📢', label:'POS Promo' },
+            { id:'posqr', icon:'📱', label:'POS QR' },
+            { id:'branding', icon:'🎨', label:'Branding' }
+        ]},
         { id:'customers', icon:'👥', label:'Customers' },
-        { id:'users', icon:'⚙️', label:'Users' },
-        { id:'settings', icon:'🔧', label:'Settings' },
-        { id:'pospromo', icon:'📢', label:'POS Promo' },
-        { id:'posqr', icon:'📱', label:'POS QR' },
-        { id:'branding', icon:'🎨', label:'Branding' },
-        { id:'suspect1pc', icon:'⚠️', label:'1PC CHECK' },
-        { id:'analytics', icon:'📈', label:'Analytics' }
+        { id:'users', icon:'👤', label:'Users' }
       ]" :key="item.id">
         <div>
-          <!-- Section header -->
-          <div x-show="item.isHeader && $store.app._sidebarOpen"
-            class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-[#4a4a7a]">
-            <span x-text="item.label"></span>
-          </div>
-          <!-- Sub header (group label under a section) -->
-          <div x-show="item.isSub && $store.app._sidebarOpen"
-            class="pl-4 pr-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-[#4a4a7a]">
-            <span x-text="item.label"></span>
-          </div>
-          <!-- Nav item -->
-          <a x-show="!item.isHeader && !item.isSub" href="#"
-            @click.prevent="$store.app.switchSection(item.id)"
+          <!-- GROUP (expandable) -->
+          <template x-if="item.items">
+            <div>
+              <button @click="$store.app.toggleGroup(item.id)"
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200"
+                :class="$store.app.isGroupActive(item.id)
+                  ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-400 font-semibold'
+                  : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] hover:text-gray-700 dark:hover:text-slate-200'">
+                <span class="text-lg shrink-0" x-text="item.icon"></span>
+                <span class="nav-label text-xs flex-1 text-left" x-show="$store.app._sidebarOpen" x-text="item.label"></span>
+                <span class="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
+                  x-show="item.id==='grp-wh' && $store.app._whBadge > 0"
+                  x-text="$store.app._whBadge"></span>
+                <svg class="w-3.5 h-3.5 shrink-0 transition-transform duration-200" x-show="$store.app._sidebarOpen"
+                  :class="$store.app.isGroupOpen(item.id) ? 'rotate-90' : ''"
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+              </button>
+              <div x-show="$store.app._sidebarOpen ? $store.app.isGroupOpen(item.id) : true">
+                <template x-for="child in item.items" :key="child.id">
+                  <div>
+                    <!-- NESTED GROUP -->
+                    <template x-if="child.items">
+                      <div>
+                        <button @click="$store.app.toggleGroup(child.id)"
+                          class="w-full flex items-center gap-3 pl-5 pr-3 py-2 rounded-lg text-sm transition-all duration-200"
+                          :class="$store.app.isGroupActive(child.id)
+                            ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-400 font-semibold'
+                            : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] hover:text-gray-700 dark:hover:text-slate-200'">
+                          <span class="text-base shrink-0" x-text="child.icon"></span>
+                          <span class="nav-label text-xs flex-1 text-left" x-show="$store.app._sidebarOpen" x-text="child.label"></span>
+                          <svg class="w-3.5 h-3.5 shrink-0 transition-transform duration-200" x-show="$store.app._sidebarOpen"
+                            :class="$store.app.isGroupOpen(child.id) ? 'rotate-90' : ''"
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        </button>
+                        <div x-show="$store.app._sidebarOpen ? $store.app.isGroupOpen(child.id) : true">
+                          <template x-for="leaf in child.items" :key="leaf.id">
+                            <a href="#" @click.prevent="$store.app.switchSection(leaf.id)"
+                              class="flex items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-sm transition-all duration-200"
+                              :class="$store.app.isActive(leaf.id)
+                                ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-400 font-semibold border-l-2 border-cyan-500'
+                                : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] hover:text-gray-700 dark:hover:text-slate-200'">
+                              <span class="text-sm shrink-0" x-text="leaf.icon"></span>
+                              <span class="nav-label text-xs" x-show="$store.app._sidebarOpen" x-text="leaf.label"></span>
+                            </a>
+                          </template>
+                        </div>
+                      </div>
+                    </template>
+                    <!-- GROUP CHILD ITEM -->
+                    <a x-show="!child.items" href="#" @click.prevent="$store.app.switchSection(child.id)"
+                      class="flex items-center gap-3 pl-5 pr-3 py-2 rounded-lg text-sm transition-all duration-200"
+                      :class="$store.app.isActive(child.id)
+                        ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-400 font-semibold border-l-2 border-cyan-500'
+                        : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] hover:text-gray-700 dark:hover:text-slate-200'">
+                      <span class="text-base shrink-0" x-text="child.icon"></span>
+                      <span class="nav-label text-xs" x-show="$store.app._sidebarOpen" x-text="child.label"></span>
+                      <span class="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
+                        x-show="child.id==='wh-transfer' && $store.app._whBadge > 0"
+                        x-text="$store.app._whBadge"></span>
+                    </a>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+          <!-- STANDALONE ITEM -->
+          <a x-show="!item.items" href="#" @click.prevent="$store.app.switchSection(item.id)"
             class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200"
             :class="$store.app.isActive(item.id)
               ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-400 font-semibold border-l-2 border-cyan-500'
-              : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] hover:text-gray-700 dark:hover:text-slate-200'"
-            :style="item.indent ? 'padding-left: 32px' : ''">
-            <span class="text-base shrink-0" x-show="item.indent" style="opacity:0.5">└</span>
-            <span class="text-lg shrink-0" x-show="!item.indent" x-text="item.icon"></span>
+              : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] hover:text-gray-700 dark:hover:text-slate-200'">
+            <span class="text-lg shrink-0" x-text="item.icon"></span>
             <span class="nav-label text-xs" x-show="$store.app._sidebarOpen" x-text="item.label"></span>
             <span class="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
-              x-show="item.id==='wh-transfer' && $store.app._sidebarOpen"
-              x-text="$store.app._whBadge || ''"></span>
+              x-show="item.id==='online-orders' && $store.app._shopBadge > 0"
+              x-text="$store.app._shopBadge"></span>
           </a>
         </div>
       </template>
@@ -913,6 +980,12 @@ tailwind.config = {
           <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#222255] gap-2">
             <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">PRODUCT MANAGEMENT</h3>
             <div class="flex items-center gap-2 flex-wrap">
+              <span x-show="status==='inactive'" class="text-[10px] font-bold px-2 py-1 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400" x-text="inactiveCount + ' INACTIVE'"></span>
+              <select x-model="status" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1.5 text-gray-700 dark:text-slate-200">
+                <option value="active">Active</option>
+                <option value="inactive" x-text="'Inactive (' + inactiveCount + ')'"></option>
+                <option value="all" x-text="'All (' + d.length + ')'"></option>
+              </select>
               <input type="text" placeholder="Search..." x-model="search"
                 class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2.5 py-1.5 w-32 text-gray-700 dark:text-slate-200 placeholder-gray-400">
               <select x-model="catFilter" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1.5 text-gray-700 dark:text-slate-200">
@@ -931,12 +1004,15 @@ tailwind.config = {
             <template x-if="filtered.length > 0">
               <table class="w-full text-xs">
                 <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
-                  <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">ID</th>
+                  <th class="text-center px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">ID</th>
                   <th class="text-center px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Image</th>
                   <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Name</th>
+                  <th class="text-center px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Status</th>
+                  <th class="text-center px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]" title="Displayed in online shop">Sell Online</th>
+                  <th class="text-center px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]" title="Tick to display in online shop">Active</th>
+                  <th class="text-center px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]" title="Points Exempt">Exempt</th>
                   <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Barcode</th>
                   <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Category</th>
-                  <th class="text-center px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]" title="Points Exempt">Exempt</th>
                   <th class="text-center px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]" title="Points Per Unit">Pts/U</th>
                   <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Price</th>
                   <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Cost</th>
@@ -949,10 +1025,13 @@ tailwind.config = {
                     <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                       <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.id"></td>
                       <td class="px-3 py-2 text-center"><img x-show="x.imageData" :src="x.imageData" class="w-8 h-8 object-cover rounded mx-auto" :alt="x.name"></td>
-                      <td class="px-3 py-2 font-medium" x-text="x.name"></td>
+                      <td class="px-3 py-2 font-medium" :class="x.isActive === false ? 'line-through text-gray-400' : ''" x-text="x.name"></td>
+                      <td class="px-3 py-2 text-center"><span x-show="x.isActive === false" class="text-[10px] font-bold px-2 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">INACTIVE</span><span x-show="x.isActive !== false" class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">ACTIVE</span></td>
+                      <td class="px-3 py-2 text-center"><input type="checkbox" :checked="x.sellOnline !== false" @change="toggleFlag(x, 'sellOnline', $event.target.checked)" class="w-3.5 h-3.5 accent-cyan-600" title="Displayed in online shop"></td>
+                      <td class="px-3 py-2 text-center"><input type="checkbox" :checked="x.isActive !== false" @change="toggleFlag(x, 'isActive', $event.target.checked)" class="w-3.5 h-3.5 accent-emerald-600" title="Active"></td>
+                      <td class="px-3 py-2 text-center"><input type="checkbox" :checked="x.pointsExempt" @change="toggleFlag(x, 'pointsExempt', $event.target.checked)" class="w-3.5 h-3.5 accent-amber-500" title="Points Exempt"></td>
                       <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.barcode || ''"></td>
                       <td class="px-3 py-2" x-text="x.category || ''"></td>
-                      <td class="px-3 py-2 text-center"><span x-show="x.pointsExempt" class="text-red-400 font-bold" title="Exempted from points">✕</span><span x-show="!x.pointsExempt" class="text-emerald-400" title="Earns points">✓</span></td>
                       <td class="px-3 py-2 text-center text-gray-500 dark:text-[#7878aa]" x-text="x.pointsPerUnit || 0"></td>
                       <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.price)"></span></td>
                       <td class="px-3 py-2 text-right text-red-500">&#8369;<span x-text="fmt(x.cost)"></span></td>
@@ -968,6 +1047,7 @@ tailwind.config = {
                         <span x-show="!x.units || !x.units.length" class="text-gray-400">—</span>
                       </td>
                       <td class="px-3 py-2">
+                        <button @click="openStock(x)" class="text-[10px] px-2 py-1 rounded bg-cyan-600 text-white hover:bg-cyan-700 mr-1" title="Stock per store (server + live POS)">VIEW STOCK</button>
                         <button @click="openEditor(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">EDIT</button>
                         <button @click="deleteProduct(x.id)" class="text-[10px] px-2 py-1 rounded border border-red-200 dark:border-red-900/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">DEL</button>
                       </td>
@@ -989,7 +1069,7 @@ tailwind.config = {
           <!-- Section Header -->
           <div class="px-4 py-3 border-b border-gray-100 dark:border-[#222255]">
             <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">
-              INVENTORY — <span x-text="$store.app.stockSubpage==='receiving' ? 'Recent Receiving' : 'Stock Status'"></span>
+              INVENTORY — <span x-text="$store.app.stockSubpage==='receiving' ? 'Recent Receiving' : 'Stock Trail (Local DB)'"></span>
             </h3>
           </div>
 
@@ -999,9 +1079,9 @@ tailwind.config = {
               <button @click="$store.app.switchStockSubpage('receiving')"
                 :class="$store.app.stockSubpage==='receiving' ? 'bg-cyan-600 text-white' : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'"
                 class="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors">Recent Receiving</button>
-              <button @click="$store.app.switchStockSubpage('status')"
-                :class="$store.app.stockSubpage==='status' ? 'bg-cyan-600 text-white' : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'"
-                class="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors">Stock Status</button>
+              <button @click="$store.app.switchStockSubpage('trail')"
+                :class="$store.app.stockSubpage==='trail' ? 'bg-cyan-600 text-white' : 'text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'"
+                class="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors">🛤️ Stock Trail</button>
             </div>
           </div>
 
@@ -1056,61 +1136,105 @@ tailwind.config = {
              </div>
            </div>
  
-           <!-- Stock Status Subpage -->
-          <div x-show="$store.app.stockSubpage === 'status'" x-data="stockStatus">
-            <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#222255] gap-2">
-              <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">STOCK STATUS</h3>
-              <div class="flex items-center gap-2">
-                <input type="text" placeholder="Search..." x-model="search"
-                  class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2.5 py-1.5 w-28 text-gray-700 dark:text-slate-200 placeholder-gray-400">
-                <select @change="setFilter($event.target.value)" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1.5 text-gray-700 dark:text-slate-200 max-w-[110px]">
-                  <option value="">All Categories</option>
-                  <template x-for="c in categories" :key="c">
-                    <option :value="c" x-text="c"></option>
-                  </template>
-                </select>
-                <button @click="load()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">LOAD</button>
-                <button @click="exportCSV('stock')" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CSV</button>
-              </div>
-            </div>
-            <div class="overflow-x-auto">
-              <template x-if="loading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
-              <template x-if="!loading && paged.length===0 && total===0"><div class="text-center py-6 text-gray-400">No stock data</div></template>
-              <template x-if="total > 0">
-                <table class="w-full text-xs">
-                  <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Product</th>
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Barcode</th>
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Category</th>
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Store</th>
-                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Stock</th>
-                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Price</th>
-                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Cost</th>
-                  </tr></thead>
-                  <tbody>
-                    <template x-for="(x,i) in paged" :key="i">
-                      <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                        <td class="px-3 py-2" x-text="x.name"></td>
-                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.barcode"></td>
-                        <td class="px-3 py-2" x-text="x.category"></td>
-                        <td class="px-3 py-2 text-cyan-600 dark:text-cyan-400 text-xs"><span x-text="shortStore(x.storeId, $store.app.storeMap[x.storeId])"></span></td>
-                        <td class="px-3 py-2 text-right font-semibold" :class="stockClass(x.stockQty)" x-text="fmtInt(x.stockQty)"></td>
-                        <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.price)"></span></td>
-                        <td class="px-3 py-2 text-right text-red-500">&#8369;<span x-text="fmt(x.cost)"></span></td>
-                      </tr>
+           <!-- Store Stock Trail Subpage (POS client LOCAL DB via agent) -->
+            <div x-show="$store.app.stockSubpage === 'trail'" x-data="storeTrailPanel">
+              <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#222255] gap-2">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">STOCK TRAIL — STORE LOCAL DB</h3>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <select x-model="store" @change="onStore()" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1.5 text-gray-700 dark:text-slate-200 max-w-[240px]">
+                    <option value="">— Select Store —</option>
+                    <template x-for="s in stores" :key="s.storeId">
+                      <option :value="s.storeId" x-text="$store.app.storeMap[s.storeId] || s.machine || s.storeId"></option>
                     </template>
-                  </tbody>
-                </table>
-              </template>
-              <div class="flex items-center justify-between px-3 py-2 text-xs text-gray-400" x-show="pages > 1">
-                <span x-text="'Page '+(page+1)+' of '+pages+' ('+total+' rows)'"></span>
-                <div class="flex gap-2">
-                  <button :disabled="page===0" @click="prev()" class="px-3 py-1 rounded border border-gray-200 dark:border-[#222255] disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-[#181848]">Prev</button>
-                  <button :disabled="page>=pages-1" @click="next()" class="px-3 py-1 rounded border border-gray-200 dark:border-[#222255] disabled:opacity-30 hover:bg-gray-100 dark:hover:bg-[#181848]">Next</button>
+                  </select>
+                  <select x-model="cat" @change="onCat()" :disabled="!store" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1.5 text-gray-700 dark:text-slate-200 max-w-[200px] disabled:opacity-40">
+                    <option value="__ALL__">All Categories</option>
+                    <template x-for="c in cats" :key="c">
+                      <option :value="c" x-text="c"></option>
+                    </template>
+                  </select>
+                  <button @click="refreshStores()" title="Refresh agent list" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">⟳</button>
+                </div>
+              </div>
+              <div class="px-4 py-2 text-[11px] text-gray-400 dark:text-[#7878aa]" x-show="status" x-text="status"></div>
+              <template x-if="loading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
+
+              <!-- Step 2: product list -->
+              <div x-show="!trail && !loading">
+                <div class="flex flex-wrap items-center justify-between px-4 py-2 border-b border-gray-100 dark:border-[#222255] gap-2" x-show="products.length > 0">
+                  <span class="text-[11px] text-gray-400" x-text="filteredProducts.length + ' product(s)'"></span>
+                  <input type="text" placeholder="Search product..." x-model="prodSearch" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2.5 py-1.5 w-40 text-gray-700 dark:text-slate-200 placeholder-gray-400">
+                </div>
+                <div class="overflow-x-auto">
+                  <template x-if="products.length===0"><div class="text-center py-6 text-gray-400">Pick a store + category to load products</div></template>
+                  <template x-if="filteredProducts.length > 0">
+                    <table class="w-full text-xs">
+                      <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                        <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Product</th>
+                        <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Barcode</th>
+                        <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Stock</th>
+                        <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]"></th>
+                      </tr></thead>
+                      <tbody>
+                        <template x-for="(p,i) in filteredProducts" :key="i">
+                          <tr @click="showTrail(p)" class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-cyan-50 dark:hover:bg-cyan-900/10 cursor-pointer">
+                            <td class="px-3 py-2" x-text="p.Name"></td>
+                            <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="p.Barcode"></td>
+                            <td class="px-3 py-2 text-right font-semibold" x-text="fmtInt(Number(p.StockQty))"></td>
+                            <td class="px-3 py-2 text-right text-cyan-600 dark:text-cyan-400 text-[10px] uppercase">View Trail →</td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Step 3: trail detail -->
+              <div x-show="trail">
+                <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#222255] gap-2">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <button @click="backToList()" class="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">← Back</button>
+                    <h3 class="text-xs font-bold text-cyan-700 dark:text-cyan-400" x-text="trailProduct"></h3>
+                    <span class="text-[11px] text-gray-400" x-text="'stock: ' + fmtInt(Number(trail.StockQty))"></span>
+                  </div>
+                  <button @click="exportTrail()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CSV</button>
+                </div>
+                <div class="overflow-x-auto">
+                  <template x-if="!loading && trailRows.length===0"><div class="text-center py-6 text-gray-400">No stock trail records</div></template>
+                  <template x-if="trailRows.length > 0">
+                    <table class="w-full text-xs">
+                      <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                        <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
+                        <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Qty</th>
+                        <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Before</th>
+                        <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">After</th>
+                        <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Type</th>
+                        <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Reference</th>
+                        <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Cashier</th>
+                        <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Invoice</th>
+                        <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Sync</th>
+                      </tr></thead>
+                      <tbody>
+                        <template x-for="(r,i) in trailRows" :key="i">
+                          <tr class="border-b border-gray-50 dark:border-[#222255]/40">
+                            <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="fmtTrailDate(r.CreatedAt)"></td>
+                            <td class="px-3 py-2 text-right" :class="qtyCls(r.QuantityAdded)" x-text="qtyTxt(r.QuantityAdded)"></td>
+                            <td class="px-3 py-2 text-right" x-text="fmtInt(Number(r.StockBefore))"></td>
+                            <td class="px-3 py-2 text-right" x-text="fmtInt(Number(r.StockAfter))"></td>
+                            <td class="px-3 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded font-medium" :class="typeCls(trailType(r))" x-text="trailType(r)"></span></td>
+                            <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="r.Reference"></td>
+                            <td class="px-3 py-2" x-text="r.UserName"></td>
+                            <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="r.InvoiceNo"></td>
+                            <td class="px-3 py-2"><span x-show="String(r.Synced)==='0'" class="text-[10px] bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded font-medium">NOT SYNCED</span></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </template>
                 </div>
               </div>
             </div>
-          </div>
 
         </div>
       </div>
@@ -1123,7 +1247,7 @@ tailwind.config = {
           <!-- Section header -->
           <div class="px-4 py-3 border-b border-gray-100 dark:border-[#222255]">
             <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">
-              WAREHOUSE — <span x-text="$store.app.whSubpage==='product' ? 'Products' : $store.app.whSubpage==='inventory' ? 'Inventory' : $store.app.whSubpage==='onlineorder' ? 'Online Orders' : $store.app.whSubpage==='sales' ? 'Sales' : 'Transfers'"></span>
+              WAREHOUSE — <span x-text="$store.app.whSubpage==='product' ? 'Products' : $store.app.whSubpage==='inventory' ? 'Inventory' : $store.app.whSubpage==='receiving' ? 'Receiving History' : $store.app.whSubpage==='onlineorder' ? 'Online Orders' : $store.app.whSubpage==='sales' ? 'Sales' : 'Transfers'"></span>
             </h3>
           </div>
           <!-- Subpage nav -->
@@ -1133,6 +1257,8 @@ tailwind.config = {
                 :class="$store.app.whSubpage==='product' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">Product</button>
               <button @click="$store.app.switchWhSubpage('inventory'); load()" class="text-[11px] px-3 py-1.5 rounded-lg transition-all font-medium"
                 :class="$store.app.whSubpage==='inventory' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">Inventory</button>
+              <button @click="$store.app.switchWhSubpage('receiving'); loadReceivings()" class="text-[11px] px-3 py-1.5 rounded-lg transition-all font-medium"
+                :class="$store.app.whSubpage==='receiving' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">📥 Receiving</button>
               <button @click="$store.app.switchWhSubpage('onlineorder'); load()" class="text-[11px] px-3 py-1.5 rounded-lg transition-all font-medium"
                 :class="$store.app.whSubpage==='onlineorder' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">Online Order</button>
               <button @click="$store.app.switchWhSubpage('transfer'); load()" class="text-[11px] px-3 py-1.5 rounded-lg transition-all font-medium"
@@ -1545,6 +1671,42 @@ tailwind.config = {
                 </table>
                 <button @click="verifyModalOpen=false" class="mt-3 text-xs px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-[#181848] text-gray-700 dark:text-slate-200 hover:bg-gray-300 dark:hover:bg-[#222266]">Close</button>
               </div>
+            </div>
+
+            <!-- ═══ Receiving History subpage ═══ -->
+            <div x-show="!loading && $store.app.whSubpage==='receiving'">
+              <div class="flex items-center gap-2 px-4 py-2 border-b border-gray-100 dark:border-[#222255]/50">
+                <button @click="recvToday()" class="text-xs px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">TODAY</button>
+                <input type="date" x-model="recvFrom" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5">
+                <span class="text-gray-400">→</span>
+                <input type="date" x-model="recvTo" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5">
+                <button @click="loadReceivings()" class="text-xs px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">FILTER</button>
+                <button @click="recvFrom='';recvTo='';loadReceivings()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">ALL</button>
+              </div>
+              <template x-if="recvLoading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
+              <template x-if="!recvLoading && recvData.length===0"><div class="text-center py-6 text-gray-400">No receiving records</div></template>
+              <template x-if="recvData.length > 0">
+                <table class="w-full text-xs">
+                  <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Reference / Supplier</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Items</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Total Qty</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
+                  </tr></thead>
+                  <tbody>
+                    <template x-for="(x,i) in recvData" :key="i">
+                      <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                        <td class="px-3 py-2 font-mono text-[10px] text-gray-500 dark:text-[#7878aa]" x-text="x.reference"></td>
+                        <td class="px-3 py-2 text-right" x-text="x.itemCount"></td>
+                        <td class="px-3 py-2 text-right font-semibold text-emerald-500" x-text="'+'+x.totalQty"></td>
+                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Manila'})"></td>
+                        <td class="px-3 py-2"><button @click="viewReceiving(x.reference)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">VIEW</button></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </template>
             </div>
 
             <!-- ═══ Sales subpage ═══ -->
@@ -2003,6 +2165,39 @@ tailwind.config = {
       </div>
     </div>
 
+    <!-- Warehouse Receiving Items View Modal -->
+    <div x-show="recvViewOpen" x-cloak
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div class="modal-box bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-[92%] max-w-xl max-h-[85vh] flex flex-col shadow-2xl">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-t-xl">
+          <h3 class="text-sm font-bold text-cyan-700 dark:text-cyan-400">Receiving <span class="font-mono text-[11px]" x-text="recvViewRef"></span></h3>
+          <button @click="closeReceivingView()" class="p-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">&times;</button>
+        </div>
+        <div class="overflow-auto p-5 flex-1">
+          <template x-if="recvViewItems.length===0"><div class="text-center py-6 text-gray-400">No items</div></template>
+          <template x-if="recvViewItems.length > 0">
+            <table class="w-full text-xs">
+              <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Product</th>
+                <th class="text-left px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Barcode</th>
+                <th class="text-right px-2 py-2 border-b border-gray-200 dark:border-[#222255]">Qty</th>
+              </tr></thead>
+              <tbody>
+                <template x-for="(x,i) in recvViewItems" :key="i">
+                  <tr class="border-b border-gray-50 dark:border-[#222255]/40">
+                    <td class="px-2 py-2" x-text="x.productName"></td>
+                    <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.barcode || ''"></td>
+                    <td class="px-2 py-2 text-right font-semibold text-emerald-500" x-text="'+'+x.qty"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </template>
+          <div class="mt-3 flex justify-end"><button @click="closeReceivingView()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500">CLOSE</button></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Warehouse Sale Items View Modal -->
     <div x-show="saleViewOpen" x-cloak
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -2385,49 +2580,158 @@ tailwind.config = {
     <div id="productEditor" x-data="productEditor"
       x-show="$store.app.section==='products' && $store.app.editorOpen"
       x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div class="modal-box bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-[92%] max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
-        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-t-xl">
-          <h3 class="text-sm font-bold text-cyan-700 dark:text-cyan-400" x-text="productId ? 'Edit: '+name : 'New Product'"></h3>
-          <button @click="reset()" class="p-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">&times;</button>
+      <div class="modal-box bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-2xl w-[94%] max-w-3xl max-h-[88vh] flex flex-col shadow-2xl">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-t-2xl">
+          <div class="min-w-0">
+            <h3 class="text-sm font-bold text-cyan-700 dark:text-cyan-400" x-text="productId ? 'Edit Product' : 'New Product'"></h3>
+            <p class="text-[11px] text-gray-400 dark:text-[#7878aa] truncate max-w-[360px]" x-text="productId ? name : 'Create a new master catalog item'"></p>
+          </div>
+          <button @click="reset()" title="Close" class="p-2 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-lg leading-none">&times;</button>
         </div>
-        <div class="overflow-auto p-5 flex-1">
-          <div class="grid grid-cols-2 gap-3 mb-4">
-            <div class="col-span-2 sm:col-span-1"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">NAME</label><input x-model="name" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
-            <div class="col-span-2 sm:col-span-1"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BARCODE</label><input x-model="barcode" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
-            <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">CATEGORY</label>
-              <div class="flex gap-1">
-              <select x-model="category" class="flex-1 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                <option value="">— Select —</option>
-                <template x-for="c in categories" :key="c"><option :value="c" x-text="c"></option></template>
-              </select>
-              <button @click="addCategory()" title="Add new category" class="text-xs px-2 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 transition-colors">+</button>
+        <div class="overflow-y-auto p-6 flex-1 space-y-6">
+
+          <section>
+            <h4 class="text-[11px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400 mb-3">Basic Info</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div class="sm:col-span-2"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1.5">NAME *</label><input x-model="name" placeholder="Product name" class="w-full text-sm bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"></div>
+              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1.5">BARCODE</label><input x-model="barcode" placeholder="Scan or type barcode" class="w-full text-sm bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"></div>
+              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1.5">CATEGORY</label>
+                <div class="flex gap-2">
+                  <select x-model="category" class="flex-1 text-sm bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none">
+                    <option value="">— Select —</option>
+                    <template x-for="c in categories" :key="c"><option :value="c" x-text="c"></option></template>
+                  </select>
+                  <button @click="addCategory()" title="Add new category" class="px-3 rounded-lg bg-cyan-600 text-white text-sm font-medium hover:bg-cyan-700 transition-colors shrink-0">+</button>
+                </div>
               </div>
             </div>
-            <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">PRICE</label><input type="number" step="0.01" x-model="price" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
-            <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">COST</label><input type="number" step="0.01" x-model="cost" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
-            <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">IMAGE</label><input type="file" accept="image/*" @change="previewImage" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1.5 text-gray-500"><div x-show="imageData" class="mt-1"><img :src="imageData" class="max-h-16 rounded"></div></div>
-            <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1 flex items-center gap-1"><input type="checkbox" x-model="pointsExempt"> POINTS EXEMPT</label></div>
-            <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">POINTS PER UNIT</label><input type="number" min="0" x-model="pointsPerUnit" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
-            <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1 flex items-center gap-1"><input type="checkbox" x-model="isActive"> ACTIVE</label></div>
-          </div>
-          <div class="border-t border-gray-200 dark:border-[#222255] pt-3 mb-3">
-            <h4 class="text-xs font-bold text-cyan-700 dark:text-cyan-400 mb-2">UNITS <button @click="addUnit()" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] ml-2">+ ADD UNIT</button></h4>
-            <template x-if="units.length===0"><div class="text-xs text-gray-400 py-2">No units. Add one above.</div></template>
-            <template x-for="(u,i) in units" :key="i">
-              <div class="flex items-center gap-2 mb-1.5">
-                <input placeholder="Name" x-model="u.unitName" class="w-24 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5 text-gray-700 dark:text-slate-200">
-                <input placeholder="Price" type="number" step="0.01" x-model="u.price" class="w-20 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5 text-gray-700 dark:text-slate-200">
-                <input placeholder="Qty" type="number" x-model="u.qtyPerUnit" class="w-16 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5 text-gray-700 dark:text-slate-200">
-                <input placeholder="Pts" type="number" min="0" x-model="u.pointsPerUnit" class="w-14 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5 text-gray-700 dark:text-slate-200">
-                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] flex items-center gap-1"><input type="checkbox" x-model="u.isDefault"> Default</label>
-                <button @click="removeUnit(i)" class="p-1 text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded">X</button>
+          </section>
+
+          <section>
+            <h4 class="text-[11px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400 mb-3">Pricing</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1.5">SELLING PRICE (₱)</label><input type="number" step="0.01" x-model="price" class="w-full text-sm bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"></div>
+              <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1.5">COST (₱)</label><input type="number" step="0.01" x-model="cost" class="w-full text-sm bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"></div>
+              <div class="rounded-xl border border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#181848] px-4 py-2">
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">PROFIT (per unit)</label>
+                <div class="text-base font-bold" :class="profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'">₱<span x-text="profit.toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2})"></span> <span class="text-xs font-medium" x-text="'(' + profitPct.toFixed(1) + '%)'"></span></div>
               </div>
-            </template>
+            </div>
+          </section>
+
+          <section>
+            <h4 class="text-[11px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400 mb-3">Image</h4>
+            <div class="flex items-center gap-4">
+              <label class="flex-1 cursor-pointer">
+                <div class="border-2 border-dashed border-gray-300 dark:border-[#222255] rounded-xl px-4 py-3 text-center hover:border-cyan-500 transition-colors">
+                  <input type="file" accept="image/*" @change="previewImage" class="hidden">
+                  <span class="text-xs text-gray-500 dark:text-[#7878aa]">Click to upload product photo</span>
+                </div>
+              </label>
+              <div x-show="imageData" class="shrink-0"><img :src="imageData" class="max-h-20 max-w-28 rounded-lg border border-gray-200 dark:border-[#222255]"></div>
+            </div>
+          </section>
+
+          <section>
+            <h4 class="text-[11px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400 mb-3">Status &amp; Points</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <label class="flex items-center gap-2.5 rounded-lg border border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#181848] px-3 py-2.5 cursor-pointer">
+                <input type="checkbox" x-model="isActive" class="accent-cyan-600 h-4 w-4"><span class="text-xs font-medium text-gray-700 dark:text-slate-200">Active</span>
+              </label>
+              <label class="flex items-center gap-2.5 rounded-lg border border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#181848] px-3 py-2.5 cursor-pointer">
+                <input type="checkbox" x-model="sellOnline" class="accent-cyan-600 h-4 w-4"><span class="text-xs font-medium text-gray-700 dark:text-slate-200">Sell Online</span>
+              </label>
+              <label class="flex items-center gap-2.5 rounded-lg border border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#181848] px-3 py-2.5 cursor-pointer">
+                <input type="checkbox" x-model="pointsExempt" class="accent-cyan-600 h-4 w-4"><span class="text-xs font-medium text-gray-700 dark:text-slate-200">Points Exempt</span>
+              </label>
+              <div class="sm:col-span-3"><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1.5">POINTS PER UNIT</label><input type="number" min="0" x-model="pointsPerUnit" class="w-full sm:w-40 text-sm bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none"></div>
+            </div>
+          </section>
+
+          <section>
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="text-[11px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">Units</h4>
+              <button @click="addUnit()" class="text-[11px] px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 transition-colors">+ ADD UNIT</button>
+            </div>
+            <template x-if="units.length===0"><div class="text-xs text-gray-400 dark:text-[#7878aa] py-3 text-center border border-dashed border-gray-300 dark:border-[#222255] rounded-lg">No units. Click "+ ADD UNIT" to add one.</div></template>
+            <div class="space-y-2">
+              <template x-for="(u,i) in units" :key="i">
+                <div class="grid grid-cols-12 gap-2 items-center rounded-lg border border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#181848] px-3 py-2">
+                  <div class="col-span-12 sm:col-span-4"><label class="text-[10px] text-gray-400 dark:text-[#7878aa] block mb-0.5">NAME</label><input placeholder="e.g. BY 6" x-model="u.unitName" class="w-full text-xs bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5 text-gray-700 dark:text-slate-200"></div>
+                  <div class="col-span-4 sm:col-span-2"><label class="text-[10px] text-gray-400 dark:text-[#7878aa] block mb-0.5">PRICE (₱)</label><input placeholder="0.00" type="number" step="0.01" x-model="u.price" class="w-full text-xs bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5 text-gray-700 dark:text-slate-200"></div>
+                  <div class="col-span-4 sm:col-span-2"><label class="text-[10px] text-gray-400 dark:text-[#7878aa] block mb-0.5">QTY</label><input placeholder="1" type="number" min="1" x-model="u.qtyPerUnit" class="w-full text-xs bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5 text-gray-700 dark:text-slate-200"></div>
+                  <div class="col-span-4 sm:col-span-2"><label class="text-[10px] text-gray-400 dark:text-[#7878aa] block mb-0.5">PTS</label><input placeholder="0" type="number" min="0" x-model="u.pointsPerUnit" class="w-full text-xs bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded px-2 py-1.5 text-gray-700 dark:text-slate-200"></div>
+                  <div class="col-span-8 sm:col-span-1"><label class="text-[10px] text-gray-400 dark:text-[#7878aa] block mb-0.5">DEFAULT</label><label class="flex items-center h-[26px]"><input type="checkbox" x-model="u.isDefault" class="accent-cyan-600 h-4 w-4"></label></div>
+                  <div class="col-span-4 sm:col-span-1 flex items-end justify-end"><button @click="removeUnit(i)" title="Remove unit" class="text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg p-1.5">&times;</button></div>
+                </div>
+              </template>
+            </div>
+          </section>
+
+        </div>
+        <div class="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-b-2xl">
+          <button @click="reset()" class="text-sm px-5 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] transition-colors">CANCEL</button>
+          <button @click="save()" class="text-sm px-6 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 transition-colors">SAVE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUCT STOCK DIALOG (server PG stock + live POS client stock via agents) -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div id="productStockDialog" x-data="productStockDialog"
+      x-show="open"
+      x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div class="modal-box bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-2xl w-[94%] max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-t-2xl">
+          <div class="min-w-0">
+            <h3 class="text-sm font-bold text-cyan-700 dark:text-cyan-400">VIEW STOCK</h3>
+            <p class="text-[11px] text-gray-400 dark:text-[#7878aa] truncate max-w-[380px]" x-text="product ? (product.name + '  ·  ' + (product.barcode || '')) : ''"></p>
           </div>
-          <div class="flex justify-end gap-2 pt-3 border-t border-gray-200 dark:border-[#222255]">
-            <button @click="reset()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CANCEL</button>
-            <button @click="save()" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">SAVE</button>
-          </div>
+          <button @click="close()" title="Close" class="p-2 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-lg leading-none">&times;</button>
+        </div>
+        <div class="overflow-y-auto p-6 flex-1">
+          <template x-if="loading"><div class="flex justify-center py-10"><span class="spinner"></span><span class="ml-3 text-xs text-gray-500" x-text="status"></span></div></template>
+          <template x-if="!loading && rows.length===0">
+            <div class="text-center py-10 text-gray-400">
+              <div class="text-3xl mb-2">🔍</div>
+              <div class="text-sm font-medium">No stock rows found for this barcode</div>
+              <div class="text-[11px] mt-1" x-text="product ? product.barcode : ''"></div>
+            </div>
+          </template>
+          <template x-if="!loading && rows.length > 0">
+            <div>
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <p class="text-[11px] text-gray-500 dark:text-[#7878aa]">
+                  Server stock = pushed by each POS every ~30s · auto-refresh 20s
+                </p>
+                <span class="text-[11px] text-gray-400" x-text="status"></span>
+              </div>
+              <table class="w-full text-xs">
+                <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                  <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Store</th>
+                  <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Stock</th>
+                  <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Price</th>
+                  <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Cost</th>
+                </tr></thead>
+                <tbody>
+                  <template x-for="(x,i) in rows" :key="i">
+                    <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]" :class="isMain(x.storeId) ? 'bg-cyan-50 dark:bg-cyan-900/10' : ''">
+                      <td class="px-3 py-2.5">
+                        <span class="font-medium" x-text="storeLabel(x.storeId)"></span>
+                        <span x-show="isMain(x.storeId)" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-600 text-white ml-1">MAIN</span>
+                      </td>
+                      <td class="px-3 py-2.5 text-right font-semibold" :class="qtyCls(x.stockQty)" x-text="x.stockQty"></td>
+                      <td class="px-3 py-2.5">&#8369;<span x-text="fmtN(x.price)"></span></td>
+                      <td class="px-3 py-2.5 text-red-500">&#8369;<span x-text="fmtN(x.cost)"></span></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </template>
+        </div>
+        <div class="flex justify-end px-6 py-4 border-t border-gray-200 dark:border-[#222255] bg-gray-50 dark:bg-[#16163a] rounded-b-2xl">
+          <button @click="close()" class="text-sm px-5 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] transition-colors">CLOSE</button>
         </div>
       </div>
     </div>
@@ -2515,6 +2819,166 @@ tailwind.config = {
         </div>
       </div>
     </div>
+
+    <!-- ONLINE ORDERS SECTION                                -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div x-show="$store.app.section === 'online-orders'" x-transition.opacity>
+      <div x-data="onlineOrdersPanel" class="space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">🛒 Online Orders
+            <span x-show="pendingCount > 0" class="ml-1 text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded-full" x-text="pendingCount + ' pending'"></span>
+          </h3>
+          <div class="flex items-center gap-2">
+            <input x-model="search" type="text" placeholder="Search name / phone / order no..." class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200 w-52 sm:w-64">
+            <button @click="load()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">REFRESH</button>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap gap-1.5">
+          <button @click="setFilter('')" class="text-[11px] px-3 py-1.5 rounded-full border transition-colors" :class="!filter ? 'bg-cyan-600 text-white border-cyan-600' : 'border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'">ALL</button>
+          <template x-for="s in ['pending','confirmed','shipped','delivered','cancelled']" :key="s">
+            <button @click="setFilter(s)" class="text-[11px] px-3 py-1.5 rounded-full border uppercase transition-colors" :class="filter === s ? statusBtnCls(s) : 'border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'" x-text="s"></button>
+          </template>
+        </div>
+
+        <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+          <table class="w-full text-xs">
+            <thead class="bg-gray-50 dark:bg-[#181848] text-gray-500 dark:text-[#7878aa] uppercase tracking-wide text-[10px]">
+              <tr>
+                <th class="px-3 py-2.5 text-left">Order</th>
+                <th class="px-3 py-2.5 text-left">Customer</th>
+                <th class="px-3 py-2.5 text-left">Payment</th>
+                <th class="px-3 py-2.5 text-right">Total</th>
+                <th class="px-3 py-2.5 text-left">Status</th>
+                <th class="px-3 py-2.5 text-left">Date</th>
+                <th class="px-3 py-2.5 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="(o,i) in filtered" :key="i">
+                <tr class="border-t border-gray-100 dark:border-[#1a1a44] hover:bg-gray-50 dark:hover:bg-[#181848]">
+                  <td class="px-3 py-2.5 font-mono text-[11px]" x-text="o.orderNo"></td>
+                  <td class="px-3 py-2.5">
+                    <div class="font-medium" x-text="o.customerName"></div>
+                    <div class="text-[10px] text-gray-400" x-text="o.phone"></div>
+                  </td>
+                  <td class="px-3 py-2.5">
+                    <span x-text="o.paymentMethod"></span>
+                    <span x-show="o.gcashRef" class="text-[10px] text-gray-400 block" x-text="'Ref: ' + o.gcashRef"></span>
+                  </td>
+                  <td class="px-3 py-2.5 text-right font-semibold">&#8369;<span x-text="fmt(o.total)"></span></td>
+                  <td class="px-3 py-2.5"><span class="text-[10px] px-2 py-0.5 rounded-full" :class="statusCls(o.status)" x-text="o.status.toUpperCase()"></span></td>
+                  <td class="px-3 py-2.5 text-gray-500" x-text="new Date(o.createdAt).toLocaleDateString('en-PH',{timeZone:'Asia/Manila'})"></td>
+                  <td class="px-3 py-2.5 text-right">
+                    <button @click="openDetail(o)" class="text-[11px] px-3 py-1 rounded-lg bg-cyan-600 text-white hover:bg-cyan-700">VIEW</button>
+                  </td>
+                </tr>
+              </template>
+              <template x-if="!loading && filtered.length===0"><tr><td colspan="7" class="text-center py-6 text-gray-400">No orders found</td></tr></template>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl p-4">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400 mb-3">DELIVERY SETTINGS</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
+            <div>
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Delivery Fee (₱)</label>
+              <input x-model.number="settings.deliveryFee" type="number" min="0" step="0.5" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+            </div>
+            <div>
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Free Delivery Above (₱) — 0 = always charge</label>
+              <input x-model.number="settings.freeDeliveryMin" type="number" min="0" step="0.5" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+            </div>
+          </div>
+          <div class="flex items-center gap-3 mt-3">
+            <button @click="saveSettings()" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">SAVE DELIVERY</button>
+            <span x-show="settingsSaved" class="text-xs text-green-500" x-text="settingsSaved"></span>
+          </div>
+          <p class="text-[10px] text-gray-400 mt-2">Charged at checkout on shop.jumongdev.com. Orders at or above the Free Delivery minimum get ₱0 fee. Confirming an order reserves the items from HQ stock; cancelling returns them.</p>
+        </div>
+
+        <div x-show="detailOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" @click.self="detailOpen=false">
+          <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[#222255]">
+              <div class="flex items-center gap-2">
+                <span class="font-mono text-xs font-bold text-gray-700 dark:text-slate-200" x-text="detail?.orderNo"></span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full" :class="statusCls(detail?.status || '')" x-text="(detail?.status || '').toUpperCase()"></span>
+              </div>
+              <button @click="detailOpen=false" class="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 text-sm px-2">✕</button>
+            </div>
+            <div class="p-4 space-y-4">
+              <div class="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <div class="text-[10px] uppercase tracking-wide text-gray-400">Customer</div>
+                  <div class="font-medium text-gray-700 dark:text-slate-200" x-text="detail?.customerName"></div>
+                  <div class="text-gray-500" x-text="detail?.phone"></div>
+                </div>
+                <div>
+                  <div class="text-[10px] uppercase tracking-wide text-gray-400">Ordered</div>
+                  <div class="text-gray-500" x-text="detail ? new Date(detail.createdAt).toLocaleString('en-PH',{timeZone:'Asia/Manila'}) : ''"></div>
+                </div>
+              </div>
+              <div class="text-xs">
+                <div class="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Delivery Address</div>
+                <div class="text-gray-700 dark:text-slate-200" x-text="detail?.address || '—'"></div>
+                <div x-show="detail?.deliveryNote" class="text-[11px] text-amber-600 dark:text-amber-400 mt-1" x-text="'Note: ' + detail?.deliveryNote"></div>
+              </div>
+              <div class="text-xs">
+                <div class="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Payment</div>
+                <div class="text-gray-700 dark:text-slate-200">
+                  <span x-text="detail?.paymentMethod"></span>
+                  <span x-show="detail?.gcashRef" class="text-[11px] text-gray-500" x-text="' · Ref: ' + detail?.gcashRef"></span>
+                </div>
+              </div>
+              <div>
+                <div class="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Items</div>
+                <div class="rounded-lg border border-gray-200 dark:border-[#222255] overflow-hidden">
+                  <table class="w-full text-xs">
+                    <thead class="bg-gray-50 dark:bg-[#181848] text-[10px] text-gray-500 dark:text-[#7878aa] uppercase">
+                      <tr><th class="px-2 py-1.5 text-left">Item</th><th class="px-2 py-1.5 text-center">Qty</th><th class="px-2 py-1.5 text-right">Amount</th></tr>
+                    </thead>
+                    <tbody>
+                      <template x-for="(it,ii) in detailItems" :key="ii">
+                        <tr class="border-t border-gray-100 dark:border-[#1a1a44]">
+                          <td class="px-2 py-1.5">
+                            <div class="text-gray-700 dark:text-slate-200" x-text="it.productName"></div>
+                            <div class="text-[10px] text-gray-400" x-text="'@ ' + fmt(it.price) + ' / ' + it.unitName"></div>
+                          </td>
+                          <td class="px-2 py-1.5 text-center" x-text="it.qty"></td>
+                          <td class="px-2 py-1.5 text-right font-medium">&#8369;<span x-text="fmt(it.total)"></span></td>
+                        </tr>
+                      </template>
+                      <template x-if="detailLoading"><tr><td colspan="3" class="px-2 py-3 text-center text-gray-400">Loading items...</td></tr></template>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="text-xs mt-2 space-y-0.5 text-gray-500 dark:text-[#7878aa]">
+                  <div class="flex justify-between"><span>Subtotal</span><span>&#8369;<span x-text="fmt(subtotal())"></span></span></div>
+                  <div class="flex justify-between"><span>Delivery Fee</span><span>&#8369;<span x-text="fmt(detail?.deliveryFee || 0)"></span></span></div>
+                  <div class="flex justify-between font-bold text-gray-700 dark:text-slate-200"><span>TOTAL</span><span>&#8369;<span x-text="fmt(detail?.total || 0)"></span></span></div>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-2 justify-end pt-1 border-t border-gray-200 dark:border-[#222255]">
+                <template x-if="(detail?.status || '') === 'pending'">
+                  <button @click="setStatus('confirmed')" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">✔ CONFIRM ORDER</button>
+                </template>
+                <template x-if="(detail?.status || '') === 'confirmed'">
+                  <button @click="setStatus('shipped')" class="text-xs px-4 py-2 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-700">🚚 MARK SHIPPED</button>
+                </template>
+                <template x-if="(detail?.status || '') === 'shipped'">
+                  <button @click="setStatus('delivered')" class="text-xs px-4 py-2 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700">✅ MARK DELIVERED</button>
+                </template>
+                <template x-if="['pending','confirmed','shipped'].includes(detail?.status || '')">
+                  <button @click="setStatus('cancelled')" class="text-xs px-4 py-2 rounded-lg border border-red-300 dark:border-red-900 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">✕ CANCEL ORDER</button>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
       <div x-show="$store.app.section === 'posqr'" x-transition.opacity>
         <div x-data="posQrPanel" class="space-y-4">
           <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">📱 POS QR Codes</h3>
@@ -2653,6 +3117,197 @@ tailwind.config = {
             </div>
             <div x-show="uploadedUrl" class="mt-1 text-[10px] text-green-500">Uploaded: <span x-text="uploadedUrl"></span></div>
             <div x-show="pushStatus" class="mt-1 text-[10px] text-gray-400" x-text="pushStatus"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI CHAT -->
+      <div x-show="$store.app.section === 'ai-chat'" x-transition.opacity>
+        <div x-data="aiChatPanel" class="space-y-4">
+          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">🤖 AI Chat Test <span class="text-[10px] font-normal text-gray-400 dark:text-[#7878aa]">(llama3.1:8b · dev PC → server failover · Knowledge Bank)</span></h3>
+
+          <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+            <div class="h-[420px] overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-[#0a0a2e]">
+              <template x-for="(m, i) in msgs" :key="i">
+                <div class="flex flex-col" :class="m.role === 'user' ? 'items-end' : 'items-start'">
+                  <div class="max-w-[80%] px-3 py-2 rounded-lg text-xs whitespace-pre-wrap"
+                    :class="m.role === 'user'
+                      ? 'bg-cyan-600 text-white'
+                      : 'bg-white dark:bg-[#181848] border border-gray-200 dark:border-[#222255] text-gray-700 dark:text-slate-200'">
+                    <span x-text="m.content"></span>
+                  </div>
+                  <div x-show="m.role === 'assistant' && !m.reviewed" class="flex gap-1 mt-1">
+                    <button @click="review(m, 'approved')" class="text-[10px] px-2 py-0.5 rounded border border-green-500 text-green-600 dark:text-green-400 hover:bg-green-500/10">✅ TAMA</button>
+                    <button @click="startCorrect(m)" class="text-[10px] px-2 py-0.5 rounded border border-amber-500 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10">✏️ I-CORRECT</button>
+                  </div>
+                  <div x-show="m.role === 'assistant' && m.reviewed" class="mt-1 text-[10px] text-gray-400 dark:text-[#7878aa]">✓ reviewed · <span x-text="m.reviewed === 'approved' ? 'TAMA' : 'I-CORRECT'"></span></div>
+                  <div x-show="m.correctOpen" class="mt-1 w-full max-w-[80%] space-y-1">
+                    <textarea x-model="m.correctText" rows="3" placeholder="Isulat ang tamang sagot..." class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200 focus:outline-none focus:border-amber-500"></textarea>
+                    <button @click="review(m, 'corrected')" :disabled="!m.correctText.trim()" class="text-[10px] px-2 py-0.5 rounded bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50">SAVE CORRECTED ANSWER</button>
+                  </div>
+                </div>
+              </template>
+              <div x-show="typing" class="flex justify-start">
+                <div class="px-3 py-2 rounded-lg text-xs bg-white dark:bg-[#181848] border border-gray-200 dark:border-[#222255] text-gray-400 dark:text-[#7878aa]">... kumukuha ng sagot</div>
+              </div>
+              <div x-show="!msgs.length" class="text-center text-xs text-gray-400 dark:text-[#4a4a7a] py-10">Magtanong tungkol sa tindahan — hal. "bukas ba kayo?", "paano mag-order?"</div>
+            </div>
+            <div class="flex gap-2 p-3 border-t border-gray-200 dark:border-[#222255]">
+              <input x-model="input" @keydown.enter="send()" placeholder="Type your question..." class="flex-1 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200 focus:outline-none focus:border-cyan-500">
+              <button @click="send()" :disabled="sending || !input.trim()" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 disabled:opacity-50">SEND</button>
+              <button @click="clearChat()" class="text-xs px-3 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CLEAR</button>
+            </div>
+          </div>
+          <div x-show="error" class="text-xs text-red-500" x-text="error"></div>
+          <div x-show="sources && sources.length" class="text-[10px] text-gray-400 dark:text-[#7878aa]">📚 <span x-text="sources.join(' · ')"></span></div>
+          <div x-show="stats" class="text-[10px] text-gray-400 dark:text-[#7878aa] space-y-1">
+            <div>⚡ <b x-text="'Avg ' + stats.avgMs/1000 + 's'"></b> · Max <b x-text="stats.maxMs/1000 + 's'"></b> · <span x-text="stats.ok"></span> ok · <span x-text="stats.fail"></span> fail <span x-text="'(last hour)'"></span></div>
+            <div x-show="stats.recent && stats.recent.length" class="flex flex-wrap gap-1">
+              <template x-for="(r, i) in stats.recent" :key="i">
+                <span class="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-[#181848] border border-gray-200 dark:border-[#222255]"
+                  :class="r.ok ? 'text-green-600 dark:text-green-400' : 'text-red-500'"
+                  :title="r.ok ? (r.replyLen + ' chars via ' + (r.backend || '?')) : ('ERR: ' + r.err)"> <span x-text="r.at"></span>·<span x-text="(r.ms/1000).toFixed(1)"></span>s<span x-text="' ' + (r.backend === 'dev' ? 'DEV' : r.backend === 'server' ? 'SRV' : '')" :class="r.backend === 'dev' ? 'font-bold text-cyan-500' : r.backend === 'server' ? 'font-bold text-amber-500' : ''"></span></span>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI KNOWLEDGE -->
+      <div x-show="$store.app.section === 'ai-kb'" x-transition.opacity>
+        <div x-data="kbPanel" class="space-y-4">
+          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">📚 AI Knowledge Bank</h3>
+          <p class="text-[11px] text-gray-500 dark:text-[#7878aa]">Mga sagot ng bot sa mga tanong ng customer. Sagutan ang mga may <b class="text-amber-500">SAGUTIN</b> badge — hindi sila ginagamit hanggang may sagot. Pagkatapos mag-reply ang bot, i-click ang ✅ TAMA o ✏️ I-CORRECT para turuan ito.</p>
+
+          <div class="flex gap-2 flex-wrap items-center">
+            <select x-model="filterCategory" @change="load()" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+              <option value="">All Categories</option>
+              <option value="business">Business</option>
+              <option value="project">Project</option>
+              <option value="approved-reply">Approved Replies</option>
+            </select>
+            <span class="text-xs text-gray-400 dark:text-[#7878aa]" x-text="'Total: ' + entries.length"></span>
+            <span class="flex-1"></span>
+            <button @click="ingestProject()" class="text-xs px-3 py-2 rounded-lg border border-cyan-600 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-600/10">📥 INGEST PROJECT</button>
+            <button @click="openAdd()" class="text-xs px-3 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">+ ADD ENTRY</button>
+          </div>
+
+          <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+            <div class="overflow-x-auto max-h-[480px] overflow-y-auto">
+              <table class="w-full text-xs">
+                <thead class="sticky top-0 bg-white dark:bg-[#10102a]">
+                  <tr class="border-b border-gray-200 dark:border-[#222255] text-left text-[10px] text-gray-500 dark:text-[#7878aa] uppercase tracking-wider">
+                    <th class="px-2 py-2">Category</th>
+                    <th class="px-2 py-2">Question</th>
+                    <th class="px-2 py-2">Answer</th>
+                    <th class="px-2 py-2">Status</th>
+                    <th class="px-2 py-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="(k, i) in entries" :key="i">
+                    <tr class="border-b border-gray-100 dark:border-[#1a1a44] hover:bg-gray-50 dark:hover:bg-[#181848]/50">
+                      <td class="px-2 py-2">
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-medium"
+                          :class="k.category === 'business' ? 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300' : k.category === 'project' ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300' : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'"
+                          x-text="k.category"></span>
+                      </td>
+                      <td class="px-2 py-2 font-medium text-gray-700 dark:text-slate-200 max-w-[220px]" x-text="k.question || '—'"></td>
+                      <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa] max-w-[300px] truncate" :title="k.answer" x-text="k.answer || '—'"></td>
+                      <td class="px-2 py-2">
+                        <template x-if="!k.answer">
+                          <span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">SAGUTIN</span>
+                        </template>
+                        <template x-if="k.answer && k.active">
+                          <span class="px-2 py-0.5 rounded-full text-[9px] font-medium bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">ACTIVE</span>
+                        </template>
+                        <template x-if="k.answer && !k.active">
+                          <span class="px-2 py-0.5 rounded-full text-[9px] font-medium bg-gray-100 dark:bg-[#181848] text-gray-500 dark:text-[#7878aa]">OFF</span>
+                        </template>
+                      </td>
+                      <td class="px-2 py-2 whitespace-nowrap">
+                        <button @click="openEdit(k)" class="text-[10px] px-2 py-1 rounded bg-cyan-600 text-white hover:bg-cyan-700">EDIT</button>
+                        <button @click="toggleActive(k)" class="text-[10px] px-2 py-1 rounded border border-gray-300 dark:border-[#222255] text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-[#181848]" x-text="k.active ? 'DEACTIVATE' : 'ACTIVATE'"></button>
+                        <button @click="remove(k)" class="text-[10px] px-2 py-1 rounded border border-red-500 text-red-500 hover:bg-red-500/10">DEL</button>
+                      </td>
+                    </tr>
+                  </template>
+                  <tr x-show="entries.length === 0">
+                    <td colspan="5" class="px-2 py-6 text-center text-gray-400 text-xs">Walang entries</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <h4 class="text-sm font-bold text-gray-700 dark:text-slate-200 pt-2">📝 Review Log</h4>
+          <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+            <div class="overflow-x-auto max-h-[300px] overflow-y-auto">
+              <table class="w-full text-xs">
+                <thead class="sticky top-0 bg-white dark:bg-[#10102a]">
+                  <tr class="border-b border-gray-200 dark:border-[#222255] text-left text-[10px] text-gray-500 dark:text-[#7878aa] uppercase tracking-wider">
+                    <th class="px-2 py-2">Date</th>
+                    <th class="px-2 py-2">User Message</th>
+                    <th class="px-2 py-2">Verdict</th>
+                    <th class="px-2 py-2">Bot Reply / Corrected</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="(r, i) in reviews" :key="i">
+                    <tr class="border-b border-gray-100 dark:border-[#1a1a44]">
+                      <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="r.createdAt"></td>
+                      <td class="px-2 py-2 text-gray-700 dark:text-slate-200 max-w-[200px] truncate" :title="r.userMessage" x-text="r.userMessage"></td>
+                      <td class="px-2 py-2">
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-medium"
+                          :class="r.verdict === 'approved' ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'"
+                          x-text="r.verdict"></span>
+                      </td>
+                      <td class="px-2 py-2 text-gray-500 dark:text-[#7878aa] max-w-[300px] truncate" :title="r.correctedAnswer || r.botReply" x-text="r.correctedAnswer || r.botReply"></td>
+                    </tr>
+                  </template>
+                  <tr x-show="reviews.length === 0">
+                    <td colspan="4" class="px-2 py-6 text-center text-gray-400 text-xs">Wala pang review</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- KB Editor Modal -->
+          <div x-show="editorOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="editorOpen=false">
+            <div class="bg-white dark:bg-[#10102a] rounded-xl border border-gray-200 dark:border-[#222255] p-4 max-w-lg w-full mx-4">
+              <h4 class="text-sm font-bold text-gray-700 dark:text-slate-200 mb-3" x-text="editingId ? 'Edit KB Entry' : 'New KB Entry'"></h4>
+              <div class="space-y-3">
+                <div>
+                  <label class="text-[10px] text-gray-500 dark:text-[#7878aa] uppercase">Category</label>
+                  <select x-model="form.category" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                    <option value="business">Business</option>
+                    <option value="project">Project</option>
+                    <option value="approved-reply">Approved Reply</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-[10px] text-gray-500 dark:text-[#7878aa] uppercase">Keywords (comma-separated)</label>
+                  <input x-model="form.keywords" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                </div>
+                <div>
+                  <label class="text-[10px] text-gray-500 dark:text-[#7878aa] uppercase">Question</label>
+                  <input x-model="form.question" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                </div>
+                <div>
+                  <label class="text-[10px] text-gray-500 dark:text-[#7878aa] uppercase">Answer</label>
+                  <textarea x-model="form.answer" rows="4" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></textarea>
+                </div>
+                <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-slate-300">
+                  <input type="checkbox" x-model="form.active" class="accent-cyan-600">
+                  Active
+                </label>
+              </div>
+              <div class="flex justify-end gap-2 mt-4">
+                <button @click="editorOpen=false" class="text-xs px-3 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa]">CANCEL</button>
+                <button @click="save()" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">SAVE</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

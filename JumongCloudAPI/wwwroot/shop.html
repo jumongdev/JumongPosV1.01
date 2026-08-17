@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Andengs Online Shop</title>
+<meta name="theme-color" id="metaTheme" content="#5b21b6">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  * { -webkit-tap-highlight-color: transparent; }
+  html, body { background: #f6f6f7; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1c1917; }
+  .safe-top { padding-top: env(safe-area-inset-top); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .line-through-x { text-decoration: line-through; }
+  .card-shadow { box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px -12px rgba(0,0,0,.12); }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+  @keyframes pop { 0% { transform: scale(.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .anim-up { animation: slideUp .28s ease-out; }
+  .anim-in { animation: fadeIn .2s ease-out; }
+  .anim-right { animation: slideRight .25s ease-out; }
+  .anim-pop { animation: pop .25s ease-out; }
+  #toastBox { position: fixed; top: calc(env(safe-area-inset-top) + 12px); left: 50%; transform: translateX(-50%); z-index: 100; width: calc(100% - 32px); max-width: 380px; }
+  .toast { animation: fadeIn .2s ease-out; }
+  .mono-tile { background: linear-gradient(135deg, #7c3aed, #4f46e5); }
+  .mono-tile-2 { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+</style>
+</head>
+<body class="safe-top">
+
+<!-- ===== TOP BAR ===== -->
+<header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-200/70">
+  <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
+    <div class="w-9 h-9 rounded-xl mono-tile flex items-center justify-center text-white font-black text-lg shrink-0" id="brandLogo">A</div>
+    <div class="min-w-0 flex-1">
+      <h1 class="font-extrabold text-stone-900 text-base leading-tight truncate" id="brandTitle">Andengs Online Shop</h1>
+      <p class="text-[11px] text-stone-500 leading-tight truncate" id="brandSub">Grocery • Delivery • Pickup</p>
+    </div>
+    <button onclick="openTrack()" class="p-2.5 rounded-xl hover:bg-gray-100 active:scale-95 transition" aria-label="Track order">
+      <svg class="w-5 h-5 text-stone-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+    </button>
+    <button onclick="openCart()" class="relative p-2.5 rounded-xl hover:bg-gray-100 active:scale-95 transition" aria-label="Cart">
+      <svg class="w-5 h-5 text-stone-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+      <span id="cartBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">0</span>
+    </button>
+  </div>
+  <!-- search -->
+  <div class="max-w-6xl mx-auto px-4 pb-3">
+    <div class="relative">
+      <svg class="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"/></svg>
+      <input id="searchInput" type="search" placeholder="Search products..." oninput="debouncedSearch(this.value)"
+        class="w-full bg-gray-100 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-violet-500/40 placeholder-stone-400">
+    </div>
+  </div>
+  <!-- promo banner -->
+  <div id="promoBar" class="hidden max-w-6xl mx-auto px-4 pb-3">
+    <div class="bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-xs font-semibold rounded-lg px-3 py-2 flex items-center gap-2">
+      <span>📣</span><span id="promoText" class="truncate"></span>
+    </div>
+  </div>
+</header>
+
+<!-- ===== CATEGORY CHIPS ===== -->
+<div class="sticky top-[118px] z-30 bg-[#f6f6f7]/95 backdrop-blur-sm border-b border-gray-200/50">
+  <div id="catChips" class="max-w-6xl mx-auto px-4 py-2.5 flex gap-2 overflow-x-auto scrollbar-hide"></div>
+</div>
+
+<!-- ===== PRODUCT GRID ===== -->
+<main class="max-w-6xl mx-auto px-4 py-4">
+  <div class="flex items-center justify-between mb-3">
+    <p class="text-xs font-bold text-stone-500 uppercase tracking-wide" id="gridLabel">All Products</p>
+    <p class="text-xs text-stone-400" id="gridCount"></p>
+  </div>
+  <div id="grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"></div>
+  <div id="gridEmpty" class="hidden text-center py-16">
+    <p class="text-4xl mb-2">🛒</p>
+    <p class="font-semibold text-stone-600">No products found</p>
+    <p class="text-sm text-stone-400 mt-1">Try a different search or category</p>
+  </div>
+</main>
+
+<footer class="max-w-6xl mx-auto px-4 pb-24 pt-6 text-center">
+  <p class="text-xs text-stone-400">Jumong POS Online Shop • Orders confirmed by Andengs Superstore (HQ)</p>
+</footer>
+
+<!-- ===== CART DRAWER ===== -->
+<div id="cartOverlay" class="hidden fixed inset-0 z-50 bg-black/50 anim-in" onclick="closeCart()"></div>
+<div id="cartDrawer" class="hidden fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl flex flex-col anim-right safe-bottom">
+  <div class="flex items-center justify-between px-4 py-4 border-b border-gray-200">
+    <p class="font-extrabold text-stone-900">🛒 Your Cart</p>
+    <button onclick="closeCart()" class="p-2 -mr-2 hover:bg-gray-100 rounded-xl text-stone-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+  </div>
+  <div id="cartItems" class="flex-1 overflow-y-auto px-4 py-2"></div>
+  <div id="cartEmpty" class="flex-1 hidden flex-col items-center justify-center text-center px-6">
+    <p class="text-5xl mb-3">🧺</p>
+    <p class="font-bold text-stone-600">Your cart is empty</p>
+    <p class="text-sm text-stone-400 mt-1">Add items from the shop to get started</p>
+  </div>
+  <div class="border-t border-gray-200 px-4 py-4 space-y-3">
+    <div class="flex items-center justify-between text-sm font-semibold text-stone-600"><span>Subtotal</span><span id="cartSubtotal" class="text-lg font-extrabold text-stone-900">₱0.00</span></div>
+    <div class="flex items-center justify-between text-sm text-stone-500"><span>Delivery</span><span id="cartFee" class="font-semibold text-emerald-600">FREE</span></div>
+    <div class="flex items-center justify-between text-sm font-bold text-stone-800"><span>Total</span><span id="cartTotal" class="text-lg font-extrabold text-stone-900">₱0.00</span></div>
+    <button onclick="openCheckout()" class="w-full bg-violet-700 hover:bg-violet-800 active:scale-[.98] transition text-white font-bold rounded-2xl py-3.5 text-sm">CHECKOUT NOW →</button>
+  </div>
+</div>
+
+<!-- ===== CHECKOUT ===== -->
+<div id="checkoutModal" class="hidden fixed inset-0 z-[60] bg-black/60 flex items-end sm:items-center justify-center anim-in">
+  <div class="w-full sm:max-w-lg bg-white sm:rounded-3xl rounded-t-3xl max-h-[94vh] overflow-y-auto anim-up safe-bottom">
+    <div class="sticky top-0 bg-white/95 backdrop-blur flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      <p class="font-extrabold text-stone-900">Checkout</p>
+      <button onclick="closeCheckout()" class="p-2 -mr-2 hover:bg-gray-100 rounded-xl text-stone-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <div class="px-5 py-4 space-y-4">
+      <div>
+        <p class="text-xs font-bold text-stone-500 mb-2">CONTACT</p>
+        <div class="space-y-2.5">
+          <input id="coName" type="text" placeholder="Full name *" class="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-violet-500/40">
+          <input id="coPhone" type="tel" placeholder="Mobile number *" inputmode="numeric" class="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-violet-500/40">
+        </div>
+      </div>
+      <div>
+        <p class="text-xs font-bold text-stone-500 mb-2">DELIVERY</p>
+        <div class="space-y-2.5">
+          <input id="coAddress" type="text" placeholder="Delivery address" class="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-violet-500/40">
+          <input id="coNote" type="text" placeholder="Note (optional)" class="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-violet-500/40">
+        </div>
+      </div>
+      <div>
+        <p class="text-xs font-bold text-stone-500 mb-2">PAYMENT</p>
+        <div class="grid grid-cols-2 gap-2.5">
+          <button id="payCod" onclick="selectPay('COD')" class="border-2 rounded-2xl px-3 py-3.5 text-sm font-bold text-left transition">
+            <span class="block text-lg">💵</span>Cash on Delivery
+          </button>
+          <button id="payGcash" onclick="selectPay('GCash')" class="border-2 rounded-2xl px-3 py-3.5 text-sm font-bold text-left transition">
+            <span class="block text-lg">📱</span>GCash
+          </button>
+        </div>
+        <div id="gcashRefRow" class="hidden mt-2.5">
+          <input id="coGcashRef" type="text" placeholder="GCash reference number" class="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-violet-500/40">
+        </div>
+      </div>
+      <div class="bg-gray-50 rounded-2xl p-4">
+        <p class="text-xs font-bold text-stone-500 mb-2">ORDER SUMMARY</p>
+        <div id="coSummary" class="space-y-1.5 text-sm"></div>
+        <div class="flex justify-between font-extrabold text-stone-900 mt-2 pt-2 border-t border-gray-200"><span>Total</span><span id="coTotal">₱0.00</span></div>
+      </div>
+      <button id="placeOrderBtn" onclick="placeOrder()" class="w-full bg-violet-700 hover:bg-violet-800 active:scale-[.98] transition text-white font-bold rounded-2xl py-4 text-sm">PLACE ORDER</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ORDER SUCCESS ===== -->
+<div id="successModal" class="hidden fixed inset-0 z-[70] bg-black/60 flex items-center justify-center anim-in px-4">
+  <div class="w-full max-w-sm bg-white rounded-3xl p-6 text-center anim-pop">
+    <div class="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+      <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+    </div>
+    <p class="font-extrabold text-stone-900 text-lg">Order Received!</p>
+    <p class="text-sm text-stone-500 mt-1">Your order <span id="okOrderNo" class="font-bold text-violet-700"></span> is pending confirmation.</p>
+    <div class="bg-gray-50 rounded-2xl p-3 mt-4 text-sm text-stone-600">
+      <p id="okPayment" class="font-semibold"></p>
+      <p class="mt-0.5" id="okTotal"></p>
+    </div>
+    <div class="grid grid-cols-2 gap-2.5 mt-5">
+      <button onclick="trackLastOrder()" class="border-2 border-violet-700 text-violet-700 font-bold rounded-2xl py-3 text-sm hover:bg-violet-50 transition">TRACK ORDER</button>
+      <button onclick="closeSuccess()" class="bg-violet-700 text-white font-bold rounded-2xl py-3 text-sm hover:bg-violet-800 transition">BACK TO SHOP</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TRACK ORDER ===== -->
+<div id="trackModal" class="hidden fixed inset-0 z-[80] bg-black/60 flex items-end sm:items-center justify-center anim-in">
+  <div class="w-full sm:max-w-md bg-white sm:rounded-3xl rounded-t-3xl max-h-[94vh] overflow-y-auto anim-up safe-bottom">
+    <div class="sticky top-0 bg-white/95 backdrop-blur flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      <p class="font-extrabold text-stone-900">Track My Order</p>
+      <button onclick="closeTrack()" class="p-2 -mr-2 hover:bg-gray-100 rounded-xl text-stone-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <div class="px-5 py-4">
+      <div class="flex gap-2">
+        <input id="trPhone" type="tel" placeholder="Enter your mobile number" inputmode="numeric" class="flex-1 border border-gray-200 rounded-xl px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-violet-500/40">
+        <button onclick="doTrack()" class="bg-violet-700 text-white font-bold rounded-xl px-5 text-sm hover:bg-violet-800 transition">SEARCH</button>
+      </div>
+      <div id="trResults" class="mt-4 space-y-3"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toastBox"></div>
+
+<script>
+const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
+const STORE = 'STORE-20260602-7159';
+const STATUS_META = {
+  pending:   { label: 'Pending',    cls: 'bg-amber-100 text-amber-700 border-amber-200' },
+  confirmed: { label: 'Confirmed',  cls: 'bg-blue-100 text-blue-700 border-blue-200' },
+  shipped:   { label: 'Shipped',    cls: 'bg-violet-100 text-violet-700 border-violet-200' },
+  delivered: { label: 'Delivered',  cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  cancelled: { label: 'Cancelled',  cls: 'bg-red-100 text-red-700 border-red-200' }
+};
+
+let catalog = [];
+let categories = [];
+let cart = JSON.parse(localStorage.getItem('shop_cart') || '[]');
+let activeCat = 'all';
+let searchQ = '';
+let payMethod = 'COD';
+let lastOrder = JSON.parse(localStorage.getItem('shop_last_order') || 'null');
+let shopSettings = { deliveryFee: 0, freeDeliveryMin: 0 };
+let checkoutFee = 0;
+const imgCache = {};
+
+const fmt = n => '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function fetchT(url, opts, ms) {
+  return fetch(url, Object.assign({}, opts, {
+    signal: (typeof AbortController !== 'undefined' ? (function () {
+      const ac = new AbortController();
+      setTimeout(() => ac.abort(), ms || 15000);
+      return ac.signal;
+    })() : undefined)
+  }));
+}
+
+function debouncedSearch(v) {
+  clearTimeout(debouncedSearch._t);
+  debouncedSearch._t = setTimeout(() => { searchQ = v.trim().toLowerCase(); renderGrid(); }, 200);
+}
+
+function defUnit(p) {
+  const u = (p.units && p.units.length ? p.units : []);
+  return u.find(x => x.isDefault) || u[0] || null;
+}
+
+function stockOf(p) { return Number(p.hqStock || 0); }
+function inCartQty(id) { return cart.filter(c => c.id === id).reduce((s, c) => s + c.qty, 0); }
+
+// ─── LOAD ────────────────────────────────────────────
+async function loadBranding() {
+  try {
+    const r = await fetchT(API + '/dashboard/branding', {}, 8000);
+    const b = await r.json();
+    if (b && b.appTitle) document.getElementById('brandTitle').textContent = b.appTitle;
+    if (b && b.primaryColor && /^#[0-9a-fA-F]{3,8}$|^rgb/.test(b.primaryColor)) {
+      document.getElementById('metaTheme').content = b.primaryColor;
+      const st = document.createElement('style');
+      st.textContent =
+        '.bg-violet-700{background:' + b.primaryColor + '!important}' +
+        '.hover\\:bg-violet-800:hover{background:' + b.primaryColor + 'dd!important}' +
+        '.border-violet-700{border-color:' + b.primaryColor + '!important}' +
+        '.text-violet-700{color:' + b.primaryColor + '!important}' +
+        '.ring-violet-700\\/20{--tw-ring-color:' + b.primaryColor + '33!important}' +
+        '.focus\\:ring-violet-500\\/40:focus{--tw-ring-color:' + b.primaryColor + '66!important}';
+      document.head.appendChild(st);
+    }
+    if (b && b.logoUrl) {
+      document.getElementById('brandLogo').innerHTML = '<img src="' + b.logoUrl + '" class="w-full h-full object-cover rounded-xl" alt="logo">';
+    }
+  } catch (e) {}
+}
+
+async function loadPromo() {
+  try {
+    const r = await fetchT(API + '/dashboard/shop/notifications/' + STORE + '?since=' + encodeURIComponent(new Date(Date.now() - 30 * 864e5).toISOString()), {}, 8000);
+    const j = await r.json();
+    if (Array.isArray(j) && j.length) {
+      document.getElementById('promoText').textContent = j[0].message;
+      document.getElementById('promoBar').classList.remove('hidden');
+    }
+  } catch (e) {}
+}
+
+async function loadCatalog() {
+  showLoading(true);
+  try {
+    const url = API + '/dashboard/shop/catalog?storeId=' + STORE + '&withImages=false';
+    const r = await fetchT(url, {}, 30000);
+    catalog = await r.json();
+    categories = [...new Set(catalog.map(p => p.category).filter(Boolean))];
+    renderChips();
+    renderGrid();
+  } catch (e) {
+    document.getElementById('grid').innerHTML = '<div class="col-span-full text-center py-16"><p class="text-4xl mb-2">⚠️</p><p class="font-bold text-stone-600">Could not load the shop</p><p class="text-sm text-stone-400 mt-1">Check your connection and try again</p><button onclick="location.reload()" class="mt-4 bg-violet-700 text-white font-bold rounded-xl px-6 py-2.5 text-sm">RETRY</button></div>';
+  } finally {
+    showLoading(false);
+  }
+}
+
+function showLoading(on) {
+  const g = document.getElementById('grid');
+  if (on) {
+    g.innerHTML = Array.from({ length: 10 }).map(() =>
+      '<div class="rounded-2xl bg-white overflow-hidden card-shadow"><div class="aspect-square bg-gray-100 animate-pulse"></div><div class="p-2.5 space-y-1.5"><div class="h-3 bg-gray-100 rounded animate-pulse"></div><div class="h-3 bg-gray-100 rounded w-2/3 animate-pulse"></div></div></div>').join('');
+  }
+}
+
+function renderChips() {
+  const wrap = document.getElementById('catChips');
+  const all = chip('all', 'All', activeCat === 'all');
+  const chips = [all, ...categories.map(c => chip(c, c, activeCat === c))];
+  wrap.innerHTML = chips.join('');
+}
+
+function chip(val, label, active) {
+  return '<button onclick="setCat(\'' + val.replace(/'/g, "\\'") + '\')" class="shrink-0 px-4 py-1.5 rounded-full text-xs font-bold border transition ' +
+    (active ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-600 border-gray-200 hover:border-stone-400') + '">' + label + '</button>';
+}
+
+function setCat(c) { activeCat = c; renderChips(); renderGrid(); }
+
+// ─── GRID ────────────────────────────────────────────
+function visibleProducts() {
+  let list = catalog;
+  if (activeCat !== 'all') list = list.filter(p => p.category === activeCat);
+  if (searchQ) list = list.filter(p => (p.name + ' ' + p.barcode).toLowerCase().includes(searchQ));
+  return list;
+}
+
+function renderGrid() {
+  const g = document.getElementById('grid');
+  const list = visibleProducts();
+  document.getElementById('gridLabel').textContent = searchQ ? 'Search: "' + searchQ.trim() + '"' : (activeCat === 'all' ? 'All Products' : activeCat);
+  document.getElementById('gridCount').textContent = list.length + ' items';
+  document.getElementById('gridEmpty').classList.toggle('hidden', list.length > 0);
+  if (!list.length) { g.innerHTML = ''; return; }
+  g.innerHTML = list.map(p => {
+    const u = defUnit(p);
+    const price = u ? Number(u.price) : Number(p.price);
+    const unit = u ? u.unitName : 'PC';
+    const avail = stockOf(p);
+    const need = (u && u.qtyPerUnit > 1 ? u.qtyPerUnit : 1);
+    const soldOut = avail < need;
+    const mono = (p.name || '?').trim().charAt(0).toUpperCase();
+    return '<div class="rounded-2xl bg-white overflow-hidden card-shadow flex flex-col hover:shadow-lg transition cursor-pointer" onclick="openDetail(' + p.id + ')">' +
+      '<div class="relative aspect-square bg-gray-50 overflow-hidden">' +
+        '<div class="w-full h-full mono-tile flex items-center justify-center text-white font-black text-3xl" data-mono="' + p.id + '">' + mono + '</div>' +
+        '<img data-lazy="' + p.id + '" class="opacity-0 absolute inset-0 w-full h-full object-cover" loading="lazy" alt="">' +
+        (soldOut ? '<div class="absolute inset-0 bg-black/55 flex items-center justify-center"><span class="bg-white text-stone-900 text-[10px] font-black tracking-wider px-3 py-1.5 rounded-lg">OUT OF STOCK</span></div>' : '') +
+        (!soldOut && avail <= 10 ? '<span class="absolute top-2 left-2 bg-amber-400 text-amber-950 text-[9px] font-black px-2 py-0.5 rounded-md">LOW STOCK</span>' : '') +
+      '</div>' +
+      '<div class="p-2.5 flex flex-col flex-1">' +
+        '<p class="text-[11px] text-stone-400 font-semibold truncate">' + (p.category || 'General') + '</p>' +
+        '<p class="text-[13px] font-semibold text-stone-800 clamp2 leading-snug mt-0.5">' + p.name + '</p>' +
+        '<div class="mt-auto pt-2 flex items-end justify-between gap-1">' +
+          '<div><p class="font-extrabold text-stone-900 text-sm leading-tight">' + fmt(price) + '</p><p class="text-[10px] text-stone-400">per ' + unit + '</p></div>' +
+          '<button onclick="event.stopPropagation();addToCart(' + p.id + ')" ' + (soldOut ? 'disabled' : '') + ' class="' + (soldOut ? 'bg-gray-200 text-gray-400' : 'bg-violet-700 hover:bg-violet-800 text-white active:scale-90') + ' w-8 h-8 rounded-xl font-black text-lg transition flex items-center justify-center shrink-0">+</button>' +
+        '</div>' +
+      '</div></div>';
+  }).join('');
+  watchImages();
+}
+
+// lazy image load — per product fetch
+let imgObs;
+function watchImages() {
+  if (!imgObs) {
+    imgObs = new IntersectionObserver(entries => {
+      entries.forEach(en => { if (en.isIntersecting) loadImg(Number(en.target.dataset.lazy)); });
+    }, { rootMargin: '400px' });
+  }
+  document.querySelectorAll('img[data-lazy]').forEach(img => imgObs.observe(img));
+}
+
+async function loadImg(id) {
+  if (imgCache[id] !== undefined) { applyImg(id, imgCache[id]); return; }
+  if (imgCache[id] === 'loading') return;
+  imgCache[id] = 'loading';
+  try {
+    const r = await fetchT(API + '/dashboard/shop/product/' + id + '?storeId=' + STORE, {}, 15000);
+    const p = await r.json();
+    const data = (p && p.imageData) || '';
+    imgCache[id] = data;
+    applyImg(id, data);
+  } catch (e) { imgCache[id] = ''; }
+}
+
+function applyImg(id, data) {
+  const img = document.querySelector('img[data-lazy="' + id + '"]');
+  const mono = document.querySelector('[data-mono="' + id + '"]');
+  if (!img || !data) return;
+  const src = data.startsWith('data:') ? data : 'data:image/jpeg;base64,' + data;
+  img.src = src;
+  img.classList.remove('opacity-0');
+  if (mono) mono.classList.add('hidden');
+}
+
+// ─── DETAIL ──────────────────────────────────────────
+async function openDetail(id) {
+  let data = imgCache[id];
+  const p = catalog.find(x => x.id === id);
+  if (!p) return;
+  const u = defUnit(p);
+  const price = u ? Number(u.price) : Number(p.price);
+  const unit = u ? u.unitName : 'PC';
+  const need = (u && u.qtyPerUnit > 1 ? u.qtyPerUnit : 1);
+  const avail = Math.floor(stockOf(p) / need);
+  const soldOut = avail < 1;
+  if (data === undefined || data === 'loading') {
+    try {
+      const r = await fetchT(API + '/dashboard/shop/product/' + id + '?storeId=' + STORE, {}, 15000);
+      const full = await r.json();
+      data = (full && full.imageData) || '';
+      imgCache[id] = data;
+      applyImg(id, data);
+    } catch (e) { data = ''; }
+  }
+  const body = document.getElementById('detailBody');
+  body.innerHTML =
+    '<div class="relative aspect-square bg-gray-100 rounded-t-3xl overflow-hidden">' +
+      (data ? '<img src="' + (data.startsWith('data:') ? data : 'data:image/jpeg;base64,' + data) + '" class="w-full h-full object-cover">' :
+        '<div class="w-full h-full mono-tile flex items-center justify-center text-white font-black text-6xl">' + (p.name || '?').trim().charAt(0).toUpperCase() + '</div>') +
+      (soldOut ? '<div class="absolute inset-0 bg-black/55 flex items-center justify-center"><span class="bg-white text-stone-900 text-xs font-black tracking-wider px-4 py-2 rounded-lg">OUT OF STOCK</span></div>' : '') +
+    '</div>' +
+    '<div class="p-5">' +
+      '<p class="text-[11px] text-stone-400 font-bold uppercase tracking-wide">' + (p.category || 'General') + '</p>' +
+      '<p class="font-extrabold text-stone-900 text-lg leading-snug mt-1">' + p.name + '</p>' +
+      '<p class="text-sm text-stone-500 mt-2">' + fmt(price) + ' <span class="text-stone-400">per ' + unit + '</span></p>' +
+      (p.barcode ? '<p class="text-[11px] text-stone-400 mt-1">Barcode: ' + p.barcode + '</p>' : '') +
+      (soldOut ? '' : '<p class="text-[11px] mt-2 ' + (avail <= 10 ? 'text-amber-600 font-bold' : 'text-emerald-600 font-semibold') + '">' + (avail <= 10 ? 'Low stock — only ' + avail + ' left' : avail + ' available') + '</p>') +
+      '<button onclick="event.stopPropagation();addToCart(' + p.id + ')" ' + (soldOut ? 'disabled' : '') + ' class="mt-4 w-full ' + (soldOut ? 'bg-gray-200 text-gray-400' : 'bg-violet-700 hover:bg-violet-800 text-white') + ' font-bold rounded-2xl py-3.5 text-sm transition active:scale-[.98]">' + (soldOut ? 'OUT OF STOCK' : 'ADD TO CART') + '</button>' +
+    '</div>';
+  document.getElementById('detailModal').classList.remove('hidden');
+  document.getElementById('detailModal').classList.add('anim-in');
+}
+
+function closeDetail() {
+  document.getElementById('detailModal').classList.add('hidden');
+}
+
+// ─── CART ────────────────────────────────────────────
+function addToCart(id) {
+  const p = catalog.find(x => x.id === id);
+  if (!p) return;
+  const u = defUnit(p);
+  const need = (u && u.qtyPerUnit > 1 ? u.qtyPerUnit : 1);
+  const avail = Math.floor(stockOf(p) / need);
+  const inCart = inCartQty(id);
+  if (inCart >= avail) { toast(avail > 0 ? 'Only ' + avail + ' available' : 'Out of stock', 'error'); return; }
+  const row = cart.find(c => c.id === id);
+  if (row) row.qty++; else cart.push({ id, qty: 1 });
+  saveCart();
+  toast('Added ' + p.name.slice(0, 40) + (p.name.length > 40 ? '…' : ''), 'ok');
+}
+
+function setQty(id, qty) {
+  const row = cart.find(c => c.id === id);
+  if (!row) return;
+  if (qty <= 0) { cart = cart.filter(c => c.id !== id); }
+  else {
+    const p = catalog.find(x => x.id === id);
+    if (p) {
+      const u = defUnit(p);
+      const need = (u && u.qtyPerUnit > 1 ? u.qtyPerUnit : 1);
+      const avail = Math.floor(stockOf(p) / need);
+      if (qty > avail) { qty = avail; toast('Only ' + avail + ' available', 'error'); }
+    }
+    row.qty = qty;
+  }
+  saveCart();
+}
+
+function saveCart() {
+  localStorage.setItem('shop_cart', JSON.stringify(cart));
+  updateBadge();
+  if (!document.getElementById('cartDrawer').classList.contains('hidden')) renderCart();
+}
+
+function updateBadge() {
+  const n = cart.reduce((s, c) => s + c.qty, 0);
+  const b = document.getElementById('cartBadge');
+  b.textContent = n;
+  b.classList.toggle('hidden', n === 0);
+}
+
+function cartTotal() {
+  return cart.reduce((s, c) => {
+    const p = catalog.find(x => x.id === c.id);
+    if (!p) return s;
+    const u = defUnit(p);
+    return s + (u ? Number(u.price) : Number(p.price)) * c.qty;
+  }, 0);
+}
+
+function loadShopSettings() {
+  fetchT(API + '/dashboard/shop/settings', {}, 10000)
+    .then(r => r.json())
+    .then(j => { shopSettings = { deliveryFee: Number(j.deliveryFee) || 0, freeDeliveryMin: Number(j.freeDeliveryMin) || 0 }; })
+    .catch(() => {});
+}
+
+function feeFor(subtotal) {
+  if (!shopSettings.deliveryFee || shopSettings.deliveryFee <= 0) return 0;
+  if (shopSettings.freeDeliveryMin > 0 && subtotal >= shopSettings.freeDeliveryMin) return 0;
+  return shopSettings.deliveryFee;
+}
+
+function openCart() {
+  renderCart();
+  document.getElementById('cartOverlay').classList.remove('hidden');
+  document.getElementById('cartDrawer').classList.remove('hidden');
+}
+
+function closeCart() {
+  document.getElementById('cartOverlay').classList.add('hidden');
+  document.getElementById('cartDrawer').classList.add('hidden');
+}
+
+function renderCart() {
+  const wrap = document.getElementById('cartItems');
+  const empty = document.getElementById('cartEmpty');
+  const has = cart.length > 0;
+  empty.classList.toggle('hidden', has);
+  empty.classList.toggle('flex', !has);
+  wrap.classList.toggle('hidden', !has);
+  if (!has) {
+    document.getElementById('cartSubtotal').textContent = fmt(0);
+    document.getElementById('cartTotal').textContent = fmt(0);
+    document.getElementById('cartFee').textContent = 'FREE';
+    return;
+  }
+  wrap.innerHTML = cart.map(c => {
+    const p = catalog.find(x => x.id === c.id);
+    if (!p) return '';
+    const u = defUnit(p);
+    const price = u ? Number(u.price) : Number(p.price);
+    const unit = u ? u.unitName : 'PC';
+    return '<div class="flex gap-3 py-3 border-b border-gray-100 last:border-0">' +
+      '<div class="w-14 h-14 rounded-xl bg-gray-100 mono-tile flex items-center justify-center text-white font-black text-lg shrink-0" data-mono2="' + p.id + '">' + (p.name || '?').trim().charAt(0).toUpperCase() + '</div>' +
+      '<div class="flex-1 min-w-0">' +
+        '<p class="text-[13px] font-semibold text-stone-800 clamp2 leading-snug">' + p.name + '</p>' +
+        '<p class="text-xs text-stone-400 mt-0.5">' + fmt(price) + ' × ' + c.qty + ' ' + unit + '</p>' +
+      '</div>' +
+      '<div class="flex flex-col items-end justify-between">' +
+        '<button onclick="setQty(' + p.id + ', 0)" class="text-stone-300 hover:text-red-500 text-xs font-bold">✕</button>' +
+        '<div class="flex items-center gap-2">' +
+          '<button onclick="setQty(' + p.id + ', ' + (c.qty - 1) + ')" class="w-7 h-7 rounded-lg border border-gray-200 font-black text-stone-600 hover:bg-gray-50">−</button>' +
+          '<span class="w-7 text-center text-sm font-bold">' + c.qty + '</span>' +
+          '<button onclick="setQty(' + p.id + ', ' + (c.qty + 1) + ')" class="w-7 h-7 rounded-lg border border-gray-200 font-black text-stone-600 hover:bg-gray-50">+</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  document.getElementById('cartSubtotal').textContent = fmt(cartTotal());
+  const fee = feeFor(cartTotal());
+  document.getElementById('cartFee').textContent = fee > 0 ? fmt(fee) : 'FREE';
+  document.getElementById('cartFee').className = 'font-semibold ' + (fee > 0 ? 'text-stone-600' : 'text-emerald-600');
+  document.getElementById('cartTotal').textContent = fmt(cartTotal() + fee);
+  document.querySelectorAll('[data-mono2]').forEach(el => {
+    const id = Number(el.dataset.mono2);
+    if (imgCache[id]) applyImg2(id, imgCache[id]);
+  });
+}
+
+function applyImg2(id, data) {
+  const el = document.querySelector('[data-mono2="' + id + '"]');
+  if (!el) return;
+  el.innerHTML = '<img src="' + (data.startsWith('data:') ? data : 'data:image/jpeg;base64,' + data) + '" class="w-full h-full object-cover rounded-xl">';
+}
+
+// ─── CHECKOUT ────────────────────────────────────────
+function openCheckout() {
+  if (!cart.length) return;
+  const sub = cartTotal();
+  checkoutFee = feeFor(sub);
+  document.getElementById('coSummary').innerHTML = cart.map(c => {
+    const p = catalog.find(x => x.id === c.id);
+    const u = defUnit(p);
+    const price = u ? Number(u.price) : Number(p.price);
+    return '<div class="flex justify-between gap-2"><span class="text-stone-500 truncate">' + (p ? p.name.slice(0, 34) + (p.name.length > 34 ? '…' : '') : '') + ' × ' + c.qty + '</span><span class="font-semibold shrink-0">' + fmt(price * c.qty) + '</span></div>';
+  }).join('') +
+    '<div class="flex justify-between pt-1.5"><span class="text-stone-500">Delivery Fee</span><span class="font-semibold">' + (checkoutFee > 0 ? fmt(checkoutFee) : '<span class="text-emerald-600 font-bold">FREE</span>') + '</span></div>';
+  document.getElementById('coTotal').textContent = fmt(sub + checkoutFee);
+  selectPay(payMethod);
+  closeCart();
+  document.getElementById('checkoutModal').classList.remove('hidden');
+}
+
+function closeCheckout() { document.getElementById('checkoutModal').classList.add('hidden'); }
+
+function selectPay(m) {
+  payMethod = m;
+  const cod = document.getElementById('payCod');
+  const gc = document.getElementById('payGcash');
+  const base = 'border-gray-200 bg-white text-stone-700';
+  const sel = 'border-violet-700 bg-violet-50 text-violet-800 ring-1 ring-violet-700/20';
+  cod.className = 'border-2 rounded-2xl px-3 py-3.5 text-sm font-bold text-left transition ' + (m === 'COD' ? sel : base);
+  gc.className = 'border-2 rounded-2xl px-3 py-3.5 text-sm font-bold text-left transition ' + (m === 'GCash' ? sel : base);
+  document.getElementById('gcashRefRow').classList.toggle('hidden', m !== 'GCash');
+}
+
+async function placeOrder() {
+  const name = document.getElementById('coName').value.trim();
+  const phone = document.getElementById('coPhone').value.trim();
+  if (!name) return toast('Please enter your full name', 'error');
+  if (!/^[0-9+\-\s]{7,}$/.test(phone)) return toast('Please enter a valid mobile number', 'error');
+  if (payMethod === 'GCash' && !document.getElementById('coGcashRef').value.trim()) return toast('Please enter GCash reference number', 'error');
+  const btn = document.getElementById('placeOrderBtn');
+  btn.disabled = true;
+  btn.textContent = 'PLACING ORDER…';
+  try {
+    const body = {
+      customerName: name,
+      phone,
+      address: document.getElementById('coAddress').value.trim(),
+      paymentMethod: payMethod,
+      gcashRef: payMethod === 'GCash' ? document.getElementById('coGcashRef').value.trim() : '',
+      deliveryNote: document.getElementById('coNote').value.trim(),
+      deliveryFee: checkoutFee,
+      items: cart.map(c => {
+        const p = catalog.find(x => x.id === c.id);
+        const u = defUnit(p);
+        const price = u ? Number(u.price) : Number(p.price);
+        return { productId: c.id, productName: p ? p.name : '', unitName: u ? u.unitName : 'PC', qty: c.qty, price, total: price * c.qty };
+      })
+    };
+    const r = await fetchT(API + '/dashboard/shop/orders', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.message || 'Order failed');
+    lastOrder = { orderNo: j.orderNo, phone, id: j.id };
+    localStorage.setItem('shop_last_order', JSON.stringify(lastOrder));
+    document.getElementById('okOrderNo').textContent = j.orderNo;
+    document.getElementById('okPayment').textContent = payMethod === 'GCash' ? 'Paid via GCash' : 'Cash on Delivery';
+    document.getElementById('okTotal').textContent = 'Total: ' + fmt(j.total);
+    closeCheckout();
+    cart = [];
+    saveCart();
+    document.getElementById('successModal').classList.remove('hidden');
+  } catch (e) {
+    toast('Order failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'PLACE ORDER';
+  }
+}
+
+function closeSuccess() { document.getElementById('successModal').classList.add('hidden'); }
+
+// ─── TRACK ───────────────────────────────────────────
+function openTrack() {
+  document.getElementById('trPhone').value = lastOrder ? lastOrder.phone : '';
+  document.getElementById('trResults').innerHTML = '';
+  document.getElementById('trackModal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('trPhone').focus(), 100);
+}
+
+function closeTrack() { document.getElementById('trackModal').classList.add('hidden'); }
+
+async function doTrack() {
+  const phone = document.getElementById('trPhone').value.trim();
+  if (!phone) return toast('Enter your mobile number', 'error');
+  const wrap = document.getElementById('trResults');
+  wrap.innerHTML = '<p class="text-center text-sm text-stone-400 py-6">Searching…</p>';
+  try {
+    const r = await fetchT(API + '/dashboard/shop/orders?phone=' + encodeURIComponent(phone) + '&limit=20', {}, 15000);
+    const j = await r.json();
+    if (!Array.isArray(j) || !j.length) {
+      wrap.innerHTML = '<div class="text-center py-8"><p class="text-4xl mb-2">🔍</p><p class="font-bold text-stone-600">No orders found</p><p class="text-sm text-stone-400 mt-1">Double-check your number</p></div>';
+      return;
+    }
+    wrap.innerHTML = j.map(o => {
+      const sm = STATUS_META[o.status] || STATUS_META.pending;
+      return '<div class="border border-gray-200 rounded-2xl p-4">' +
+        '<div class="flex items-center justify-between gap-2">' +
+          '<p class="font-extrabold text-stone-900 text-sm">' + o.orderNo + '</p>' +
+          '<span class="text-[10px] font-black px-2.5 py-1 rounded-full border ' + sm.cls + '">' + sm.label.toUpperCase() + '</span>' +
+        '</div>' +
+        '<p class="text-xs text-stone-500 mt-1.5">' + o.customerName + ' • ' + new Date(o.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' }) + '</p>' +
+        '<div class="flex justify-between mt-2 text-sm"><span class="text-stone-500">' + o.paymentMethod + (o.paymentMethod === 'GCash' && o.gcashRef ? ' (' + o.gcashRef + ')' : '') + '</span><span class="font-extrabold text-stone-900">' + fmt(o.total) + '</span></div>' +
+        (o.address ? '<p class="text-[11px] text-stone-400 mt-1.5">📍 ' + o.address + '</p>' : '') +
+        '<div class="mt-3"><button onclick="viewOrder(' + o.id + ')" class="text-xs font-bold text-violet-700">View items →</button></div>' +
+      '</div>';
+    }).join('');
+  } catch (e) {
+    wrap.innerHTML = '<p class="text-center text-sm text-red-500 py-6">Failed to load orders. Try again.</p>';
+  }
+}
+
+async function viewOrder(id) {
+  const wrap = document.getElementById('trResults');
+  try {
+    const r = await fetchT(API + '/dashboard/shop/orders/' + id, {}, 15000);
+    const j = await r.json();
+    const items = (j.items || []).map(it =>
+      '<div class="flex justify-between gap-2 text-sm"><span class="text-stone-600 truncate">' + it.productName + ' × ' + it.qty + ' ' + it.unitName + '</span><span class="font-semibold">' + fmt(it.total) + '</span></div>').join('');
+    wrap.innerHTML = '<div class="border border-gray-200 rounded-2xl p-4">' +
+      '<div class="flex items-center justify-between"><p class="font-extrabold text-sm">' + j.order.orderNo + '</p><button onclick="doTrack()" class="text-xs font-bold text-violet-700">← Back</button></div>' +
+      '<div class="mt-2 space-y-1.5">' + items + '</div>' +
+      '<div class="flex justify-between font-extrabold mt-2 pt-2 border-t border-gray-100"><span>Total</span><span>' + fmt(j.order.total) + '</span></div>' +
+    '</div>';
+  } catch (e) {
+    toast('Failed to load order details', 'error');
+  }
+}
+
+function trackLastOrder() {
+  closeSuccess();
+  openTrack();
+}
+
+// ─── TOAST ───────────────────────────────────────────
+function toast(msg, type) {
+  const box = document.getElementById('toastBox');
+  const el = document.createElement('div');
+  el.className = 'toast mb-2 px-4 py-3 rounded-2xl text-sm font-semibold shadow-xl text-white ' + (type === 'error' ? 'bg-red-500' : 'bg-stone-900');
+  el.textContent = msg;
+  box.appendChild(el);
+  setTimeout(() => { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2200);
+}
+
+// ─── INIT ────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeCart(); closeCheckout(); closeDetail(); closeTrack(); }
+});
+loadBranding();
+loadPromo();
+loadCatalog();
+loadShopSettings();
+updateBadge();
+</script>
+
+<!-- ===== DETAIL MODAL ===== -->
+<div id="detailModal" class="hidden fixed inset-0 z-[90] bg-black/60 flex items-end sm:items-center justify-center">
+  <div class="w-full sm:max-w-md bg-white sm:rounded-3xl rounded-t-3xl max-h-[94vh] overflow-y-auto anim-up safe-bottom">
+    <div class="sticky top-0 z-10 bg-white/95 backdrop-blur flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+      <p class="font-extrabold text-stone-900">Product Details</p>
+      <button onclick="closeDetail()" class="p-2 -mr-2 hover:bg-gray-100 rounded-xl text-stone-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <div id="detailBody"></div>
+  </div>
+</div>
+</body>
+</html>

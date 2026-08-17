@@ -9,7 +9,7 @@ namespace JumongPosV1._01.Forms;
 public class EndShiftForm : Form
 {
     private readonly User _currentUser;
-    private decimal _totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, _creditPayCash, _creditPayEWallet, _totalExpenses, _totalCostSold, _totalStockReceivedCost;
+    private decimal _totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, _creditPayCash, _creditPayEWallet, _totalExpenses, _totalCostSold, _totalStockReceivedCost, _voidReturns, _adjustDown;
     private decimal _openingBalance;
     private bool _denominationsEntered = false;
     private Label lblTotal1000 = null!, lblTotal500 = null!, lblTotal200 = null!, lblTotal100 = null!, lblTotal50 = null!, lblTotal20 = null!, lblTotalCoins = null!;
@@ -31,7 +31,7 @@ public class EndShiftForm : Form
 
     private void LoadTotals()
     {
-        (_totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, _creditPayCash, _creditPayEWallet, _totalExpenses, _totalCostSold, _totalStockReceivedCost) = DailyCloseService.GetShiftTotals();
+        (_totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, _creditPayCash, _creditPayEWallet, _totalExpenses, _totalCostSold, _totalStockReceivedCost, _voidReturns, _adjustDown) = DailyCloseService.GetShiftTotals();
         lblDate.Text = TimeHelper.Now.ToString("MMMM dd, yyyy  hh:mm tt");
         var cashierName = string.IsNullOrEmpty(_currentUser.FullName) ? _currentUser.Username : _currentUser.FullName;
         lblCashierName.Text = cashierName;
@@ -206,7 +206,7 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
     {
         PrinterService.PrintAuditEndShiftReport(cashOnHand, diff, cashierName, now, txtNotes.Text.Trim(), _totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, expenses, gcashTxns, creditCustomers, creditPayments,
             (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value,
-            totalInvCost, _totalCostSold, _totalStockReceivedCost, prevInv,
+            totalInvCost, _totalCostSold, _totalStockReceivedCost, prevInv, _voidReturns, _adjustDown,
             (receiptAudit.TotalReceipts, receiptAudit.VoidedCount, receiptAudit.DeletedCount, receiptAudit.LostValue, receiptAudit.VoidedInvoices, receiptAudit.MissingInvoices));
     }
     catch (Exception printEx)
@@ -222,7 +222,7 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
         {
             var ee = emailSvc.SendEndShiftReport(_totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, cashOnHand, diff, cashierName, _totalExpenses, expenses, gcashTxns, creditCustomers, creditPayments,
                 (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value,
-                totalInvCost, _totalCostSold, _totalStockReceivedCost, prevInv);
+                totalInvCost, _totalCostSold, _totalStockReceivedCost, prevInv, _voidReturns, _adjustDown);
             if (ee != null) emailErrorMsg = $"\n\nEmail error: {ee}";
         }
     }
@@ -376,7 +376,7 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
     
         var error = emailSvc.SendEndShiftReport(_totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, cashOnHand, diff, cashierName, _totalExpenses, expenses, gcashTxns, creditCustomers, creditPayments,
             (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value,
-            totalInvCost, _totalCostSold, _totalStockReceivedCost, DailyCloseService.GetLastInventoryCost());
+            totalInvCost, _totalCostSold, _totalStockReceivedCost, DailyCloseService.GetLastInventoryCost(), _voidReturns, _adjustDown);
     if (error != null) 
     {
         MessageBox.Show($"Email error: {error}", "Email Error", MessageBoxButtons.OK, MessageBoxIcon.Error);

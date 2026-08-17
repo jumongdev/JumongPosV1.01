@@ -61,6 +61,7 @@ window.exportCSV = (name) => {
     else if (name === 'wh-inventory-activity') { data = wh.invActivity; headers = 'Date,Product,Change,Type,Reference'; rows = data.map(x => [x.createdAt, x.productName, x.qtyChange, wh.formatType(x.referenceType||''), x.reference || '']) }
     else if (name === 'wh-onlineorder') { data = wh.orders; headers = 'ID,Client,Status,Total,Notes,Date'; rows = data.map(x => [x.id, x.clientName, x.status, x.totalAmount, x.notes, x.createdAt]) }
     else if (name === 'wh-transfer') { data = wh.transfers; headers = 'ID,Client,Status,Notes,Date'; rows = data.map(x => [x.id, x.clientName, x.status, x.notes, x.createdAt]) }
+    else if (name === 'wh-receiving') { data = wh.recvData; headers = 'Reference,Items,TotalQty,Date'; rows = data.map(x => [x.reference, x.itemCount, x.totalQty, x.createdAt]) }
     if (!headers) return;
     let csv = headers + '\n' + rows.map(r => r.map(c => '"' + (c + '').replace(/"/g, '""') + '"').join(',')).join('\n');
     downloadCSV(csv, name);
@@ -72,7 +73,7 @@ window.exportCSV = (name) => {
   downloadCSV(csv, name);
 };
 
-window.exportAllCSV = () => { ['sales', 'trends', 'peakhours', 'saleprofits', 'cashiers', 'expenses', 'shifts', 'voids', 'receiving', 'stock', 'analytics'].forEach(n => { if (Alpine.store('app').cache[n]) exportCSV(n) }) };
+window.exportAllCSV = () => { ['sales', 'trends', 'peakhours', 'saleprofits', 'cashiers', 'expenses', 'shifts', 'voids', 'receiving', 'analytics'].forEach(n => { if (Alpine.store('app').cache[n]) exportCSV(n) }) };
 
 function downloadCSV(csv, name) {
   const blob = new Blob([csv], { type: 'text/csv' });

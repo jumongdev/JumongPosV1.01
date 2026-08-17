@@ -42,6 +42,17 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
+// shop.jumongdev.com -> serve shop.html (clean URL, no /shop.html in the address bar)
+app.Use(async (ctx, next) =>
+{
+    var host = ctx.Request.Host.Host?.ToLowerInvariant() ?? "";
+    if (host == "shop.jumongdev.com" && (ctx.Request.Path == "/" || ctx.Request.Path == "/index.html"))
+    {
+        ctx.Request.Path = "/shop.html";
+    }
+    await next();
+});
+
 app.UseDefaultFiles();
 var staticProvider = new FileExtensionContentTypeProvider();
 staticProvider.Mappings[".apk"] = "application/vnd.android.package-archive";
