@@ -1396,7 +1396,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.1.34" });
+            return Ok(new { version = "1.1.35" });
     }
 
     private static readonly HttpClient _ollamaClient = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
@@ -1567,22 +1567,6 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             var json = JsonSerializer.Serialize(body);
             using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
-            var devClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-            try
-            {
-                var devResp = await devClient.PostAsync("http://DESKTOP-Q36S34R:11434/api/chat", content);
-                if (devResp.IsSuccessStatusCode)
-                {
-                    sw.Stop();
-                    using var doc = JsonDocument.Parse(await devResp.Content.ReadAsStringAsync());
-                    var reply = doc.RootElement.GetProperty("message").GetProperty("content").GetString() ?? "";
-                    _chatLog.Enqueue(new ChatLogEntry { At = now, Ms = sw.ElapsedMilliseconds, Ok = true, ReplyLen = reply.Length, Err = "", Backend = "dev" });
-                    TrimChatLog();
-                    return Ok(new { reply = reply.Trim(), backend = "dev", sources });
-                }
-            }
-            catch { }
-
             var resp = await _ollamaClient.PostAsync("http://localhost:11434/api/chat", content);
             sw.Stop();
             if (!resp.IsSuccessStatusCode)
@@ -1591,11 +1575,11 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 TrimChatLog();
                 return StatusCode(502, new { error = $"Ollama error {(int)resp.StatusCode}" });
             }
-            using var doc2 = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
-            var reply2 = doc2.RootElement.GetProperty("message").GetProperty("content").GetString() ?? "";
-            _chatLog.Enqueue(new ChatLogEntry { At = now, Ms = sw.ElapsedMilliseconds, Ok = true, ReplyLen = reply2.Length, Err = "", Backend = "server" });
+            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+            var reply = doc.RootElement.GetProperty("message").GetProperty("content").GetString() ?? "";
+            _chatLog.Enqueue(new ChatLogEntry { At = now, Ms = sw.ElapsedMilliseconds, Ok = true, ReplyLen = reply.Length, Err = "", Backend = "server" });
             TrimChatLog();
-            return Ok(new { reply = reply2.Trim(), backend = "server", sources });
+            return Ok(new { reply = reply.Trim(), backend = "server", sources });
         }
         catch (Exception ex)
         {
@@ -1933,7 +1917,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         return Ok(new
         {
             api = "ok",
-            version = "1.1.34",
+            version = "1.1.35",
             db = dbOk ? "ok" : "down",
             uptimeSeconds = Environment.TickCount64 / 1000,
             memory = new { totalMb = (long)(memTotal / (1024 * 1024)), freeMb = (long)(memFree / (1024 * 1024)) },
