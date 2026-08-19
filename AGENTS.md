@@ -1,6 +1,35 @@
 ﻿# JumongPOS — Full Project Guide for AI Agents
 
-## Latest Change (2026-08-19) — v1.1.37 (Cloud API) + web-only: HQ→POS Transfer Fixes (clickable + NEW TRANSFER + deduction survives the 30s snapshot push)
+## Latest Change (2026-08-19) — v1.1.38 (Cloud API) + mobile web: Warehouse Mobile App Now Uses HQ Stock (+ dashboard Warehouse Inventory stock filter + modal ADD button fixes)
+
+**Request:** "in warehouse-inventory can you give me filter to see what else have stock so i can transfer to HQ" + "tapos yung mobile app from warehouse stock change to HQ stock" + "pati ang receiving stock goes to HQ na dating warehouse ang dagdag" — (1) dashboard Warehouse → Inventory now has **ALL / IN STOCK / OUT OF STOCK** filter buttons (with counts) to quickly find what can be transferred to HQ; (2) the **warehouse mobile app (whmobile.html) now sells/receives from HQ stock** (`products` table, `STORE-20260602-7159`) instead of `wh_products`; (3) receiving now ADDS to HQ stock (was warehouse).
+
+### Mobile app → HQ stock switch (the big one)
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **`WhGetProducts`** — new `?source=hq`: reads `products` WHERE `store_id='STORE-20260602-7159'`, `id = pos_id`, units via `master_products` **barcode** join (duplicate-barcode safe: json_agg subquery), price/cost from the products row (maintained by snapshot UPSERT), imageData from master by barcode. Same 12-column shape as the wh query (boxQty=1, piecePrice=price). |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **`WhSell`** — `WhWalkinSellRequest.StockSource` (`'hq'`); hq branch: product lookup + units (barcode join) + guarded stock check + `UPDATE products SET stock_qty = stock_qty - sd WHERE store_id='STORE-20260602-7159' AND pos_id=@pid` + trail `INSERT INTO stock_trails (pos_id=-NEXTVAL, store_id=HQ, product_id=pos_id, quantity_added=-sd, stock_before/after, reference='WH-… | customer | unit x qty | Mobile', user_name)`. Sale header writes `wh_walkin_sales.stock_source` (`'hq'`/`'warehouse'`). Warehouse branch unchanged. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **`WhVoidSale`** — reads `stock_source`; hq → restores `products` + reversal trail (pos_id<0, `+dedQty`, ref `Wholesale [Partial] Void #{id}`). **`WhEditSale`** — same restore branch. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **Receiving** — `WhReceivingDto.StockSource`; `WhCreateReceiving` hq → `UPDATE products += qty` + stock_trails trail (pos_id<0, `RECV-… | supplier`). `WhGetReceivings`/`WhGetReceivingItems` — `?source=hq` reads stock_trails (`reference LIKE 'RECV-%'` grouped / per-ref items). |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **`WhInventorySummary`** — `?source=hq` → products-based (items/stock/cost/price/zero-cost). **`WhGetStockTrails`** — `?source=hq` → stock_trails for HQ store + computed `type` (CASE on reference: RECV→manual_receive, %Void%→void_return, WH-→walkin_sale, Transfer #→transfer_out, else manual_set). `quantity_added::int` cast (NUMERIC column). |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **`WhStockSnapshot` offset GENERALIZED** — was `@q - Σ(-quantity_added WHERE quantity_added<0 AND ref LIKE 'Transfer #%')`; now **`@q + Σ(quantity_added WHERE store_id=@sid AND product_id=@pid AND pos_id < 0)`** — ALL server-written trails (negative pos_id = never synced from a POS local DB; local-synced trails always carry positive local ids). This single formula covers transfer-outs (−), mobile hq sales (−), voids (+), mobile receiving (+) — verified live each direction survives the 30s full push. |
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs` | Migration: `ALTER TABLE wh_walkin_sales ADD COLUMN IF NOT EXISTS stock_source TEXT NOT NULL DEFAULT 'warehouse'`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1400,1921` | Version bumped `"1.1.37"` → `"1.1.38"`. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | SELL search + unit-picker cache + product detail + INVENTORY list + inventory-summary + stock-trail detail + RECEIVING search/history/reprint now pass `source=hq` (sell body `stockSource:'hq'`, receive body `stockSource:'hq'`). **Transfer tab + orders + clients stay warehouse** (transfers still move warehouse stock → HQ). |
+
+**Verified live (DINGDONG pos 5628, all cleaned after):** sell hq 101→100 + trail `walkin_sale −1 (101→100)` → **waited 50s → 100 stays** (offset survives snapshot); void #708 → 101 restored + reversal trail; receive +3 → 104 → **waited 50s → 104 stays** (positive offset survives); receiving history `?source=hq` shows the RECV entry (1 item, 3 pcs). Test rows deleted (sales/void logs/trails), stock restored 101. Web files + API deployed via WinRM stop→copy→start; version 1.1.38 verified. Git `4066bc6`.
+
+**IMPORTANT operating rule (double-entry risk):** the offset model means deliveries received on the **mobile app (HQ)** and mobile sales are server-side deltas the HQ POS local DB never sees. **Never record the same delivery at the HQ POS locally too** — that would double the stock (local pushed value rises AND the positive offset stays). One entry point per movement: receiving via mobile = only mobile. HQ POS staff keep selling normally (their deltas flow through the pushed snapshot). If the user later wants a local copy of mobile receivings on the HQ POS, that needs a stock pull feature (future work).
+
+### Same session, web-only (before the mobile switch)
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/index.html` + `components.js` | **Warehouse Inventory stock filter** — ALL (n) / IN STOCK (n) / OUT OF STOCK (n) pills in the WAREHOUSE — INVENTORY header; `warehousePanel.stockFilter` + `setStockFilter()` + `stockCounts`; `filtered` getter applies `(x.stockQty||0)>0` / `<=0` when `sp==='inventory'`. |
+| `JumongCloudAPI/wwwroot/index.html` | **+ ADD button overflow fix (New Transfer — HQ to POS modal)** — product `<select>` `flex-1` had no `min-w-0` → min-content = longest option pushed qty/+ ADD off-screen (needed horizontal scroll). Added `min-w-0` to the selects (stTrfProd, trfProd, whOrdProd), `shrink-0` on qty inputs, `shrink-0 whitespace-nowrap` on the three + ADD buttons (store transfer, warehouse transfer, wholesale order modals). |
+
+## Previous Change (2026-08-19) — v1.1.37 (Cloud API) + web-only: HQ→POS Transfer Fixes (clickable + NEW TRANSFER + deduction survives the 30s snapshot push)
 
 **Request:** "i cannot click the new transfer in HQ - pos" + "stock trail pala d nagana" — TWO real bugs found in the v1.1.36 HQ→POS transfer feature:
 
