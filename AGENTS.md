@@ -1,6 +1,17 @@
 ﻿# JumongPOS — Full Project Guide for AI Agents
 
-## Latest Change (2026-08-20) — v1.1.41 (Cloud API) + v1.1.50 (POS client): End-Shift v2 — Per-Channel Breakdown from PG (Phase 2 complete)
+## Latest Change (2026-08-20) — perf: shop catalog 6.4s → 250ms + PG pool 300 (100-customer concurrency verified)
+
+**Request:** "mga customer connecting to this server in 100 customer my lag?" — investigated server capacity for 100 concurrent shop customers. Found ONE real bottleneck: **`GET /shop/catalog` took 6.4s** (the LATERAL join on `products WHERE store_id=@sid AND barcode=mp.barcode` had NO index → scanned all 703 HQ products PER catalog row = ~485k row filters). Also raised the Npgsql pool (default 100 → 300) as cheap insurance.
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs` | Migration: `CREATE INDEX IF NOT EXISTS idx_products_store_barcode ON products(store_id, barcode)` — LATERAL now uses an Index Scan (EXPLAIN cost 92,621 → 5,821; full query **6.7ms**). |
+| `JumongCloudAPI/appsettings.json` | Connection string append `;Maximum Pool Size=300` (default 100 → headroom for 100+ concurrent customers). |
+
+**Verified live (2026-08-20):** catalog warm = **~250ms** (was 6.4s cold + bad query — first call after restart is slow, always re-time warm); **40 parallel catalog requests via curl --parallel = 0.86s wall** (vs 8.8s sequential); **120 concurrent = 0 failures**. GOTCHA: PowerShell 5.1 `Invoke-WebRequest` adds ~2s/request overhead (IE proxy autodetect) — parallel PS tests show ~2s avg even for the 12ms `/version` endpoint; ALWAYS use curl.exe for real measurements. Baseline (curl, single warm): `/version` 12ms, `/stock-status` 106ms, `/warehouse/products?source=hq` 332ms, `/shop/catalog?withImages=false` 222ms. No version bump (config+migration only; API stays 1.1.41). Git `818479f`.
+
+## Previous Change (2026-08-20) — v1.1.41 (Cloud API) + v1.1.50 (POS client): End-Shift v2 — Per-Channel Breakdown from PG (Phase 2 complete)
 
 **Request:** "sige" — finish the remaining Phase 2 pieces: end-shift v2 (per-channel inventory reporting from PG, "same inventory, separate reporting") + `channel` tagging on stock_trails. The end-shift receipt/email now shows a **CHANNEL BREAKDOWN (SERVER)** section: wholesale mobile sales, e-commerce orders, server received pcs, HQ→POS transfer-out pcs — all from the server PG for the shift window (since the last daily close, fallback PH midnight). The local reconciliation math is UNCHANGED (local == server mirror via the pull, so it already balances); the server section adds the per-channel transparency on top.
 
