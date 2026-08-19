@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -1397,7 +1397,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.1.37" });
+            return Ok(new { version = "1.1.38" });
     }
 
     private static readonly HttpClient _ollamaClient = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
@@ -1918,7 +1918,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         return Ok(new
         {
             api = "ok",
-            version = "1.1.37",
+            version = "1.1.38",
             db = dbOk ? "ok" : "down",
             uptimeSeconds = Environment.TickCount64 / 1000,
             memory = new { totalMb = (long)(memTotal / (1024 * 1024)), freeMb = (long)(memFree / (1024 * 1024)) },
@@ -2442,24 +2442,42 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
 
         // ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ Warehouse API ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬
         [HttpGet("warehouse/products")]
-        public IActionResult WhGetProducts([FromQuery] bool activeOnly = true, [FromQuery] string? search = null, [FromQuery] bool noImage = false)
+        public IActionResult WhGetProducts([FromQuery] bool activeOnly = true, [FromQuery] string? search = null, [FromQuery] bool noImage = false, [FromQuery] string? source = null)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
+            var isHq = string.Equals(source, "hq", StringComparison.OrdinalIgnoreCase);
             var where = activeOnly ? "wp.is_active = true" : "1=1";
             if (!string.IsNullOrEmpty(search))
                 where += $" AND (wp.name ILIKE @s OR wp.barcode ILIKE @s)";
-            cmd.CommandText = $@"
-                SELECT wp.id, wp.name, wp.barcode, wp.category, wp.box_price, wp.box_cost, wp.box_qty, wp.piece_price, wp.stock_qty,
-                       CASE WHEN wp.master_product_id IS NOT NULL THEN
-                           (SELECT COALESCE(json_agg(json_build_object('unitName', mpu.unit_name, 'price', mpu.price, 'cost', mpu.cost, 'qtyPerUnit', mpu.qty_per_unit, 'isDefault', mpu.is_default) ORDER BY mpu.is_default DESC, mpu.id), '[]'::json)
-                            FROM master_product_units mpu WHERE mpu.product_id = wp.master_product_id)
-                       ELSE '[]'::json END AS units,
-                       COALESCE(mp.image_data, '') AS imageData,
-                       COALESCE(mp.cost, wp.box_cost / NULLIF(wp.box_qty, 0), 0) AS cost
-                FROM wh_products wp
-                LEFT JOIN master_products mp ON mp.id = wp.master_product_id
-                WHERE {where} ORDER BY wp.name {(string.IsNullOrEmpty(search) ? "" : "LIMIT 500")}";
+            if (isHq)
+            {
+                // HQ stock mode: read the HQ store's products table (STORE-20260602-7159),
+                // joined to master_products by barcode for units/image/cost. id = products.pos_id.
+                cmd.CommandText = $@"
+                    SELECT wp.pos_id, wp.name, wp.barcode, COALESCE(wp.category, ''), COALESCE(wp.price, 0), COALESCE(wp.cost, 0), 1, COALESCE(wp.price, 0), wp.stock_qty,
+                           COALESCE((SELECT json_agg(json_build_object('unitName', mpu.unit_name, 'price', mpu.price, 'cost', mpu.cost, 'qtyPerUnit', mpu.qty_per_unit, 'isDefault', mpu.is_default) ORDER BY mpu.is_default DESC, mpu.id)
+                                     FROM master_products mp JOIN master_product_units mpu ON mpu.product_id = mp.id
+                                     WHERE wp.barcode <> '' AND mp.barcode = wp.barcode), '[]'::json) AS units,
+                           COALESCE((SELECT mp.image_data FROM master_products mp WHERE wp.barcode <> '' AND mp.barcode = wp.barcode ORDER BY mp.id LIMIT 1), '') AS imageData,
+                           COALESCE(wp.cost, 0) AS cost
+                    FROM products wp
+                    WHERE wp.store_id = 'STORE-20260602-7159' AND {where} ORDER BY wp.name {(string.IsNullOrEmpty(search) ? "" : "LIMIT 500")}";
+            }
+            else
+            {
+                cmd.CommandText = $@"
+                    SELECT wp.id, wp.name, wp.barcode, wp.category, wp.box_price, wp.box_cost, wp.box_qty, wp.piece_price, wp.stock_qty,
+                           CASE WHEN wp.master_product_id IS NOT NULL THEN
+                               (SELECT COALESCE(json_agg(json_build_object('unitName', mpu.unit_name, 'price', mpu.price, 'cost', mpu.cost, 'qtyPerUnit', mpu.qty_per_unit, 'isDefault', mpu.is_default) ORDER BY mpu.is_default DESC, mpu.id), '[]'::json)
+                                FROM master_product_units mpu WHERE mpu.product_id = wp.master_product_id)
+                           ELSE '[]'::json END AS units,
+                           COALESCE(mp.image_data, '') AS imageData,
+                           COALESCE(mp.cost, wp.box_cost / NULLIF(wp.box_qty, 0), 0) AS cost
+                    FROM wh_products wp
+                    LEFT JOIN master_products mp ON mp.id = wp.master_product_id
+                    WHERE {where} ORDER BY wp.name {(string.IsNullOrEmpty(search) ? "" : "LIMIT 500")}";
+            }
             if (!string.IsNullOrEmpty(search))
                 cmd.Parameters.AddWithValue("s", $"%{search}%");
             var data = new List<object>();
@@ -2521,20 +2539,35 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         }
 
         [HttpGet("warehouse/inventory-summary")]
-        public IActionResult WhInventorySummary()
+        public IActionResult WhInventorySummary([FromQuery] string? source = null)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
-                SELECT
-                    COUNT(*)::bigint AS total_items,
-                    COALESCE(SUM(w.stock_qty), 0)::bigint AS total_stock_qty,
-                    COALESCE(SUM(COALESCE(mp.cost, w.box_cost / NULLIF(w.box_qty, 0), 0) * w.stock_qty), 0) AS total_cost,
-                    COALESCE(SUM(w.piece_price * w.stock_qty), 0) AS total_price,
-                    COUNT(*) FILTER (WHERE COALESCE(mp.cost, w.box_cost) = 0 OR COALESCE(mp.cost, w.box_cost) IS NULL)::bigint AS zero_cost_items
-                FROM wh_products w
-                LEFT JOIN master_products mp ON mp.id = w.master_product_id
-                WHERE w.is_active = true";
+            if (string.Equals(source, "hq", StringComparison.OrdinalIgnoreCase))
+            {
+                cmd.CommandText = @"
+                    SELECT
+                        COUNT(*)::bigint AS total_items,
+                        COALESCE(SUM(p.stock_qty), 0)::bigint AS total_stock_qty,
+                        COALESCE(SUM(COALESCE(p.cost, 0) * p.stock_qty), 0) AS total_cost,
+                        COALESCE(SUM(COALESCE(p.price, 0) * p.stock_qty), 0) AS total_price,
+                        COUNT(*) FILTER (WHERE COALESCE(p.cost, 0) = 0)::bigint AS zero_cost_items
+                    FROM products p
+                    WHERE p.store_id = 'STORE-20260602-7159' AND p.is_active = true";
+            }
+            else
+            {
+                cmd.CommandText = @"
+                    SELECT
+                        COUNT(*)::bigint AS total_items,
+                        COALESCE(SUM(w.stock_qty), 0)::bigint AS total_stock_qty,
+                        COALESCE(SUM(COALESCE(mp.cost, w.box_cost / NULLIF(w.box_qty, 0), 0) * w.stock_qty), 0) AS total_cost,
+                        COALESCE(SUM(w.piece_price * w.stock_qty), 0) AS total_price,
+                        COUNT(*) FILTER (WHERE COALESCE(mp.cost, w.box_cost) = 0 OR COALESCE(mp.cost, w.box_cost) IS NULL)::bigint AS zero_cost_items
+                    FROM wh_products w
+                    LEFT JOIN master_products mp ON mp.id = w.master_product_id
+                    WHERE w.is_active = true";
+            }
             using var r = cmd.ExecuteReader();
             if (r.Read()) return Ok(new {
                 totalItems = r.GetInt64(0),
@@ -2601,6 +2634,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 return BadRequest(new { error = "Source is required" });
             if (b.Items == null || b.Items.Count == 0)
                 return BadRequest(new { error = "No items" });
+            var isHq = string.Equals(b.StockSource, "hq", StringComparison.OrdinalIgnoreCase);
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var tx = conn.BeginTransaction();
             try
@@ -2611,28 +2645,57 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 {
                     if (it.Qty <= 0) { tx.Rollback(); return BadRequest(new { error = "Invalid quantity for item " + it.ProductId }); }
                     string? name = null, barcode = null; int stock = 0;
-                    using (var get = conn.CreateCommand()) { get.Transaction = tx;
-                        get.CommandText = "SELECT name, barcode, stock_qty FROM wh_products WHERE id = @id";
-                        get.Parameters.AddWithValue("id", it.ProductId);
-                        using var r = get.ExecuteReader();
-                        if (!r.Read()) { tx.Rollback(); return NotFound(new { error = "Product not found: " + it.ProductId }); }
-                        name = r.GetString(0); barcode = r.IsDBNull(1) ? null : r.GetString(1); stock = r.GetInt32(2);
-                    }
-                    using var upd = conn.CreateCommand(); upd.Transaction = tx;
-                    upd.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @q WHERE id = @id";
-                    upd.Parameters.AddWithValue("q", it.Qty);
-                    upd.Parameters.AddWithValue("id", it.ProductId);
-                    upd.ExecuteNonQuery();
+                    if (isHq)
+                    {
+                        using (var get = conn.CreateCommand()) { get.Transaction = tx;
+                            get.CommandText = "SELECT name, barcode, stock_qty FROM products WHERE store_id = 'STORE-20260602-7159' AND pos_id = @id";
+                            get.Parameters.AddWithValue("id", it.ProductId);
+                            using var r = get.ExecuteReader();
+                            if (!r.Read()) { tx.Rollback(); return NotFound(new { error = "Product not found: " + it.ProductId }); }
+                            name = r.GetString(0); barcode = r.IsDBNull(1) ? null : r.GetString(1); stock = r.GetInt32(2);
+                        }
+                        using var upd = conn.CreateCommand(); upd.Transaction = tx;
+                        upd.CommandText = "UPDATE products SET stock_qty = stock_qty + @q WHERE store_id = 'STORE-20260602-7159' AND pos_id = @id";
+                        upd.Parameters.AddWithValue("q", it.Qty);
+                        upd.Parameters.AddWithValue("id", it.ProductId);
+                        upd.ExecuteNonQuery();
 
-                    using var trail = conn.CreateCommand(); trail.Transaction = tx;
-                    trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type, source) VALUES (@pid, @pn, @bc, @qty, @ref, 'manual_receive', @src)";
-                    trail.Parameters.AddWithValue("pid", it.ProductId);
-                    trail.Parameters.AddWithValue("pn", name ?? "");
-                    trail.Parameters.AddWithValue("bc", barcode ?? "");
-                    trail.Parameters.AddWithValue("qty", it.Qty);
-                    trail.Parameters.AddWithValue("ref", reference);
-                    trail.Parameters.AddWithValue("src", b.Source2 == "desktop" ? "desktop" : "mobile");
-                    trail.ExecuteNonQuery();
+                        using var trail = conn.CreateCommand(); trail.Transaction = tx;
+                        trail.CommandText = "INSERT INTO stock_trails (pos_id, store_id, product_id, product_name, barcode, quantity_added, stock_before, stock_after, reference, user_name) VALUES (-NEXTVAL('stock_trails_id_seq'), 'STORE-20260602-7159', @pid, @pn, @bc, @qty, @sb, @sa, @ref, 'Mobile')";
+                        trail.Parameters.AddWithValue("pid", it.ProductId);
+                        trail.Parameters.AddWithValue("pn", name ?? "");
+                        trail.Parameters.AddWithValue("bc", barcode ?? "");
+                        trail.Parameters.AddWithValue("qty", it.Qty);
+                        trail.Parameters.AddWithValue("sb", stock);
+                        trail.Parameters.AddWithValue("sa", stock + it.Qty);
+                        trail.Parameters.AddWithValue("ref", reference);
+                        trail.ExecuteNonQuery();
+                    }
+                    else
+                    {
+                        using (var get = conn.CreateCommand()) { get.Transaction = tx;
+                            get.CommandText = "SELECT name, barcode, stock_qty FROM wh_products WHERE id = @id";
+                            get.Parameters.AddWithValue("id", it.ProductId);
+                            using var r = get.ExecuteReader();
+                            if (!r.Read()) { tx.Rollback(); return NotFound(new { error = "Product not found: " + it.ProductId }); }
+                            name = r.GetString(0); barcode = r.IsDBNull(1) ? null : r.GetString(1); stock = r.GetInt32(2);
+                        }
+                        using var upd = conn.CreateCommand(); upd.Transaction = tx;
+                        upd.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @q WHERE id = @id";
+                        upd.Parameters.AddWithValue("q", it.Qty);
+                        upd.Parameters.AddWithValue("id", it.ProductId);
+                        upd.ExecuteNonQuery();
+
+                        using var trail = conn.CreateCommand(); trail.Transaction = tx;
+                        trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type, source) VALUES (@pid, @pn, @bc, @qty, @ref, 'manual_receive', @src)";
+                        trail.Parameters.AddWithValue("pid", it.ProductId);
+                        trail.Parameters.AddWithValue("pn", name ?? "");
+                        trail.Parameters.AddWithValue("bc", barcode ?? "");
+                        trail.Parameters.AddWithValue("qty", it.Qty);
+                        trail.Parameters.AddWithValue("ref", reference);
+                        trail.Parameters.AddWithValue("src", b.Source2 == "desktop" ? "desktop" : "mobile");
+                        trail.ExecuteNonQuery();
+                    }
                 }
 
                 tx.Commit();
@@ -2642,14 +2705,20 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         }
 
         [HttpGet("warehouse/receivings")]
-        public IActionResult WhGetReceivings([FromQuery] string? from, [FromQuery] string? to, [FromQuery] int? limit)
+        public IActionResult WhGetReceivings([FromQuery] string? from, [FromQuery] string? to, [FromQuery] int? limit, [FromQuery] string? source = null)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            var sql = @"
-                SELECT reference, MIN(created_at) AS created_at, COUNT(*) AS item_count, SUM(qty_change) AS total_qty
-                FROM wh_stock_trails
-                WHERE reference_type = 'manual_receive'";
+            var isHq = string.Equals(source, "hq", StringComparison.OrdinalIgnoreCase);
+            var sql = isHq
+                ? @"
+                    SELECT reference, MIN(created_at) AS created_at, COUNT(*) AS item_count, SUM(quantity_added) AS total_qty
+                    FROM stock_trails
+                    WHERE store_id = 'STORE-20260602-7159' AND reference LIKE 'RECV-%'"
+                : @"
+                    SELECT reference, MIN(created_at) AS created_at, COUNT(*) AS item_count, SUM(qty_change) AS total_qty
+                    FROM wh_stock_trails
+                    WHERE reference_type = 'manual_receive'";
             if (!string.IsNullOrEmpty(from) && DateTime.TryParse(from, out var fd))
                 sql += " AND created_at >= @from";
             if (!string.IsNullOrEmpty(to) && DateTime.TryParse(to, out var td))
@@ -2666,11 +2735,14 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         }
 
         [HttpGet("warehouse/receivings/{ref}/items")]
-        public IActionResult WhGetReceivingItems(string @ref)
+        public IActionResult WhGetReceivingItems(string @ref, [FromQuery] string? source = null)
         {
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT product_id, product_name, barcode, qty_change, created_at FROM wh_stock_trails WHERE reference = @ref OR reference LIKE @ref || ' |%' ORDER BY id";
+            if (string.Equals(source, "hq", StringComparison.OrdinalIgnoreCase))
+                cmd.CommandText = "SELECT product_id, product_name, barcode, quantity_added, created_at FROM stock_trails WHERE store_id = 'STORE-20260602-7159' AND (reference = @ref OR reference LIKE @ref || ' |%') ORDER BY id";
+            else
+                cmd.CommandText = "SELECT product_id, product_name, barcode, qty_change, created_at FROM wh_stock_trails WHERE reference = @ref OR reference LIKE @ref || ' |%' ORDER BY id";
             cmd.Parameters.AddWithValue("ref", @ref);
             var list = new List<object>();
             using var r = cmd.ExecuteReader();
@@ -3480,16 +3552,33 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         }
 
         [HttpGet("warehouse/stock-trails")]
-    public IActionResult WhGetStockTrails([FromQuery] int productId)
+    public IActionResult WhGetStockTrails([FromQuery] int productId, [FromQuery] string? source = null)
     {
         using var conn = Data.PgDatabaseHelper.GetConnection();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = @"
-            SELECT qty_change, reference, reference_type, created_at,
-                   SUM(qty_change) OVER (PARTITION BY product_id ORDER BY created_at) - qty_change AS stock_before,
-                   SUM(qty_change) OVER (PARTITION BY product_id ORDER BY created_at) AS stock_after,
-                   COALESCE(invoice_no,'')
-            FROM wh_stock_trails WHERE product_id = @pid ORDER BY created_at DESC LIMIT 200";
+        if (string.Equals(source, "hq", StringComparison.OrdinalIgnoreCase))
+        {
+            cmd.CommandText = @"
+                SELECT quantity_added::int, reference,
+                       CASE WHEN reference LIKE 'RECV-%' THEN 'manual_receive'
+                            WHEN reference LIKE '%Void%' THEN 'void_return'
+                            WHEN reference LIKE 'WH-%' THEN 'walkin_sale'
+                            WHEN reference LIKE 'Transfer #%' THEN 'transfer_out'
+                            ELSE 'manual_set' END AS type,
+                       created_at, stock_before, stock_after, ''
+                FROM stock_trails
+                WHERE store_id = 'STORE-20260602-7159' AND product_id = @pid
+                ORDER BY created_at DESC, id DESC LIMIT 200";
+        }
+        else
+        {
+            cmd.CommandText = @"
+                SELECT qty_change, reference, reference_type, created_at,
+                       SUM(qty_change) OVER (PARTITION BY product_id ORDER BY created_at) - qty_change AS stock_before,
+                       SUM(qty_change) OVER (PARTITION BY product_id ORDER BY created_at) AS stock_after,
+                       COALESCE(invoice_no,'')
+                FROM wh_stock_trails WHERE product_id = @pid ORDER BY created_at DESC LIMIT 200";
+        }
         cmd.Parameters.AddWithValue("pid", productId);
         var list = new List<object>();
         using var r = cmd.ExecuteReader();
@@ -3530,10 +3619,9 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                         ORDER BY (barcode = @b) DESC LIMIT 1
                     ) mp ON TRUE
                     ON CONFLICT (store_id, pos_id) DO UPDATE
-                    SET stock_qty = @q - COALESCE((
-                            SELECT SUM(-st.quantity_added) FROM stock_trails st
-                            WHERE st.store_id = @sid AND st.product_id = @pid
-                              AND st.quantity_added < 0 AND st.reference LIKE 'Transfer #%'
+                    SET stock_qty = @q + COALESCE((
+                            SELECT SUM(st.quantity_added) FROM stock_trails st
+                            WHERE st.store_id = @sid AND st.product_id = @pid AND st.pos_id < 0
                         ), 0),
                         name = @n, barcode = @b, synced_at = NOW()";
                 var pSid = cmd.Parameters.AddWithValue("sid", req.StoreId);
@@ -3929,15 +4017,18 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             }
             var invoiceNo = $"WH-{today}-{seq:D4}";
 
+            var isHq = string.Equals(req.StockSource, "hq", StringComparison.OrdinalIgnoreCase);
+
             // Create sale header
             int saleId;
             using (var hdr = conn.CreateCommand()) { hdr.Transaction = tx;
-                hdr.CommandText = "INSERT INTO wh_walkin_sales (customer_id, customer_name, total_amount, item_count, invoice_no, payment_method) VALUES (@cid, @cn, 0, @ic, @inv, @pm) RETURNING id";
+                hdr.CommandText = "INSERT INTO wh_walkin_sales (customer_id, customer_name, total_amount, item_count, invoice_no, payment_method, stock_source) VALUES (@cid, @cn, 0, @ic, @inv, @pm, @ss) RETURNING id";
                 hdr.Parameters.AddWithValue("cid", req.CustomerId > 0 ? req.CustomerId : 0);
                 hdr.Parameters.AddWithValue("cn", req.CustomerName.Trim());
                 hdr.Parameters.AddWithValue("ic", req.Items.Count);
                 hdr.Parameters.AddWithValue("inv", invoiceNo);
                 hdr.Parameters.AddWithValue("pm", req.PaymentMethod ?? "Cash");
+                hdr.Parameters.AddWithValue("ss", isHq ? "hq" : "warehouse");
                 saleId = Convert.ToInt32(hdr.ExecuteScalar());
             }
 
@@ -3949,15 +4040,30 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 // Get product info + units
                 string productName = "", barcode = "";
                 int stockQty = 0, boxQty = 1;
-                using (var get = conn.CreateCommand()) { get.Transaction = tx;
-                    get.CommandText = "SELECT name, barcode, stock_qty, box_qty FROM wh_products WHERE id = @pid";
-                    get.Parameters.AddWithValue("pid", item.ProductId);
-                    using var r = get.ExecuteReader();
-                    if (!r.Read()) return BadRequest(new { error = "Product not found: " + item.ProductId });
-                    productName = r.GetString(0);
-                    barcode = r.IsDBNull(1) ? "" : r.GetString(1);
-                    stockQty = r.GetInt32(2);
-                    boxQty = r.IsDBNull(3) ? 1 : Math.Max(1, r.GetInt32(3));
+                if (isHq)
+                {
+                    using (var get = conn.CreateCommand()) { get.Transaction = tx;
+                        get.CommandText = "SELECT name, barcode, stock_qty FROM products WHERE store_id = 'STORE-20260602-7159' AND pos_id = @pid";
+                        get.Parameters.AddWithValue("pid", item.ProductId);
+                        using var r = get.ExecuteReader();
+                        if (!r.Read()) return BadRequest(new { error = "Product not found: " + item.ProductId });
+                        productName = r.GetString(0);
+                        barcode = r.IsDBNull(1) ? "" : r.GetString(1);
+                        stockQty = r.GetInt32(2);
+                    }
+                }
+                else
+                {
+                    using (var get = conn.CreateCommand()) { get.Transaction = tx;
+                        get.CommandText = "SELECT name, barcode, stock_qty, box_qty FROM wh_products WHERE id = @pid";
+                        get.Parameters.AddWithValue("pid", item.ProductId);
+                        using var r = get.ExecuteReader();
+                        if (!r.Read()) return BadRequest(new { error = "Product not found: " + item.ProductId });
+                        productName = r.GetString(0);
+                        barcode = r.IsDBNull(1) ? "" : r.GetString(1);
+                        stockQty = r.GetInt32(2);
+                        boxQty = r.IsDBNull(3) ? 1 : Math.Max(1, r.GetInt32(3));
+                    }
                 }
 
                 // Find unit by index (0 = default piece)
@@ -3966,14 +4072,22 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 int qtyPerUnit = 1;
                 int pointsPerUnit = 0;
 
-                // Get units from master_product_units via master_product_id
+                // Get units from master_product_units via master_product_id (warehouse) or barcode (HQ)
                 using (var get = conn.CreateCommand()) { get.Transaction = tx;
-                    get.CommandText = @"
-                        SELECT mu.unit_name, mu.price, mu.qty_per_unit, mu.points_per_unit
-                        FROM master_product_units mu
-                        JOIN wh_products wp ON wp.master_product_id = mu.product_id
-                        WHERE wp.id = @pid ORDER BY mu.is_default DESC, mu.id LIMIT 20";
+                    get.CommandText = isHq
+                        ? @"
+                            SELECT mu.unit_name, mu.price, mu.qty_per_unit, mu.points_per_unit
+                            FROM master_products mp
+                            JOIN master_product_units mu ON mu.product_id = mp.id
+                            WHERE mp.barcode = @bc AND @bc <> ''
+                            ORDER BY mu.is_default DESC, mu.id LIMIT 20"
+                        : @"
+                            SELECT mu.unit_name, mu.price, mu.qty_per_unit, mu.points_per_unit
+                            FROM master_product_units mu
+                            JOIN wh_products wp ON wp.master_product_id = mu.product_id
+                            WHERE wp.id = @pid ORDER BY mu.is_default DESC, mu.id LIMIT 20";
                     get.Parameters.AddWithValue("pid", item.ProductId);
+                    get.Parameters.AddWithValue("bc", barcode);
                     var units = new List<(string name, decimal price, int qty, int pts)>();
                     {
                         using var r = get.ExecuteReader();
@@ -3993,7 +4107,9 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                     {
                         qtyPerUnit = boxQty;
                         using var fp = conn.CreateCommand(); fp.Transaction = tx;
-                        fp.CommandText = "SELECT piece_price FROM wh_products WHERE id = @pid";
+                        fp.CommandText = isHq
+                            ? "SELECT COALESCE(price, 0) FROM products WHERE store_id = 'STORE-20260602-7159' AND pos_id = @pid"
+                            : "SELECT piece_price FROM wh_products WHERE id = @pid";
                         fp.Parameters.AddWithValue("pid", item.ProductId);
                         unitPrice = Convert.ToDecimal(fp.ExecuteScalar());
                     }
@@ -4008,7 +4124,9 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
 
                 // Deduct stock
                 using var deduct = conn.CreateCommand(); deduct.Transaction = tx;
-                deduct.CommandText = "UPDATE wh_products SET stock_qty = stock_qty - @sd WHERE id = @pid";
+                deduct.CommandText = isHq
+                    ? "UPDATE products SET stock_qty = stock_qty - @sd WHERE store_id = 'STORE-20260602-7159' AND pos_id = @pid"
+                    : "UPDATE wh_products SET stock_qty = stock_qty - @sd WHERE id = @pid";
                 deduct.Parameters.AddWithValue("sd", stockDeduction);
                 deduct.Parameters.AddWithValue("pid", item.ProductId);
                 deduct.ExecuteNonQuery();
@@ -4016,15 +4134,32 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 // Log stock trail
                 var isMobile = string.Equals(req.Source, "mobile", StringComparison.OrdinalIgnoreCase);
                 var trailSource = isMobile ? "mobile" : "desktop";
-                using var trail = conn.CreateCommand(); trail.Transaction = tx;
-                trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type, source) VALUES (@pid, @pn, @bc, @qc, @ref, 'walkin_sale', @src)";
-                trail.Parameters.AddWithValue("pid", item.ProductId);
-                trail.Parameters.AddWithValue("pn", productName);
-                trail.Parameters.AddWithValue("bc", barcode);
-                trail.Parameters.AddWithValue("qc", -stockDeduction);
-                trail.Parameters.AddWithValue("ref", $"{invoiceNo} | {req.CustomerName.Trim()} | {unitName} x {item.Qty}{(isMobile ? " | Mobile" : "")}");
-                trail.Parameters.AddWithValue("src", trailSource);
-                trail.ExecuteNonQuery();
+                if (isHq)
+                {
+                    using var trail = conn.CreateCommand(); trail.Transaction = tx;
+                    trail.CommandText = "INSERT INTO stock_trails (pos_id, store_id, product_id, product_name, barcode, quantity_added, stock_before, stock_after, reference, user_name) VALUES (-NEXTVAL('stock_trails_id_seq'), 'STORE-20260602-7159', @pid, @pn, @bc, @qty, @sb, @sa, @ref, @un)";
+                    trail.Parameters.AddWithValue("pid", item.ProductId);
+                    trail.Parameters.AddWithValue("pn", productName);
+                    trail.Parameters.AddWithValue("bc", barcode);
+                    trail.Parameters.AddWithValue("qty", -stockDeduction);
+                    trail.Parameters.AddWithValue("sb", stockQty);
+                    trail.Parameters.AddWithValue("sa", stockQty - stockDeduction);
+                    trail.Parameters.AddWithValue("ref", $"{invoiceNo} | {req.CustomerName.Trim()} | {unitName} x {item.Qty}{(isMobile ? " | Mobile" : "")}");
+                    trail.Parameters.AddWithValue("un", isMobile ? "Mobile" : "Desktop");
+                    trail.ExecuteNonQuery();
+                }
+                else
+                {
+                    using var trail = conn.CreateCommand(); trail.Transaction = tx;
+                    trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type, source) VALUES (@pid, @pn, @bc, @qc, @ref, 'walkin_sale', @src)";
+                    trail.Parameters.AddWithValue("pid", item.ProductId);
+                    trail.Parameters.AddWithValue("pn", productName);
+                    trail.Parameters.AddWithValue("bc", barcode);
+                    trail.Parameters.AddWithValue("qc", -stockDeduction);
+                    trail.Parameters.AddWithValue("ref", $"{invoiceNo} | {req.CustomerName.Trim()} | {unitName} x {item.Qty}{(isMobile ? " | Mobile" : "")}");
+                    trail.Parameters.AddWithValue("src", trailSource);
+                    trail.ExecuteNonQuery();
+                }
 
                 // Insert sale item
                 using var si = conn.CreateCommand(); si.Transaction = tx;
@@ -4190,8 +4325,9 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         try
         {
             string invoiceNo = "";
+            var isHq = false;
             using var chk = conn.CreateCommand(); chk.Transaction = tx;
-            chk.CommandText = "SELECT is_voided, COALESCE(invoice_no, ''), customer_name, total_amount, COALESCE(payment_method, 'Cash'), COALESCE(customer_id, 0) FROM wh_walkin_sales WHERE id = @id";
+            chk.CommandText = "SELECT is_voided, COALESCE(invoice_no, ''), customer_name, total_amount, COALESCE(payment_method, 'Cash'), COALESCE(customer_id, 0), COALESCE(stock_source, 'warehouse') FROM wh_walkin_sales WHERE id = @id";
             chk.Parameters.AddWithValue("id", id);
             using var cr = chk.ExecuteReader();
             if (!cr.Read()) return NotFound(new { error = "Sale not found" });
@@ -4201,6 +4337,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             var totalAmt = cr.GetDecimal(3);
             var paymentMethod = cr.IsDBNull(4) ? "Cash" : cr.GetString(4);
             var customerId = cr.IsDBNull(5) ? 0 : cr.GetInt32(5);
+            isHq = cr.IsDBNull(6) ? false : string.Equals(cr.GetString(6), "hq", StringComparison.OrdinalIgnoreCase);
             cr.Close();
 
             var isPartial = req?.Items != null && req.Items.Count > 0;
@@ -4225,19 +4362,48 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             {
                 if (isPartial && !voidItemIds.Contains(itemId)) continue;
 
-                using var upd = conn.CreateCommand(); upd.Transaction = tx;
-                upd.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @qty WHERE id = @pid";
-                upd.Parameters.AddWithValue("pid", pid);
-                upd.Parameters.AddWithValue("qty", dedQty);
-                upd.ExecuteNonQuery();
+                if (isHq)
+                {
+                    var stockBefore = 0;
+                    using (var sb = conn.CreateCommand()) { sb.Transaction = tx;
+                        sb.CommandText = "SELECT stock_qty FROM products WHERE store_id = 'STORE-20260602-7159' AND pos_id = @pid";
+                        sb.Parameters.AddWithValue("pid", pid);
+                        var v = sb.ExecuteScalar();
+                        stockBefore = v == null || v == DBNull.Value ? 0 : Convert.ToInt32(v);
+                    }
+                    using var upd = conn.CreateCommand(); upd.Transaction = tx;
+                    upd.CommandText = "UPDATE products SET stock_qty = stock_qty + @qty WHERE store_id = 'STORE-20260602-7159' AND pos_id = @pid";
+                    upd.Parameters.AddWithValue("pid", pid);
+                    upd.Parameters.AddWithValue("qty", dedQty);
+                    upd.ExecuteNonQuery();
 
-                using var trail = conn.CreateCommand(); trail.Transaction = tx;
-                trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, qty_change, reference, reference_type) VALUES (@pid, @pn, @qty, @ref, 'void_return')";
-                trail.Parameters.AddWithValue("pid", pid);
-                trail.Parameters.AddWithValue("pn", pname);
-                trail.Parameters.AddWithValue("qty", dedQty);
-                trail.Parameters.AddWithValue("ref", isPartial ? $"Wholesale Partial Void #{id}" : $"Wholesale Void #{id}");
-                trail.ExecuteNonQuery();
+                    using var trail = conn.CreateCommand(); trail.Transaction = tx;
+                    trail.CommandText = "INSERT INTO stock_trails (pos_id, store_id, product_id, product_name, quantity_added, stock_before, stock_after, reference, user_name) VALUES (-NEXTVAL('stock_trails_id_seq'), 'STORE-20260602-7159', @pid, @pn, @qty, @sb, @sa, @ref, @un)";
+                    trail.Parameters.AddWithValue("pid", pid);
+                    trail.Parameters.AddWithValue("pn", pname);
+                    trail.Parameters.AddWithValue("qty", dedQty);
+                    trail.Parameters.AddWithValue("sb", stockBefore);
+                    trail.Parameters.AddWithValue("sa", stockBefore + dedQty);
+                    trail.Parameters.AddWithValue("ref", isPartial ? $"Wholesale Partial Void #{id}" : $"Wholesale Void #{id}");
+                    trail.Parameters.AddWithValue("un", req?.UserName ?? "");
+                    trail.ExecuteNonQuery();
+                }
+                else
+                {
+                    using var upd = conn.CreateCommand(); upd.Transaction = tx;
+                    upd.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @qty WHERE id = @pid";
+                    upd.Parameters.AddWithValue("pid", pid);
+                    upd.Parameters.AddWithValue("qty", dedQty);
+                    upd.ExecuteNonQuery();
+
+                    using var trail = conn.CreateCommand(); trail.Transaction = tx;
+                    trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, qty_change, reference, reference_type) VALUES (@pid, @pn, @qty, @ref, 'void_return')";
+                    trail.Parameters.AddWithValue("pid", pid);
+                    trail.Parameters.AddWithValue("pn", pname);
+                    trail.Parameters.AddWithValue("qty", dedQty);
+                    trail.Parameters.AddWithValue("ref", isPartial ? $"Wholesale Partial Void #{id}" : $"Wholesale Void #{id}");
+                    trail.ExecuteNonQuery();
+                }
 
                 using var mi = conn.CreateCommand(); mi.Transaction = tx;
                 mi.CommandText = "UPDATE wh_walkin_sale_items SET is_voided = TRUE WHERE id = @iid";
@@ -4324,6 +4490,14 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         using var tx = conn.BeginTransaction();
         try
         {
+            var isHq = false;
+            using (var src = conn.CreateCommand()) { src.Transaction = tx;
+                src.CommandText = "SELECT COALESCE(stock_source, 'warehouse') FROM wh_walkin_sales WHERE id = @sid";
+                src.Parameters.AddWithValue("sid", id);
+                var v = src.ExecuteScalar();
+                isHq = v != null && v != DBNull.Value && string.Equals(v.ToString(), "hq", StringComparison.OrdinalIgnoreCase);
+            }
+
             // Restore all original stock deductions
             using var orig = conn.CreateCommand(); orig.Transaction = tx;
             orig.CommandText = "SELECT product_id, product_name, stock_deduction FROM wh_walkin_sale_items WHERE sale_id = @sid";
@@ -4335,13 +4509,22 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             foreach (var (pid, pn, qty) in restores)
             {
                 using var res = conn.CreateCommand(); res.Transaction = tx;
-                res.CommandText = "UPDATE wh_products SET stock_qty = stock_qty + @qty WHERE id = @pid";
+                res.CommandText = isHq
+                    ? "UPDATE products SET stock_qty = stock_qty + @qty WHERE store_id = 'STORE-20260602-7159' AND pos_id = @pid"
+                    : "UPDATE wh_products SET stock_qty = stock_qty + @qty WHERE id = @pid";
                 res.Parameters.AddWithValue("pid", pid);
                 res.Parameters.AddWithValue("qty", qty);
                 res.ExecuteNonQuery();
 
                 using var trail = conn.CreateCommand(); trail.Transaction = tx;
-                trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) VALUES (@pid, @pn, '', @qty, @ref, 'walkin_sale_edit_restore')";
+                if (isHq)
+                {
+                    trail.CommandText = "INSERT INTO stock_trails (pos_id, store_id, product_id, product_name, quantity_added, stock_before, stock_after, reference, user_name) VALUES (-NEXTVAL('stock_trails_id_seq'), 'STORE-20260602-7159', @pid, @pn, @qty, 0, 0, @ref, 'Desktop')";
+                }
+                else
+                {
+                    trail.CommandText = "INSERT INTO wh_stock_trails (product_id, product_name, barcode, qty_change, reference, reference_type) VALUES (@pid, @pn, '', @qty, @ref, 'walkin_sale_edit_restore')";
+                }
                 trail.Parameters.AddWithValue("pid", pid);
                 trail.Parameters.AddWithValue("pn", pn);
                 trail.Parameters.AddWithValue("qty", qty);
@@ -5358,7 +5541,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     public class WhStockDto { public int StockQty { get; set; } }
     public class WhStockMoveDto { public int QtyChange { get; set; } public string Reason { get; set; } = ""; public string? Source { get; set; } }
 
-    public class WhReceivingDto { public string Source { get; set; } = ""; public string? Source2 { get; set; } public List<WhReceivingItemDto> Items { get; set; } = new(); }
+    public class WhReceivingDto { public string Source { get; set; } = ""; public string? Source2 { get; set; } public string? StockSource { get; set; } public List<WhReceivingItemDto> Items { get; set; } = new(); }
     public class WhReceivingItemDto { public int ProductId { get; set; } public int Qty { get; set; } }
     public class WhClientDto { public string Name { get; set; } = ""; public string? Contact { get; set; } public string? Address { get; set; } public string? StoreType { get; set; } public string? StoreId { get; set; } }
     public class WhOrderDto { public int ClientId { get; set; } public string? ClientName { get; set; } public string? Notes { get; set; } public List<WhOrderItemDto>? Items { get; set; } }
@@ -5401,6 +5584,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         public string PaymentMethod { get; set; } = "Cash";
         public decimal CashReceived { get; set; }
         public string? Source { get; set; }
+        public string? StockSource { get; set; }
         public List<WhWalkinSellItem> Items { get; set; } = new();
     }
     public class WhVoidRequest { public string Reason { get; set; } = ""; public string? UserName { get; set; } public List<WhVoidItemDto>? Items { get; set; } }

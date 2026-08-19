@@ -1155,7 +1155,7 @@
       const q = document.getElementById('sellSearch').value.trim();
       const box = document.getElementById('productResults');
       if (!q) { box.innerHTML = ''; return; }
-      const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true';
+      const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true&source=hq';
       try {
         const r = await fetch(url);
         const data = await r.json();
@@ -1181,7 +1181,7 @@
     async function ensureSellProdCache() {
       if (sellProdCacheLoaded) return;
       try {
-        const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true');
+        const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&source=hq');
         const data = await r.json();
         sellProdCache = data || [];
         sellProdCacheLoaded = true;
@@ -1694,6 +1694,7 @@
         paymentMethod: method,
         cashReceived: cash,
         source: 'mobile',
+        stockSource: 'hq',
         items
       };
       try {
@@ -1783,7 +1784,7 @@
 
     async function loadInventoryTotals() {
       try {
-        const r = await fetch(API + '/dashboard/warehouse/inventory-summary');
+        const r = await fetch(API + '/dashboard/warehouse/inventory-summary?source=hq');
         const j = await r.json();
         document.getElementById('invCost').textContent = '₱' + Number(j.totalCost || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         document.getElementById('invGross').textContent = '₱' + Number(j.totalPrice || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1830,7 +1831,7 @@
     async function searchInventory() {
       loadInventoryTotals();
       const q = document.getElementById('invSearch').value.trim();
-      const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true';
+      const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true&source=hq';
       try {
         const r = await fetch(url);
         const data = await r.json();
@@ -1880,7 +1881,7 @@
       if (!IN_APP || !AndroidPrinter.isConnected()) { toast('Connect printer first', 'error'); return; }
       const q = document.getElementById('invSearch').value.trim();
       const cat = getInvCatFilter();
-      const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true';
+      const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true&source=hq';
       let data = [];
       try {
         const r = await fetch(url);
@@ -2118,7 +2119,7 @@
 
     async function loadProducts() {
       const q = document.getElementById('prodSearch').value.trim();
-      const url = API + '/dashboard/warehouse/products?activeOnly=true&noImage=true' + (q ? '&search=' + encodeURIComponent(q) : '');
+      const url = API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&source=hq' + (q ? '&search=' + encodeURIComponent(q) : '');
       const list = document.getElementById('prodResults');
       list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Loading...</p>';
       try {
@@ -2191,7 +2192,7 @@
       if (!box) return;
       box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading trail...</p>';
       try {
-        const r = await fetch(API + '/dashboard/warehouse/stock-trails?productId=' + id);
+        const r = await fetch(API + '/dashboard/warehouse/stock-trails?productId=' + id + '&source=hq');
         const data = await r.json();
         box.innerHTML = '';
         if (!data || !data.length) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">No stock trail records</p>'; return; }
@@ -2443,7 +2444,7 @@
       if (!q) { box.innerHTML = ''; return; }
       box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading...</p>';
       try {
-        const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&search=' + encodeURIComponent(q));
+        const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&search=' + encodeURIComponent(q) + '&source=hq');
         const data = await r.json();
         recvProdCache = data || [];
         box.innerHTML = '';
@@ -2632,7 +2633,7 @@
       const source = document.getElementById('recvSource').value.trim();
       if (!source) { toast('Enter the supplier / source', 'error'); document.getElementById('recvSource').focus(); return; }
       if (!recvCart.length) { toast('Add at least one item', 'error'); return; }
-      const body = { source, items: recvCart.map(i => ({ productId: i.id, qty: i.qty })) };
+      const body = { source, stockSource: 'hq', items: recvCart.map(i => ({ productId: i.id, qty: i.qty })) };
       const btn = document.getElementById('btnSaveReceiving');
       btn.disabled = true; btn.textContent = 'SAVING...';
       try {
@@ -2706,7 +2707,7 @@
       const box = document.getElementById('recvHistoryList');
       box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading...</p>';
       try {
-        const r = await fetch(API + '/dashboard/warehouse/receivings');
+        const r = await fetch(API + '/dashboard/warehouse/receivings?source=hq');
         const rows = await r.json();
         box.innerHTML = '';
         if (!rows || !rows.length) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">No receiving history yet</p>'; return; }
@@ -2729,7 +2730,7 @@
 
     async function showRecvHistoryItems(ref) {
       try {
-        const r = await fetch(API + '/dashboard/warehouse/receivings/' + encodeURIComponent(ref) + '/items');
+        const r = await fetch(API + '/dashboard/warehouse/receivings/' + encodeURIComponent(ref) + '/items?source=hq');
         const items = await r.json();
         const box = document.getElementById('recvHistoryList');
         box.innerHTML = '<div class="card !mb-2"><p class="text-white text-xs font-bold">' + ref + '</p>' +
@@ -2747,7 +2748,7 @@
 
     async function reprintReceiving(ref) {
       try {
-        const r = await fetch(API + '/dashboard/warehouse/receivings/' + encodeURIComponent(ref) + '/items');
+        const r = await fetch(API + '/dashboard/warehouse/receivings/' + encodeURIComponent(ref) + '/items?source=hq');
         const items = await r.json();
         const parts = ref.split(' | ');
         lastReceiving = { reference: ref, source: parts[1] || '—', items: (items || []).map(i => ({ productName: i.productName, qty: i.qty })) };

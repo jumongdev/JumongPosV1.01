@@ -736,6 +736,11 @@ public static class PgDatabaseHelper
         wvPmMig.CommandText = "ALTER TABLE wh_walkin_sales ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'Cash'";
         try { wvPmMig.ExecuteNonQuery(); } catch { }
 
+        // Migration: stock_source on wh_walkin_sales ('warehouse' | 'hq' - which stock table the sale deducted)
+        using var wvSrcMig = conn.CreateCommand();
+        wvSrcMig.CommandText = "ALTER TABLE wh_walkin_sales ADD COLUMN IF NOT EXISTS stock_source TEXT NOT NULL DEFAULT 'warehouse'";
+        try { wvSrcMig.ExecuteNonQuery(); } catch { }
+
         using var whVoidLogMig = conn.CreateCommand();
         whVoidLogMig.CommandText = @"
             CREATE TABLE IF NOT EXISTS wh_void_logs (
