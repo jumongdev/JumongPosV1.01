@@ -1,6 +1,10 @@
 ﻿# JumongPOS — Full Project Guide for AI Agents
 
-## Latest Change (2026-08-19) — v1.1.39 (Cloud API) + v1.1.47 (POS client): HQ Stock Pull IMPLEMENTED (Phase 1 of the HQ Stock Sync Roadmap)
+## Latest Change (2026-08-20) — v1.1.48 (POS client): HQ POS Wholesale Form/Button REMOVED (mobile app now handles wholesale from HQ stock)
+
+**Request:** "ang wholesale sa pos hq pwede na alisin?" — the HQ POS sidebar **🏪 Wholesale** button (`MainForm.cs` `btnWhSell_Click` + sidebar tuple) and the whole `Forms/WarehouseSellForm.cs` (warehouse-stock walk-in sell UI + WH-INVENTORY viewer + wholesale REPORT popup) are DELETED. Since v1.1.38 the warehouse mobile app (whmobile.html) handles wholesale selling/receiving from HQ stock, so the POS-side wholesale (which sold from the retiring `wh_products`/warehouse stock via `/warehouse/sell` without `stockSource=hq`) is redundant. Client AppVersion `"1.1.47"`→`"1.1.48"`; API `latestVer` `"1.1.47"`→`"1.1.48"` (API stays 1.1.39). Published (exe 211,350,972 B) + drop pushed + **GitHub release v1.1.48** (release id 373189616, asset id 521064238, verified latest). Git `29b92c0`. Wholesale REPORT/inventory/end-shift remain available on the mobile app; other stores unaffected (the button was HQ/DEV-only).
+
+## Previous Change (2026-08-19) — v1.1.39 (Cloud API) + v1.1.47 (POS client): HQ Stock Pull IMPLEMENTED (Phase 1 of the HQ Stock Sync Roadmap)
 
 **Context:** the plan session below (previous entry) was approved and Phase 1 is now BUILT + DEPLOYED. The pre-implementation check first CONFIRMED the bug live: server vs HQ local comparison showed local = 55,487 units vs server = 53,357 — a **+2,130 gap on exactly 5 items**, 100% explained by the owner's transfers #838 (20:06) + #840 (20:18) to ACGS (Ginebra Round −1,800, Ginebra Frasco −180, Cobra by12 −50, Mountain Dew by12 −50, Sting by12 −50). Server trails (`pos_id<0`, ref `Transfer #838/#840 -> ACGS - Naic Market`) proved the deductions exist server-side while HQ local never knew.
 
