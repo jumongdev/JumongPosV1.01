@@ -1,6 +1,10 @@
 ﻿# JumongPOS — Full Project Guide for AI Agents
 
-## Latest Change (2026-08-20) — perf: shop catalog 6.4s → 250ms + PG pool 300 (100-customer concurrency verified)
+## Latest Change (2026-08-20) — web-only: Shop Mobile Caching (instant repeat opens on phones)
+
+**Request:** "pag na load na sa cellphone sasave ba ito sa mobile nila para bumilis sa mga susunod na open?" — YES now. Previously every shop open re-fetched the catalog (~250ms warm, but adds up on phone data). Now: (1) `shop.html` caches the catalog in **localStorage (`shop_catalog_cache`, 5-min TTL)** — first paint renders instantly from cache on repeat opens, then background-refreshes from the server; offline → still shows the cached catalog (order CONFIRM still validates stock server-side, so stale stock ≤5 min is safe); (2) `GET /shop/product/{id}` now sends **`Cache-Control: public, max-age=300`** so phone browsers reuse the ~60KB base64 product images instead of re-downloading them every visit. No version bump (web + header only). Deployed live + publish copy; verified `Cache-Control` header + cache code live. Git `1441e6a`.
+
+## Previous Change (2026-08-20) — perf: shop catalog 6.4s → 250ms + PG pool 300 (100-customer concurrency verified)
 
 **Request:** "mga customer connecting to this server in 100 customer my lag?" — investigated server capacity for 100 concurrent shop customers. Found ONE real bottleneck: **`GET /shop/catalog` took 6.4s** (the LATERAL join on `products WHERE store_id=@sid AND barcode=mp.barcode` had NO index → scanned all 703 HQ products PER catalog row = ~485k row filters). Also raised the Npgsql pool (default 100 → 300) as cheap insurance.
 
