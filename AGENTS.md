@@ -1,6 +1,30 @@
 ﻿# JumongPOS — Full Project Guide for AI Agents
 
-## Latest Change (2026-08-19) — v1.1.46 (POS client): Stock Receiving Receipt + History Reprint — Item Names Wrap (80mm, no more truncation)
+## Latest Change (2026-08-19) — v1.1.37 (Cloud API) + web-only: HQ→POS Transfer Fixes (clickable + NEW TRANSFER + deduction survives the 30s snapshot push)
+
+**Request:** "i cannot click the new transfer in HQ - pos" + "stock trail pala d nagana" — TWO real bugs found in the v1.1.36 HQ→POS transfer feature:
+
+**(1) Modal never opened (can't click + NEW TRANSFER).** The `stTransferModal` + `stTransferViewOpen` modals were placed AFTER the warehouse section in `index.html` — OUTSIDE the `storeTransferPanel` Alpine x-data scope (the panel div closes at the end of the transfer subpage). `x-show="stTransferModal"` resolved against the enclosing `warehousePanel` scope → ReferenceError → the modal stayed hidden forever, so clicking "+ NEW TRANSFER" did nothing. **Fix: moved BOTH modal blocks inside the `storeTransferPanel` div** (after the pagination `</template>`, before the panel's closing `</div>`). Fixed-position overlays work fine inside the section div (same pattern as the warehouse modals). Div balance 640/640, template 215/215; 115 lines moved (git diff = exactly 115+/115−).
+
+**(2) HQ stock deduction UNDONE within 30 seconds (this is the "stock trail d nagana" + duplicated-stock bug).** `WhReceiveTransfer` (hq branch) deducts the HQ `products` row server-side and writes a `stock_trails` row (`pos_id = -NEXTVAL`, `product_id` = HQ pos_id, ref `Transfer #{id} -> {clientName}`, user `System`). BUT the HQ POS runs `PushAllUnsyncedAsync` every 30s, which sends its FULL local product list (local stock never knows about the transfer deduction) to `/warehouse/stock-snapshot` → the UPSERT `ON CONFLICT (store_id, pos_id) DO UPDATE SET stock_qty = @q` blindly overwrote the deduction back to the pre-transfer value → HQ stock NEVER actually decreased and the receiving store's +1 made stock DUPLICATED. **Fix (DashboardController.cs `WhStockSnapshot` ~line 3532):** the conflict UPDATE now subtracts outstanding HQ transfer deductions:
+```sql
+SET stock_qty = @q - COALESCE((
+    SELECT SUM(-st.quantity_added) FROM stock_trails st
+    WHERE st.store_id = @sid AND st.product_id = @pid
+      AND st.quantity_added < 0 AND st.reference LIKE 'Transfer #%'
+), 0), name = @n, barcode = @b, synced_at = NOW()
+```
+**GOTCHA (first fix attempt failed):** the trail's `pos_id` is the NEGATIVE `-NEXTVAL` (collision-avoidance), NOT the HQ pos_id — the subquery must match on **`st.product_id`** (= HQ pos_id), not `st.pos_id`. With `pos_id` it matched nothing → deduction still overwritten (verified live: 102→101→102). Switched to `product_id` → verified live: **102 → 101 (receive) → still 101 after 45s** (one full 30s push window passed). The offset model is accounting-correct forever: server stock = pushed local − Σ transfer-out trails (the local DB never applies those deductions itself; when HQ later receives/sells, the local delta still flows correctly).
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs:3532` | `WhStockSnapshot` UPSERT `stock_qty` now subtracts outstanding HQ transfer-deduction trails (match `store_id` + `product_id`, `quantity_added < 0`, ref `LIKE 'Transfer #%'`). |
+| `JumongCloudAPI/wwwroot/index.html` | Moved `stTransferModal` + `stTransferViewOpen` blocks inside the `storeTransferPanel` x-data div (fixes modal scope — + NEW TRANSFER now opens, form/items/save resolve correctly). |
+| `JumongCloudAPI/Controllers/DashboardController.cs:1400,1921` | Version bumped `"1.1.36"` → `"1.1.37"`. |
+
+**Verified live:** v1.1.37 (API), served page has modal inside panel scope (`x-data="storeTransferPanel"` before the modal comment, warehousePanel after). Live transfer tests #835/#836 (DINGDONG SWEET & SPICY 100G, HQ pos_id 5628, stock 102): receive → 101, wait 45s (snapshot window) → **101 stays** (fix #2 proven; pre-fix it bounced to 102). Test data cleaned after each run (stock restored to 102, trail + transfer rows deleted via psql). Deployed via WinRM stop→copy→start (GOTCHA: the FIRST copy ran while the service was live → `System.*.dll` locked → JumongCloudAPI.dll itself did NOT land (version still 1.1.36) — ALWAYS `net stop` BEFORE `Copy-Item`). Web files live + publish copy synced. Git pushed (`df84a74`). **Remaining:** none blocking. NOTE for the future: the 🛤️ Stock Trail panel reads each POS's LOCAL SQLite via agent — server-side HQ transfer deduction trails are NOT visible there by design (they live only in cloud `stock_trails`; visible via Stock Status / Store Transfer panel / psql). Offer to surface them in the panel if the user wants them on-screen.
+
+## Previous Change (2026-08-19) — v1.1.46 (POS client): Stock Receiving Receipt + History Reprint — Item Names Wrap (80mm, no more truncation)
 
 **Request:** "in pos client print what receivied can you fix the resibo in reprint to fit the name of the item in 80mm" + "d ko kasi mabasa sa pos client pag nag reprint sila ng history" + "item name wrap to second [line] - cur rcv after?" — the STOCK RECEIVING receipt (`PrintStockReceiving`) and the receiving HISTORY reprint (`PrintStockReceivingHistory`, via StockReceivingForm → HISTORY → PRINT) truncated long item names with `".."` (same bug family as the retail/wholesale receipts fixed in v1.1.40, but these two paths were missed). Long names are now WRAPPED onto continuation lines, and the **Cur/Rcv/New stats move to the END of the wrapped name (last line)** so the numbers stay readable.
 
