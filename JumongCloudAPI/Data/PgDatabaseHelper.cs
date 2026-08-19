@@ -751,6 +751,11 @@ public static class PgDatabaseHelper
         stChanMig.CommandText = "ALTER TABLE stock_trails ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT 'other'";
         try { stChanMig.ExecuteNonQuery(); } catch { }
 
+        // Migration: index for the shop catalog LATERAL barcode lookup (was scanning all HQ products per row -> 6s)
+        using var prodBcMig = conn.CreateCommand();
+        prodBcMig.CommandText = "CREATE INDEX IF NOT EXISTS idx_products_store_barcode ON products(store_id, barcode)";
+        try { prodBcMig.ExecuteNonQuery(); } catch { }
+
         using var whVoidLogMig = conn.CreateCommand();
         whVoidLogMig.CommandText = @"
             CREATE TABLE IF NOT EXISTS wh_void_logs (
