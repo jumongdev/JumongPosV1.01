@@ -1602,9 +1602,22 @@ tailwind.config = {
 
               <!-- WAREHOUSE — Inventory -->
               <div class="px-4 py-2.5 border-b border-gray-100 dark:border-[#222255]/50 bg-gray-50/50 dark:bg-[#0d0d25]/50">
-                <h4 class="text-[11px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">WAREHOUSE — INVENTORY</h4>
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                  <h4 class="text-[11px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">WAREHOUSE — INVENTORY</h4>
+                  <div class="flex items-center gap-1">
+                    <button @click="setStockFilter('all')"
+                      :class="stockFilter==='all' ? 'bg-cyan-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'"
+                      class="text-[10px] px-2 py-1 rounded-lg font-medium transition-colors">ALL <span class="opacity-70" x-text="'('+products.length+')'"></span></button>
+                    <button @click="setStockFilter('instock')"
+                      :class="stockFilter==='instock' ? 'bg-emerald-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'"
+                      class="text-[10px] px-2 py-1 rounded-lg font-medium transition-colors">IN STOCK <span class="opacity-70" x-text="'('+stockCounts.instock+')'"></span></button>
+                    <button @click="setStockFilter('out')"
+                      :class="stockFilter==='out' ? 'bg-red-600 text-white' : 'border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]'"
+                      class="text-[10px] px-2 py-1 rounded-lg font-medium transition-colors">OUT OF STOCK <span class="opacity-70" x-text="'('+stockCounts.out+')'"></span></button>
+                  </div>
+                </div>
               </div>
-              <template x-if="filtered.length===0"><div class="text-center py-6 text-gray-400">No products</div></template>
+              <template x-if="filtered.length===0"><div class="text-center py-6 text-gray-400">No products <span x-show="stockFilter!=='all'" class="text-gray-500">match this stock filter</span></div></template>
               <template x-if="filtered.length > 0">
                 <table class="w-full text-xs">
                   <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">

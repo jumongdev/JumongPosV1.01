@@ -670,7 +670,7 @@ Alpine.store('app', {
 
   /* ΓöÇΓöÇ Warehouse ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('warehousePanel', () => ({
-    products: [], clientsData: [], orders: [], transfers: [], loading: true, catFilter: '', search: '',
+    products: [], clientsData: [], orders: [], transfers: [], loading: true, catFilter: '', search: '', stockFilter: 'all',
     salesData: [], saleFrom: '', saleTo: '', saleViewOpen: false, saleViewItems: [], saleSummary: null,
     invActivity: [], invSearch: '', invFrom: '', invTo: '', invExpanded: true, invActivityLoading: false,
     inventorySummary: null,
@@ -755,9 +755,17 @@ Alpine.store('app', {
       let items = this.sp === 'product' || this.sp === 'inventory' ? this.products : this.sp === 'onlineorder' ? this.orders : this.transfers;
       if (this.catFilter && (this.sp === 'product' || this.sp === 'inventory')) items = items.filter(x => x.category === this.catFilter);
       if (this.search && this.sp !== 'transfer') { const q = this.search.toLowerCase(); items = items.filter(x => JSON.stringify(x).toLowerCase().includes(q)) }
+      if (this.sp === 'inventory' && this.stockFilter === 'instock') items = items.filter(x => (x.stockQty || 0) > 0);
+      if (this.sp === 'inventory' && this.stockFilter === 'out') items = items.filter(x => (x.stockQty || 0) <= 0);
       return items;
     },
+    get stockCounts() {
+      let instock = 0, out = 0;
+      this.products.forEach(x => { if ((x.stockQty || 0) > 0) instock++; else out++ });
+      return { instock, out };
+    },
     setFilter(cat) { this.catFilter = cat },
+    setStockFilter(v) { this.stockFilter = v },
 
     async loadSales() {
       this.loading = true;
