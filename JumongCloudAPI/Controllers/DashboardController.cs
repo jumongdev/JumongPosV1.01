@@ -5411,7 +5411,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         [HttpGet("agent/status")]
         public IActionResult AgentStatus()
         {
-            var latestVer = "1.1.47";
+            var latestVer = "1.1.48";
             var list = _agents.Select(a => new { storeId = a.Key, lastSeen = a.Value.lastSeen, ip = a.Value.ip, machine = a.Value.machine, appVersion = a.Value.appVersion, outdated = string.Compare(latestVer, a.Value.appVersion ?? "", StringComparison.Ordinal) > 0, hasError = a.Value.hasError, errorSummary = a.Value.errorSummary }).OrderBy(a => a.storeId);
             return Ok(list);
         }

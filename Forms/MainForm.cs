@@ -279,22 +279,6 @@ public partial class MainForm : Form
         form.ShowDialog();
     }
 
-    private void btnWhSell_Click(object? sender, EventArgs e)
-    {
-        try
-        {
-            ErrorLogger.Log("btnWhSell", "Opening WarehouseSellForm...");
-            using var form = new WarehouseSellForm(_currentUser);
-            form.ShowDialog();
-        }
-        catch (Exception ex)
-        {
-            ErrorLogger.Log("btnWhSell", ex);
-            MessageBox.Show($"Error: {ex.Message}", "Wholesale Error",
-                MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-    }
-
     private void btnInventoryCount_Click(object? sender, EventArgs e)
     {
         using var form = new InventoryHistoryForm(_currentUser);
@@ -456,7 +440,6 @@ public partial class MainForm : Form
             ("\uD83D\uDCCA", "Reports", btnReports_Click, false),
             ("\uD83D\uDCB3", "Credit", btnCredit_Click, false),
             ("\uD83D\uDCE6", "Inventory", btnInventory_Click, false),
-            ("\uD83C\uDFEA", "Wholesale", btnWhSell_Click, false),
             ("\uD83D\uDCCA", "Inventory Count", btnInventoryCount_Click, false),
             ("\uD83D\uDCE6", "Incoming Stock", btnOnlineOrders_Click, false),
             ("\uD83D\uDCB8", "Expenses", btnExpenses_Click, false),
