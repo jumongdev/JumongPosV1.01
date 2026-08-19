@@ -1,6 +1,71 @@
 ﻿# JumongPOS — Full Project Guide for AI Agents
 
-## Latest Change (2026-08-19) — v1.1.38 (Cloud API) + mobile web: Warehouse Mobile App Now Uses HQ Stock (+ dashboard Warehouse Inventory stock filter + modal ADD button fixes)
+## Latest Change (2026-08-19) — PLAN SESSION (not yet implemented): HQ Stock Sync Roadmap — "One Live Inventory, Separate Channel Reporting"
+
+**Context:** after v1.1.38 (mobile app now sells/receives from HQ stock on the server), the owner identified the core gap: **the HQ POS local SQLite never learns about server-side stock deltas** (HQ→POS transfers, mobile sales/receives) → HQ keeps selling stock that physically left or was already sold (oversell), and end-shift inventory reconciliation mismatches. Long discussion (options weighed: webhook-via-agent 3s poll, SQLite-over-SMB share, PG direct via LAN, stock-pull) produced the following AGREED architecture and phased plan. **The plan below was user-approved ("ok") on 2026-08-19 with the instruction: save this to AGENTS.md BEFORE implementing. Implementation starts with the server-vs-local stock comparison, then Phase 1.**
+
+### Agreed end-state architecture ("same inventory, separate reporting")
+
+```
+        SERVER PG — products (ONE live inventory per item, STORE-20260602-7159)
+           ▲            ▲            ▲
+      HQ POS (Phase 2:    MOBILE app (DONE:    E-COMMERCE (DONE:
+      stock ops via LAN   source=hq v1.1.38,   shop.html hqStock +
+      API, push OFF,      sells/receives on    stock reservation on
+      delta writes)       products)            confirm v1.1.33)
+           │            │            │
+     separate ledgers: sales / wh_walkin_sales / online_orders
+     → separate sales reporting, ONE inventory
+```
+- Tagging: add `channel` column to `stock_trails` (retail/mobile/ecommerce/transfer/receive) so every movement shows who used it. Much tagging already exists (trail references, user_name Mobile/System, ledger tables).
+- End-Shift v2 (HQ): money/cash = retail drawer only (unchanged); inventory reconciliation reads SERVER inventory cost (Actual) + per-channel movement lines (retail COGS / mobile wholesale / ecommerce / receivings) → one inventory, per-channel report.
+- **Other stores (HVR/ACGS/Naic) are NOT affected** — all PG rows are store-scoped (`store_id`), and every HQ-only behavior is gated on `StoreId == STORE-20260602-7159` (same build for everyone, same pattern as the HQ-only Warehouse Sell button).
+
+### Phase 1 — Pull @ 10s (HQ local becomes a mirror of PG) — NEXT TO IMPLEMENT
+
+| Area | Change |
+|---|---|
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs` | Migration: `ALTER TABLE stock_trails ADD COLUMN IF NOT EXISTS applied_at TIMESTAMPTZ` (marks server-written deltas consumed by the HQ POS local apply). |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | `WhStockSnapshot` offset formula → `@q + SUM(quantity_added WHERE store_id=@sid AND product_id=@pid AND pos_id < 0 AND applied_at IS NULL)`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | New `GET /warehouse/stock-deltas?storeId=&afterId=` → unapplied `pos_id<0` trails (id, productId, productName, barcode, quantityAdded, stockBefore, stockAfter, reference, createdAt), ordered by id, LIMIT 1000. New `POST /warehouse/stock-deltas/ack` `{storeId, maxId}` → `UPDATE stock_trails SET applied_at=NOW() WHERE store_id=@sid AND pos_id<0 AND id<=@maxId AND applied_at IS NULL`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | Version 1.1.38 → 1.1.39. |
+| `Services/SyncService.cs` (client) | New `PullStockDeltasAsync()` — **HQ-gated** (`StoreId` check). Loop: (1) GET deltas where `id > StockPullLastTrailId` (Settings key); (2) apply each locally: `UPDATE Products SET StockQty += delta` + INSERT local `StockTrail` row (reference copied from server, Synced=1 — **never pushed back**, prevents duplicate server history); (3) `await PushStockSnapshotAsync()` (delta push of affected products); (4) POST ack with max id. Idempotent: save `StockPullLastTrailId` BEFORE applying, so a failed push/ack just retries next cycle without re-applying. Transient double-count window (push landed, ack not yet) is self-correcting on the next cycle. |
+| `Forms/MainForm.cs` (client) | New 10s timer, HQ-gated + STORE-DEV-0001 skip; also one run at startup (after the 3s drain). |
+| `Services/AppVersion.cs` (client) | 1.1.46 → 1.1.47; API `latestVer` 1.1.46 → 1.1.47. |
+
+**First-run effect (EXPECTED + correct, must warn staff):** the first pull applies ALL historic unapplied server deltas (all past HQ→POS transfer deductions + today's mobile ops the local never knew) → HQ local stock drops once to match the server. One-time auto-reconcile, everything has a trail.
+**Operating rule (already in force):** one entry point per movement — receiving on mobile = only mobile; HQ POS staff keep selling normally (their deltas flow through pushed snapshots). After Phase 1, HQ local mirrors server within ~10s so the POS stock guard (can't add out-of-stock) protects against oversell.
+**Optional upgrade (user undecided):** pre-pay server stock check (zero oversell between pulls) — deferred.
+
+### Phase 2 — Stock authority moves to PG (the "point HQ stock source to server via LAN" the owner asked for)
+
+| Item | Detail |
+|---|---|
+| HQ snapshot push | **OFF** (HQ-gated) — HQ no longer full-pushes stock; it is direct. |
+| HQ stock writes | Convert to **delta writes** (guarded `UPDATE products SET stock_qty = stock_qty ± N WHERE ... AND stock_qty >= N`) instead of absolute-set, so concurrent mobile/ecommerce writes never get clobbered (no lost update). |
+| HQ stock reads | Option A (pure live reads — simple, stalls if server hangs) vs **Option B (live guards + local cache refreshed ~10s — recommended)**. User to pick at Phase 2 time. |
+| End-Shift v2 | Inventory reconciliation from PG: new endpoint `/dashboard/end-shift-snapshot?storeId=HQ` returning per-channel shift summary (retail/wholesale/ecommerce/receivings) + current server inventory cost; receipt/email shows per-channel lines. Cash/denom math stays local retail. |
+| Other stores | No change — local SQLite stays master, PG mirror, their pushes continue. Same build; all HQ behavior StoreId-gated. |
+
+### What was REJECTED and why (recorded decisions)
+
+| Idea | Verdict |
+|---|---|
+| SQLite file moved to server + HQ points to share | **NO** — SQLite over SMB has unreliable file locking, 2 concurrent writers (HQ POS + API) = corruption risk, mid-write disconnect can corrupt the DB. Client-server PG is the right container for a shared DB. |
+| Webhook via agent (3s poll) routing all mobile/ecommerce ops through HQ local | **NO (as carrier)** — makes mobile/ecommerce stock view lag ~35s (they read PG; would wait for the 30s push-back) → oversell risk between devices; adds a second writer to the live POS SQLite. Agent channel may still be used later as an instant trigger only. |
+| Full PG-direct rewrite of the POS app in one jump | **NO for now** — ~50 SQLite stock touchpoints, live store risk. Phased path (1 → 2) reaches the same end-state safely. |
+
+### Data map (verified live 2026-08-19, PG already holds HQ data)
+
+`hq_products=703, hq_sales=15,839, hq_trails=88,172, hq_closes=188, customers=341` — the HQ DB is ALREADY synced into PG; the gap is authority (local master pushes; PG is a copy), not data. Phase 1-2 flip the authority for INVENTORY only; sales/history stay local-first synced (that's what gives separate channel reporting).
+
+### Status of pre-implementation check (server vs HQ local stock comparison)
+
+- Server PG: `products` for `STORE-20260602-7159` (703 rows) exported to `C:\Users\ADMIN\AppData\Local\Temp\opencode\server_hq_stock.csv`.
+- HQ local read ATTEMPT 1 failed: `LoadFrom(SQLite.Interop.dll)` throws BadImageFormat (it's a NATIVE dll, not an assembly). **Retry approach:** load ONLY `System.Data.SQLite.dll` from `C:\Users\ADMIN\Desktop\JumongPosHW\agent\` (interop auto-resolves from the same dir), open `JumongPos.db` with `Read Only=True`, stream `SELECT Barcode, Name, StockQty FROM Products WHERE IsActive=1` over the WinRM pipeline (no file written on HQ; the DB file itself is locked for Copy-Item by the running POS but SQLite readers are fine). Fallback: agent `sql` command via `/dashboard/agent/send` (buffer may be eaten by the dashboard AGENTS tab — poll immediately).
+- Comparison method: match by barcode (trimmed, case-insensitive), fallback exact name for empty-barcode items; report matched-same/matched-diff (top 20 by |diff|), local-only, server-only, and total units per side. Expected: local total > server total by Σ unapplied server deltas (today's transfers + mobile ops).
+
+## Previous Change (2026-08-19) — v1.1.38 (Cloud API) + mobile web: Warehouse Mobile App Now Uses HQ Stock (+ dashboard Warehouse Inventory stock filter + modal ADD button fixes)
 
 **Request:** "in warehouse-inventory can you give me filter to see what else have stock so i can transfer to HQ" + "tapos yung mobile app from warehouse stock change to HQ stock" + "pati ang receiving stock goes to HQ na dating warehouse ang dagdag" — (1) dashboard Warehouse → Inventory now has **ALL / IN STOCK / OUT OF STOCK** filter buttons (with counts) to quickly find what can be transferred to HQ; (2) the **warehouse mobile app (whmobile.html) now sells/receives from HQ stock** (`products` table, `STORE-20260602-7159`) instead of `wh_products`; (3) receiving now ADDS to HQ stock (was warehouse).
 
