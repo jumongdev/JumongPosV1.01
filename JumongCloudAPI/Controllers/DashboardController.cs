@@ -5047,6 +5047,9 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
             whBoxPrice = reader.GetDecimal(10),
             units = reader.IsDBNull(11) ? new object[0] : JsonSerializer.Deserialize<object[]>(reader.GetString(11)) ?? new object[0]
         };
+        // Browser-cache the product payload (images are ~60KB base64) - 5 min TTL so repeat
+        // shop visits reuse cached images instead of re-downloading them.
+        Response.Headers["Cache-Control"] = "public, max-age=300";
         return Ok(p);
     }
 

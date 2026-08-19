@@ -277,15 +277,37 @@ async function loadPromo() {
 
 async function loadCatalog() {
   showLoading(true);
+  // Cached catalog -> instant render on repeat opens (localStorage, 5 min TTL)
+  const CACHE_KEY = 'shop_catalog_cache';
+  const CACHE_TTL = 5 * 60 * 1000;
+  let cached = null;
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (raw) {
+      const obj = JSON.parse(raw);
+      if (obj && Array.isArray(obj.data) && obj.data.length && (Date.now() - obj.ts) < CACHE_TTL) cached = obj.data;
+    }
+  } catch (e) { /* ignore */ }
+
+  if (cached) {
+    catalog = cached;
+    categories = [...new Set(catalog.map(p => p.category).filter(Boolean))];
+    renderChips();
+    renderGrid();
+  }
+
   try {
     const url = API + '/dashboard/shop/catalog?storeId=' + STORE + '&withImages=false';
     const r = await fetchT(url, {}, 30000);
     catalog = await r.json();
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: catalog })); } catch (e) { /* storage full - ignore */ }
     categories = [...new Set(catalog.map(p => p.category).filter(Boolean))];
     renderChips();
     renderGrid();
   } catch (e) {
-    document.getElementById('grid').innerHTML = '<div class="col-span-full text-center py-16"><p class="text-4xl mb-2">⚠️</p><p class="font-bold text-stone-600">Could not load the shop</p><p class="text-sm text-stone-400 mt-1">Check your connection and try again</p><button onclick="location.reload()" class="mt-4 bg-violet-700 text-white font-bold rounded-xl px-6 py-2.5 text-sm">RETRY</button></div>';
+    if (!cached) {
+      document.getElementById('grid').innerHTML = '<div class="col-span-full text-center py-16"><p class="text-4xl mb-2">⚠️</p><p class="font-bold text-stone-600">Could not load the shop</p><p class="text-sm text-stone-400 mt-1">Check your connection and try again</p><button onclick="location.reload()" class="mt-4 bg-violet-700 text-white font-bold rounded-xl px-6 py-2.5 text-sm">RETRY</button></div>';
+    }
   } finally {
     showLoading(false);
   }
