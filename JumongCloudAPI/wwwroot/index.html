@@ -1352,7 +1352,7 @@ tailwind.config = {
           <div class="mb-3">
             <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Add Product (HQ stock)</label>
             <div class="flex gap-2 items-center">
-              <select id="stTrfProd" class="flex-1 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2" x-init="
+              <select id="stTrfProd" class="flex-1 min-w-0 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2" x-init="
                 $nextTick(async ()=>{
                   const prods = await fetchJSON(API+'/stock-status?storeId=STORE-20260602-7159');
                   const sel = $el;
@@ -1367,7 +1367,7 @@ tailwind.config = {
                   });
                 })">
               </select>
-              <input id="stTrfQty" type="number" value="1" min="1" class="w-20 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-2">
+              <input id="stTrfQty" type="number" value="1" min="1" class="w-20 shrink-0 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-2">
               <button @click="
                 const sel = document.getElementById('stTrfProd');
                 const opt = sel.options[sel.selectedIndex];
@@ -1376,7 +1376,7 @@ tailwind.config = {
                 addTransferItem(parseInt(opt.value), opt.getAttribute('data-name'),
                   opt.getAttribute('data-barcode'), qty);
                 document.getElementById('stTrfQty').value = 1;
-              " class="text-xs px-3 py-2 rounded-lg bg-cyan-600 text-white font-medium">+ ADD</button>
+              " class="text-xs px-3 py-2 shrink-0 whitespace-nowrap rounded-lg bg-cyan-600 text-white font-medium">+ ADD</button>
             </div>
           </div>
           <div class="mb-3">
@@ -2051,7 +2051,7 @@ tailwind.config = {
           <div class="mb-3">
             <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Add Item</label>
             <div class="flex gap-2 items-center">
-              <select id="whOrdProd" class="flex-1 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2" x-init="
+              <select id="whOrdProd" class="flex-1 min-w-0 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2" x-init="
                 $nextTick(async ()=>{
                   const prods = await fetchProducts();
                   const sel = $el;
@@ -2080,7 +2080,7 @@ tailwind.config = {
                 })">
               </select>
               <select id="whOrdUnit" class="w-32 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-2"></select>
-              <input id="whOrdQty" type="number" value="1" min="1" class="w-16 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-2">
+              <input id="whOrdQty" type="number" value="1" min="1" class="w-16 shrink-0 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-2">
               <button @click="
                 const sel = document.getElementById('whOrdProd');
                 const opt = sel.options[sel.selectedIndex];
@@ -2095,7 +2095,7 @@ tailwind.config = {
                 addOrderItem(parseInt(opt.value), opt.getAttribute('data-name'),
                   unitName, ordQty, unitPrice, unitQty);
                 document.getElementById('whOrdQty').value = 1;
-              " class="text-xs px-3 py-2 rounded-lg bg-cyan-600 text-white font-medium">+ ADD</button>
+              " class="text-xs px-3 py-2 shrink-0 whitespace-nowrap rounded-lg bg-cyan-600 text-white font-medium">+ ADD</button>
             </div>
           </div>
           <div class="mb-3">
@@ -2240,7 +2240,7 @@ tailwind.config = {
           <div class="mb-3">
             <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Add Product</label>
             <div class="flex gap-2 items-center">
-              <select id="trfProd" class="flex-1 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2" x-init="
+              <select id="trfProd" class="flex-1 min-w-0 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2" x-init="
                 $nextTick(async ()=>{
                   const prods = await fetchJSON(API+'/warehouse/products');
                   const sel = $el;
@@ -2255,7 +2255,7 @@ tailwind.config = {
                   });
                 })">
               </select>
-              <input id="trfQty" type="number" value="1" min="1" class="w-20 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-2">
+              <input id="trfQty" type="number" value="1" min="1" class="w-20 shrink-0 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-2">
               <button @click="
                 const sel = document.getElementById('trfProd');
                 const opt = sel.options[sel.selectedIndex];
@@ -2264,7 +2264,7 @@ tailwind.config = {
                 addTransferItem(parseInt(opt.value), opt.getAttribute('data-name'),
                   opt.getAttribute('data-barcode'), qty);
                 document.getElementById('trfQty').value = 1;
-              " class="text-xs px-3 py-2 rounded-lg bg-cyan-600 text-white font-medium">+ ADD</button>
+              " class="text-xs px-3 py-2 shrink-0 whitespace-nowrap rounded-lg bg-cyan-600 text-white font-medium">+ ADD</button>
             </div>
           </div>
           <div class="mb-3">
