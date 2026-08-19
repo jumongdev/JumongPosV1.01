@@ -1,6 +1,30 @@
 ﻿# JumongPOS — Full Project Guide for AI Agents
 
-## Latest Change (2026-08-19) — PLAN SESSION (not yet implemented): HQ Stock Sync Roadmap — "One Live Inventory, Separate Channel Reporting"
+## Latest Change (2026-08-19) — v1.1.39 (Cloud API) + v1.1.47 (POS client): HQ Stock Pull IMPLEMENTED (Phase 1 of the HQ Stock Sync Roadmap)
+
+**Context:** the plan session below (previous entry) was approved and Phase 1 is now BUILT + DEPLOYED. The pre-implementation check first CONFIRMED the bug live: server vs HQ local comparison showed local = 55,487 units vs server = 53,357 — a **+2,130 gap on exactly 5 items**, 100% explained by the owner's transfers #838 (20:06) + #840 (20:18) to ACGS (Ginebra Round −1,800, Ginebra Frasco −180, Cobra by12 −50, Mountain Dew by12 −50, Sting by12 −50). Server trails (`pos_id<0`, ref `Transfer #838/#840 -> ACGS - Naic Market`) proved the deductions exist server-side while HQ local never knew.
+
+### What was implemented (Phase 1)
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs` | Migration: `ALTER TABLE stock_trails ADD COLUMN IF NOT EXISTS applied_at TIMESTAMPTZ` (server deltas consumed by the HQ POS local apply). |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | `WhStockSnapshot` offset → `@q + SUM(quantity_added WHERE store_id=@sid AND product_id=@pid AND pos_id < 0 AND applied_at IS NULL)`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **New `GET /warehouse/stock-deltas?storeId=&afterId=`** — unapplied `pos_id<0` trails (id, productId, productName, barcode, quantityAdded, stockBefore, stockAfter, reference, createdAt) ORDER BY id LIMIT 1000. **New `POST /warehouse/stock-deltas/ack`** `{storeId, maxId}` → `UPDATE ... SET applied_at=NOW() WHERE store_id=@sid AND pos_id<0 AND id<=@maxId AND applied_at IS NULL` (returns `{applied}`; validates maxId>0). DTO `WhStockDeltasAckDto`. Version → `"1.1.39"` (2 places); `latestVer` → `"1.1.47"`. |
+| `Services/SyncService.cs` (client) | **New `PullStockDeltasAsync()`** — HQ-gated (`StoreId != "STORE-20260602-7159"` → return). Cycle: (0) retry pending ack if `StockPullAckedId < StockPullLastTrailId` (push snapshot + re-ack); (1) GET deltas `afterId=StockPullLastTrailId`; (2) apply each in ONE tx: `UPDATE Products SET StockQty += delta` + INSERT local `StockTrail` (`Synced=1` — never pushes back, ref copied, before/after from local current stock, UserName 'System') + cursor `INSERT OR REPLACE Settings StockPullLastTrailId` **inside the same tx** (crash-safe — rollback restores both); (3) `PushStockSnapshotAsync()` (delta push of affected products); (4) POST ack → save `StockPullAckedId`. Skips products missing locally. |
+| `Forms/MainForm.cs` (client) | New **10s timer** calling `PullStockDeltasAsync()` (gate inside the method; non-HQ stores just return — zero API calls) + one run in the 3s startup drain task. |
+| `Services/AppVersion.cs` (client) | `"1.1.46"` → `"1.1.47"`. |
+
+**Verified live (server side):** API 1.1.39; `/warehouse/stock-deltas?storeId=HQ` returns exactly the 5 unapplied transfer trails (−2,130); ack endpoint verified (accidentally acked the 5 real trails during a maxId test → **UNDONE immediately**: `UPDATE stock_trails SET applied_at=NULL WHERE reference LIKE 'Transfer #838/%840%'`, test trail deleted; Ginebra Round server stock correctly self-corrected 6,566→4,766 on the next 30s push, proving the applied_at formula + push cycle works end-to-end). Client v1.1.47 published (exe 211,830,204 B) + drop pushed to `C:\JumongAPI\client\`. Git `a592bdb`.
+
+**NEXT: user taps UPDATE APP at HQ → first pull applies the −2,130 (local 55,487 → 53,357) as 'System' trails → HQ local mirrors server. MUST warn staff: HQ stock drops once (auto-reconcile) — expected, all trailable. After that, HQ local follows server within ~10s; transfers/mobile sales visible at HQ POS in ~10s. Remaining: Phase 2 (stock authority to PG, snapshot push OFF for HQ, delta writes, end-shift v2 per-channel reporting) — plan in the entry below. Optional pre-pay server check still undecided. NOTE: the stock-pull timer fires every 10s on ALL stores but returns instantly for non-HQ (gate inside the method).**
+
+### Pre-implementation check (server vs HQ local stock, verified 2026-08-19 ~10:30 PM)
+
+- Server PG `products` for `STORE-20260602-7159`: 703 rows (psql export). HQ local: 703 rows (read via **agent `sql` command** in 3 chunks — GOTCHAS: (1) `Copy-Item` of the live `JumongPos.db` fails "being used by another process" (POS holds it; a FileShare.ReadWrite stream copy DOES work but isn't needed); (2) PS 5.1 cannot load the .NET 8 `System.Data.SQLite.dll` ("Could not load type 'System.Object' from assembly 'System.Private.CoreLib'") — always use the agent channel instead; (3) agent results may contain duplicated chunk outputs — dedupe by barcode+name; (4) agent sql output = TSV with header row `Barcode\tName\tStockQty`, cap 500 rows/query).
+- Result: 698 identical, 5 differ (all transfers #838/#840), 0 local-only, 0 server-only. Local 55,487 vs server 53,357 = **+2,130 exactly the transferred amount** — bug confirmed live.
+
+## Previous Change (2026-08-19) — PLAN SESSION (approved 2026-08-19, Phase 1 now IMPLEMENTED — see above): HQ Stock Sync Roadmap — "One Live Inventory, Separate Channel Reporting"
 
 **Context:** after v1.1.38 (mobile app now sells/receives from HQ stock on the server), the owner identified the core gap: **the HQ POS local SQLite never learns about server-side stock deltas** (HQ→POS transfers, mobile sales/receives) → HQ keeps selling stock that physically left or was already sold (oversell), and end-shift inventory reconciliation mismatches. Long discussion (options weighed: webhook-via-agent 3s poll, SQLite-over-SMB share, PG direct via LAN, stock-pull) produced the following AGREED architecture and phased plan. **The plan below was user-approved ("ok") on 2026-08-19 with the instruction: save this to AGENTS.md BEFORE implementing. Implementation starts with the server-vs-local stock comparison, then Phase 1.**
 
