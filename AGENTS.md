@@ -1,6 +1,22 @@
 ﻿# JumongPOS — Full Project Guide for AI Agents
 
-## Latest Change (2026-08-20) — v1.1.40 (Cloud API) + v1.1.49 (POS client): HQ Live Stock Guards (Phase 2, Option B — decision: B over A)
+## Latest Change (2026-08-20) — v1.1.41 (Cloud API) + v1.1.50 (POS client): End-Shift v2 — Per-Channel Breakdown from PG (Phase 2 complete)
+
+**Request:** "sige" — finish the remaining Phase 2 pieces: end-shift v2 (per-channel inventory reporting from PG, "same inventory, separate reporting") + `channel` tagging on stock_trails. The end-shift receipt/email now shows a **CHANNEL BREAKDOWN (SERVER)** section: wholesale mobile sales, e-commerce orders, server received pcs, HQ→POS transfer-out pcs — all from the server PG for the shift window (since the last daily close, fallback PH midnight). The local reconciliation math is UNCHANGED (local == server mirror via the pull, so it already balances); the server section adds the per-channel transparency on top.
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **New `GET /dashboard/end-shift-snapshot?storeId=`** — `since` = last `daily_closes.close_date` (fallback `date_trunc('day', NOW() AT TIME ZONE 'Asia/Manila')`); returns `{since, prevInventoryCost (last close total_inventory_cost), serverInventoryCost (Σ stock_qty×cost active), retail{count,total,cogs} (sales header-only + sale_items COGS `COALESCE(NULLIF(si.unit_cost,0),p.cost,0)*si.quantity`), mobile{count,total,cogs} (`wh_walkin_sales` + `si.stock_deduction × COALESCE(mp.cost, wp.box_cost/NULLIF(wp.box_qty,0),0)`), ecommerce{orders,total} (online_orders status confirmed/shipped/delivered), receivedPcs (Σ `RECV-%` trails pos_id<0), transferOutPcs (−Σ `Transfer #%` trails)}`. GOTCHA: `sales` uses `grand_total` NOT `total_amount` (42703 first deploy). Version → `"1.1.41"`; `latestVer` → `"1.1.50"`. |
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs` | Migration: `stock_trails ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT 'other'` — set `'mobile'` (WhSell hq, WhCreateReceiving hq, WhVoidSale hq, WhEditSale hq) / `'transfer'` (WhReceiveTransfer hq). POS-synced local trails stay `'other'`. |
+| `Services/SyncService.cs` (client) | **New `GetEndShiftSnapshot()`** (synchronous, HQ-gated, `GetAwaiter().GetResult()` + `ConfigureAwait(false)`; null on failure/non-HQ). Returns `(MobileSales, MobileTotal, EcomOrders, EcomTotal, ReceivedPcs, TransferOutPcs)?`. |
+| `Services/PrinterService.cs` | `PrintAuditEndShiftReport` + `BuildAuditEndShiftReportLines` — new optional params `(mobileSales, mobileTotal, ecomOrders, ecomTotal, receivedPcs, transferOutPcs)` (defaults 0 → history reprints unchanged); prints **CHANNEL BREAKDOWN (SERVER)** section after INVENTORY RECONCILIATION when any value > 0. |
+| `Services/EmailService.cs` | `SendEndShiftReport` — same optional params + **Channel Breakdown (Server)** HTML table (Wholesale (mobile) N sale(s) / E-commerce N order(s) / Received (server) +N pcs / Transfers out (HQ->POS) −N pcs). |
+| `Forms/EndShiftForm.cs` | On save: `var channel = SyncService.GetEndShiftSnapshot(); var ch = channel ?? (0,0m,0,0m,0,0);` passed to both print and email calls. |
+| `Services/AppVersion.cs` | `"1.1.49"` → `"1.1.50"`. |
+
+**Verified live:** API v1.1.41 — `/dashboard/end-shift-snapshot?storeId=STORE-20260602-7159` → `{since: last close, prevInventoryCost: 3,072,828.27, serverInventoryCost: 3,296,951.67, retail: {3 sales, ₱421.25, cogs 406}, mobile: 0, ecommerce: 0, receivedPcs: 2500, transferOutPcs: 0}`. Client v1.1.50 (exe 211,383,740 B) → drop + **GitHub release v1.1.50** (release id 373211352, asset id 521116237, verified latest). Git `2a1ca27`. **Phase 2 is now COMPLETE** (live guards v1.1.49 + end-shift v2 + channel column). HQ gets everything via UPDATE APP.
+
+## Previous Change (2026-08-20) — v1.1.40 (Cloud API) + v1.1.49 (POS client): HQ Live Stock Guards (Phase 2, Option B — decision: B over A)
 
 **Request:** user weighed Option A (pure live reads) vs B (live guards + local cache); they deferred the decision ("ikaw kung ano dapat") and I chose **Option B**: the POS display keeps the local mirror (instant, ≤10s via the Phase 1 pull), but the DECISION POINTS — add-to-cart, qty-change, and pre-pay — now check LIVE server stock for HQ. Guard formula: **available = min(local mirror, server live)** — a mobile/ecommerce delta (server lower) AND the HQ's own not-yet-pushed sales (local lower) are both respected, so the HQ POS can never oversell, even between pulls. Option A (rewrite ~50 SQLite read touchpoints to live calls) was rejected as high-risk for no extra business value.
 
