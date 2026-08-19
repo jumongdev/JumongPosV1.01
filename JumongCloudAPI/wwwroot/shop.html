@@ -65,6 +65,55 @@
   </div>
 </header>
 
+<!-- ===== HERO ===== -->
+<section class="mono-tile text-white">
+  <div class="max-w-6xl mx-auto px-4 py-14 sm:py-20 text-center">
+    <p class="text-xs font-black tracking-[0.3em] uppercase text-white/80 mb-3">Andengs Superstore</p>
+    <h1 class="text-3xl sm:text-5xl font-black leading-tight max-w-3xl mx-auto" id="heroTitle">Fresh Groceries Delivered to Your Door</h1>
+    <p class="mt-4 text-sm sm:text-base text-white/85 max-w-2xl mx-auto" id="heroSub">Shop everyday essentials from Andengs Superstore. Retail and wholesale bulk orders welcome.</p>
+    <div class="mt-7 flex items-center justify-center gap-3 flex-wrap">
+      <a href="#shop" id="heroCta" class="bg-white text-stone-900 font-black rounded-xl px-8 py-3.5 text-sm shadow-lg hover:scale-105 transition">SHOP NOW</a>
+      <a href="#" data-msg class="border border-white/40 rounded-xl px-8 py-3.5 text-sm font-bold hover:bg-white/10 transition">💬 MESSAGE US</a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== TRUST BADGES ===== -->
+<section class="max-w-6xl mx-auto px-4 -mt-8 relative z-10">
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+    <div class="rounded-2xl bg-white card-shadow p-3.5 flex items-center gap-3">
+      <span class="text-2xl">🚚</span>
+      <div class="min-w-0"><p class="text-xs font-black text-stone-900 truncate" id="trustDelivery">Fast Local Delivery</p><p class="text-[11px] text-stone-500 truncate" id="trustDeliveryDetail">Straight to your doorstep</p></div>
+    </div>
+    <div class="rounded-2xl bg-white card-shadow p-3.5 flex items-center gap-3">
+      <span class="text-2xl">🏪</span>
+      <div class="min-w-0"><p class="text-xs font-black text-stone-900 truncate" id="trustPickup">Store Pickup</p><p class="text-[11px] text-stone-500 truncate" id="trustPickupDetail">Order online, pick up at the store</p></div>
+    </div>
+    <div class="rounded-2xl bg-white card-shadow p-3.5 flex items-center gap-3">
+      <span class="text-2xl">💵</span>
+      <div class="min-w-0"><p class="text-xs font-black text-stone-900 truncate" id="trustCod">Cash on Delivery</p><p class="text-[11px] text-stone-500 truncate" id="trustCodDetail">Pay when your order arrives</p></div>
+    </div>
+    <div class="rounded-2xl bg-white card-shadow p-3.5 flex items-center gap-3">
+      <span class="text-2xl">📱</span>
+      <div class="min-w-0"><p class="text-xs font-black text-stone-900 truncate" id="trustGcash">GCash Accepted</p><p class="text-[11px] text-stone-500 truncate" id="trustGcashDetail">Easy and convenient payment</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== WHOLESALE BANNER ===== -->
+<section class="max-w-6xl mx-auto px-4 mt-6">
+  <div class="bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-2xl px-5 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+    <p class="text-sm font-bold flex items-center gap-2">📦 <span id="wholesaleText">Need Wholesale / Bulk ordering for Sari-Sari Stores? Message us for special rates.</span></p>
+    <a href="#" data-msg class="shrink-0 bg-white text-orange-700 font-black text-xs rounded-xl px-5 py-2.5 hover:scale-105 transition">💬 MESSAGE US</a>
+  </div>
+</section>
+
+<!-- ===== SHOP BY CATEGORY ===== -->
+<section id="shop" class="max-w-6xl mx-auto px-4 mt-8">
+  <p class="text-xs font-bold text-stone-500 uppercase tracking-wide mb-3">Shop by Category</p>
+  <div id="catTiles" class="grid grid-cols-3 sm:grid-cols-4 gap-2.5"></div>
+</section>
+
 <!-- ===== CATEGORY CHIPS ===== -->
 <div class="sticky top-[118px] z-30 bg-[#f6f6f7]/95 backdrop-blur-sm border-b border-gray-200/50">
   <div id="catChips" class="max-w-6xl mx-auto px-4 py-2.5 flex gap-2 overflow-x-auto scrollbar-hide"></div>
@@ -84,8 +133,46 @@
   </div>
 </main>
 
-<footer class="max-w-6xl mx-auto px-4 pb-24 pt-6 text-center">
-  <p class="text-xs text-stone-400">Jumong POS Online Shop • Orders confirmed by Andengs Superstore (HQ)</p>
+<!-- ===== ABOUT / WHY US ===== -->
+<section class="max-w-6xl mx-auto px-4 mt-10">
+  <div class="rounded-2xl bg-white card-shadow p-6">
+    <p class="font-black text-stone-900 mb-1.5">Why Shop With Andengs?</p>
+    <p class="text-sm text-stone-600 leading-relaxed" id="aboutText">Andengs Superstore is a trusted local supermarket serving households and sari-sari stores with authentic products, fast delivery and easy pickup.</p>
+    <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-stone-600">
+      <p class="flex gap-2"><span>🚚</span><span id="coverageText">We deliver around the Naic area - message us to confirm your barangay.</span></p>
+      <p class="flex gap-2"><span>🏪</span><span id="addressText">Andengs Superstore, Naic, Cavite</span></p>
+      <p class="flex gap-2"><span>📞</span><span id="phoneText">09xx-xxx-xxxx</span></p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="bg-stone-900 text-stone-300 mt-10">
+  <div class="max-w-6xl mx-auto px-4 py-10 grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
+    <div>
+      <p class="font-black text-white mb-2">Andengs Superstore</p>
+      <p class="text-xs text-stone-400">Kumpletong groceries para sa bahay at negosyo.</p>
+    </div>
+    <div>
+      <p class="font-bold text-white mb-2">SHOP</p>
+      <a href="#shop" class="block text-xs py-1 hover:text-white">All Products</a>
+      <a href="#" onclick="setGroup('all'); document.getElementById('shop').scrollIntoView({behavior:'smooth'})" class="block text-xs py-1 hover:text-white">Categories</a>
+      <a href="#" onclick="setGroup('bundles'); document.getElementById('shop').scrollIntoView({behavior:'smooth'})" class="block text-xs py-1 hover:text-white">Wholesale Bundles</a>
+    </div>
+    <div>
+      <p class="font-bold text-white mb-2">HELP</p>
+      <a href="#" onclick="openTrack()" class="block text-xs py-1 hover:text-white">Track Order</a>
+      <a href="#" onclick="openCart()" class="block text-xs py-1 hover:text-white">My Cart</a>
+      <a href="#" onclick="document.getElementById('shop').scrollIntoView({behavior:'smooth'})" class="block text-xs py-1 hover:text-white">How to Order</a>
+    </div>
+    <div>
+      <p class="font-bold text-white mb-2">CONTACT</p>
+      <a href="#" data-msg class="block text-xs py-1 hover:text-white">💬 Messenger</a>
+      <a href="#" id="fbLink" class="block text-xs py-1 hover:text-white">📘 Facebook</a>
+      <p class="text-xs py-1 text-stone-400" id="phoneText2"></p>
+    </div>
+  </div>
+  <div class="border-t border-stone-800 py-4 text-center text-xs text-stone-500">Jumong POS Online Shop • Orders confirmed by Andengs Superstore (HQ)</div>
 </footer>
 
 <!-- ===== CART DRAWER ===== -->
@@ -208,8 +295,93 @@ let catalog = [];
 let categories = [];
 let cart = JSON.parse(localStorage.getItem('shop_cart') || '[]');
 let activeCat = 'all';
+let activeGroup = 'all';
 let searchQ = '';
 let payMethod = 'COD';
+
+// ─── SHOP CONTENT (editable via dashboard -> Shop Content) ─────────────
+const CONTENT_DEFAULTS = {
+  hero_title: 'Fresh Groceries Delivered to Your Door',
+  hero_subtitle: 'Shop everyday essentials from Andengs Superstore. Retail and wholesale bulk orders welcome.',
+  hero_cta: 'SHOP NOW',
+  wholesale_banner: 'Need Wholesale / Bulk ordering for Sari-Sari Stores? Message us for special rates.',
+  trust_delivery: 'Fast Local Delivery', trust_delivery_detail: 'Straight to your doorstep',
+  trust_pickup: 'Store Pickup', trust_pickup_detail: 'Order online, pick up at the store',
+  trust_cod: 'Cash on Delivery', trust_cod_detail: 'Pay when your order arrives',
+  trust_gcash: 'GCash Accepted', trust_gcash_detail: 'Easy and convenient payment',
+  delivery_coverage: 'We deliver around the Naic area - message us to confirm your barangay.',
+  pickup_address: 'Andengs Superstore, Naic, Cavite',
+  phone: '09xx-xxx-xxxx',
+  messenger_link: 'https://m.me/jumongdev',
+  facebook_link: 'https://facebook.com/jumongdev',
+  about_text: 'Andengs Superstore is a trusted local supermarket serving households and sari-sari stores with authentic products, fast delivery and easy pickup.'
+};
+let shopContent = Object.assign({}, CONTENT_DEFAULTS);
+
+async function loadShopContent() {
+  try {
+    const raw = localStorage.getItem('shop_content_cache');
+    if (raw) { const o = JSON.parse(raw); if (o && (Date.now() - o.ts) < 300000) shopContent = Object.assign({}, CONTENT_DEFAULTS, o.data); }
+  } catch (e) { /* ignore */ }
+  applyContent();
+  try {
+    const r = await fetchT(API + '/dashboard/shop/content', {}, 15000);
+    const j = await r.json();
+    shopContent = Object.assign({}, CONTENT_DEFAULTS, j || {});
+    try { localStorage.setItem('shop_content_cache', JSON.stringify({ ts: Date.now(), data: j || {} })); } catch (e) { /* ignore */ }
+    applyContent();
+  } catch (e) { /* keep cached/defaults */ }
+}
+
+function applyContent() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('heroTitle', shopContent.hero_title);
+  set('heroSub', shopContent.hero_subtitle);
+  set('heroCta', shopContent.hero_cta);
+  set('wholesaleText', shopContent.wholesale_banner);
+  set('trustDelivery', shopContent.trust_delivery); set('trustDeliveryDetail', shopContent.trust_delivery_detail);
+  set('trustPickup', shopContent.trust_pickup); set('trustPickupDetail', shopContent.trust_pickup_detail);
+  set('trustCod', shopContent.trust_cod); set('trustCodDetail', shopContent.trust_cod_detail);
+  set('trustGcash', shopContent.trust_gcash); set('trustGcashDetail', shopContent.trust_gcash_detail);
+  set('coverageText', shopContent.delivery_coverage);
+  set('addressText', shopContent.pickup_address);
+  set('phoneText', shopContent.phone);
+  set('phoneText2', shopContent.phone);
+  set('aboutText', shopContent.about_text);
+  document.querySelectorAll('[data-msg]').forEach(a => a.href = shopContent.messenger_link || '#');
+  const fb = document.getElementById('fbLink'); if (fb) fb.href = shopContent.facebook_link || '#';
+}
+
+// ─── SHOP BY CATEGORY TILES ────────────────────────────────────────────
+const CATEGORY_GROUPS = [
+  { key: 'all', icon: '🛒', label: 'All Products', cats: null },
+  { key: 'pantry', icon: '🌾', label: 'Pantry & Rice', cats: ['rice', 'sugar', 'cooking oil', 'seasoning', 'condiments', 'sauces', 'egg'] },
+  { key: 'drinks', icon: '🧃', label: 'Beverages', cats: ['softdrinks', 'juices', 'powdered drink', 'coffee', 'mineral', 'dairy product', 'powdered milk'] },
+  { key: 'noodles', icon: '🍜', label: 'Noodles & Canned', cats: ['noodles', 'canned goods'] },
+  { key: 'snacks', icon: '🍪', label: 'Snacks & Biscuits', cats: ['snacks', 'biscuit', 'wafer', 'cakes', 'candy'] },
+  { key: 'care', icon: '🧴', label: 'Personal Care', cats: ['body care', 'shampoo', 'conditioner', 'oral care'] },
+  { key: 'house', icon: '🧹', label: 'Household', cats: ['powder detergent', 'fabcon', 'laundry', 'household', 'cleaning product', 'napkin', 'diaper', 'medicine'] },
+  { key: 'tobacco', icon: '🚬', label: 'Tobacco & Alcohol', cats: ['tobacco', 'alcohol'] },
+  { key: 'bundles', icon: '📦', label: 'Wholesale Bundles', cats: '__bulk__' }
+];
+
+function renderTiles() {
+  const wrap = document.getElementById('catTiles');
+  if (!wrap) return;
+  wrap.innerHTML = CATEGORY_GROUPS.map(g =>
+    '<button onclick="setGroup(\'' + g.key + '\')" class="rounded-2xl bg-white card-shadow p-3 text-center transition active:scale-95 ' + (activeGroup === g.key ? 'ring-2 ring-stone-900' : '') + '">' +
+    '<span class="text-2xl block mb-1">' + g.icon + '</span>' +
+    '<span class="text-[11px] font-black text-stone-700 leading-tight block">' + g.label + '</span></button>').join('');
+}
+
+function setGroup(key) {
+  activeGroup = key;
+  activeCat = 'all';
+  renderTiles();
+  renderChips();
+  renderGrid();
+  document.getElementById('gridLabel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 let lastOrder = JSON.parse(localStorage.getItem('shop_last_order') || 'null');
 let shopSettings = { deliveryFee: 0, freeDeliveryMin: 0 };
 let checkoutFee = 0;
@@ -333,11 +505,18 @@ function chip(val, label, active) {
     (active ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-600 border-gray-200 hover:border-stone-400') + '">' + label + '</button>';
 }
 
-function setCat(c) { activeCat = c; renderChips(); renderGrid(); }
+function setCat(c) { activeCat = c; if (c !== 'all') activeGroup = 'all'; renderTiles(); renderChips(); renderGrid(); }
 
 // ─── GRID ────────────────────────────────────────────
 function visibleProducts() {
   let list = catalog;
+  if (activeGroup !== 'all') {
+    const g = CATEGORY_GROUPS.find(x => x.key === activeGroup);
+    if (g) {
+      if (g.cats === '__bulk__') list = list.filter(p => (p.units || []).some(u => Number(u.qtyPerUnit) > 1));
+      else if (g.cats) list = list.filter(p => g.cats.includes(String(p.category || '').toLowerCase().trim()));
+    }
+  }
   if (activeCat !== 'all') list = list.filter(p => p.category === activeCat);
   if (searchQ) list = list.filter(p => (p.name + ' ' + p.barcode).toLowerCase().includes(searchQ));
   return list;
@@ -744,6 +923,8 @@ loadBranding();
 loadPromo();
 loadCatalog();
 loadShopSettings();
+loadShopContent();
+renderTiles();
 updateBadge();
 </script>
 

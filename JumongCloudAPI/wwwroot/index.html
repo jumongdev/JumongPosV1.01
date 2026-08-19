@@ -88,6 +88,7 @@ tailwind.config = {
             ]},
             { id:'products', icon:'📦', label:'Master Products' },
             { id:'online-orders', icon:'🛒', label:'Online Orders' },
+            { id:'shop-content', icon:'🛍️', label:'Shop Content' },
             { id:'grp-inv', icon:'📦', label:'Inventory', items:[
                 { id:'st-receiving', icon:'📥', label:'Recent Receiving' },
                 { id:'st-trail', icon:'🛤️', label:'Stock Trail' },
@@ -3039,6 +3040,40 @@ tailwind.config = {
             <div x-show="saved" class="text-xs text-green-500" x-text="saved"></div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- SHOP CONTENT SECTION (landing page editor)                       -->
+    <div x-show="$store.app.section === 'shop-content'" x-transition.opacity>
+      <div x-data="shopContentPanel" class="space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">🛍️ Shop Content <span class="text-[10px] text-gray-400 dark:text-[#7878aa] font-normal">(online shop landing page — makikita agad sa shop.jumongdev.com)</span></h3>
+          <div class="flex items-center gap-2">
+            <button @click="load()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">REFRESH</button>
+            <button @click="save()" :disabled="saving" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 disabled:opacity-50" x-text="saving ? 'SAVING...' : '💾 SAVE ALL'"></button>
+          </div>
+        </div>
+        <template x-if="!loaded"><div class="flex justify-center py-10"><span class="spinner"></span></div></template>
+        <template x-if="loaded">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <template x-for="g in groups" :key="g">
+              <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+                <div class="px-4 py-2.5 border-b border-gray-100 dark:border-[#222255] bg-gray-50 dark:bg-[#0d0d25]/50">
+                  <h4 class="text-[11px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400" x-text="g"></h4>
+                </div>
+                <div class="p-4 space-y-3">
+                  <template x-for="f in fields.filter(x => x.g === g)" :key="f.k">
+                    <div>
+                      <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1" x-text="f.label"></label>
+                      <textarea x-show="f.t === 'textarea'" x-model="c[f.k]" rows="2" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></textarea>
+                      <input x-show="f.t === 'text'" x-model="c[f.k]" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
       </div>
     </div>
 

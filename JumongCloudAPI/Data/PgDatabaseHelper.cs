@@ -756,6 +756,36 @@ public static class PgDatabaseHelper
         prodBcMig.CommandText = "CREATE INDEX IF NOT EXISTS idx_products_store_barcode ON products(store_id, barcode)";
         try { prodBcMig.ExecuteNonQuery(); } catch { }
 
+        // Migration: shop_content key-value store (editable via dashboard Shop Content panel)
+        using var shopContentMig = conn.CreateCommand();
+        shopContentMig.CommandText = @"
+            CREATE TABLE IF NOT EXISTS shop_content (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL DEFAULT '',
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            INSERT INTO shop_content (key, value) VALUES
+                ('hero_title', 'Fresh Groceries Delivered to Your Door'),
+                ('hero_subtitle', 'Shop everyday essentials from Andengs Superstore. Retail and wholesale bulk orders welcome.'),
+                ('hero_cta', 'SHOP NOW'),
+                ('wholesale_banner', 'Need Wholesale / Bulk ordering for Sari-Sari Stores? Message us for special rates.'),
+                ('trust_delivery', 'Fast Local Delivery'),
+                ('trust_delivery_detail', 'Straight to your doorstep'),
+                ('trust_pickup', 'Store Pickup'),
+                ('trust_pickup_detail', 'Order online, pick up at the store'),
+                ('trust_cod', 'Cash on Delivery'),
+                ('trust_cod_detail', 'Pay when your order arrives'),
+                ('trust_gcash', 'GCash Accepted'),
+                ('trust_gcash_detail', 'Easy and convenient payment'),
+                ('delivery_coverage', 'We deliver around the Naic area - message us to confirm your barangay.'),
+                ('pickup_address', 'Andengs Superstore, Naic, Cavite'),
+                ('phone', '09xx-xxx-xxxx'),
+                ('messenger_link', 'https://m.me/jumongdev'),
+                ('facebook_link', 'https://facebook.com/jumongdev'),
+                ('about_text', 'Andengs Superstore is a trusted local supermarket serving households and sari-sari stores with authentic products, fast delivery and easy pickup.')
+            ON CONFLICT (key) DO NOTHING";
+        try { shopContentMig.ExecuteNonQuery(); } catch { }
+
         using var whVoidLogMig = conn.CreateCommand();
         whVoidLogMig.CommandText = @"
             CREATE TABLE IF NOT EXISTS wh_void_logs (

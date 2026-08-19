@@ -40,7 +40,7 @@ Alpine.store('app', {
       'ai-chat': 'grp-ai', 'ai-kb': 'grp-ai',
       'health': 'grp-system', 'suspect1pc': 'grp-system',
       'rpt-sales': 'grp-reports', 'rpt-invcost': 'grp-reports', 'rpt-shifts': 'grp-reports', 'analytics': 'grp-reports',
-      'grp-reports': 'grp-pos', 'products': 'grp-pos', 'grp-inv': 'grp-pos', 'online-orders': 'grp-pos',
+      'grp-reports': 'grp-pos', 'products': 'grp-pos', 'grp-inv': 'grp-pos', 'online-orders': 'grp-pos', 'shop-content': 'grp-pos',
       'st-receiving': 'grp-inv', 'st-trail': 'grp-inv', 'st-transfer': 'grp-inv',
       'wh-product': 'grp-wh', 'wh-inventory': 'grp-wh', 'wh-sales': 'grp-wh', 'wh-onlineorder': 'grp-wh', 'wh-transfer': 'grp-wh', 'wh-receiving': 'grp-wh',
       'settings': 'grp-settings', 'pospromo': 'grp-settings', 'posqr': 'grp-settings', 'branding': 'grp-settings'
@@ -2037,6 +2037,46 @@ Alpine.store('app', {
         toast('Ingested ' + (r.sections || 0) + ' project sections');
         await this.load();
       } catch (e) { toast(e.message || 'Ingest failed'); }
+    }
+  }));
+
+  /* ── Shop Content (landing page content editor) ─────────────────────── */
+  Alpine.data('shopContentPanel', () => ({
+    c: {}, loaded: false, saving: false,
+    fields: [
+      { k: 'hero_title', label: 'Hero Title', g: 'HERO', t: 'text' },
+      { k: 'hero_subtitle', label: 'Hero Subtitle', g: 'HERO', t: 'textarea' },
+      { k: 'hero_cta', label: 'Hero Button Text', g: 'HERO', t: 'text' },
+      { k: 'wholesale_banner', label: 'Wholesale Banner Text', g: 'WHOLESALE', t: 'textarea' },
+      { k: 'trust_delivery', label: 'Badge: Fast Delivery (title)', g: 'TRUST BADGES', t: 'text' },
+      { k: 'trust_delivery_detail', label: 'Badge: Fast Delivery (detail)', g: 'TRUST BADGES', t: 'text' },
+      { k: 'trust_pickup', label: 'Badge: Store Pickup (title)', g: 'TRUST BADGES', t: 'text' },
+      { k: 'trust_pickup_detail', label: 'Badge: Store Pickup (detail)', g: 'TRUST BADGES', t: 'text' },
+      { k: 'trust_cod', label: 'Badge: COD (title)', g: 'TRUST BADGES', t: 'text' },
+      { k: 'trust_cod_detail', label: 'Badge: COD (detail)', g: 'TRUST BADGES', t: 'text' },
+      { k: 'trust_gcash', label: 'Badge: GCash (title)', g: 'TRUST BADGES', t: 'text' },
+      { k: 'trust_gcash_detail', label: 'Badge: GCash (detail)', g: 'TRUST BADGES', t: 'text' },
+      { k: 'delivery_coverage', label: 'Delivery Coverage', g: 'CONTACT / ABOUT', t: 'textarea' },
+      { k: 'pickup_address', label: 'Pickup Address', g: 'CONTACT / ABOUT', t: 'textarea' },
+      { k: 'phone', label: 'Phone Number', g: 'CONTACT / ABOUT', t: 'text' },
+      { k: 'messenger_link', label: 'Messenger Link (m.me/...)', g: 'CONTACT / ABOUT', t: 'text' },
+      { k: 'facebook_link', label: 'Facebook Link', g: 'CONTACT / ABOUT', t: 'text' },
+      { k: 'about_text', label: 'About Us Text', g: 'CONTACT / ABOUT', t: 'textarea' }
+    ],
+    get groups() { return ['HERO', 'WHOLESALE', 'TRUST BADGES', 'CONTACT / ABOUT'] },
+    async load() {
+      try { this.c = await fetchJSON(API + '/dashboard/shop-content'); this.loaded = true; }
+      catch (e) { this.loaded = false; }
+    },
+    async save() {
+      this.saving = true;
+      try {
+        const r = await fetchJSON(API + '/dashboard/shop-content', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.c)
+        });
+        toast('Shop content saved (' + (r.saved || 0) + ' fields)');
+      } catch (e) { toast('Save failed: ' + e.message, 'error'); }
+      this.saving = false;
     }
   }));
 
