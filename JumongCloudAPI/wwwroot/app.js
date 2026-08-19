@@ -50,6 +50,15 @@ window.exportCSV = (name) => {
     stock: ['Product,Barcode,Category,Store,Stock,Price,Cost', d => d.map(x => [x.name, x.barcode, x.category, window.shortStore(x.storeId, Alpine.store('app').storeMap[x.storeId]), x.stockQty, x.price, x.cost])],
     analytics: ['Product,Barcode,Category,Unit,Qty Sold,Revenue,Cost,Profit,Margin%', d => d.map(x => [x.productName, x.barcode, x.category, x.unitName || 'pc', x.totalQty, x.totalRevenue, x.totalCost, x.totalProfit, x.marginPct + '%'])]
   };
+  if (name === 'st-transfer') {
+    const st = document.querySelector('[x-data="storeTransferPanel"]')?.__x?.$data;
+    if (!st || !st.transfers || !st.transfers.length) { toast('No data to export', 'error'); return }
+    const headers = 'ID,Client,Status,Notes,Date';
+    const rows = st.transfers.map(x => [x.id, x.clientName, x.status, x.notes, x.createdAt]);
+    let csv = headers + '\n' + rows.map(r => r.map(c => '"' + (c + '').replace(/"/g, '""') + '"').join(',')).join('\n');
+    downloadCSV(csv, name);
+    return;
+  }
   const cache = Alpine.store('app').cache[name] || Alpine.store('app').cache[name.replace('wh-', '')];
   if (!cache || !cache.length) { toast('No data to export', 'error'); return }
   if (name.startsWith('wh-')) {

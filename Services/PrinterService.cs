@@ -433,13 +433,13 @@ public class PrinterService
 
         lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Align = TextAlign.Center, Spacing = 12 });
         lines.Add(new LineEntry { Text = "CASH ON HAND", Bold = true, Spacing = 14 });
-        if (denom1000 > 0) lines.Add(new LineEntry { Text = "  1000  x", RightText = denom1000.ToString(), Spacing = 12 });
-        if (denom500 > 0) lines.Add(new LineEntry { Text = "  500   x", RightText = denom500.ToString(), Spacing = 12 });
-        if (denom200 > 0) lines.Add(new LineEntry { Text = "  200   x", RightText = denom200.ToString(), Spacing = 12 });
-        if (denom100 > 0) lines.Add(new LineEntry { Text = "  100   x", RightText = denom100.ToString(), Spacing = 12 });
-        if (denom50 > 0) lines.Add(new LineEntry { Text = "  50    x", RightText = denom50.ToString(), Spacing = 12 });
-        if (denom20 > 0) lines.Add(new LineEntry { Text = "  20    x", RightText = denom20.ToString(), Spacing = 12 });
-        if (denomCoins > 0) lines.Add(new LineEntry { Text = "  Coins", RightText = denomCoins.ToString("N2"), Spacing = 12 });
+        if (denom1000 > 0) lines.Add(new LineEntry { Text = $"  1000  x  {denom1000}", RightText = $"= {(denom1000 * 1000m):N2}", Spacing = 12 });
+        if (denom500 > 0) lines.Add(new LineEntry { Text = $"  500   x  {denom500}", RightText = $"= {(denom500 * 500m):N2}", Spacing = 12 });
+        if (denom200 > 0) lines.Add(new LineEntry { Text = $"  200   x  {denom200}", RightText = $"= {(denom200 * 200m):N2}", Spacing = 12 });
+        if (denom100 > 0) lines.Add(new LineEntry { Text = $"  100   x  {denom100}", RightText = $"= {(denom100 * 100m):N2}", Spacing = 12 });
+        if (denom50 > 0) lines.Add(new LineEntry { Text = $"  50    x  {denom50}", RightText = $"= {(denom50 * 50m):N2}", Spacing = 12 });
+        if (denom20 > 0) lines.Add(new LineEntry { Text = $"  20    x  {denom20}", RightText = $"= {(denom20 * 20m):N2}", Spacing = 12 });
+        if (denomCoins > 0) lines.Add(new LineEntry { Text = "  Coins", RightText = $"= {denomCoins:N2}", Spacing = 12 });
         lines.Add(new LineEntry { Text = "Counted Cash Drop", RightText = cashOnHand.ToString("N2"), Bold = true, Spacing = 18 });
 
         lines.Add(new LineEntry { Text = "VARIANCE", Bold = true, Spacing = 14 });
@@ -488,16 +488,29 @@ public class PrinterService
 
         if (creditPayments.Count > 0)
         {
+            var cashPayments = creditPayments.Where(p => p.PaymentMethod == "Cash").ToList();
+            var walletPayments = creditPayments.Where(p => p.PaymentMethod != "Cash").ToList();
             lines.Add(new LineEntry { Text = new string('=', lineChars), Align = TextAlign.Center, Spacing = 14 });
             lines.Add(new LineEntry { Text = "DEBT COLLECTIONS (PAID CREDIT)", Bold = true, Spacing = 14 });
-            foreach (var (cust, payType, amt, ts) in creditPayments)
+            if (cashPayments.Count > 0)
             {
-                var payLabel = payType == "Cash" ? "CASH" : "WALLET";
-                lines.Add(new LineEntry { Text = $"{cust} [{payLabel}]", Spacing = 12 });
-                lines.Add(new LineEntry { Text = $"  {ts[..16]}", RightText = amt.ToString("N2"), Spacing = 14 });
+                foreach (var (cust, payType, amt, ts) in cashPayments)
+                {
+                    lines.Add(new LineEntry { Text = $"{cust} [CASH]", Spacing = 12 });
+                    lines.Add(new LineEntry { Text = $"  {ts[..16]}", RightText = amt.ToString("N2"), Spacing = 14 });
+                }
+                lines.Add(new LineEntry { Text = "TOTAL COLLECTED (CASH)", RightText = cashPayments.Sum(t => t.Amount).ToString("N2"), Bold = true, Spacing = 18 });
             }
-            var totalCollected = creditPayments.Sum(t => t.Amount);
-            lines.Add(new LineEntry { Text = "TOTAL COLLECTED", RightText = totalCollected.ToString("N2"), Bold = true, Spacing = 18 });
+            if (walletPayments.Count > 0)
+            {
+                foreach (var (cust, payType, amt, ts) in walletPayments)
+                {
+                    lines.Add(new LineEntry { Text = $"{cust} [WALLET]", Spacing = 12 });
+                    lines.Add(new LineEntry { Text = $"  {ts[..16]}", RightText = amt.ToString("N2"), Spacing = 14 });
+                }
+                lines.Add(new LineEntry { Text = "TOTAL COLLECTED (WALLET)", RightText = walletPayments.Sum(t => t.Amount).ToString("N2"), Bold = true, Spacing = 18 });
+            }
+            lines.Add(new LineEntry { Text = "TOTAL COLLECTED", RightText = creditPayments.Sum(t => t.Amount).ToString("N2"), Bold = true, Spacing = 18 });
         }
 
         // Inventory Reconciliation
@@ -690,9 +703,17 @@ public class PrinterService
         foreach (var (_, name, _, stockBefore, qty) in items)
         {
             var newStock = stockBefore + qty;
-            var displayName = name.Length > maxNameWidth ? name[..(maxNameWidth - 2)] + ".." : name.PadRight(maxNameWidth);
             string statsPart = string.Format("{0,4}{1,4}{2,4}", stockBefore, qty, newStock);
-            lines.Add(new LineEntry { Text = displayName + statsPart, Spacing = 14 });
+            var nameLines = WrapText(name, maxNameWidth - 2);
+            if (nameLines.Count == 0) nameLines.Add("");
+            for (int i = 0; i < nameLines.Count; i++)
+            {
+                var prefix = i == 0 ? "" : "  ";
+                var pad = i == 0 ? maxNameWidth : maxNameWidth - 2;
+                var text = prefix + nameLines[i].PadRight(pad);
+                if (i == nameLines.Count - 1) text += statsPart;
+                lines.Add(new LineEntry { Text = text, Spacing = 14 });
+            }
         }
 
         lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Spacing = 12 });
@@ -799,9 +820,17 @@ public class PrinterService
         foreach (var entry in receivingOnly)
         {
             var name = entry.ProductName;
-            var displayName = name.Length > maxNameWidth ? name[..(maxNameWidth - 2)] + ".." : name.PadRight(maxNameWidth);
             string statsPart = string.Format("{0,4}{1,4}{2,4}", entry.StockBefore, (int)entry.QuantityAdded, entry.StockAfter);
-            lines.Add(new LineEntry { Text = displayName + statsPart, Spacing = 14 });
+            var nameLines = WrapText(name, maxNameWidth - 2);
+            if (nameLines.Count == 0) nameLines.Add("");
+            for (int i = 0; i < nameLines.Count; i++)
+            {
+                var prefix = i == 0 ? "" : "  ";
+                var pad = i == 0 ? maxNameWidth : maxNameWidth - 2;
+                var text = prefix + nameLines[i].PadRight(pad);
+                if (i == nameLines.Count - 1) text += statsPart;
+                lines.Add(new LineEntry { Text = text, Spacing = 14 });
+            }
         }
 
         lines.Add(new LineEntry { Text = new string('=', lineChars), Align = TextAlign.Center, Spacing = 20 });

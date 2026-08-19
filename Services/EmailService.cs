@@ -169,8 +169,11 @@ tr:nth-child(even) td {{ background: #F8F8FC; }}
         {(creditPayments.Count > 0 ? $@"
 <table>
 <tr><th>Customer</th><th>Payment Type</th><th>Time</th><th>Amount Collected</th></tr>
-{string.Join("\n", creditPayments.Select(p => $"<tr><td>{p.CustomerName}</td><td>{p.PaymentMethod}</td><td>{p.Timestamp[10..]}</td><td>Php {p.Amount:N2}</td></tr>"))}
-<tr class=""total-row""><td colspan=""3"">Total Collected</td><td>Php {creditPayments.Sum(p => p.Amount):N2}</td></tr>
+{string.Join("\n", creditPayments.Where(p => p.PaymentMethod == "Cash").Select(p => $"<tr><td>{p.CustomerName}</td><td>CASH</td><td>{p.Timestamp[10..]}</td><td>Php {p.Amount:N2}</td></tr>"))}
+{(creditPayments.Any(p => p.PaymentMethod == "Cash") ? $@"<tr class=""total-row""><td colspan=""3"">Total Collected (Cash)</td><td>Php {creditPayments.Where(p => p.PaymentMethod == "Cash").Sum(p => p.Amount):N2}</td></tr>" : "")}
+{string.Join("\n", creditPayments.Where(p => p.PaymentMethod != "Cash").Select(p => $"<tr><td>{p.CustomerName}</td><td>E-WALLET</td><td>{p.Timestamp[10..]}</td><td>Php {p.Amount:N2}</td></tr>"))}
+{(creditPayments.Any(p => p.PaymentMethod != "Cash") ? $@"<tr class=""total-row""><td colspan=""3"">Total Collected (E-Wallet)</td><td>Php {creditPayments.Where(p => p.PaymentMethod != "Cash").Sum(p => p.Amount):N2}</td></tr>" : "")}
+<tr class=""total-row""><td colspan=""3"">Total Collected (All)</td><td>Php {creditPayments.Sum(p => p.Amount):N2}</td></tr>
 </table>" : "<p style='color:#8C8CAA'>No debt collections this shift.</p>")}
 </div>
 

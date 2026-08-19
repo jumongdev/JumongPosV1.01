@@ -527,6 +527,12 @@ public static class PgDatabaseHelper
             CREATE INDEX IF NOT EXISTS idx_wh_transfers_client ON wh_transfers(client_id);
             CREATE INDEX IF NOT EXISTS idx_wh_transfers_status ON wh_transfers(status);
             CREATE INDEX IF NOT EXISTS idx_wh_transfer_items_transfer ON wh_transfer_items(transfer_id);
+            -- HQ-source transfers (same table): 'warehouse' = legacy warehouse-to-POS, 'hq' = HQ-to-POS
+            ALTER TABLE wh_transfers ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'warehouse';
+            CREATE INDEX IF NOT EXISTS idx_wh_transfers_source ON wh_transfers(source);
+            -- HQ transfers store the HQ products.pos_id in product_id (barcode is the true linkage),
+            -- so the wh_products FK would reject them - drop it (validation is done in the endpoint)
+            ALTER TABLE wh_transfer_items DROP CONSTRAINT IF EXISTS wh_transfer_items_product_id_fkey;
             CREATE TABLE IF NOT EXISTS wh_stock_trails (
                 id SERIAL PRIMARY KEY,
                 product_id INTEGER NOT NULL REFERENCES wh_products(id),
