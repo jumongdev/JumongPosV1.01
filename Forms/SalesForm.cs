@@ -394,10 +394,11 @@ public partial class SalesForm : Form
         var totalPieces = otherPieces + newQty * item.QtyPerUnit;
 
         var prod = ProductService.GetById(item.ProductId);
-        if (prod != null && totalPieces > prod.StockQty)
+        var available = prod != null ? AvailablePieces(prod.Id, prod.StockQty) : 0;
+        if (prod != null && totalPieces > available)
         {
             MessageBox.Show(
-                $"Insufficient stock for '{prod.Name}'.\nRequested: {totalPieces} pcs\nAvailable: {prod.StockQty} pcs",
+                $"Insufficient stock for '{prod.Name}'.\nRequested: {totalPieces} pcs\nAvailable: {available} pcs",
                 "Out of Stock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
@@ -494,10 +495,11 @@ public partial class SalesForm : Form
             .Sum(x => x.Quantity * x.QtyPerUnit);
         var newPieces = cartPieces + quantity * qtyPerUnit;
 
-        if (newPieces > product.StockQty)
+        var available = AvailablePieces(product.Id, product.StockQty);
+        if (newPieces > available)
         {
             MessageBox.Show(
-                $"Insufficient stock for '{product.Name}'.\nRequested: {newPieces} pcs\nAvailable: {product.StockQty} pcs",
+                $"Insufficient stock for '{product.Name}'.\nRequested: {newPieces} pcs\nAvailable: {available} pcs",
                 "Out of Stock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
@@ -528,6 +530,18 @@ public partial class SalesForm : Form
             });
         }
         RefreshCart();
+    }
+
+    /// <summary>
+    /// HQ-only: live available pieces = min(local mirror, server live stock) so a concurrent
+    /// mobile/ecommerce deduction AND the HQ's own not-yet-pushed sales are both respected.
+    /// Non-HQ stores (and server failures) simply use the local stock.
+    /// </summary>
+    private int AvailablePieces(int productId, int localStock)
+    {
+        if (SyncService.StoreId != "STORE-20260602-7159") return localStock;
+        var live = SyncService.GetLiveStockAsync(new[] { productId }).GetAwaiter().GetResult();
+        return live.TryGetValue(productId, out var serverQty) ? Math.Min(localStock, serverQty) : localStock;
     }
 
     private void ShowSearchPopup(string initialSearch)
@@ -688,6 +702,28 @@ public partial class SalesForm : Form
         if (_paying) return;
         _paying = true;
         btnPay.Enabled = false;
+
+        // HQ live stock guard: verify the whole cart against min(local, server) before payment
+        var liveIssues = new List<string>();
+        var liveStock = SyncService.GetLiveStockAsync(_cart.Select(x => x.ProductId)).GetAwaiter().GetResult();
+        foreach (var g in _cart.GroupBy(x => x.ProductId))
+        {
+            var prod = ProductService.GetById(g.Key);
+            if (prod == null) continue;
+            var pieces = g.Sum(x => x.Quantity * x.QtyPerUnit);
+            var available = Math.Min(prod.StockQty, liveStock.TryGetValue(g.Key, out var sv) ? sv : prod.StockQty);
+            if (pieces > available)
+                liveIssues.Add($"'{prod.Name}' — needs {pieces} pcs, only {available} available (live check)");
+        }
+        if (liveIssues.Count > 0)
+        {
+            var warn = "Stock changed on the server since adding to cart:\n\n" + string.Join("\n", liveIssues) +
+                       "\n\nRemove/adjst quantities before paying.";
+            MessageBox.Show(warn, "Stock Check", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            _paying = false;
+            btnPay.Enabled = true;
+            return;
+        }
 
         var subTotal = _cart.Sum(x => x.TotalPrice);
         _discountPercent = 0; // discount disabled — prices locked to master catalog

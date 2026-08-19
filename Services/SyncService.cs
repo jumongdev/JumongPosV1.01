@@ -757,6 +757,38 @@ public static class SyncService
         catch { }
     }
 
+    /// <summary>
+    /// HQ-ONLY: fetches LIVE server stock (products table, STORE-20260602-7159) for the given
+    /// product ids (local Product.Id == server pos_id). Used by the POS sale guards to compute
+    /// min(local, server) available. Returns an empty dict for non-HQ stores or on any failure
+    /// (caller falls back to local stock). ConfigureAwait(false) so callers may block with
+    /// GetAwaiter().GetResult() from the UI thread without deadlocking.
+    /// </summary>
+    public static async Task<Dictionary<int, int>> GetLiveStockAsync(IEnumerable<int> productIds)
+    {
+        var result = new Dictionary<int, int>();
+        if (StoreId != "STORE-20260602-7159") return result;
+        try
+        {
+            var ids = productIds.Distinct().ToList();
+            if (ids.Count == 0) return result;
+            var url = ApiUrl.TrimEnd('/') + "/dashboard/warehouse/stock-live?ids=" + string.Join(",", ids);
+            var resp = await _client.GetAsync(url).ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode) return result;
+            var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array) return result;
+            foreach (var el in doc.RootElement.EnumerateArray())
+            {
+                if (el.TryGetProperty("productId", out var pidEl) && pidEl.TryGetInt32(out var pid) &&
+                    el.TryGetProperty("stockQty", out var qEl) && qEl.TryGetInt32(out var q))
+                    result[pid] = q;
+            }
+        }
+        catch { }
+        return result;
+    }
+
     public static Dictionary<string, int> GetPendingCounts()
     {
         var c = new Dictionary<string, int>
