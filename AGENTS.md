@@ -1,6 +1,21 @@
 ﻿# JumongPOS — Full Project Guide for AI Agents
 
-## Latest Change (2026-08-20) — web-only: Shop Mobile Caching (instant repeat opens on phones)
+## Latest Change (2026-08-20) — v1.1.42 (Cloud API) + web: Shop Content Panel + Shop Landing Redesign (dashboard-editable)
+
+**Request:** "pwede ba mag karoon sa dashboard ng mga pwede sasagutan para sa mga content for the mean time mag lagay ka ng default tapos edit ko sa dashboard" — the shop landing page content is now **editable from the dashboard** (sidebar POS CLIENT → 🛍️ Shop Content): hero title/subtitle/CTA, wholesale banner, 4 trust badges, delivery coverage, pickup address, phone, messenger/fb links, about text — stored in a new `shop_content` key-value PG table with seeded defaults. shop.html now has the **full landing redesign**: HERO section (gradient + CTAs SHOP NOW / MESSAGE US), TRUST BADGES row (🚚🏪💵📱), WHOLESALE banner, SHOP BY CATEGORY tiles (9 groups mapped to real catalog categories incl. dynamic **Wholesale Bundles** = products with bulk units), ABOUT/WHY-US section, and a 4-column footer. Content is cached 5 min in localStorage (`shop_content_cache`) like the catalog.
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs` | Migration: `shop_content` table (key TEXT PK, value, updated_at) + seed of 18 defaults (hero_title 'Fresh Groceries Delivered to Your Door', hero_subtitle, hero_cta, wholesale_banner, trust_* ×8, delivery_coverage, pickup_address, phone, messenger_link, facebook_link, about_text) `ON CONFLICT DO NOTHING`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **`GET /shop/content`** (public dict) + **`POST /dashboard/shop-content`** (upsert each key, returns `{saved}`). Version `"1.1.41"` → `"1.1.42"` (2 places). latestVer unchanged (1.1.50 — no client release). |
+| `JumongCloudAPI/wwwroot/index.html` + `components.js` | Sidebar item `{ id:'shop-content', icon:'🛍️', label:'Shop Content' }` in grp-pos + `groupParents['shop-content']='grp-pos'`; new **`shopContentPanel`** Alpine component (fields list with groups HERO/WHOLESALE/TRUST BADGES/CONTACT-ABOUT, load/save) + section UI (2-col field grid, REFRESH + 💾 SAVE ALL). |
+| `JumongCloudAPI/wwwroot/shop.html` | Landing redesign: hero (`heroTitle/heroSub/heroCta` + `data-msg` buttons), trust badges (`trust*` ids), wholesale banner (`wholesaleText` + MESSAGE US), `#shop` category tiles (`catTiles` + `CATEGORY_GROUPS` 9 groups, `renderTiles()/setGroup()`, group filter in `visibleProducts()`, `__bulk__` = units qtyPerUnit>1), about/why-us (`aboutText/coverageText/addressText/phoneText`), 4-col footer (`fbLink`, phoneText2). `CONTENT_DEFAULTS` fallback + `loadShopContent()` (localStorage 5-min cache, background refresh) + `applyContent()`. |
+
+**Verified live:** API v1.1.42; `/shop/content` returns 18 seeded keys; shop.html live has hero/tiles/wholesale/footer; dashboard has shop-content nav + panel + SAVE ALL. Deployed via WinRM + web copy. Git `03b5b3f`.
+
+**NOTES:** the shop page renders instantly from cached content + defaults even if the API is down; the "Message Us" buttons default to `https://m.me/jumongdev` until the owner edits the real links in the dashboard. Best Sellers section (top-sold endpoint) + Google Sign-In for customers = planned next (user asked about Google auth — needs the owner's Google Cloud OAuth Client ID/Secret first).
+
+## Previous Change (2026-08-20) — web-only: Shop Mobile Caching (instant repeat opens on phones)
 
 **Request:** "pag na load na sa cellphone sasave ba ito sa mobile nila para bumilis sa mga susunod na open?" — YES now. Previously every shop open re-fetched the catalog (~250ms warm, but adds up on phone data). Now: (1) `shop.html` caches the catalog in **localStorage (`shop_catalog_cache`, 5-min TTL)** — first paint renders instantly from cache on repeat opens, then background-refreshes from the server; offline → still shows the cached catalog (order CONFIRM still validates stock server-side, so stale stock ≤5 min is safe); (2) `GET /shop/product/{id}` now sends **`Cache-Control: public, max-age=300`** so phone browsers reuse the ~60KB base64 product images instead of re-downloading them every visit. No version bump (web + header only). Deployed live + publish copy; verified `Cache-Control` header + cache code live. Git `1441e6a`.
 
