@@ -202,11 +202,14 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
 
     var printErrorMsg = "";
     var prevInv = DailyCloseService.GetLastInventoryCost();
+    var channel = SyncService.GetEndShiftSnapshot();
+    var ch = channel ?? (0, 0m, 0, 0m, 0, 0);
     try
     {
         PrinterService.PrintAuditEndShiftReport(cashOnHand, diff, cashierName, now, txtNotes.Text.Trim(), _totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, expenses, gcashTxns, creditCustomers, creditPayments,
             (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value,
             totalInvCost, _totalCostSold, _totalStockReceivedCost, prevInv, _voidReturns, _adjustDown,
+            ch.MobileSales, ch.MobileTotal, ch.EcomOrders, ch.EcomTotal, ch.ReceivedPcs, ch.TransferOutPcs,
             (receiptAudit.TotalReceipts, receiptAudit.VoidedCount, receiptAudit.DeletedCount, receiptAudit.LostValue, receiptAudit.VoidedInvoices, receiptAudit.MissingInvoices));
     }
     catch (Exception printEx)
@@ -222,7 +225,8 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
         {
             var ee = emailSvc.SendEndShiftReport(_totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, cashOnHand, diff, cashierName, _totalExpenses, expenses, gcashTxns, creditCustomers, creditPayments,
                 (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value,
-                totalInvCost, _totalCostSold, _totalStockReceivedCost, prevInv, _voidReturns, _adjustDown);
+                totalInvCost, _totalCostSold, _totalStockReceivedCost, prevInv, _voidReturns, _adjustDown,
+                ch.MobileSales, ch.MobileTotal, ch.EcomOrders, ch.EcomTotal, ch.ReceivedPcs, ch.TransferOutPcs);
             if (ee != null) emailErrorMsg = $"\n\nEmail error: {ee}";
         }
     }

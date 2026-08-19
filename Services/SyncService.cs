@@ -789,6 +789,36 @@ public static class SyncService
         return result;
     }
 
+    /// <summary>
+    /// HQ-ONLY: fetches the per-channel end-shift snapshot from the server (retail is computed
+    /// locally; this adds mobile wholesale / e-commerce / server received / transfers-out lines).
+    /// Returns null for non-HQ stores or on failure (callers simply omit the channel section).
+    /// </summary>
+    public static (int MobileSales, decimal MobileTotal, int EcomOrders, decimal EcomTotal, int ReceivedPcs, int TransferOutPcs)? GetEndShiftSnapshot()
+    {
+        if (StoreId != "STORE-20260602-7159") return null;
+        try
+        {
+            var url = ApiUrl.TrimEnd('/') + "/dashboard/dashboard/end-shift-snapshot?storeId=" + Uri.EscapeDataString(StoreId);
+            var resp = _client.GetAsync(url).GetAwaiter().GetResult();
+            if (!resp.IsSuccessStatusCode) return null;
+            var json = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return null;
+            int g(string name) => root.TryGetProperty(name, out var el) && el.TryGetInt32(out var v) ? v : 0;
+            decimal gd(string name) => root.TryGetProperty(name, out var el) && el.TryGetDecimal(out var v) ? v : 0m;
+            var mobile = root.TryGetProperty("mobile", out var mEl) ? mEl : default;
+            var ecom = root.TryGetProperty("ecommerce", out var eEl) ? eEl : default;
+            int mSales = mobile.ValueKind == JsonValueKind.Object && mobile.TryGetProperty("sales", out var ms) && ms.TryGetInt32(out var msv) ? msv : 0;
+            decimal mTotal = mobile.ValueKind == JsonValueKind.Object && mobile.TryGetProperty("total", out var mt) && mt.TryGetDecimal(out var mtv) ? mtv : 0m;
+            int eOrders = ecom.ValueKind == JsonValueKind.Object && ecom.TryGetProperty("orders", out var eo) && eo.TryGetInt32(out var eov) ? eov : 0;
+            decimal eTotal = ecom.ValueKind == JsonValueKind.Object && ecom.TryGetProperty("total", out var et) && et.TryGetDecimal(out var etv) ? etv : 0m;
+            return (mSales, mTotal, eOrders, eTotal, g("receivedPcs"), g("transferOutPcs"));
+        }
+        catch { return null; }
+    }
+
     public static Dictionary<string, int> GetPendingCounts()
     {
         var c = new Dictionary<string, int>

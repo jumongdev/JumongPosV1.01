@@ -331,6 +331,7 @@ public class PrinterService
         int denom1000, int denom500, int denom200, int denom100, int denom50, int denom20, decimal denomCoins,
         decimal totalInventoryCost = 0, decimal totalCostSold = 0, decimal totalStockReceivedCost = 0, decimal previousInventory = 0,
         decimal voidReturns = 0, decimal adjustDown = 0,
+        int mobileSales = 0, decimal mobileTotal = 0, int ecomOrders = 0, decimal ecomTotal = 0, int receivedPcs = 0, int transferOutPcs = 0,
         (int Total, int Voided, int Deleted, decimal Lost, List<string> VoidedInvs, List<string> MissingInvs)? receiptAudit = null)
     {
         var printerName = GetSetting("PrinterName");
@@ -352,7 +353,7 @@ public class PrinterService
         if (lineChars < 20) lineChars = 20;
         if (lineChars > 48) lineChars = 48;
 
-        var lines = BuildAuditEndShiftReportLines(cashOnHand, difference, cashierName, timestamp, notes, totalSales, totalCash, totalEWallet, totalCredit, totalVoided, expenses, gcashTxns, creditCustomers, creditPayments, lineChars, denom1000, denom500, denom200, denom100, denom50, denom20, denomCoins, totalInventoryCost, totalCostSold, totalStockReceivedCost, previousInventory, voidReturns, adjustDown, receiptAudit);
+        var lines = BuildAuditEndShiftReportLines(cashOnHand, difference, cashierName, timestamp, notes, totalSales, totalCash, totalEWallet, totalCredit, totalVoided, expenses, gcashTxns, creditCustomers, creditPayments, lineChars, denom1000, denom500, denom200, denom100, denom50, denom20, denomCoins, totalInventoryCost, totalCostSold, totalStockReceivedCost, previousInventory, voidReturns, adjustDown, mobileSales, mobileTotal, ecomOrders, ecomTotal, receivedPcs, transferOutPcs, receiptAudit);
         ExtendPaperIfNeeded(doc, lines.Count, 16);
 
         doc.PrintPage += (sender, e) =>
@@ -411,6 +412,7 @@ public class PrinterService
         int denom1000, int denom500, int denom200, int denom100, int denom50, int denom20, decimal denomCoins,
         decimal totalInventoryCost = 0, decimal totalCostSold = 0, decimal totalStockReceivedCost = 0, decimal previousInventory = 0,
         decimal voidReturns = 0, decimal adjustDown = 0,
+        int mobileSales = 0, decimal mobileTotal = 0, int ecomOrders = 0, decimal ecomTotal = 0, int receivedPcs = 0, int transferOutPcs = 0,
         (int Total, int Voided, int Deleted, decimal Lost, List<string> VoidedInvs, List<string> MissingInvs)? receiptAudit = null)
     {
         var lines = new List<LineEntry>();
@@ -534,6 +536,21 @@ public class PrinterService
             lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Align = TextAlign.Center, Spacing = 12 });
             var label = variance == 0 ? "✔ BALANCED" : variance > 0 ? $"⚠ OVER by {variance:N2}" : $"❌ SHORT by {Math.Abs(variance):N2}";
             lines.Add(new LineEntry { Text = label, Align = TextAlign.Center, Bold = true, Spacing = 18 });
+        }
+
+        // Channel breakdown (server-side movements: mobile wholesale / ecommerce / receives / transfers)
+        if (mobileSales > 0 || ecomOrders > 0 || receivedPcs > 0 || transferOutPcs > 0)
+        {
+            lines.Add(new LineEntry { Text = new string('=', lineChars), Align = TextAlign.Center, Spacing = 14 });
+            lines.Add(new LineEntry { Text = "CHANNEL BREAKDOWN (SERVER)", Bold = true, Spacing = 14 });
+            if (mobileSales > 0)
+                lines.Add(new LineEntry { Text = $"Wholesale (mobile): {mobileSales} sale(s)", RightText = mobileTotal.ToString("N2"), Spacing = 14 });
+            if (ecomOrders > 0)
+                lines.Add(new LineEntry { Text = $"E-commerce: {ecomOrders} order(s)", RightText = ecomTotal.ToString("N2"), Spacing = 14 });
+            if (receivedPcs > 0)
+                lines.Add(new LineEntry { Text = $"Received (server): +{receivedPcs} pcs", Spacing = 14 });
+            if (transferOutPcs > 0)
+                lines.Add(new LineEntry { Text = $"Transfers out (HQ->POS): -{transferOutPcs} pcs", Spacing = 14 });
         }
 
         lines.Add(new LineEntry { Text = new string('=', lineChars), Align = TextAlign.Center, Spacing = 14 });

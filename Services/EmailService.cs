@@ -56,7 +56,8 @@ public class EmailService
         List<(string CustomerName, string PaymentMethod, decimal Amount, string Timestamp)> creditPayments,
         int denom1000, int denom500, int denom200, int denom100, int denom50, int denom20, decimal denomCoins,
         decimal totalInventoryCost = 0, decimal totalCostSold = 0, decimal totalStockReceivedCost = 0, decimal previousInventory = 0,
-        decimal voidReturns = 0, decimal adjustDown = 0)
+        decimal voidReturns = 0, decimal adjustDown = 0,
+        int mobileSales = 0, decimal mobileTotal = 0, int ecomOrders = 0, decimal ecomTotal = 0, int receivedPcs = 0, int transferOutPcs = 0)
     {
         if (!IsConfigured) return "Email not configured. Set SMTP settings first.";
 
@@ -190,6 +191,18 @@ tr:nth-child(even) td {{ background: #F8F8FC; }}
 <tr class=""total-row""><td>Expected Inventory</td><td style=""text-align:right"">Php {(previousInventory + totalStockReceivedCost + voidReturns - totalCostSold - adjustDown):N2}</td></tr>
 <tr class=""total-row""><td>Actual Inventory</td><td style=""text-align:right"">Php {totalInventoryCost:N2}</td></tr>
 <tr class=""total-row""><td>Variance</td><td style=""text-align:right; color:{(previousInventory + totalStockReceivedCost + voidReturns - totalCostSold - adjustDown == totalInventoryCost ? "#27AE60" : "#E74C3C")}"">{(previousInventory + totalStockReceivedCost + voidReturns - totalCostSold - adjustDown == totalInventoryCost ? "✔" : "⚠")} Php {Math.Abs(totalInventoryCost - (previousInventory + totalStockReceivedCost + voidReturns - totalCostSold - adjustDown)):N2} {(previousInventory + totalStockReceivedCost + voidReturns - totalCostSold - adjustDown == totalInventoryCost ? "Balanced" : totalInventoryCost > previousInventory + totalStockReceivedCost + voidReturns - totalCostSold - adjustDown ? "OVER" : "SHORT")}</td></tr>
+</table>
+</div>" : "")}
+
+{(mobileSales > 0 || ecomOrders > 0 || receivedPcs > 0 || transferOutPcs > 0 ? $@"
+<div class=""section"">
+<h2>Channel Breakdown (Server)</h2>
+<table>
+<tr><th>Channel</th><th style=""text-align:right"">Amount</th></tr>
+{(mobileSales > 0 ? $"<tr><td>Wholesale (mobile): {mobileSales} sale(s)</td><td style='text-align:right'>Php {mobileTotal:N2}</td></tr>" : "")}
+{(ecomOrders > 0 ? $"<tr><td>E-commerce: {ecomOrders} order(s)</td><td style='text-align:right'>Php {ecomTotal:N2}</td></tr>" : "")}
+{(receivedPcs > 0 ? $"<tr><td>Received (server)</td><td style='text-align:right'>+{receivedPcs} pcs</td></tr>" : "")}
+{(transferOutPcs > 0 ? $"<tr><td>Transfers out (HQ->POS)</td><td style='text-align:right'>-{transferOutPcs} pcs</td></tr>" : "")}
 </table>
 </div>" : "")}
 

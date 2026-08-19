@@ -746,6 +746,11 @@ public static class PgDatabaseHelper
         stApplyMig.CommandText = "ALTER TABLE stock_trails ADD COLUMN IF NOT EXISTS applied_at TIMESTAMPTZ";
         try { stApplyMig.ExecuteNonQuery(); } catch { }
 
+        // Migration: channel on stock_trails (retail/mobile/ecommerce/transfer/receive - who used the stock)
+        using var stChanMig = conn.CreateCommand();
+        stChanMig.CommandText = "ALTER TABLE stock_trails ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT 'other'";
+        try { stChanMig.ExecuteNonQuery(); } catch { }
+
         using var whVoidLogMig = conn.CreateCommand();
         whVoidLogMig.CommandText = @"
             CREATE TABLE IF NOT EXISTS wh_void_logs (
