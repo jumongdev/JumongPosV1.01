@@ -741,6 +741,11 @@ public static class PgDatabaseHelper
         wvSrcMig.CommandText = "ALTER TABLE wh_walkin_sales ADD COLUMN IF NOT EXISTS stock_source TEXT NOT NULL DEFAULT 'warehouse'";
         try { wvSrcMig.ExecuteNonQuery(); } catch { }
 
+        // Migration: applied_at on stock_trails (server-written deltas consumed by the HQ POS stock pull)
+        using var stApplyMig = conn.CreateCommand();
+        stApplyMig.CommandText = "ALTER TABLE stock_trails ADD COLUMN IF NOT EXISTS applied_at TIMESTAMPTZ";
+        try { stApplyMig.ExecuteNonQuery(); } catch { }
+
         using var whVoidLogMig = conn.CreateCommand();
         whVoidLogMig.CommandText = @"
             CREATE TABLE IF NOT EXISTS wh_void_logs (

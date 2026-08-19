@@ -506,6 +506,7 @@ public partial class MainForm : Form
                 var storeId = SyncService.StoreId;
                 if (string.IsNullOrEmpty(storeId) || storeId == "STORE-DEV-0001") return;
                 await SyncService.DrainAllUnsyncedAsync();
+                await SyncService.PullStockDeltasAsync();
             }
             catch { }
         });
@@ -540,6 +541,20 @@ public partial class MainForm : Form
             pushTimer.Start();
         };
         pushTimer.Start();
+
+        // Stock pull: HQ-only mirror of server-side stock deltas (transfers/mobile/ecommerce)
+        var stockPullTimer = new System.Windows.Forms.Timer { Interval = 10000 };
+        stockPullTimer.Tick += async (_, _) =>
+        {
+            stockPullTimer.Stop();
+            try
+            {
+                await SyncService.PullStockDeltasAsync();
+            }
+            catch { }
+            stockPullTimer.Start();
+        };
+        stockPullTimer.Start();
 
         // Master sync: download cloud updates every 5 minutes
         var masterPullTimer = new System.Windows.Forms.Timer { Interval = 300000 };

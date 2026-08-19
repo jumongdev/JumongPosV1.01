@@ -657,6 +657,106 @@ public static class SyncService
         catch { }
     }
 
+    /// <summary>
+    /// HQ-ONLY: pulls server-written stock deltas (HQ->POS transfer outs, mobile sales/receives,
+    /// voids) and applies them to the local DB so HQ local stock mirrors the server inventory.
+    /// Idempotent + crash-safe: the cursor (StockPullLastTrailId) is saved in the SAME transaction
+    /// as the applies; the server ack (StockPullAckedId) is retried on the next cycle if it fails.
+    /// Pulled trails are written locally with Synced=1 so they never push back (no duplicate history).
+    /// </summary>
+    public static async Task PullStockDeltasAsync()
+    {
+        if (StoreId != "STORE-20260602-7159") return;
+        try
+        {
+            long lastId = 0;
+            long.TryParse(DatabaseHelper.GetSetting("StockPullLastTrailId", "0"), out lastId);
+            long ackedId = 0;
+            long.TryParse(DatabaseHelper.GetSetting("StockPullAckedId", "0"), out ackedId);
+
+            // Retry a pending ack from a previous cycle (applied but ack failed).
+            if (ackedId < lastId && lastId > 0)
+            {
+                await PushStockSnapshotAsync();
+                var rack = await _client.PostAsync(
+                    ApiUrl.TrimEnd('/') + "/dashboard/warehouse/stock-deltas/ack",
+                    new StringContent(JsonSerializer.Serialize(new { storeId = StoreId, maxId = lastId }), Encoding.UTF8, "application/json"));
+                if (rack.IsSuccessStatusCode)
+                    DatabaseHelper.SaveSetting("StockPullAckedId", lastId.ToString());
+            }
+
+            var url = ApiUrl.TrimEnd('/') + "/dashboard/warehouse/stock-deltas?storeId=" + Uri.EscapeDataString(StoreId) + "&afterId=" + lastId;
+            var resp = await _client.GetAsync(url);
+            if (!resp.IsSuccessStatusCode) return;
+            var json = await resp.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array) return;
+
+            var deltas = new List<(long id, int productId, string productName, string barcode, int qty, string reference)>();
+            foreach (var el in doc.RootElement.EnumerateArray())
+            {
+                var id = el.TryGetProperty("id", out var idEl) && idEl.TryGetInt64(out var i) ? i : 0;
+                var pid = el.TryGetProperty("productId", out var pidEl) && pidEl.TryGetInt32(out var p) ? p : 0;
+                var pn = el.TryGetProperty("productName", out var pnEl) ? pnEl.GetString() ?? "" : "";
+                var bc = el.TryGetProperty("barcode", out var bcEl) ? bcEl.GetString() ?? "" : "";
+                var q = el.TryGetProperty("quantityAdded", out var qEl) && qEl.TryGetInt32(out var qv) ? qv : 0;
+                var rf = el.TryGetProperty("reference", out var rfEl) ? rfEl.GetString() ?? "" : "";
+                if (id <= 0 || pid <= 0 || q == 0) continue;
+                deltas.Add((id, pid, pn, bc, q, rf));
+            }
+            if (deltas.Count == 0) return;
+
+            long maxId = deltas.Max(d => d.id);
+            var now = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            using (var conn = DatabaseHelper.GetConnection())
+            {
+                conn.Open();
+                using var tx = conn.BeginTransaction();
+                foreach (var (id, pid, pn, bc, q, rf) in deltas)
+                {
+                    using var get = new SQLiteCommand("SELECT StockQty FROM Products WHERE Id = @pid", conn, tx);
+                    get.Parameters.AddWithValue("@pid", pid);
+                    var stockVal = get.ExecuteScalar();
+                    if (stockVal == null || stockVal == DBNull.Value) continue;
+                    var before = Convert.ToInt32(stockVal);
+
+                    using var upd = new SQLiteCommand("UPDATE Products SET StockQty = StockQty + @d WHERE Id = @pid", conn, tx);
+                    upd.Parameters.AddWithValue("@d", q);
+                    upd.Parameters.AddWithValue("@pid", pid);
+                    upd.ExecuteNonQuery();
+
+                    using var ins = new SQLiteCommand(
+                        "INSERT INTO StockTrail (ProductId, ProductName, Barcode, QuantityAdded, StockBefore, StockAfter, Reference, UserId, UserName, InvoiceNo, CustomerName, CreatedAt, Synced) " +
+                        "VALUES (@pid, @pn, @bc, @qa, @sb, @sa, @ref, 0, 'System', '', '', @ca, 1)", conn, tx);
+                    ins.Parameters.AddWithValue("@pid", pid);
+                    ins.Parameters.AddWithValue("@pn", pn);
+                    ins.Parameters.AddWithValue("@bc", bc);
+                    ins.Parameters.AddWithValue("@qa", q);
+                    ins.Parameters.AddWithValue("@sb", before);
+                    ins.Parameters.AddWithValue("@sa", before + q);
+                    ins.Parameters.AddWithValue("@ref", rf);
+                    ins.Parameters.AddWithValue("@ca", now);
+                    ins.ExecuteNonQuery();
+                }
+                // Cursor saved in the same transaction -> crash-safe (rollback restores both).
+                using var cur = new SQLiteCommand("INSERT OR REPLACE INTO Settings (Key, Value) VALUES ('StockPullLastTrailId', @v)", conn, tx);
+                cur.Parameters.AddWithValue("@v", maxId.ToString());
+                cur.ExecuteNonQuery();
+                tx.Commit();
+            }
+
+            // Push the affected products so the server's pushed value includes the delta,
+            // then ack so the server-side offset is dropped.
+            await PushStockSnapshotAsync();
+            var ackResp = await _client.PostAsync(
+                ApiUrl.TrimEnd('/') + "/dashboard/warehouse/stock-deltas/ack",
+                new StringContent(JsonSerializer.Serialize(new { storeId = StoreId, maxId }), Encoding.UTF8, "application/json"));
+            if (ackResp.IsSuccessStatusCode)
+                DatabaseHelper.SaveSetting("StockPullAckedId", maxId.ToString());
+        }
+        catch { }
+    }
+
     public static Dictionary<string, int> GetPendingCounts()
     {
         var c = new Dictionary<string, int>
