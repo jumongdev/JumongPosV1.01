@@ -1,6 +1,16 @@
 ﻿# JumongPOS — Full Project Guide for AI Agents
 
-## Latest Change (2026-08-20) — v1.1.42 (Cloud API) + web: Shop Content Panel + Shop Landing Redesign (dashboard-editable)
+## Latest Change (2026-08-20) — web-only: Mobile TRANSFER Tab Now Uses HQ/Server Products (source=hq)
+
+**Request:** "in mobile you said its server product but with transferring old warehouse stock" — the mobile app's TRANSFER tab was still moving OLD warehouse stock while SELL/INVENTORY/RECEIVING had already switched to HQ/server products (v1.1.38). Now consistent: mobile TRANSFER = **HQ→POS** transfers from server `products`.
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/wwwroot/whmobile.html` | `searchTxProducts()` → product picker now `&source=hq` (HQ/server products + stock). `createTransfer()` body → `source: 'hq'` (WhCreateTransfer hq branch: validates HQ products, WhReceiveTransfer hq branch deducts server HQ stock + trail `channel='transfer'` on receive; HQ POS sees the deduction in ~10s via the stock pull). `loadTxClients()` → excludes `STORE-20260602-7159` (HQ can't transfer to itself) + warehouse as before. |
+
+**Kept:** dashboard WAREHOUSE → Transfer panel remains warehouse→HQ (for draining any remaining wh_products stock into HQ). Receiving stores still pick transfers up via PENDING TRANSFERS (unchanged). Web-only — no API change, no version bump. Deployed live (verified `source: 'hq'` + client filter). Git `6e48066`.
+
+## Previous Change (2026-08-20) — v1.1.42 (Cloud API) + web: Shop Content Panel + Shop Landing Redesign (dashboard-editable)
 
 **Request:** "pwede ba mag karoon sa dashboard ng mga pwede sasagutan para sa mga content for the mean time mag lagay ka ng default tapos edit ko sa dashboard" — the shop landing page content is now **editable from the dashboard** (sidebar POS CLIENT → 🛍️ Shop Content): hero title/subtitle/CTA, wholesale banner, 4 trust badges, delivery coverage, pickup address, phone, messenger/fb links, about text — stored in a new `shop_content` key-value PG table with seeded defaults. shop.html now has the **full landing redesign**: HERO section (gradient + CTAs SHOP NOW / MESSAGE US), TRUST BADGES row (🚚🏪💵📱), WHOLESALE banner, SHOP BY CATEGORY tiles (9 groups mapped to real catalog categories incl. dynamic **Wholesale Bundles** = products with bulk units), ABOUT/WHY-US section, and a 4-column footer. Content is cached 5 min in localStorage (`shop_content_cache`) like the catalog.
 
