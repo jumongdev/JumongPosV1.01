@@ -302,9 +302,11 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
             }
 
             // 4. Gap detection: invoice numbers in Sales are sequential per day
+            //    Include voided invoices in the sequence (they still exist as rows) so a
+            //    voided number does NOT create a phantom gap -> not flagged as deleted.
             using (var gCmd = new SQLiteCommand(@"
                 SELECT InvoiceNo FROM Sales
-                WHERE SaleDate > @since AND IsVoided = 0
+                WHERE SaleDate > @since
                 ORDER BY InvoiceNo", conn))
             {
                 gCmd.Parameters.AddWithValue("@since", since);
