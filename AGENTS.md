@@ -1,6 +1,18 @@
 ﻿# JumongPOS — Full Project Guide for AI Agents
 
-## Latest Change (2026-08-20) — v1.1.52 (POS) + v1.1.43 (API): Stock Movement SOURCE Column + E-Commerce Trails
+## Latest Change (2026-08-20) — v1.1.53 (POS client): Receipt Audit No Longer Double-Counts Voided Receipts as DELETED/MISSING
+
+**Request:** "voided receipt in pos client is also deleted mean because in report receipt said there is deleted resibo sa HQ 3 and voided 3 pa check na rin" — the dashboard Sale Profits **Deleted/Missing Receipts** column was showing **3 "deleted" resibo at HQ that were actually just VOIDED**. Verified against stored `receipt_audits` (PG): today's HQ audit had `voided_invoices = [INV-7159-20260820-0082, -0089, -0107]` AND `missing_invoices = [the SAME 3]` (Aug 18 had the same pattern with -0128). Root cause: `ComputeReceiptAudit()` gap detection (EndShiftForm.cs:307) filtered `AND IsVoided = 0` when building the sequential invoice-number list → voided invoices created phantom gaps (0081→0083, 0088→0090, 0106→0108) → the voided numbers got flagged as DELETED *in addition to* being counted as VOIDED. The receipts were NOT actually deleted — they exist with `IsVoided=1` (verified in cloud PG: `is_voided=t`, blank cashier_name, no microseconds on those rows).
+
+| File | Change |
+|---|---|
+| `Forms/EndShiftForm.cs` | Gap-detection query: removed `AND IsVoided = 0` — voided invoices now fill the sequence, so only numbers genuinely ABSENT from Sales (hard-deleted, no stock-trail ref) trigger a gap. Step 3 (INV- stock-trail ref with no Sales row) still catches real deletions. |
+| `Services/AppVersion.cs` | `"1.1.52"` → `"1.1.53"`. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | `latestVer` → `"1.1.53"` (API stays 1.1.43). |
+
+**Deployed:** client v1.1.53 (exe 211,383,740 B) → drop + **GitHub release v1.1.53** (release id 373817326, published, verified). Git `08874c8`. **PG data fixed immediately:** `UPDATE receipt_audits SET deleted_count=0, missing_invoices='[]'::jsonb, lost_value=0 WHERE store_id='STORE-20260602-7159' AND shift_date >= '2026-08-18'` (3 rows) → dashboard now shows Deleted/Missing = None for HQ. Future end shifts recompute correctly after stores UPDATE APP. GOTCHA this session: GitHub draft releases are NOT visible to unauthenticated API calls (`/releases/tags/<tag>` and `/releases/<id>` return 404 until published) — always send the Authorization header when checking an in-progress upload.
+
+## Previous Change (2026-08-20) — v1.1.52 (POS) + v1.1.43 (API): Stock Movement SOURCE Column + E-Commerce Trails
 
 **Request:** "pwede isabay pos client - product - stock movement - new column sana for reference - kunwari kung galing sa mobile transfer yung item kung sold sa pos or sold sa ecommerce or sold sa mobile para madali ko malaman kung ano source ng transaction" — two changes: (1) `StockMovementForm` (POS → Products → VIEW STOCK MOV'T) now has a **SOURCE** column derived from the trail Reference: `Transfer #`/`WH-Transfer` → **Transfer**, `SHOP-` → **E-Commerce**, `WH-`/`Wholesale`/`RECV-` → **Mobile**, everything else → **POS** (`DeriveSource()` helper; local receiving `RR-`, sales `INV-`, voids, adjustments = POS). (2) **E-commerce CONFIRM/CANCEL previously updated `products.stock_qty` with NO trail** — same lost-update family as the old transfer bug: the HQ 30s snapshot push would overwrite the reservation. Now `ShopUpdateOrderStatus` writes `stock_trails` rows (pos_id=-NEXTVAL, store=HQ, ref `SHOP-<orderNo> -> <customer>`, user 'E-commerce', channel='ecommerce', before/after captured) so the offset formula keeps the reservation AND the HQ pull applies it locally → visible in Stock Movement with SOURCE=E-Commerce.
 
