@@ -1,6 +1,20 @@
 ﻿# JumongPOS — Full Project Guide for AI Agents
 
-## Latest Change (2026-08-20) — v1.1.51 (POS client): End-Shift HISTORY REPRINT Previous-Inventory Bug FIXED (phantom SHORT)
+## Latest Change (2026-08-20) — v1.1.52 (POS) + v1.1.43 (API): Stock Movement SOURCE Column + E-Commerce Trails
+
+**Request:** "pwede isabay pos client - product - stock movement - new column sana for reference - kunwari kung galing sa mobile transfer yung item kung sold sa pos or sold sa ecommerce or sold sa mobile para madali ko malaman kung ano source ng transaction" — two changes: (1) `StockMovementForm` (POS → Products → VIEW STOCK MOV'T) now has a **SOURCE** column derived from the trail Reference: `Transfer #`/`WH-Transfer` → **Transfer**, `SHOP-` → **E-Commerce**, `WH-`/`Wholesale`/`RECV-` → **Mobile**, everything else → **POS** (`DeriveSource()` helper; local receiving `RR-`, sales `INV-`, voids, adjustments = POS). (2) **E-commerce CONFIRM/CANCEL previously updated `products.stock_qty` with NO trail** — same lost-update family as the old transfer bug: the HQ 30s snapshot push would overwrite the reservation. Now `ShopUpdateOrderStatus` writes `stock_trails` rows (pos_id=-NEXTVAL, store=HQ, ref `SHOP-<orderNo> -> <customer>`, user 'E-commerce', channel='ecommerce', before/after captured) so the offset formula keeps the reservation AND the HQ pull applies it locally → visible in Stock Movement with SOURCE=E-Commerce.
+
+| File | Change |
+|---|---|
+| `Forms/StockMovementForm.cs` | New SOURCE column (Width 95, centered) after TYPE; `CellFormatting` fills it via new `DeriveSource(StockTrail)`; TYPE column now 110 fixed + REFERENCE gets Fill. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | `ShopUpdateOrderStatus` rewritten item loop: resolves HQ product row (`pos_id, stock_qty, name` by barcode), guarded UPDATE by pos_id, then INSERT trail (pos_id<0, ±pcs, before/after, ref `SHOP-...`, channel='ecommerce'). Version → `"1.1.43"`; `latestVer` → `"1.1.52"`. |
+| `Services/AppVersion.cs` | `"1.1.51"` → `"1.1.52"`. |
+
+**Deployed:** API v1.1.43 live; client v1.1.52 (exe 211,383,740 B) → drop + **GitHub release v1.1.52** (release id 373791532, published, verified). Git `9e672fb`. Stores via UPDATE APP.
+
+**Also answered this session:** the POS sidebar **📊 Inventory Count** button = stocktaking viewer (`InventoryHistoryForm`); it is BLANK because sessions are created from the MOBILE counting page served by the POS itself at `http://<POS-IP>:5002` (PIN `1234`, `InventoryWebServer`) — start a session on the phone (same store Wi-Fi), scan/count items, end session, then the POS shows session/variance/report. Not a bug — no sessions yet.
+
+## Previous Change (2026-08-20) — v1.1.51 (POS client): End-Shift HISTORY REPRINT Previous-Inventory Bug FIXED (phantom SHORT)
 
 **Request:** "bakit kasi sa resibo iba ang pag print ng reconciliation mo pwede paki check" + "inventory reconciliation ng u got mart need ko ng buong paliwanang bakit short ng 146553.85" — the U Got Mart Aug 20 shift is actually **BALANCED** (Expected = Previous ₱925,825.19 + Received ₱263,568 − COGS ₱117,014.15 = ₱1,072,379.04 = Actual). The **SHORT ₱146,553.85 came from the history REPRINT path only**: `btnHistory_Click` reprint used `GetLastInventoryCost()` as "Previous Inventory" — by reprint time that returns the NEWEST close (the shift being reprinted itself: ₱1,072,379.04), not the close before it → Expected inflated by exactly (current − previous) = **146,553.85** → phantom SHORT. The LIVE close path (line 204) calls GetLastInventoryCost BEFORE saving, so live receipts/emails were always correct; only reprints were wrong.
 
