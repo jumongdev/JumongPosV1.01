@@ -21,6 +21,17 @@ public partial class StockMovementForm : Form
         DebugHelper.AddFormLabel(this);
     }
 
+    private static string DeriveSource(StockTrail st)
+    {
+        var r = st.Reference ?? "";
+        if (r.Contains("Transfer #") || r.StartsWith("WH-Transfer")) return "Transfer";
+        if (r.StartsWith("SHOP-")) return "E-Commerce";
+        if (r.StartsWith("WH-")) return "Mobile";
+        if (r.StartsWith("Wholesale")) return "Mobile";
+        if (r.StartsWith("RECV-")) return "Mobile";
+        return "POS";
+    }
+
     private void InitializeComponent()
     {
         var t = ThemeManager.Current;
@@ -103,8 +114,9 @@ public partial class StockMovementForm : Form
         _dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "QuantityAdded", HeaderText = "QTY +/-", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, Font = new Font("Segoe UI", 10F, FontStyle.Bold) } });
         _dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "StockBefore", HeaderText = "BEFORE", Width = 70, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter } });
         _dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "StockAfter", HeaderText = "AFTER", Width = 70, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter } });
-        _dgv.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "TYPE", Width = 120, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
-        _dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Reference", HeaderText = "REFERENCE", Width = 160 });
+        _dgv.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "TYPE", Width = 110 });
+        _dgv.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "SOURCE", Width = 95, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter } });
+        _dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Reference", HeaderText = "REFERENCE", Width = 160, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
         _dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "CreatedAt", HeaderText = "DATE/TIME", Width = 140, DefaultCellStyle = new DataGridViewCellStyle { Format = "yyyy-MM-dd HH:mm" } });
         _dgv.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "UserName", HeaderText = "CASHIER", Width = 100 });
 
@@ -139,14 +151,17 @@ public partial class StockMovementForm : Form
                     else
                         e.Value = "—";
                 }
+                if (e.ColumnIndex == _dgv.Columns["SOURCE"]?.Index)
+                {
+                    e.Value = DeriveSource(st);
+                }
             }
         };
 
         _dgv.CellMouseClick += (_, e) =>
         {
             if (e.RowIndex < 0) return;
-            if (_dgv.Rows[e.RowIndex].DataBoundItem is not StockTrail st) return;
-            var inv = !string.IsNullOrEmpty(st.InvoiceNo) ? st.InvoiceNo 
+            if (_dgv.Rows[e.RowIndex].DataBoundItem is not StockTrail st) return;            var inv = !string.IsNullOrEmpty(st.InvoiceNo) ? st.InvoiceNo 
                 : st.Reference.Contains("void") ? null 
                 : (st.Reference.Length >= 8 ? st.Reference : null);
             if (string.IsNullOrEmpty(inv)) return;
