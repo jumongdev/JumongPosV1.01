@@ -1,6 +1,18 @@
 ﻿# JumongPOS — Full Project Guide for AI Agents
 
-## Latest Change (2026-08-20) — web-only: Mobile TRANSFER Tab Now Uses HQ/Server Products (source=hq)
+## Latest Change (2026-08-20) — v1.1.51 (POS client): End-Shift HISTORY REPRINT Previous-Inventory Bug FIXED (phantom SHORT)
+
+**Request:** "bakit kasi sa resibo iba ang pag print ng reconciliation mo pwede paki check" + "inventory reconciliation ng u got mart need ko ng buong paliwanang bakit short ng 146553.85" — the U Got Mart Aug 20 shift is actually **BALANCED** (Expected = Previous ₱925,825.19 + Received ₱263,568 − COGS ₱117,014.15 = ₱1,072,379.04 = Actual). The **SHORT ₱146,553.85 came from the history REPRINT path only**: `btnHistory_Click` reprint used `GetLastInventoryCost()` as "Previous Inventory" — by reprint time that returns the NEWEST close (the shift being reprinted itself: ₱1,072,379.04), not the close before it → Expected inflated by exactly (current − previous) = **146,553.85** → phantom SHORT. The LIVE close path (line 204) calls GetLastInventoryCost BEFORE saving, so live receipts/emails were always correct; only reprints were wrong.
+
+| File | Change |
+|---|---|
+| `Services/DailyCloseService.cs` | New `GetPreviousInventoryCost(int currentCloseId)` — `SELECT TotalInventoryCost FROM DailyClose WHERE Id < @id ORDER BY Id DESC LIMIT 1`. |
+| `Forms/EndShiftForm.cs:431` | Reprint path: `var prevInv2 = since != null ? GetLastInventoryCost() : 0m;` → `var prevInv2 = DailyCloseService.GetPreviousInventoryCost(dc.Id);` |
+| `Services/AppVersion.cs` | `"1.1.50"` → `"1.1.51"`; API `latestVer` → `"1.1.51"` (API stays 1.1.42). |
+
+**Deployed:** client v1.1.51 (exe 211,383,740 B) → drop `C:\JumongAPI\client\` + **GitHub release v1.1.51** (release id/asset uploaded+published, verified). API redeployed (latestVer). Git `42818b7`. Stores reprint correctly after UPDATE APP. NOTE: the already-stored daily_closes rows are CORRECT (they store the live-computed values) — only the reprint computation was wrong, so no data fix needed.
+
+## Previous Change (2026-08-20) — web-only: Mobile TRANSFER Tab Now Uses HQ/Server Products (source=hq)
 
 **Request:** "in mobile you said its server product but with transferring old warehouse stock" — the mobile app's TRANSFER tab was still moving OLD warehouse stock while SELL/INVENTORY/RECEIVING had already switched to HQ/server products (v1.1.38). Now consistent: mobile TRANSFER = **HQ→POS** transfers from server `products`.
 
