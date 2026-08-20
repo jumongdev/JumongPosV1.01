@@ -349,6 +349,16 @@ public class DailyCloseService
         return val == null || val == DBNull.Value ? 0m : Convert.ToDecimal(val);
     }
 
+    public static decimal GetPreviousInventoryCost(int currentCloseId)
+    {
+        using var conn = DatabaseHelper.GetConnection();
+        conn.Open();
+        using var cmd = new SQLiteCommand("SELECT TotalInventoryCost FROM DailyClose WHERE Id < @id ORDER BY Id DESC LIMIT 1", conn);
+        cmd.Parameters.AddWithValue("@id", currentCloseId);
+        var val = cmd.ExecuteScalar();
+        return val == null || val == DBNull.Value ? 0m : Convert.ToDecimal(val);
+    }
+
     public static string? GetPreviousCloseTime(int currentCloseId)
     {
         using var conn = DatabaseHelper.GetConnection();

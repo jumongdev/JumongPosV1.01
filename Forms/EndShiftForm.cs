@@ -428,7 +428,7 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
             var creditPayments = DailyCloseService.GetCreditPaymentsBetween(since, closeDate);
             var expenses = ExpenseService.GetExpensesBetween(since, closeDate);
             var cashOnHand = dc.Denom1000 * 1000m + dc.Denom500 * 500m + dc.Denom200 * 200m + dc.Denom100 * 100m + dc.Denom50 * 50m + dc.Denom20 * 20m + dc.DenomCoins;
-            var prevInv2 = since != null ? DailyCloseService.GetLastInventoryCost() : 0m;
+            var prevInv2 = DailyCloseService.GetPreviousInventoryCost(dc.Id);
             PrinterService.PrintAuditEndShiftReport(cashOnHand, dc.Difference, dc.UserName, closeDate, dc.Notes, dc.TotalSales, dc.TotalCash, dc.TotalEWallet, dc.TotalCredit, dc.TotalVoided, expenses, gcashTxns, creditCustomers, creditPayments,
                 dc.Denom1000, dc.Denom500, dc.Denom200, dc.Denom100, dc.Denom50, dc.Denom20, dc.DenomCoins,
                 dc.TotalInventoryCost, dc.TotalCostSold, dc.TotalStockReceivedCost, prevInv2);
