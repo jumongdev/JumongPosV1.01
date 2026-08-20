@@ -2316,7 +2316,7 @@
       try {
         const r = await fetch(API + '/dashboard/warehouse/clients');
         const data = await r.json();
-        (data || []).filter(c => c.storeType === 'pos' && c.storeId !== 'STORE-WAREHOUSE').forEach(c => {
+        (data || []).filter(c => c.storeType === 'pos' && c.storeId !== 'STORE-WAREHOUSE' && c.storeId !== 'STORE-20260602-7159').forEach(c => {
           const o = document.createElement('option');
           o.value = c.id;
           o.textContent = c.name;
@@ -2332,7 +2332,7 @@
       if (!q) { box.innerHTML = ''; return; }
       box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading...</p>';
       try {
-        const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&search=' + encodeURIComponent(q));
+        const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&search=' + encodeURIComponent(q) + '&source=hq');
         const data = await r.json();
         txProdCache = data || [];
         box.innerHTML = '';
@@ -2413,6 +2413,7 @@
         clientName: txClientName,
         notes: document.getElementById('txNotes').value.trim(),
         storeId: txClientStoreId,
+        source: 'hq',
         items: txItems.map(x => ({ productId: x.productId, productName: x.productName, barcode: x.barcode, qty: x.qty }))
       };
       const btn = document.querySelector('#tabNewTransfer .btn-green');
