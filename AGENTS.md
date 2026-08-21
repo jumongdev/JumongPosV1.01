@@ -13,7 +13,7 @@
 | `JumongCloudAPI/wwwroot/whmobile.html` | Burger menu **WAREHOUSE section → TOOLS** (label only); **Online Order row + tabOrders div + goOrders/loadOrders/loadOrderItems removed** (the only remaining wh-bound tab — external client orders via wh_orders). Product/Inventory/Sales/Transfer/Receiving/Credit/EndShift kept (all `source=hq` server-product flows). Store switcher isWh cosmetics kept (harmless). |
 | PostgreSQL | `UPDATE wh_products SET is_active=false WHERE is_active=true` → **UPDATE 402** (items hidden; rows kept for audit). |
 
-**Verified live:** API v1.1.45; `/stock-status` = 2825 rows / **0 warehouse rows**; `/warehouse/products` active = 0; dashboard nav has no WAREHOUSE group; whmobile shows Tools + no ONLINE ORDERS. Deployed via WinRM (stop→copy→start, PSCredential from `Jum0ng!Dev55`). Git pending. No POS client release. NOTE: mobile app's wh_* API endpoints still exist server-side (all HQ-stock now); `order.html` (external client ordering) still reachable by direct URL but orphaned from menus — kept as-is unless user wants it removed.
+**Verified live:** API v1.1.45; `/stock-status` = 2825 rows / **0 warehouse rows**; `/warehouse/products` active = 0; dashboard nav has no WAREHOUSE group; whmobile shows Tools + no ONLINE ORDERS. Deployed via WinRM (stop→copy→start, PSCredential from `Jum0ng!Dev55`). Git `56e822f`. No POS client release. NOTE: mobile app's wh_* API endpoints still exist server-side (all HQ-stock now); `order.html` (external client ordering) still reachable by direct URL but orphaned from menus — kept as-is unless user wants it removed.
 
 ## Previous Change (2026-08-21) — v1.1.44 (Cloud API) + web: INVENTORY VALUE panel (per-store + grand total, POS stores only)
 
