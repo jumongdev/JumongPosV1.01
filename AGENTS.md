@@ -1,6 +1,21 @@
 ﻿# JumongPOS — Full Project Guide for AI Agents
 
-## Latest Change (2026-08-21) — v1.1.44 (Cloud API) + web: INVENTORY VALUE panel (per-store + grand total, POS stores only)
+## Latest Change (2026-08-21) — v1.1.45 (Cloud API) + web: WAREHOUSE RETIRED — all wh_products UI removed (warehouse totally shifted to server products)
+
+**Request:** "NGAYON ANG WAREHOUSE TOTALLY SHIFTED TO SERVER PRODUCT" — user confirmed the warehouse (wh_products) is fully drained and retired; chose **"Tanggalin lahat ng warehouse UI"**. Verified first: 402 wh_products items ALL at 0 stock, 0 pending transfers, last warehouse-source sale 2026-08-19 (v1.1.38 switch); the 170 warehouse sales / ₱699k in the last 7 days were all pre-08-20 history. Action: warehouse UI removed everywhere; **history preserved** (wh_walkin_sales, wh_stock_trails, wh_transfers, wh_daily_closes untouched for audit).
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **`/stock-status` warehouse UNION branch REMOVED** — response now `products`-only (no STORE-WAREHOUSE rows; VIEW STOCK dialog + stock views are POS stores only). Version → `"1.1.45"` (2 places). All other wh_* endpoints left intact (still used by mobile app for HQ-stock flows). |
+| `JumongCloudAPI/wwwroot/index.html` | Sidebar **grp-wh (WAREHOUSE) nav group + wh-* items REMOVED** + its `_whBadge` span; the entire ~1040-line **warehouse section** (x-data warehousePanel: products/inventory/online-order/transfer/receiving/sales subpages + Add/Edit/Order/Transfer modals) DELETED (div balance 511/511 verified). Store Transfer (HQ→POS, grp-inv) untouched. |
+| `JumongCloudAPI/wwwroot/components.js` | **`warehousePanel` Alpine component deleted** (546 lines) + store state cleanup: `whSubpage`, `_whBadge`, wh-* groupParents, grp-wh isGroupActive, switchSection wh-* branch, switchWhSubpage, isActive wh-* branch. `storeTransferPanel` kept. productStockDialog store order list: STORE-WAREHOUSE removed. |
+| `JumongCloudAPI/wwwroot/app.js` | wh-* CSV export branches (wh-product/wh-inventory/wh-inventory-activity/wh-onlineorder/wh-transfer/wh-receiving) + `cache[name.replace('wh-','')]` fallback removed. |
+| `JumongCloudAPI/wwwroot/whmobile.html` | Burger menu **WAREHOUSE section → TOOLS** (label only); **Online Order row + tabOrders div + goOrders/loadOrders/loadOrderItems removed** (the only remaining wh-bound tab — external client orders via wh_orders). Product/Inventory/Sales/Transfer/Receiving/Credit/EndShift kept (all `source=hq` server-product flows). Store switcher isWh cosmetics kept (harmless). |
+| PostgreSQL | `UPDATE wh_products SET is_active=false WHERE is_active=true` → **UPDATE 402** (items hidden; rows kept for audit). |
+
+**Verified live:** API v1.1.45; `/stock-status` = 2825 rows / **0 warehouse rows**; `/warehouse/products` active = 0; dashboard nav has no WAREHOUSE group; whmobile shows Tools + no ONLINE ORDERS. Deployed via WinRM (stop→copy→start, PSCredential from `Jum0ng!Dev55`). Git pending. No POS client release. NOTE: mobile app's wh_* API endpoints still exist server-side (all HQ-stock now); `order.html` (external client ordering) still reachable by direct URL but orphaned from menus — kept as-is unless user wants it removed.
+
+## Previous Change (2026-08-21) — v1.1.44 (Cloud API) + web: INVENTORY VALUE panel (per-store + grand total, POS stores only)
 
 **Request:** "ito kasi gusto ko makita dashboard para sa inventory cost and value ng buong store kabuohan at ng per store" — new Reports panel showing the CURRENT stock value of the whole company (cost basis + gross/SRP basis) per store and combined. User explicitly said **NO warehouse** (`wh_products` excluded). Also answered this session: the Master Catalog table does NOT show stock — its API `stockQty` is the legacy `master_products.stock_qty` column that no pipeline ever updates (the 30s snapshot writes `products`, not `master_products`). Added a TOTAL STOCK column to Master Catalog first (web-only, sums `/stock-status` per barcode, cached 30s) — user later clarified this value panel was what they actually wanted.
 

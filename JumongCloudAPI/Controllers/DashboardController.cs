@@ -985,19 +985,6 @@ public class DashboardController : ControllerBase
                 SELECT name, barcode, category, stock_qty, price, cost, store_id, p.pos_id
                 FROM products p
                 {whereClause}
-                {(string.IsNullOrEmpty(storeId) ? @"
-                UNION ALL
-                SELECT w.name,
-                       COALESCE(NULLIF(w.barcode,''), mp.barcode, '') AS barcode,
-                       COALESCE(NULLIF(w.category,''), mp.category, '') AS category,
-                       w.stock_qty,
-                       COALESCE(w.piece_price, w.box_price/NULLIF(w.box_qty,0), mp.price, 0) AS price,
-                       COALESCE(mp.cost, w.box_cost/NULLIF(w.box_qty,0), 0) AS cost,
-                       'STORE-WAREHOUSE' AS store_id,
-                       NULL AS pos_id
-                FROM wh_products w
-                LEFT JOIN master_products mp ON mp.id = w.master_product_id
-                WHERE w.is_active = true" : "")}
                 ORDER BY stock_qty ASC";
             if (!string.IsNullOrEmpty(storeId)) cmd.Parameters.AddWithValue("storeId", storeId);
             var data = new List<object>();
@@ -1397,7 +1384,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.1.44" });
+            return Ok(new { version = "1.1.45" });
     }
 
     private static readonly HttpClient _ollamaClient = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
@@ -1918,7 +1905,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         return Ok(new
         {
             api = "ok",
-            version = "1.1.44",
+            version = "1.1.45",
             db = dbOk ? "ok" : "down",
             uptimeSeconds = Environment.TickCount64 / 1000,
             memory = new { totalMb = (long)(memTotal / (1024 * 1024)), freeMb = (long)(memFree / (1024 * 1024)) },

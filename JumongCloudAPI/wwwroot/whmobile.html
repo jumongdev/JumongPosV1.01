@@ -247,16 +247,6 @@
           <div id="prodResults" class="space-y-2"></div>
         </div>
 
-        <!-- ONLINE ORDER TAB -->
-        <div id="tabOrders" class="hidden">
-          <div class="flex items-center justify-between mb-3">
-            <button class="btn-ghost px-4" onclick="backToSell()">← BACK</button>
-            <p class="text-white text-sm font-bold">ONLINE ORDERS</p>
-            <p class="text-gray-500 text-[11px]">customer orders</p>
-          </div>
-          <div id="ordersList" class="space-y-2"></div>
-        </div>
-
         <!-- TRANSFER TAB -->
         <div id="tabTransfers" class="hidden">
           <div class="flex items-center justify-between mb-3">
@@ -393,13 +383,12 @@
           <span class="text-gray-500 text-lg">›</span>
         </div>
 
-        <!-- WAREHOUSE section -->
-        <p class="text-[10px] text-[#5a5a8a] uppercase tracking-wider font-bold mb-1.5 mt-4">Warehouse</p>
+        <!-- TOOLS section -->
+        <p class="text-[10px] text-[#5a5a8a] uppercase tracking-wider font-bold mb-1.5 mt-4">Tools</p>
         <div class="space-y-1 mb-2">
           <div class="menu-row" onclick="goProducts()"><span>📦</span>Product</div>
           <div class="menu-row" onclick="goInventory('all')"><span>📊</span>Inventory</div>
           <div class="menu-row" onclick="goSalesReport()"><span>🧾</span>Sales</div>
-          <div class="menu-row" onclick="goOrders()"><span>🛒</span>Online Order</div>
           <div class="menu-row" onclick="goTransfers()"><span>🚚</span>Transfer</div>
           <div class="menu-row" onclick="goReceiving()"><span>📥</span>Receiving</div>
           <div class="menu-row" onclick="openCreditBilling()"><span>💳</span>Credit Billing</div>
@@ -809,13 +798,12 @@
       document.getElementById('menuStoreIcon').textContent = isWh ? '🏭' : '🏬';
       setScreen('main');
       const savedTab = localStorage.getItem('wh_tab');
-      const tab = (savedTab === 'inventory' || savedTab === 'setup' || savedTab === 'sales' || savedTab === 'products' || savedTab === 'orders' || savedTab === 'transfers') ? savedTab : 'sell';
+      const tab = (savedTab === 'inventory' || savedTab === 'setup' || savedTab === 'sales' || savedTab === 'products' || savedTab === 'transfers') ? savedTab : 'sell';
       if (savedTab === 'newtransfer' || savedTab === 'receiving') { localStorage.setItem('wh_tab', 'transfers'); }
       switchTab(tab);
       if (tab === 'inventory') searchInventory();
       if (tab === 'sales') loadSales();
       if (tab === 'products') loadProducts();
-      if (tab === 'orders') loadOrders();
       if (tab === 'transfers') loadTransfers();
       document.getElementById('appInfo').textContent = IN_APP ? 'App version: ' + AndroidApp.getVersion() + ' (native APK with Bluetooth)' : 'Browser mode (no Bluetooth print)';
       loadPaperWidth();
@@ -876,7 +864,6 @@
     function backToSell() { switchTab('sell'); }
 
     function goProducts() { closeBurgerMenu(); switchTab('products'); loadProducts(); }
-    function goOrders() { closeBurgerMenu(); switchTab('orders'); loadOrders(); }
     function goTransfers() { closeBurgerMenu(); switchTab('transfers'); loadTransfers(); }
     function goReceiving() { closeBurgerMenu(); switchTab('receiving'); document.getElementById('recvSearch').value = ''; document.getElementById('recvResults').innerHTML = ''; document.getElementById('recvSearch').focus(); }
     function goNewTransfer() {
@@ -925,7 +912,6 @@
       hide(document.getElementById('tabSales'));
       hide(document.getElementById('tabSetup'));
       hide(document.getElementById('tabProducts'));
-      hide(document.getElementById('tabOrders'));
       hide(document.getElementById('tabTransfers'));
       hide(document.getElementById('tabNewTransfer'));
       hide(document.getElementById('tabReceiving'));
@@ -936,7 +922,6 @@
       if (tab === 'sales') { show(document.getElementById('tabSales')); }
       if (tab === 'setup') { show(document.getElementById('tabSetup')); refreshPrinters(); loadPaperWidth(); }
       if (tab === 'products') { show(document.getElementById('tabProducts')); document.getElementById('prodSearch').focus(); }
-      if (tab === 'orders') { show(document.getElementById('tabOrders')); }
       if (tab === 'transfers') { show(document.getElementById('tabTransfers')); }
       if (tab === 'newtransfer') { show(document.getElementById('tabNewTransfer')); }
       if (tab === 'receiving') { show(document.getElementById('tabReceiving')); document.getElementById('recvSearch').focus(); }
@@ -2209,51 +2194,6 @@
           box.appendChild(d);
         });
       } catch (e) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Failed: ' + e.message + '</p>'; }
-    }
-
-    // ─── ONLINE ORDERS ──────────────────────────────────────
-    async function loadOrders() {
-      const list = document.getElementById('ordersList');
-      list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Loading...</p>';
-      try {
-        const r = await fetch(API + '/dashboard/warehouse/orders');
-        const data = await r.json();
-        const rows = data || [];
-        list.innerHTML = '';
-        if (!rows.length) { list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No orders</p>'; return; }
-        rows.forEach(x => {
-          const st = String(x.status || '').toLowerCase();
-          const stColor = st === 'completed' || st === 'received' ? 'text-emerald-400' : (st === 'pending' ? 'text-amber-400' : 'text-cyan-400');
-          const div = document.createElement('div');
-          div.className = 'card';
-          const dt = new Date(x.createdAt);
-          div.innerHTML = '<div class="flex items-center justify-between" onclick="loadOrderItems(' + x.id + ',\'' + String(x.id).replace(/'/g, '') + '\')"><div class="flex-1 pr-2"><p class="text-white text-sm font-bold">Order #' + x.id + (x.hasShortage ? ' ⚠' : '') + '</p>' +
-            '<p class="text-gray-500 text-[11px]">' + (x.clientName || '') + ' • ' + dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) + '</p></div>' +
-            '<div class="text-right"><p class="' + stColor + ' text-[10px] font-bold uppercase">' + (x.status || '') + '</p>' +
-            '<p class="text-cyan-400 text-xs font-bold">₱' + Number(x.totalAmount || 0).toFixed(2) + '</p></div></div>';
-          list.appendChild(div);
-        });
-      } catch (e) { list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Failed to load: ' + e.message + '</p>'; }
-    }
-
-    async function loadOrderItems(id, label) {
-      try {
-        const r = await fetch(API + '/dashboard/warehouse/orders/' + id + '/items');
-        const items = await r.json();
-        document.getElementById('txItemsTitle').textContent = 'ORDER #' + label;
-        const box = document.getElementById('txItemsList');
-        box.innerHTML = '';
-        (items || []).forEach(it => {
-          const d = document.createElement('div');
-          d.className = 'cart-item';
-          d.innerHTML = '<div class="flex-1"><p class="text-white text-xs font-bold">' + it.productName + '</p>' +
-            '<p class="text-gray-500 text-[10px]">' + (it.unitType || 'Piece') + ' x' + it.qty + '</p></div>' +
-            '<p class="text-cyan-400 text-xs font-bold">₱' + Number(it.totalPrice || 0).toFixed(2) + '</p>';
-          box.appendChild(d);
-        });
-        if (!items || !items.length) box.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No items</p>';
-        show(document.getElementById('txItemsModal'));
-      } catch (e) { toast('Failed: ' + e.message, 'error'); }
     }
 
     // ─── TRANSFERS ──────────────────────────────────────────

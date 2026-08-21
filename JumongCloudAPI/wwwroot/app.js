@@ -69,23 +69,8 @@ window.exportCSV = (name) => {
     downloadCSV(csv, name);
     return;
   }
-  const cache = Alpine.store('app').cache[name] || Alpine.store('app').cache[name.replace('wh-', '')];
+  const cache = Alpine.store('app').cache[name];
   if (!cache || !cache.length) { toast('No data to export', 'error'); return }
-  if (name.startsWith('wh-')) {
-    const wh = document.querySelector('[x-data="warehousePanel"]')?.__x?.$data;
-    if (!wh) return;
-    let headers, rows, data;
-    if (name === 'wh-product') { data = wh.products; headers = 'ID,Name,Barcode,Category,Price,Units,Stock'; rows = data.map(x => [x.id, x.name, x.barcode, x.category, x.piecePrice, x.units ? x.units.map(u => u.unitName + ': ' + u.price + (u.isDefault ? '*' : '')).join(' | ') : '', x.stockQty]) }
-    else if (name === 'wh-inventory') { data = wh.products; headers = 'ID,Name,Barcode,Category,Price,Units,Stock'; rows = data.map(x => [x.id, x.name, x.barcode, x.category, x.piecePrice, x.units ? x.units.map(u => u.unitName + ': ' + u.price + (u.isDefault ? '*' : '')).join(' | ') : '', x.stockQty]) }
-    else if (name === 'wh-inventory-activity') { data = wh.invActivity; headers = 'Date,Product,Change,Type,Reference'; rows = data.map(x => [x.createdAt, x.productName, x.qtyChange, wh.formatType(x.referenceType||''), x.reference || '']) }
-    else if (name === 'wh-onlineorder') { data = wh.orders; headers = 'ID,Client,Status,Total,Notes,Date'; rows = data.map(x => [x.id, x.clientName, x.status, x.totalAmount, x.notes, x.createdAt]) }
-    else if (name === 'wh-transfer') { data = wh.transfers; headers = 'ID,Client,Status,Notes,Date'; rows = data.map(x => [x.id, x.clientName, x.status, x.notes, x.createdAt]) }
-    else if (name === 'wh-receiving') { data = wh.recvData; headers = 'Reference,Items,TotalQty,Date'; rows = data.map(x => [x.reference, x.itemCount, x.totalQty, x.createdAt]) }
-    if (!headers) return;
-    let csv = headers + '\n' + rows.map(r => r.map(c => '"' + (c + '').replace(/"/g, '""') + '"').join(',')).join('\n');
-    downloadCSV(csv, name);
-    return;
-  }
   const entry = map[name];
   if (!entry) { toast('Unknown export type', 'error'); return }
   let csv = entry[0] + '\n' + entry[1](cache).map(r => r.map(c => '"' + (c + '').replace(/"/g, '""') + '"').join(',')).join('\n');

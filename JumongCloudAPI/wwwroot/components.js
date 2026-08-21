@@ -13,7 +13,6 @@ document.addEventListener('alpine:init', () => {
 
 Alpine.store('app', {
     section: 'dashboard',
-    whSubpage: 'product',
     stockSubpage: 'receiving',
     storeId: '',
     range: 'today',
@@ -32,7 +31,6 @@ Alpine.store('app', {
     saleModalOpen: false, saleInvoiceNo: '', saleItems: [], saleLoading: false,
     salePaymentMethod: '', saleReferenceNo: '', saleEwPaid: 0, saleGrandTotal: 0,
     _sidebarOpen: window.innerWidth < 768 ? false : localStorage.getItem('sidebar') !== 'collapsed',
-    _whBadge: 0,
     _stBadge: 0,
     _shopBadge: 0,
     groupOpen: {},
@@ -42,7 +40,6 @@ Alpine.store('app', {
       'rpt-sales': 'grp-reports', 'rpt-invcost': 'grp-reports', 'rpt-shifts': 'grp-reports', 'analytics': 'grp-reports', 'rpt-invval': 'grp-reports',
       'grp-reports': 'grp-pos', 'products': 'grp-pos', 'grp-inv': 'grp-pos', 'online-orders': 'grp-pos', 'shop-content': 'grp-pos',
       'st-receiving': 'grp-inv', 'st-trail': 'grp-inv', 'st-transfer': 'grp-inv',
-      'wh-product': 'grp-wh', 'wh-inventory': 'grp-wh', 'wh-sales': 'grp-wh', 'wh-onlineorder': 'grp-wh', 'wh-transfer': 'grp-wh', 'wh-receiving': 'grp-wh',
       'settings': 'grp-settings', 'pospromo': 'grp-settings', 'posqr': 'grp-settings', 'branding': 'grp-settings'
     },
     toggleGroup(id) {
@@ -57,7 +54,6 @@ Alpine.store('app', {
         if (id === 'grp-inv') return this.section === 'stock' || ['st-receiving', 'st-trail', 'st-transfer'].includes(this.section);
         return this.section === 'products' || this.section === 'stock' || this.section === 'rpt-sales' || this.section === 'rpt-invcost' || this.section === 'rpt-shifts' || this.section === 'analytics' || this.section === 'rpt-invval' || this.section === 'online-orders';
       }
-      if (id === 'grp-wh' && this.section === 'warehouse') return true;
       if (id === 'grp-inv' && this.section === 'stock') return true;
       const parent = this.groupParents[this.section];
       return parent ? (parent === id || this.groupParents[parent] === id) : false;
@@ -106,12 +102,6 @@ Alpine.store('app', {
       document.getElementById('sidebar')?.classList.remove('open');
       if (section === 'health') { window.open('health.html', '_blank'); return; }
       if (section === 'shop') { window.open('shop.html', '_blank'); return; }
-      if (section.startsWith('wh-')) {
-        this.section = 'warehouse';
-        this.whSubpage = section.replace('wh-', '');
-        dispatchEvent(new CustomEvent('load-warehouse'));
-        return;
-      }
       if (section.startsWith('st-')) {
         this.section = 'stock';
         this.stockSubpage = section.replace('st-', '');
@@ -121,20 +111,15 @@ Alpine.store('app', {
       this.section = section;
       if (section === 'customers') dispatchEvent(new CustomEvent('load-customers'));
       if (section === 'users') dispatchEvent(new CustomEvent('load-users'));
-      if (section === 'warehouse') { this.whSubpage = 'product'; dispatchEvent(new CustomEvent('load-warehouse')); }
       if (section === 'products') dispatchEvent(new CustomEvent('load-products'));
       if (section === 'stock') { this.stockSubpage = 'receiving'; dispatchEvent(new CustomEvent('load-stock')); }
       if (section === 'analytics') dispatchEvent(new CustomEvent('load-analytics'));
       if (section === 'suspect1pc') dispatchEvent(new CustomEvent('load-suspect1pc'));
     },
-    switchWhSubpage(subpage) {
-      this.whSubpage = subpage;
-    },
     switchStockSubpage(subpage) {
       this.stockSubpage = subpage;
     },
     isActive(id) {
-      if (id.startsWith('wh-')) return this.section === 'warehouse' && this.whSubpage === id.replace('wh-', '');
       if (id.startsWith('st-')) return this.section === 'stock' && this.stockSubpage === id.replace('st-', '');
       return this.section === id;
     },
@@ -601,7 +586,7 @@ Alpine.store('app', {
         const bc = this.product.barcode || '';
         const seen = {};
         this.rows = all.filter(x => x.barcode === bc && !seen[x.storeId] && (seen[x.storeId] = true));
-        const order = ['STORE-20260602-7159', 'STORE-20260602-AA36', 'STORE-20260626-A80C', 'STORE-20260622-E174', 'STORE-WAREHOUSE', 'STORE-DEV-0001'];
+        const order = ['STORE-20260602-7159', 'STORE-20260602-AA36', 'STORE-20260626-A80C', 'STORE-20260622-E174', 'STORE-DEV-0001'];
         this.rows.sort((a, b) => {
           const ia = order.indexOf(a.storeId), ib = order.indexOf(b.storeId);
           return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
@@ -690,552 +675,6 @@ Alpine.store('app', {
     }
   }));
 
-  /* ΓöÇΓöÇ Warehouse ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
-  Alpine.data('warehousePanel', () => ({
-    products: [], clientsData: [], orders: [], transfers: [], loading: true, catFilter: '', search: '', stockFilter: 'all',
-    salesData: [], saleFrom: '', saleTo: '', saleViewOpen: false, saleViewItems: [], saleSummary: null,
-    invActivity: [], invSearch: '', invFrom: '', invTo: '', invExpanded: true, invActivityLoading: false,
-    inventorySummary: null,
-    recvData: [], recvFrom: '', recvTo: '', recvLoading: false, recvViewOpen: false, recvViewItems: [], recvViewRef: '',
-    transferPage: 1, transferPageSize: 30, transferTotal: 0, transferFilterDate: '', transferFilterSearch: '',
-    async init() { window.addEventListener('load-warehouse', () => this.load()); if (Alpine.store('app').section === 'warehouse') await this.load(); this.startPoll() },
-    async load() {
-      this.loading = true;
-      try {
-        const sp = Alpine.store('app').whSubpage;
-        if (sp === 'product' || sp === 'inventory') { this.products = await fetchJSON(API + '/warehouse/products'); if (sp === 'inventory') await this.loadInvActivity() }
-        else if (sp === 'onlineorder') { this.clientsData = await fetchJSON(API + '/warehouse/clients'); this.orders = await fetchJSON(API + '/warehouse/orders') }
-        else if (sp === 'transfer') await this.loadTransfers();
-        else if (sp === 'sales') await this.loadSales();
-        else if (sp === 'receiving') await this.loadReceivings();
-        if (sp === 'inventory') await this.loadInventorySummary();
-      } catch (e) { this.products = []; this.clientsData = []; this.orders = []; this.transfers = [] }
-      this.loading = false;
-    },
-    async loadTransfers() {
-      try {
-        const q = [];
-        if (this.transferFilterDate) q.push('date=' + this.transferFilterDate);
-        if (this.transferFilterSearch) q.push('search=' + encodeURIComponent(this.transferFilterSearch));
-        q.push('source=warehouse');
-        q.push('page=' + this.transferPage);
-        q.push('pageSize=' + this.transferPageSize);
-        const d = await fetchJSON(API + '/warehouse/transfers?' + q.join('&'));
-        this.transfers = d.items || [];
-        this.transferTotal = d.total || 0;
-      } catch (e) { this.transfers = []; this.transferTotal = 0 }
-    },
-    applyTransferFilter() { this.transferPage = 1; this.loadTransfers() },
-    clearTransferFilter() { this.transferFilterDate = ''; this.transferFilterSearch = ''; this.transferPage = 1; this.loadTransfers() },
-    prevTransferPage() { if (this.transferPage > 1) { this.transferPage--; this.loadTransfers() } },
-    nextTransferPage() { if (this.transferPage < this.transferTotalPages) { this.transferPage++; this.loadTransfers() } },
-    gotoTransferPage(p) { this.transferPage = p; this.loadTransfers() },
-    get transferTotalPages() { return Math.max(1, Math.ceil(this.transferTotal / this.transferPageSize)) },
-    get transferPageStart() { return this.transfers.length === 0 ? 0 : (this.transferPage - 1) * this.transferPageSize + 1 },
-    get transferPageEnd() { return (this.transferPage - 1) * this.transferPageSize + this.transfers.length },
-    get transferPageNumbers() {
-      const total = this.transferTotalPages, cur = this.transferPage, out = [];
-      if (total <= 7) { for (let i = 1; i <= total; i++) out.push(i); return out }
-      out.push(1);
-      if (cur > 3) out.push('...');
-      for (let i = Math.max(2, cur - 1); i <= Math.min(total - 1, cur + 1); i++) out.push(i);
-      if (cur < total - 2) out.push('...');
-      out.push(total);
-      return out;
-    },
-    get transferSummary() {
-      const all = this.transfers;
-      return {
-        total: this.transferTotal,
-        pending: 0, completed: 0, partial: 0, cancelled: 0
-      };
-    },
-    async loadInvActivity() {
-      this.invActivityLoading = true;
-      try {
-        const p = [];
-        if (this.invSearch) p.push('search=' + encodeURIComponent(this.invSearch));
-        const qs = p.length ? '?' + p.join('&') : '';
-        this.invActivity = await fetchJSON(API + '/warehouse/inventory-activity' + qs);
-      } catch (e) { this.invActivity = [] }
-      this.invActivityLoading = false;
-    },
-    async loadInventorySummary() {
-      try { this.inventorySummary = await fetchJSON(API + '/warehouse/inventory-summary') }
-      catch (e) { this.inventorySummary = null }
-    },
-    formatType(t) {
-      const map = { manual_receive: 'Receive', manual_return: 'Return', manual_set: 'Manual Set', transfer_out: 'Transfer Out', shortage_return: 'Shortage Return', walkin_sale: 'Walk-in Sale' };
-      return map[t] || t.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-    },
-    get sp() { return Alpine.store('app').whSubpage },
-    get categories() {
-      if (this.sp !== 'product' && this.sp !== 'inventory') return [];
-      const c = []; this.products.forEach(x => { if (x.category && !c.includes(x.category)) c.push(x.category) }); return c.sort()
-    },
-    get filtered() {
-      let items = this.sp === 'product' || this.sp === 'inventory' ? this.products : this.sp === 'onlineorder' ? this.orders : this.transfers;
-      if (this.catFilter && (this.sp === 'product' || this.sp === 'inventory')) items = items.filter(x => x.category === this.catFilter);
-      if (this.search && this.sp !== 'transfer') { const q = this.search.toLowerCase(); items = items.filter(x => JSON.stringify(x).toLowerCase().includes(q)) }
-      if (this.sp === 'inventory' && this.stockFilter === 'instock') items = items.filter(x => (x.stockQty || 0) > 0);
-      if (this.sp === 'inventory' && this.stockFilter === 'out') items = items.filter(x => (x.stockQty || 0) <= 0);
-      return items;
-    },
-    get stockCounts() {
-      let instock = 0, out = 0;
-      this.products.forEach(x => { if ((x.stockQty || 0) > 0) instock++; else out++ });
-      return { instock, out };
-    },
-    setFilter(cat) { this.catFilter = cat },
-    setStockFilter(v) { this.stockFilter = v },
-
-    async loadSales() {
-      this.loading = true;
-      try {
-        let url = API + '/warehouse/sales';
-        if (this.saleFrom || this.saleTo) {
-          const p = [];
-          if (this.saleFrom) p.push('from=' + this.saleFrom);
-          if (this.saleTo) p.push('to=' + this.saleTo);
-          url += '?' + p.join('&');
-        }
-        this.salesData = await fetchJSON(url);
-        const su = [];
-        if (this.saleFrom) su.push('from=' + this.saleFrom);
-        if (this.saleTo) su.push('to=' + this.saleTo);
-        this.saleSummary = await fetchJSON(API + '/warehouse/sales/summary' + (su.length ? '?' + su.join('&') : ''));
-      } catch (e) { this.salesData = []; this.saleSummary = null }
-      this.loading = false;
-    },
-    async viewSaleItems(id) {
-      try {
-        this.saleViewItems = await fetchJSON(API + '/warehouse/sales/' + id + '/items');
-        this.saleViewOpen = true;
-      } catch (e) { toast('Error loading items', 'error') }
-    },
-    closeSaleView() { this.saleViewOpen = false; this.saleViewItems = [] },
-    async loadReceivings() {
-      this.recvLoading = true;
-      try {
-        const p = [];
-        if (this.recvFrom) p.push('from=' + this.recvFrom);
-        if (this.recvTo) p.push('to=' + this.recvTo);
-        const qs = p.length ? '?' + p.join('&') : '';
-        this.recvData = await fetchJSON(API + '/warehouse/receivings' + qs);
-      } catch (e) { this.recvData = [] }
-      this.recvLoading = false;
-    },
-    recvToday() { this.recvFrom = new Date().toISOString().slice(0, 10); this.recvTo = this.recvFrom; this.loadReceivings() },
-    async viewReceiving(ref) {
-      try {
-        this.recvViewItems = await fetchJSON(API + '/warehouse/receivings/' + encodeURIComponent(ref) + '/items');
-        this.recvViewRef = ref;
-        this.recvViewOpen = true;
-      } catch (e) { toast('Error loading items', 'error') }
-    },
-    closeReceivingView() { this.recvViewOpen = false; this.recvViewItems = [] },
-    editId: null, editItems: [], editingSale: false,
-    async editSaleItems(id) {
-      this.editId = id; this.editingSale = true;
-      try {
-        const items = await fetchJSON(API + '/warehouse/sales/' + id + '/items');
-        this.editItems = items.map(x => ({ ...x }));
-
-        const prods = await fetchJSON(API + '/warehouse/products?activeOnly=false');
-        // Map barcode to find products for adding
-        this._saleEditProds = prods;
-      } catch (e) { toast('Error loading', 'error') }
-    },
-    closeEditSale() { this.editingSale = false; this.editId = null; this.editItems = [] },
-    addEditSaleItem(pid, pn, qty) {
-      var existing = this.editItems.find(x => x.productId === pid);
-      if (existing) { existing.qty += qty; existing.subtotal = existing.qty * existing.price; }
-      else this.editItems.push({ productId: pid, productName: pn, unitIndex: 0, qty, price: 0, subtotal: 0, unitName: 'Piece' });
-    },
-    removeEditSaleItem(i) { this.editItems.splice(i, 1) },
-    async saveEditSale() {
-      if (!this.editItems.length) { toast('Add at least one item', 'error'); return }
-      try {
-        var body = {
-          customerId: 0, customerName: '',
-          items: this.editItems.map(x => ({ productId: x.productId, productName: x.productName, unitIndex: x.unitIndex || 0, qty: x.qty }))
-        };
-        var r = await fetch(API + '/warehouse/sales/' + this.editId, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        if (r.ok) { toast('Sale updated — stock corrected', 'success'); this.closeEditSale(); this.loadSales() }
-        else { var j = await r.json(); toast('Error: ' + (j.error || 'Failed'), 'error') }
-      } catch (e) { toast('Error: ' + e.message, 'error') }
-    },
-
-    modalOpen: false, modalTitle: '', modalMode: 'add', modalId: null, form: {},
-
-    openAdd() {
-      this.modalMode = 'add'; this.modalId = null; this.modalOpen = true;
-      if (this.sp === 'product') this.form = { name: '', barcode: '', category: '', price: 0, cost: 0, stockQty: 0, units: [] };
-      else this.form = { name: '', contact: '', address: '', storeType: 'pos', storeId: '' };
-      this.modalTitle = this.sp === 'product' ? 'Add Product' : 'Add Client';
-    },
-    openEdit(id) {
-      const arr = this.sp === 'product' || this.sp === 'inventory' ? this.products : this.clientsData;
-      const p = arr.find(x => x.id === id); if (!p) return;
-      this.modalMode = 'edit'; this.modalId = id; this.modalOpen = true;
-      if (this.sp === 'product' || this.sp === 'inventory') {
-        const units = p.units && p.units.length ? JSON.parse(JSON.stringify(p.units)) : [];
-        if (!units.length) units.push({ unitName: 'pc', price: parseFloat(p.piecePrice) || 0, qtyPerUnit: 1, isDefault: true });
-        this.form = {
-          name: p.name, barcode: p.barcode || '', category: p.category || '',
-          price: parseFloat(p.piecePrice) || 0,
-          cost: p.boxCost && p.boxQty ? (parseFloat(p.boxCost) / parseInt(p.boxQty)).toFixed(2) : (p.piecePrice || 0),
-          stockQty: p.stockQty, units
-        };
-      } else {
-        this.form = { name: p.name, contact: p.contact || '', address: p.address || '', storeType: p.storeType || 'pos', storeId: p.storeId || '' };
-      }
-      this.modalTitle = (this.sp === 'product' || this.sp === 'inventory') ? 'Edit: ' + p.name : 'Edit: ' + p.name;
-    },
-    editAddUnit() {
-      if (!this.form.units) this.form.units = [];
-      this.form.units.push({ unitName: '', price: 0, qtyPerUnit: 1, isDefault: !this.form.units.length });
-    },
-    editRemoveUnit(i) { this.form.units.splice(i, 1) },
-    _computeBody() {
-      const pp = parseFloat(this.form.price) || 0;
-      const du = (this.form.units || []).find(u => u.isDefault) || (this.form.units || [])[0];
-      const bq = du ? parseInt(du.qtyPerUnit) || 1 : 1;
-      const bp = du ? parseFloat(du.price) || 0 : pp;
-      return {
-        name: this.form.name, barcode: this.form.barcode, category: this.form.category,
-        boxPrice: bp, boxCost: (parseFloat(this.form.cost) || 0) * bq,
-        boxQty: bq, piecePrice: pp
-      };
-    },
-    closeModal() { this.modalOpen = false },
-    async save() {
-      try {
-        const isProduct = this.sp === 'product' || this.sp === 'inventory';
-        const baseUrl = API + (isProduct ? '/warehouse/products' : '/warehouse/clients');
-        const method = this.modalId ? 'PUT' : 'POST';
-        const url = this.modalId ? baseUrl + '/' + this.modalId : baseUrl;
-        const body = isProduct ? this._computeBody() : { name: this.form.name, contact: this.form.contact, address: this.form.address, storeType: this.form.storeType, storeId: this.form.storeId };
-        const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        if (!r.ok) throw new Error('Failed');
-        if (isProduct && !this.modalId) {
-          const j = await r.json();
-          if (this.form.stockQty) await fetch(API + '/warehouse/products/' + j.id + '/stock', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ stockQty: parseInt(this.form.stockQty) || 0 }) });
-        }
-        toast((this.modalId ? 'Updated' : 'Created') + ' successfully', 'success');
-        this.modalOpen = false;
-        this.load();
-      } catch (e) { toast('Save failed: ' + e.message, 'error') }
-    },
-    async deleteItem(id) {
-      const arr = this.sp === 'onlineorder' ? this.clientsData : this.products;
-      const p = arr.find(x => x.id === id); if (!p) return;
-      if (!confirm('Delete "' + p.name + '"?')) return;
-      try {
-        const isProduct = this.sp === 'product' || this.sp === 'inventory';
-        await fetch(API + (isProduct ? '/warehouse/products' : '/warehouse/clients') + '/' + id, { method: 'DELETE' });
-        toast('Deleted', 'success');
-        this.load();
-      } catch (e) { toast('Delete failed: ' + e.message, 'error') }
-    },
-    async stockMove(id, mode) {
-      const p = this.products.find(x => x.id === id); if (!p) return;
-      const label = mode === 'receive' ? 'RECEIVE' : 'RETURN';
-      let reference = prompt('Reference for ' + label + ' "' + p.name + '" (optional):', '');
-      if (reference === null) return;
-      if (mode === 'return' && !reference.trim()) { toast('Reference is required for return', 'error'); return }
-      const qty = parseInt(prompt('Quantity to ' + label + ' for "' + p.name + '":', '1'));
-      if (isNaN(qty) || qty <= 0) { toast('Invalid quantity', 'error'); return }
-      const change = mode === 'receive' ? qty : -qty;
-      if (mode === 'return' && p.stockQty < qty) { toast('Not enough stock (have ' + p.stockQty + ')', 'error'); return }
-      try {
-        const r = await fetch(API + '/warehouse/products/' + id + '/stock-move', {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ qtyChange: change, reason: reference.trim() })
-        });
-        if (!r.ok) { const j = await r.json(); throw new Error(j.error || 'Failed') }
-        toast(label + ' ' + qty + ' done', 'success');
-        this.load();
-      } catch (e) { toast('Error: ' + e.message, 'error') }
-    },
-
-    trailModal: false, trailProduct: null, trailItems: [],
-    async showTrail(id) {
-      const p = this.products.find(x => x.id === id); if (!p) return;
-      this.trailProduct = p;
-      this.trailItems = [];
-      try { this.trailItems = await fetchJSON(API + '/warehouse/stock-trails?productId=' + id) } catch (e) { this.trailItems = [] }
-      this.trailModal = true;
-    },
-    closeTrail() { this.trailModal = false; this.trailProduct = null; this.trailItems = [] },
-
-    orderModal: false, orderForm: { clientId: '', clientName: '', notes: '', items: [] },
-    openNewOrder() { this.orderModal = true; this.orderForm = { clientId: '', clientName: '', notes: '', items: [] } },
-    closeOrder() { this.orderModal = false },
-    async fetchClients() { try { return await fetchJSON(API + '/warehouse/clients') } catch (e) { return [] } },
-    async fetchProducts() { try { return await fetchJSON(API + '/warehouse/products') } catch (e) { return [] } },
-    addOrderItem(pid, pname, unitName, qty, unitPrice, unitQty) {
-      const price = unitPrice;
-      const total = price * qty;
-      const baseQty = qty * (unitQty || 1);
-      this.orderForm.items.push({ productId: pid, productName: pname, unitType: unitName, qty, price, totalPrice: total, baseQty, baseUnitName: unitName, boxQtyPerUnit: unitQty || 1 });
-    },
-    removeOrderItem(i) { this.orderForm.items.splice(i, 1) },
-    get orderTotal() { return this.orderForm.items.reduce((s, x) => s + x.totalPrice, 0) },
-    async saveOrder() {
-      if (!this.orderForm.clientId) { toast('Select a client', 'error'); return }
-      if (!this.orderForm.items.length) { toast('Add at least one item', 'error'); return }
-      try {
-        const r = await fetch(API + '/warehouse/orders', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ clientId: parseInt(this.orderForm.clientId), clientName: this.orderForm.clientName, notes: this.orderForm.notes, items: this.orderForm.items })
-        });
-        const j = await r.json();
-        if (j.id) { toast('Order #' + j.id + ' created', 'success'); this.orderModal = false; this.load() }
-        else throw new Error('Failed');
-      } catch (e) { toast('Error: ' + e.message, 'error') }
-    },
-
-    async changeOrderStatus(id, status) {
-      try {
-        await fetch(API + '/warehouse/orders/' + id + '/status', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
-        toast('Order #' + id + ' -> ' + status.toUpperCase(), 'success');
-        this.load();
-        this.updateBadge();
-      } catch (e) { toast('Error: ' + e.message, 'error') }
-    },
-    async receiveOrder(id) {
-      if (!confirm('Mark order #' + id + ' as received?')) return;
-      try {
-        const r = await fetch(API + '/warehouse/orders/' + id + '/receive', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || 'Failed');
-        if (j.shortages && j.shortages.length > 0)
-          toast('Order #' + id + ' received with ' + j.shortages.length + ' shortage(s)', 'warning');
-        else
-          toast('Order #' + id + ' received', 'success');
-        this.load();
-        this.updateBadge();
-      } catch (e) { toast('Error: ' + e.message, 'error') }
-    },
-    async cancelOrder(id) {
-      if (!confirm('Cancel order #' + id + '?')) return;
-      await this.changeOrderStatus(id, 'cancelled');
-    },
-    async viewOrder(id) {
-      try {
-        const items = await fetchJSON(API + '/warehouse/orders/' + id);
-        if (!items || !items.length) { toast('No items', 'info'); return }
-        this.orderViewItems = items;
-        this.orderViewId = id;
-        this.orderViewOpen = true;
-      } catch (e) { toast('Error: ' + e.message, 'error') }
-    },
-    orderViewOpen: false, orderViewId: null, orderViewItems: [],
-    closeOrderView() { this.orderViewOpen = false; this.orderViewItems = [] },
-    async importFromMaster() {
-      try {
-        const [mp, importedIds] = await Promise.all([
-          fetchJSON(API + '/products/master'),
-          fetchJSON(API + '/warehouse/products/imported-ids')
-        ]);
-        this.masterImportList = mp;
-        this.importedMasterIds = importedIds || [];
-        this.masterImportOpen = true;
-      } catch (e) { toast('Error loading master products', 'error') }
-    },
-    masterImportOpen: false, masterImportList: [], masterSearch: '', importBoxQty: 1,
-    importedMasterIds: [],
-    closeImport() { this.masterImportOpen = false; this.masterSearch = '' },
-    async doImport(mid) {
-      try {
-        const r = await fetch(API + '/warehouse/products/from-master/' + mid + '?boxQty=' + this.importBoxQty, { method: 'POST' });
-        const j = await r.json();
-        if (j.id) { toast('Imported (ID: ' + j.id + ')', 'success'); this.importedMasterIds.push(mid); this.masterImportOpen = false; this.load() }
-        else toast('Failed to import', 'error');
-      } catch (e) { toast('Error: ' + e.message, 'error') }
-    },
-    // ════════════════════════════════════════════════════
-    // TRANSFER methods (warehouse → POS stock transfers)
-    // ════════════════════════════════════════════════════
-    transferModal: false, transferSaving: false, transferForm: { clientId: '', clientName: '', notes: '', storeId: '' }, transferFormItems: [],
-    openNewTransfer() { this.transferModal = true; this.transferForm = { clientId: '', clientName: '', notes: '', storeId: '' }; this.transferFormItems = [] },
-    closeTransfer() { this.transferModal = false; this.transferFormItems = [] },
-    addTransferItem(pid, pname, barcode, qty) { this.transferFormItems.push({ productId: pid, productName: pname, barcode: barcode || '', qty: parseInt(qty) || 1 }) },
-    removeTransferItem(i) { this.transferFormItems.splice(i, 1) },
-    get transferTotalQty() { return this.transferFormItems.reduce((s, x) => s + x.qty, 0) },
-    async saveTransfer() {
-      if (this.transferSaving) return;
-      if (!this.transferForm.clientId) { toast('Select a POS client', 'error'); return }
-      if (!this.transferFormItems.length) { toast('Add at least one product', 'error'); return }
-      this.transferSaving = true;
-      try {
-        const r = await fetch(API + '/warehouse/transfers', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clientId: parseInt(this.transferForm.clientId),
-            clientName: this.transferForm.clientName,
-            notes: this.transferForm.notes,
-            storeId: this.transferForm.storeId,
-            items: this.transferFormItems.map(x => ({ productId: x.productId, productName: x.productName, barcode: x.barcode, qty: x.qty }))
-          })
-        });
-        const j = await r.json();
-        if (j.id) { toast('Transfer #' + j.id + ' created', 'success'); this.transferModal = false; this.load(); this.updateBadge() }
-        else throw new Error('Failed');
-      } catch (e) { toast('Error: ' + e.message, 'error') }
-      finally { this.transferSaving = false; }
-    },
-    async receiveTransfer(id) {
-      if (!confirm('Receive transfer #' + id + '? This will add stock to the POS client.')) return;
-      try {
-        const r = await fetch(API + '/warehouse/transfers/' + id + '/receive', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || 'Failed');
-        if (j.shortages && j.shortages.length > 0)
-          toast('Transfer #' + id + ' received with ' + j.shortages.length + ' shortage(s)', 'warning');
-        else
-          toast('Transfer #' + id + ' completed', 'success');
-        this.load(); this.updateBadge();
-      } catch (e) { toast('Error: ' + e.message, 'error') }
-    },
-    transferViewOpen: false, transferViewId: null, transferViewItems: [],
-    async viewTransfer(id) {
-      try {
-        const items = await fetchJSON(API + '/warehouse/transfers/' + id + '/items');
-        if (!items || !items.length) { toast('No items', 'info'); return }
-        this.transferViewItems = items;
-        this.transferViewId = id;
-        this.transferViewOpen = true;
-      } catch (e) { toast('Error: ' + e.message, 'error') }
-    },
-    closeTransferView() { this.transferViewOpen = false; this.transferViewItems = [] },
-    async cancelTransfer(id) {
-      if (!confirm('Cancel transfer #' + id + '?')) return;
-      try {
-        await fetch(API + '/warehouse/transfers/' + id + '/cancel', { method: 'PUT' });
-        toast('Transfer cancelled', 'success');
-        this.load(); this.updateBadge();
-      } catch (e) { toast('Error: ' + e.message, 'error') }
-    },
-    verifyDate: new Date().toISOString().slice(0, 10),
-    verifying: false,
-    verifyStatus: '',
-    verifyModalOpen: false,
-    verifyResults: [],
-    async verifyDailyTransfers() {
-      this.verifyModalOpen = false;
-      this.verifyResults = [];
-      this.verifying = true;
-      this.verifyStatus = 'Fetching transfers...';
-      try {
-        const d = await fetchJSON(API + '/warehouse/transfers?pageSize=200');
-        const transfers = d.items || [];
-        const check = transfers.filter(t => {
-          if (t.status === 'pending') return false;
-          if (!t.storeId) return false;
-          const dt = new Date(t.createdAt).toISOString().slice(0, 10);
-          return dt === this.verifyDate;
-        });
-
-        if (check.length === 0) {
-          this.verifyStatus = '';
-          this.verifying = false;
-          this.verifyModalOpen = true;
-          return;
-        }
-
-        const cmdMap = {};
-        this.verifyStatus = 'Fetching items...';
-        for (const t of check) {
-          try {
-            t._items = await fetchJSON(API + '/warehouse/transfers/' + t.id + '/items');
-          } catch (e) { t._items = []; }
-        }
-
-        this.verifyStatus = 'Sending verify commands...';
-        for (const t of check) {
-          const sql = `SELECT Barcode, ProductName, QuantityAdded FROM StockTrail WHERE Reference LIKE '%WH-Transfer #${t.id}%' OR Reference LIKE '%Transfer #${t.id}%'`;
-          try {
-            const r = await fetch(API + '/agent/send/' + encodeURIComponent(t.storeId), {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type: 'sql', payload: sql })
-            });
-            const j = await r.json();
-            if (j.commandId) cmdMap[j.commandId] = t;
-          } catch (e) {}
-        }
-
-        this.verifyStatus = 'Waiting for results...';
-        const maxTries = 15;
-        const resultsFound = {};
-        for (let attempt = 0; attempt < maxTries; attempt++) {
-          this.verifyStatus = 'Polling... (' + (attempt+1) + '/' + maxTries + ')';
-          await new Promise(r => setTimeout(r, 4000));
-          for (const t of check) {
-            if (resultsFound[t.id]) continue;
-            try {
-              const results = await fetchJSON(API + '/agent/results/' + encodeURIComponent(t.storeId));
-              for (const res of results) {
-                const mapped = cmdMap[res.commandId];
-                if (!mapped || mapped.id !== t.id) continue;
-                if (res.error) { t._localData = []; } else {
-                  try {
-                    t._localData = res.output.split('\r\n').filter(l => l && !l.startsWith('Barcode\t')).map(l => {
-                      const parts = l.split('\t');
-                      return { barcode: parts[0] || '', name: parts[1] || '', qty: parseInt(parts[2]) || 0 };
-                    });
-                  } catch (e) { t._localData = []; }
-                }
-                resultsFound[t.id] = true;
-              }
-            } catch (e) {}
-          }
-          if (Object.values(resultsFound).filter(Boolean).length >= check.length) break;
-        }
-
-        this.verifyStatus = 'Comparing...';
-        for (const t of check) {
-          const local = t._localData || [];
-          const items = [];
-          let allOk = true, anyOk = false;
-          for (const ci of (t._items || [])) {
-            const barcode = (ci.barcode || '').trim();
-            const expected = ci.receivedQty || 0;
-            const found = local.filter(l => (l.barcode || '').trim() === barcode).reduce((s, l) => s + l.qty, 0);
-            const status = found >= expected ? 'ok' : found > 0 ? 'partial' : 'missing';
-            if (status === 'ok') anyOk = true;
-            if (status !== 'ok') allOk = false;
-            items.push({ productName: ci.productName || '', barcode, expected, found, status });
-          }
-          const overall = !t._localData ? 'error' : allOk ? 'ok' : anyOk ? 'partial' : 'missing';
-          this.verifyResults.push({ transferId: t.id, storeName: t.clientName || t.storeId, items, overall });
-        }
-        this.verifyModalOpen = true;
-      } catch (e) { toast('Verify error: ' + e.message, 'error'); }
-      this.verifying = false;
-      this.verifyStatus = '';
-    },
-
-    get filteredMaster() {
-      const list = (this.masterImportList || []).filter(x => !this.importedMasterIds.includes(x.id));
-      if (!this.masterSearch) return list;
-      const q = this.masterSearch.toLowerCase();
-      return list.filter(x => (x.name || '').toLowerCase().includes(q) || (x.barcode || '').toLowerCase().includes(q) || (x.category || '').toLowerCase().includes(q));
-    },
-    badgeCount: 0,
-    async updateBadge() {
-      try {
-        const d = await fetchJSON(API + '/warehouse/transfers/pending-count?source=warehouse');
-        this.badgeCount = d ? d.pending || 0 : 0;
-      } catch (e) { this.badgeCount = 0 }
-      Alpine.store('app')._whBadge = this.badgeCount;
-    },
-    startPoll() {
-      this.updateBadge();
-      setInterval(() => { if (Alpine.store('app').whSubpage === 'transfer') this.load(); this.updateBadge() }, 30000);
-    }
-  }));
 
   // ════════════════════════════════════════════════════
   // STORE TRANSFER panel (HQ → POS clients) — same UI as
