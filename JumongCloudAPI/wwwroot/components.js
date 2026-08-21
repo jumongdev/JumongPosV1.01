@@ -39,7 +39,7 @@ Alpine.store('app', {
     groupParents: {
       'ai-chat': 'grp-ai', 'ai-kb': 'grp-ai',
       'health': 'grp-system', 'suspect1pc': 'grp-system',
-      'rpt-sales': 'grp-reports', 'rpt-invcost': 'grp-reports', 'rpt-shifts': 'grp-reports', 'analytics': 'grp-reports',
+      'rpt-sales': 'grp-reports', 'rpt-invcost': 'grp-reports', 'rpt-shifts': 'grp-reports', 'analytics': 'grp-reports', 'rpt-invval': 'grp-reports',
       'grp-reports': 'grp-pos', 'products': 'grp-pos', 'grp-inv': 'grp-pos', 'online-orders': 'grp-pos', 'shop-content': 'grp-pos',
       'st-receiving': 'grp-inv', 'st-trail': 'grp-inv', 'st-transfer': 'grp-inv',
       'wh-product': 'grp-wh', 'wh-inventory': 'grp-wh', 'wh-sales': 'grp-wh', 'wh-onlineorder': 'grp-wh', 'wh-transfer': 'grp-wh', 'wh-receiving': 'grp-wh',
@@ -53,9 +53,9 @@ Alpine.store('app', {
     },
     isGroupActive(id) {
       if (id === 'grp-pos' || id === 'grp-reports' || id === 'grp-inv') {
-        if (id === 'grp-reports') return ['rpt-sales', 'rpt-invcost', 'rpt-shifts', 'analytics'].includes(this.section);
+        if (id === 'grp-reports') return ['rpt-sales', 'rpt-invcost', 'rpt-shifts', 'analytics', 'rpt-invval'].includes(this.section);
         if (id === 'grp-inv') return this.section === 'stock' || ['st-receiving', 'st-trail', 'st-transfer'].includes(this.section);
-        return this.section === 'products' || this.section === 'stock' || this.section === 'rpt-sales' || this.section === 'rpt-invcost' || this.section === 'rpt-shifts' || this.section === 'analytics' || this.section === 'online-orders';
+        return this.section === 'products' || this.section === 'stock' || this.section === 'rpt-sales' || this.section === 'rpt-invcost' || this.section === 'rpt-shifts' || this.section === 'analytics' || this.section === 'rpt-invval' || this.section === 'online-orders';
       }
       if (id === 'grp-wh' && this.section === 'warehouse') return true;
       if (id === 'grp-inv' && this.section === 'stock') return true;
@@ -486,12 +486,12 @@ Alpine.store('app', {
 
   /* ΓöÇΓöÇ Master Products ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('masterProducts', () => ({
-    d: [], loading: true, search: '', catFilter: '', status: 'active',
+    d: [], loading: true, search: '', catFilter: '', status: 'active', stockTotals: {}, stockTotalsByName: {},
     async init() { window.addEventListener('load-products', () => this.load()); if (Alpine.store('app').section === 'products') await this.load() },
     async load(force) {
       if (!force) {
         const c = Alpine.store('app').cache.master;
-        if (c && Date.now() - c.t < 15000) { this.d = c.data; this.loading = false; return }
+        if (c && Date.now() - c.t < 15000) { this.d = c.data; this.loading = false; this.loadTotals(); return }
       }
       this.loading = true;
       try {
@@ -499,7 +499,29 @@ Alpine.store('app', {
         Alpine.store('app').cache.master = { data: this.d, t: Date.now() };
       } catch (e) { this.d = [] }
       this.loading = false;
+      this.loadTotals();
     },
+    async loadTotals() {
+      const c = Alpine.store('app').cache.stockTotals;
+      if (c && Date.now() - c.t < 30000) { this.stockTotals = c.data; this.stockTotalsByName = c.byName; return }
+      try {
+        const all = await fetchJSON(API + '/stock-status');
+        const byBc = {}, byName = {}, seen = {};
+        all.forEach(x => {
+          const key = (x.barcode || '') + '|' + x.storeId;
+          if (seen[key]) return;
+          seen[key] = true;
+          const q = Number(x.stockQty) || 0;
+          if (x.barcode) byBc[x.barcode] = (byBc[x.barcode] || 0) + q;
+          else byName[x.name] = (byName[x.name] || 0) + q;
+        });
+        this.stockTotals = byBc;
+        this.stockTotalsByName = byName;
+        Alpine.store('app').cache.stockTotals = { data: byBc, byName: byName, t: Date.now() };
+      } catch (e) { /* keep previous totals */ }
+    },
+    totalStock(p) { if (!p) return 0; if (p.barcode) return this.stockTotals[p.barcode] || 0; return this.stockTotalsByName[p.name] || 0 },
+    stockCls(q) { return q === 0 ? 'text-red-500' : q < 10 ? 'text-amber-500' : 'text-emerald-500' },
     get categories() { const c = []; this.d.forEach(x => { if (x.category && !c.includes(x.category)) c.push(x.category) }); return c.sort() },
     get inactiveCount() { return this.d.filter(x => x.isActive === false).length },
     get filtered() {
@@ -1519,6 +1541,32 @@ Alpine.store('app', {
       } catch (e) { this.d = [] }
       this.loading = false;
     }
+  }));
+
+  // INVENTORY VALUE panel (current stock value per store + grand total, POS stores only)
+  Alpine.data('inventoryValuePanel', () => ({
+    stores: [], total: null, asOf: '', loading: true, _timer: null,
+    async init() {
+      if (Alpine.store('app').section === 'rpt-invval') { await this.load(); this._startTimer() }
+      this.$watch('$store.app.section', v => { if (v === 'rpt-invval') { this.load(); this._startTimer() } });
+      window.addEventListener('refresh-data', () => { if (Alpine.store('app').section === 'rpt-invval') this.load() });
+    },
+    _startTimer() {
+      if (this._timer) clearInterval(this._timer);
+      this._timer = setInterval(() => this.load(), 60000);
+    },
+    async load() {
+      this.loading = true;
+      try {
+        const r = await fetchJSON(API + '/inventory-value');
+        this.stores = r.stores || [];
+        this.total = r.total || null;
+        this.asOf = r.asOf ? new Date(r.asOf).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : '';
+      } catch (e) { this.stores = []; this.total = null }
+      this.loading = false;
+    },
+    storeLabel(sid) { const m = Alpine.store('app').storeMap || {}; return m[sid] || sid },
+    hasZero(x) { return (x.zeroCostItems || 0) > 0 }
   }));
 
   // RECEIPT AUDIT panel (anti-theft)

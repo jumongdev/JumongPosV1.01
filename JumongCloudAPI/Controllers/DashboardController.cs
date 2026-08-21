@@ -1397,7 +1397,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
     [HttpGet("version")]
     public IActionResult GetVersion()
     {
-            return Ok(new { version = "1.1.43" });
+            return Ok(new { version = "1.1.44" });
     }
 
     private static readonly HttpClient _ollamaClient = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
@@ -1918,7 +1918,7 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
         return Ok(new
         {
             api = "ok",
-            version = "1.1.43",
+            version = "1.1.44",
             db = dbOk ? "ok" : "down",
             uptimeSeconds = Environment.TickCount64 / 1000,
             memory = new { totalMb = (long)(memTotal / (1024 * 1024)), freeMb = (long)(memFree / (1024 * 1024)) },
@@ -2577,6 +2577,41 @@ si.total_price - (si.quantity * COALESCE(NULLIF(si.unit_cost, 0), p.cost, 0)) AS
                 zeroCostItems = r.GetInt64(4)
             });
             return Ok(new { totalItems = 0L, totalStockQty = 0L, totalCost = 0m, totalPrice = 0m, zeroCostItems = 0L });
+        }
+
+        [HttpGet("inventory-value")]
+        public IActionResult GetInventoryValue()
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT store_id,
+                       COUNT(*)::bigint AS items,
+                       COALESCE(SUM(stock_qty), 0)::bigint AS units,
+                       COALESCE(SUM(COALESCE(cost, 0) * stock_qty), 0) AS cost_value,
+                       COALESCE(SUM(COALESCE(price, 0) * stock_qty), 0) AS gross_value,
+                       COUNT(*) FILTER (WHERE COALESCE(cost, 0) = 0)::bigint AS zero_cost_items
+                FROM products
+                WHERE is_active = true AND store_id != 'STORE-WAREHOUSE' AND store_id != 'STORE-DEV-0001'
+                GROUP BY store_id ORDER BY cost_value DESC";
+            using var r = cmd.ExecuteReader();
+            var stores = new List<object>();
+            long totalItems = 0, totalUnits = 0, totalZeroCost = 0;
+            decimal totalCost = 0m, totalGross = 0m;
+            while (r.Read())
+            {
+                var items = r.GetInt64(1); var units = r.GetInt64(2);
+                var cost = r.GetDecimal(3); var gross = r.GetDecimal(4);
+                var zero = r.GetInt64(5);
+                totalItems += items; totalUnits += units;
+                totalCost += cost; totalGross += gross; totalZeroCost += zero;
+                stores.Add(new { storeId = r.GetString(0), items, units, costValue = cost, grossValue = gross, zeroCostItems = zero });
+            }
+            return Ok(new {
+                asOf = DateTime.Now,
+                stores,
+                total = new { items = totalItems, units = totalUnits, costValue = totalCost, grossValue = totalGross, zeroCostItems = totalZeroCost }
+            });
         }
 
         [HttpPut("warehouse/products/{id}/stock-move")]

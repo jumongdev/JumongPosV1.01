@@ -59,6 +59,16 @@ window.exportCSV = (name) => {
     downloadCSV(csv, name);
     return;
   }
+  if (name === 'rpt-invval') {
+    const p = document.querySelector('[x-data="inventoryValuePanel"]')?.__x?.$data;
+    if (!p || !p.stores || !p.stores.length) { toast('No data to export', 'error'); return }
+    const rows = p.stores.map(x => [x.storeId, x.items, x.units, x.costValue, x.grossValue, (x.grossValue - x.costValue)]);
+    if (p.total) rows.push(['GRAND TOTAL', p.total.items, p.total.units, p.total.costValue, p.total.grossValue, (p.total.grossValue - p.total.costValue)]);
+    const headers = 'Store,Items,Units,Cost Value,Gross Value (SRP),Potential Margin';
+    let csv = headers + '\n' + rows.map(r => r.map(c => '"' + (c + '').replace(/"/g, '""') + '"').join(',')).join('\n');
+    downloadCSV(csv, name);
+    return;
+  }
   const cache = Alpine.store('app').cache[name] || Alpine.store('app').cache[name.replace('wh-', '')];
   if (!cache || !cache.length) { toast('No data to export', 'error'); return }
   if (name.startsWith('wh-')) {

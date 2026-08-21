@@ -83,6 +83,7 @@ tailwind.config = {
             { id:'grp-reports', icon:'📈', label:'Reports', items:[
                 { id:'rpt-sales', icon:'🧾', label:'Sales Report' },
                 { id:'rpt-invcost', icon:'💰', label:'Inventory Cost' },
+                { id:'rpt-invval', icon:'🏦', label:'Inventory Value' },
                 { id:'rpt-shifts', icon:'🕐', label:'Shift History' },
                 { id:'analytics', icon:'📊', label:'Analytics' }
             ]},
@@ -829,6 +830,87 @@ tailwind.config = {
       </div>
 
       <!-- ═══════════════════════════════════════════════ -->
+      <!-- REPORTS - INVENTORY VALUE (per store + total)  -->
+      <!-- ═══════════════════════════════════════════════ -->
+      <div x-show="$store.app.section === 'rpt-invval'" x-transition.opacity>
+        <div x-data="inventoryValuePanel">
+          <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
+            <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[#222255] gap-2">
+              <div class="flex items-center gap-3">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">INVENTORY VALUE</h3>
+                <span class="text-[10px] text-gray-500 dark:text-[#7878aa]" x-text="asOf ? ('as of ' + asOf) : ''"></span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button @click="exportCSV('rpt-invval')" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CSV</button>
+                <button @click="load()" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">↻ Refresh</button>
+              </div>
+            </div>
+            <div class="p-4">
+              <template x-if="loading"><div class="flex justify-center py-8"><span class="spinner"></span></div></template>
+              <template x-if="!loading && !total"><div class="text-center py-8 text-gray-400">No store stock data available</div></template>
+              <template x-if="total">
+                <div>
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    <div class="bg-cyan-50 dark:bg-cyan-900/10 border border-cyan-200 dark:border-cyan-800/40 rounded-xl p-3">
+                      <div class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-[#7878aa] font-bold">Total Units</div>
+                      <div class="text-lg font-bold text-cyan-700 dark:text-cyan-300" x-text="fmtInt(total.units)"></div>
+                    </div>
+                    <div class="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/40 rounded-xl p-3">
+                      <div class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-[#7878aa] font-bold">Total Cost Value</div>
+                      <div class="text-lg font-bold text-red-600 dark:text-red-400">&#8369;<span x-text="fmt(total.costValue)"></span></div>
+                    </div>
+                    <div class="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/40 rounded-xl p-3">
+                      <div class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-[#7878aa] font-bold">Total Gross Value (SRP)</div>
+                      <div class="text-lg font-bold text-emerald-600 dark:text-emerald-400">&#8369;<span x-text="fmt(total.grossValue)"></span></div>
+                    </div>
+                    <div class="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 rounded-xl p-3">
+                      <div class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-[#7878aa] font-bold">Zero-Cost Items</div>
+                      <div class="text-lg font-bold" :class="total.zeroCostItems > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-600 dark:text-gray-300'" x-text="fmtInt(total.zeroCostItems)"></div>
+                    </div>
+                  </div>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                      <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                        <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Store</th>
+                        <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Items</th>
+                        <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Units</th>
+                        <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Cost Value</th>
+                        <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Gross Value (SRP)</th>
+                        <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Potential Margin</th>
+                      </tr></thead>
+                      <tbody>
+                        <template x-for="(x, i) in stores" :key="i">
+                          <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                            <td class="px-2 py-2">
+                              <span class="text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded" x-text="storeLabel(x.storeId)"></span>
+                              <span x-show="hasZero(x)" class="ml-1 text-[9px] font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded" :title="x.zeroCostItems + ' product(s) without cost — value understated'">⚠ <span x-text="x.zeroCostItems"></span> NO COST</span>
+                            </td>
+                            <td class="px-2 py-2 text-right" x-text="fmtInt(x.items)"></td>
+                            <td class="px-2 py-2 text-right" x-text="fmtInt(x.units)"></td>
+                            <td class="px-2 py-2 text-right text-red-500">&#8369;<span x-text="fmt(x.costValue)"></span></td>
+                            <td class="px-2 py-2 text-right text-emerald-500">&#8369;<span x-text="fmt(x.grossValue)"></span></td>
+                            <td class="px-2 py-2 text-right font-medium" :class="x.grossValue - x.costValue >= 0 ? 'text-emerald-500' : 'text-red-500'">&#8369;<span x-text="fmt(x.grossValue - x.costValue)"></span></td>
+                          </tr>
+                        </template>
+                        <tr class="bg-cyan-50 dark:bg-cyan-900/20 font-bold">
+                          <td class="px-2 py-2 text-cyan-700 dark:text-cyan-300 uppercase">Grand Total</td>
+                          <td class="px-2 py-2 text-right text-cyan-700 dark:text-cyan-300" x-text="fmtInt(total.items)"></td>
+                          <td class="px-2 py-2 text-right text-cyan-700 dark:text-cyan-300" x-text="fmtInt(total.units)"></td>
+                          <td class="px-2 py-2 text-right text-cyan-700 dark:text-cyan-300">&#8369;<span x-text="fmt(total.costValue)"></span></td>
+                          <td class="px-2 py-2 text-right text-cyan-700 dark:text-cyan-300">&#8369;<span x-text="fmt(total.grossValue)"></span></td>
+                          <td class="px-2 py-2 text-right text-cyan-700 dark:text-cyan-300">&#8369;<span x-text="fmt(total.grossValue - total.costValue)"></span></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════ -->
       <!-- REPORTS - RECEIPT AUDIT (anti-theft)           -->
       <!-- ═══════════════════════════════════════════════ -->
       <div x-show="$store.app.section === 'rpt-invcost'" x-transition.opacity>
@@ -1023,6 +1105,7 @@ tailwind.config = {
                   <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Cost</th>
                   <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Margin</th>
                   <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Units</th>
+                  <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]" title="Total stock across all stores (server snapshot)">TOTAL STOCK</th>
                   <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Actions</th>
                 </tr></thead>
                 <tbody>
@@ -1051,6 +1134,7 @@ tailwind.config = {
                         </template>
                         <span x-show="!x.units || !x.units.length" class="text-gray-400">—</span>
                       </td>
+                      <td class="px-3 py-2 text-right font-bold" :class="stockCls(totalStock(x))" x-text="totalStock(x)"></td>
                       <td class="px-3 py-2">
                         <button @click="openStock(x)" class="text-[10px] px-2 py-1 rounded bg-cyan-600 text-white hover:bg-cyan-700 mr-1" title="Stock per store (server + live POS)">VIEW STOCK</button>
                         <button @click="openEditor(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">EDIT</button>
