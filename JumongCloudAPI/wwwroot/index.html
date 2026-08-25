@@ -24,6 +24,13 @@ tailwind.config = {
 }
 </script>
 <link rel="stylesheet" href="style.css">
+<style>
+  @media print {
+    body * { visibility: hidden !important; }
+    #receiptPrint, #receiptPrint * { visibility: visible !important; }
+    #receiptPrint { position: absolute !important; left: 0 !important; top: 0 !important; width: 80mm !important; border: none !important; box-shadow: none !important; }
+  }
+</style>
 </head>
 <body class="bg-gray-50 dark:bg-[#080816] text-gray-900 dark:text-slate-200 min-h-screen" x-data x-cloak>
 
@@ -88,20 +95,28 @@ tailwind.config = {
                 { id:'analytics', icon:'📊', label:'Analytics' }
             ]},
             { id:'products', icon:'📦', label:'Master Products' },
-            { id:'online-orders', icon:'🛒', label:'Online Orders' },
-            { id:'shop-content', icon:'🛍️', label:'Shop Content' },
             { id:'grp-inv', icon:'📦', label:'Inventory', items:[
                 { id:'st-receiving', icon:'📥', label:'Recent Receiving' },
                 { id:'st-trail', icon:'🛤️', label:'Stock Trail' },
                 { id:'st-transfer', icon:'🚚', label:'Store Transfer' }
             ]}
         ]},
+        { id:'grp-ecom', icon:'🛒', label:'E-COMMERCE', items:[
+            { id:'online-orders', icon:'🛒', label:'Online Orders' },
+            { id:'shop-content', icon:'🛍️', label:'Shop Content' },
+            { id:'promo-banners', icon:'🎯', label:'Promo Banners' },
+            { id:'msgr-bot', icon:'🤖', label:'Messenger Bot' },
+            { id:'sari-sari', icon:'🏪', label:'Sari-Sari Apps' },
+            { id:'restock-requests', icon:'🚨', label:'Restock Requests' },
+            { id:'product-suggestions', icon:'💡', label:'Product Suggestions' }
+        ]},
         { id:'shop', icon:'🛍️', label:'ONLINE SHOP' },
         { id:'grp-settings', icon:'⚙️', label:'SETTINGS', items:[
             { id:'settings', icon:'🔧', label:'Settings' },
             { id:'pospromo', icon:'📢', label:'POS Promo' },
             { id:'posqr', icon:'📱', label:'POS QR' },
-            { id:'branding', icon:'🎨', label:'Branding' }
+            { id:'branding', icon:'🎨', label:'Branding' },
+            { id:'google-auth', icon:'🔑', label:'Google Login' }
         ]},
         { id:'customers', icon:'👥', label:'Customers' },
         { id:'users', icon:'👤', label:'Users' }
@@ -178,8 +193,8 @@ tailwind.config = {
             <span class="text-lg shrink-0" x-text="item.icon"></span>
             <span class="nav-label text-xs" x-show="$store.app._sidebarOpen" x-text="item.label"></span>
             <span class="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
-              x-show="item.id==='online-orders' && $store.app._shopBadge > 0"
-              x-text="$store.app._shopBadge"></span>
+              x-show="(item.id==='online-orders' && $store.app._shopBadge > 0) || (item.id==='ai-kb' && $store.app._kbBadge > 0) || (item.id==='sari-sari' && $store.app._ssBadge > 0) || (item.id==='restock-requests' && $store.app._restockBadge > 0) || (item.id==='product-suggestions' && $store.app._suggBadge > 0)"
+              x-text="item.id==='online-orders' ? $store.app._shopBadge : item.id==='ai-kb' ? $store.app._kbBadge : item.id==='sari-sari' ? $store.app._ssBadge : item.id==='restock-requests' ? $store.app._restockBadge : $store.app._suggBadge"></span>
           </a>
         </div>
       </template>
@@ -276,9 +291,9 @@ tailwind.config = {
                         <span x-show="i < missing.length-1">, </span>
                       </span>
                     </template>
-                  </div>
-                </div>
-              </div>
+          </div>
+        </div>
+      </div>
             </div>
           </template>
           <template x-if="!loading && allGood">
@@ -584,8 +599,8 @@ tailwind.config = {
                       <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">E-Wallet</th>
                       <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Credit</th>
                     </tr></thead>
-                    <tbody>
-                      <template x-for="(x,i) in d" :key="i">
+                <tbody>
+                  <template x-for="(x,i) in d" :key="i">
                         <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                           <td class="px-3 py-2 font-medium" x-text="x.cashier"></td>
                           <td class="px-3 py-2 text-right" x-text="fmtInt(x.totalSales)"></td>
@@ -1087,6 +1102,7 @@ tailwind.config = {
                   <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Barcode</th>
                   <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Category</th>
                   <th class="text-center px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]" title="Points Per Unit">Pts/U</th>
+                  <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]" title="Price for regular online members (0 = use default price)">Online Price</th>
                   <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Price</th>
                   <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Cost</th>
                   <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Margin</th>
@@ -1098,7 +1114,7 @@ tailwind.config = {
                   <template x-for="(x,i) in filtered" :key="i">
                     <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                       <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.id"></td>
-                      <td class="px-3 py-2 text-center"><img x-show="x.imageData" :src="x.imageData" class="w-8 h-8 object-cover rounded mx-auto" :alt="x.name"></td>
+                      <td class="px-3 py-2 text-center"><img x-show="x.imageData" :src="x.imageData" class="w-8 h-8 object-cover rounded mx-auto" :alt="x.name"><span x-show="!x.imageData" class="inline-block w-8 h-8 rounded bg-gray-100 dark:bg-[#181848] text-[8px] text-gray-400 flex items-center justify-center mx-auto">IMG</span></td>
                       <td class="px-3 py-2 font-medium" :class="x.isActive === false ? 'line-through text-gray-400' : ''" x-text="x.name"></td>
                       <td class="px-3 py-2 text-center"><span x-show="x.isActive === false" class="text-[10px] font-bold px-2 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">INACTIVE</span><span x-show="x.isActive !== false" class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">ACTIVE</span></td>
                       <td class="px-3 py-2 text-center"><input type="checkbox" :checked="x.sellOnline !== false" @change="toggleFlag(x, 'sellOnline', $event.target.checked)" class="w-3.5 h-3.5 accent-cyan-600" title="Displayed in online shop"></td>
@@ -1107,6 +1123,11 @@ tailwind.config = {
                       <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.barcode || ''"></td>
                       <td class="px-3 py-2" x-text="x.category || ''"></td>
                       <td class="px-3 py-2 text-center text-gray-500 dark:text-[#7878aa]" x-text="x.pointsPerUnit || 0"></td>
+                      <td class="px-3 py-2 text-right">
+                        <input :value="x.onlinePrice || ''" @change="saveOnlinePrice(x, $event.target.value)"
+                          class="w-20 text-right text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-1.5 py-1 text-gray-700 dark:text-slate-200"
+                          placeholder="0 = default" title="Online price (0 = default price)">
+                      </td>
                       <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.price)"></span></td>
                       <td class="px-3 py-2 text-right text-red-500">&#8369;<span x-text="fmt(x.cost)"></span></td>
                       <td class="px-3 py-2 text-right font-medium" :class="marginClass(margin(x))"><span x-text="margin(x)"></span>%</td>
@@ -1274,7 +1295,7 @@ tailwind.config = {
                   <div class="flex items-center gap-2 flex-wrap">
                     <button @click="backToList()" class="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">← Back</button>
                     <h3 class="text-xs font-bold text-cyan-700 dark:text-cyan-400" x-text="trailProduct"></h3>
-                    <span class="text-[11px] text-gray-400" x-text="'stock: ' + fmtInt(Number(trail.StockQty))"></span>
+                    <span class="text-[11px] text-gray-400" x-text="trail && trail.StockQty != null ? 'stock: ' + fmtInt(Number(trail.StockQty)) : ''"></span>
                   </div>
                   <button @click="exportTrail()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CSV</button>
                 </div>
@@ -1522,38 +1543,93 @@ tailwind.config = {
       <!-- ═══════════════════════════════════════════════ -->
       <!-- CUSTOMERS SECTION                             -->
       <!-- ═══════════════════════════════════════════════ -->
-      <div x-show="$store.app.section === 'customers'" x-transition.opacity>
-        <div x-data="customersList" class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
-          <div class="px-4 py-3 border-b border-gray-100 dark:border-[#222255]">
+      <div x-show="$store.app.section === 'customers'" x-transition.opacity x-data="customersList">
+        <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
+          <div class="px-4 py-3 border-b border-gray-100 dark:border-[#222255] flex items-center justify-between gap-3 flex-wrap">
             <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">CUSTOMERS</h3>
+            <div class="flex gap-1.5">
+              <button @click="setPtsFilter('all')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="ptsFilter==='all' ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-gray-100 dark:bg-[#181848] text-gray-600 dark:text-slate-300 border-gray-200 dark:border-[#222255]'">ALL (<span x-text="d.length"></span>)</button>
+              <button @click="setPtsFilter('star')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="ptsFilter==='star' ? 'bg-amber-500 text-white border-amber-500' : 'bg-amber-50 dark:bg-[#181848] text-amber-600 dark:text-amber-400 border-amber-200 dark:border-[#222255]'">⭐ WITH POINTS (<span x-text="withStar"></span>)</button>
+              <button @click="setPtsFilter('nostar')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="ptsFilter==='nostar' ? 'bg-gray-700 text-white border-gray-700' : 'bg-gray-100 dark:bg-[#181848] text-gray-600 dark:text-slate-300 border-gray-200 dark:border-[#222255]'">⛔ WITHOUT (<span x-text="withoutStar"></span>)</button>
+            </div>
           </div>
           <div class="overflow-x-auto">
             <template x-if="loading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
-            <template x-if="!loading && d.length===0"><div class="text-center py-6 text-gray-400">No customers</div></template>
-            <template x-if="d.length > 0">
+            <template x-if="!loading && filtered.length===0"><div class="text-center py-6 text-gray-400">No customers</div></template>
+            <template x-if="filtered.length > 0">
               <table class="w-full text-xs">
                 <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Name</th>
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Phone</th>
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Email</th>
-                  <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Loyalty</th>
+                  <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">⭐ Points</th>
                   <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Credit Balance</th>
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Store</th>
+                  <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
                 </tr></thead>
                 <tbody>
-                  <template x-for="(x,i) in d" :key="i">
+                  <template x-for="(x,i) in filtered" :key="i">
                     <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                       <td class="px-3 py-2 font-medium" x-text="x.name"></td>
                       <td class="px-3 py-2" x-text="x.phone || ''"></td>
                       <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.email || ''"></td>
-                      <td class="px-3 py-2 text-right" x-text="x.loyaltyPoints"></td>
+                      <td class="px-3 py-2 text-right">
+                        <span class="font-bold" :class="x.loyaltyPoints > 0 ? 'text-amber-500' : 'text-gray-400 dark:text-[#5a5a8a]'" x-text="x.loyaltyPoints"></span>
+                        <template x-if="x.qrCode"><span class="ml-1 text-[9px] font-black text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-full" title="May QR — pwedeng mag-earn ng points">⭐EARN</span></template>
+                        <template x-if="!x.qrCode"><span class="ml-1 text-[9px] text-gray-400 dark:text-[#5a5a8a]" title="Walang QR — hindi pwedeng mag-earn">⛔</span></template>
+                      </td>
                       <td class="px-3 py-2 text-right text-red-500">&#8369;<span x-text="fmt(x.creditBalance)"></span></td>
-                      <td class="px-3 py-2"><span class="text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded" x-text="shortStore(x.storeId, $store.app.storeMap[x.storeId])"></span></td>
+                      <td class="px-3 py-2">
+                        <template x-if="x.storeId"><span class="text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded" x-text="shortStore(x.storeId, $store.app.storeMap[x.storeId])"></span></template>
+                        <template x-if="!x.storeId"><span class="text-[10px] bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 px-1.5 py-0.5 rounded font-medium" title="Online-registered customer (Google account)">ECOM</span></template>
+                      </td>
+                      <td class="px-3 py-2 text-right"><button @click="viewOrders(x)" class="text-[10px] px-2.5 py-1.5 rounded-lg bg-violet-600 text-white font-medium hover:bg-violet-700">📋 ORDERS</button></td>
                     </tr>
                   </template>
                 </tbody>
               </table>
             </template>
+          </div>
+        </div>
+
+        <!-- ORDER HISTORY MODAL (per customer, may points) -->
+        <div x-show="ordersOpen" class="fixed inset-0 z-[120] bg-black/50 flex items-center justify-center p-4" @click.self="closeOrders()">
+          <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-full max-w-2xl max-h-[80vh] overflow-auto shadow-2xl">
+            <div class="px-4 py-3 border-b border-gray-100 dark:border-[#222255] flex items-center justify-between sticky top-0 bg-white dark:bg-[#10102a]">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-violet-700 dark:text-violet-400">📋 ORDER HISTORY — <span x-text="ordersName"></span></h3>
+              <button @click="closeOrders()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-lg leading-none">✕</button>
+            </div>
+            <div class="p-4">
+              <template x-if="ordersLoading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
+              <template x-if="!ordersLoading && orders.length===0"><div class="text-center py-6 text-gray-400">Wala pang ONLINE order (e-commerce) ang customer na ito — ang mga counter/retail purchases ay wala dito</div></template>
+              <template x-if="orders.length > 0">
+                <table class="w-full text-xs">
+                  <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Order</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Total</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Status</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Paid</th>
+                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">⭐ Points</th>
+                  </tr></thead>
+                  <tbody>
+                    <template x-for="(o,i) in orders" :key="i">
+                      <tr class="border-b border-gray-50 dark:border-[#222255]/40">
+                        <td class="px-3 py-2 font-medium" x-text="o.orderNo"></td>
+                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="o.createdAt"></td>
+                        <td class="px-3 py-2 text-right font-semibold">₱<span x-text="fmt(o.total)"></span></td>
+                        <td class="px-3 py-2"><span class="text-[10px] font-bold px-1.5 py-0.5 rounded" :class="statusCls(o.status)" x-text="o.status"></span></td>
+                        <td class="px-3 py-2" x-text="o.paidStatus === 'paid' ? '✅ PAID' : 'unpaid'"></td>
+                        <td class="px-3 py-2 text-right">
+                          <template x-if="o.totalPoints > 0"><span class="font-bold text-amber-500" x-text="o.totalPoints.toFixed(2) + ' pts → +' + o.awardPoints"></span></template>
+                          <template x-if="!(o.totalPoints > 0)"><span class="text-gray-400">—</span></template>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </template>
+            </div>
           </div>
         </div>
       </div>
@@ -1625,6 +1701,7 @@ tailwind.config = {
                   <select x-model="form.role" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
                     <option value="Cashier">Cashier</option>
                     <option value="Admin">Admin</option>
+                    <option value="Driver">Driver (delivery)</option>
                   </select>
                 </div>
                 <div><label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">PIN (default: 12345)</label><input type="password" x-model="form.passwordHash" placeholder="12345" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></div>
@@ -2103,6 +2180,344 @@ tailwind.config = {
             </template>
           </div>
         </template>
+
+        <!-- SUBDIVISION SUGGESTIONS (customer-submitted) -->
+        <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+          <div class="px-4 py-2.5 border-b border-gray-100 dark:border-[#222255] bg-gray-50 dark:bg-[#0d0d25]/50 flex items-center justify-between">
+            <h4 class="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">🏘️ SUBDIVISION SUGGESTIONS <span x-show="suggestions.length > 0" class="ml-1 px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[9px]" x-text="suggestions.length"></span></h4>
+            <button @click="loadSuggestions()" class="text-[10px] text-gray-500 dark:text-[#7878aa] hover:text-cyan-600">REFRESH</button>
+          </div>
+          <div class="p-4">
+            <template x-if="suggestions.length === 0">
+              <p class="text-xs text-gray-400 dark:text-[#7878aa] text-center py-3">Wala pang suggestion — ang mga customers na hindi nasa list ay magse-suggest dito</p>
+            </template>
+            <div class="space-y-2">
+              <template x-for="s in suggestions" :key="s.id">
+                <div class="flex items-center justify-between gap-3 border border-gray-100 dark:border-[#222255] rounded-xl px-3 py-2.5">
+                  <div class="min-w-0">
+                    <p class="text-sm font-semibold text-gray-700 dark:text-slate-200" x-text="s.name"></p>
+                    <p class="text-[10px] text-gray-400 dark:text-[#7878aa]" x-text="s.customerName + ' • ' + s.createdAt"></p>
+                  </div>
+                  <div class="flex gap-1.5 shrink-0">
+                    <button @click="approveSuggestion(s)" class="text-[10px] px-2.5 py-1.5 rounded bg-emerald-600 text-white font-bold hover:bg-emerald-700">✔ ADD TO LIST</button>
+                    <button @click="dismissSuggestion(s)" class="text-[10px] px-2.5 py-1.5 rounded border border-red-500 text-red-500 hover:bg-red-500/10">✕</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MESSENGER BOT SECTION (Facebook Messenger API)                    -->
+    <div x-show="$store.app.section === 'msgr-bot'" x-transition.opacity>
+      <div x-data="messengerBotPanel" class="space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">🤖 Messenger Bot <span class="text-[10px] text-gray-400 dark:text-[#7878aa] font-normal">(Facebook page AI chatbot — Answers via AI Chat + Knowledge Bank)</span></h3>
+          <div class="flex items-center gap-2">
+            <button @click="load()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">REFRESH</button>
+            <button @click="test()" :disabled="testing" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] disabled:opacity-50" x-text="testing ? 'TESTING...' : '🧪 TEST CONNECTION'"></button>
+            <button @click="save()" :disabled="saving" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 disabled:opacity-50" x-text="saving ? 'SAVING...' : '💾 SAVE'"></button>
+          </div>
+        </div>
+
+        <div x-show="msg" x-transition.opacity class="text-xs px-4 py-3 rounded-lg border" :class="msgOk ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'" x-text="msg"></div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+            <div class="px-4 py-2.5 border-b border-gray-100 dark:border-[#222255] bg-gray-50 dark:bg-[#0d0d25]/50">
+              <h4 class="text-[11px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">SETTINGS</h4>
+            </div>
+            <div class="p-4 space-y-3">
+              <div>
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Page ID</label>
+                <input x-model="f.pageId" type="text" placeholder="203372639529959" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+              </div>
+              <div>
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Page Access Token <span x-show="hasToken" class="text-emerald-600 dark:text-emerald-400" x-text="'(' + pageTokenMasked + ')'"></span></label>
+                <input x-model="f.pageToken" type="password" placeholder="EAA... (paste token)" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                <p class="text-[10px] text-gray-400 dark:text-[#7878aa] mt-1">Pagkatapos mag-save, naka-mask na ang token (hindi na makikita). I-paste ulit para palitan.</p>
+              </div>
+              <div>
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Verify Token (piliin mo, gamitin sa Meta webhook setup)</label>
+                <input x-model="f.verifyToken" type="text" placeholder="e.g. jumong_verify_2026" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+              </div>
+              <div class="flex items-center justify-between">
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa]">Bot Enabled</label>
+                <button @click="f.enabled = !f.enabled" class="relative w-11 h-6 rounded-full transition-colors" :class="f.enabled ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-[#222255]'">
+                  <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform" :class="f.enabled ? 'translate-x-5' : ''"></span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+            <div class="px-4 py-2.5 border-b border-gray-100 dark:border-[#222255] bg-gray-50 dark:bg-[#0d0d25]/50">
+              <h4 class="text-[11px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">SETUP GUIDE</h4>
+            </div>
+            <div class="p-4 space-y-3 text-xs text-gray-600 dark:text-slate-300 leading-relaxed">
+              <p><b>1. I-save muna ang settings</b> sa itaas (Page ID + Token + Verify Token).</p>
+              <p><b>2. Sa Meta for Developers</b> (App Dashboard → Messenger → Webhooks):</p>
+              <ul class="list-disc pl-5 space-y-1">
+                <li>Callback URL: <code class="text-[10px] bg-gray-100 dark:bg-[#181848] px-1 py-0.5 rounded break-all" x-text="webhookUrl"></code></li>
+                <li>Verify Token: <span class="font-semibold" x-text="f.verifyToken || '(ang verify token mo sa itaas)'"></span></li>
+                <li>Subscription fields: <b>messages</b> + <b>messaging_postbacks</b></li>
+                <li>I-click <b>Verify and Save</b>, tapos i-click ang <b>Subscribe</b> button</li>
+              </ul>
+              <p><b>3. I-test:</b> i-message ang page mo sa Messenger (hal. "magkano ang Zonrox?") — sasagot ang AI bot.</p>
+              <p class="text-[10px] text-gray-400 dark:text-[#7878aa]">Commands: "shop" / "qr" / "menu" → magpapadala ng shop link + QR. Lahat ng ibang tanong → AI assistant (llama3.1 + Knowledge Bank).</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROMO BANNERS SECTION                                       -->
+    <div x-show="$store.app.section === 'promo-banners'" x-transition.opacity>
+      <div x-data="promoBannersPanel" class="space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">🎯 Promo Banners <span class="text-[10px] text-gray-400 dark:text-[#7878aa] font-normal">(clickable banners sa shop front — guest = login, member = target)</span></h3>
+          <div class="flex items-center gap-2">
+            <span class="text-xs px-3 py-2 rounded-lg border border-violet-500 text-violet-600 dark:text-violet-400 font-medium">PointsRate: <b x-text="pointsRate"></b></span>
+            <button @click="load()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">REFRESH</button>
+          </div>
+        </div>
+        <div x-show="msg" x-transition.opacity class="text-xs px-4 py-3 rounded-lg border" :class="msgOk ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'" x-text="msg"></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <template x-for="b in banners" :key="b.id">
+            <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+              <div class="relative bg-gray-100 dark:bg-[#181848] aspect-[12/5]">
+                <img x-show="b.imageUrl" :src="b.imageUrl" class="w-full h-full object-cover" :alt="'Banner ' + b.id">
+                <div x-show="!b.imageUrl" class="w-full h-full flex items-center justify-center text-3xl">🎨</div>
+                <span class="absolute top-2 right-2 text-[9px] font-bold px-2 py-0.5 rounded-full" :class="b.active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-500'" x-text="b.active ? 'ACTIVE' : 'OFF'"></span>
+              </div>
+              <div class="p-3 space-y-2">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-gray-600 dark:text-slate-300 font-bold" x-text="'#' + b.id + ' · ' + b.targetType.toUpperCase()"></span>
+                  <span class="text-gray-400" x-text="b.targetValue || '—'"></span>
+                </div>
+                <div class="flex gap-1.5">
+                  <button @click="openEdit(b)" class="text-[10px] px-2.5 py-1.5 rounded bg-cyan-600 text-white font-bold hover:bg-cyan-700">EDIT</button>
+                  <button @click="remove(b)" class="text-[10px] px-2.5 py-1.5 rounded border border-red-500 text-red-500 hover:bg-red-500/10">DEL</button>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+          <div class="px-4 py-2.5 border-b border-gray-100 dark:border-[#222255] bg-gray-50 dark:bg-[#0d0d25]/50 flex items-center justify-between">
+            <h4 class="text-[11px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">BANNER EDITOR</h4>
+            <button @click="openAdd()" class="text-[10px] font-bold text-cyan-600 dark:text-cyan-400">➕ ADD BANNER</button>
+          </div>
+          <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="sm:col-span-2">
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Image <span x-show="!form.id" class="text-amber-500">(required para sa bagong banner)</span></label>
+              <input id="pbFile" type="file" @change="onFile($event)" accept="image/png,image/jpeg,image/webp" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg p-2 text-gray-700 dark:text-slate-200">
+            </div>
+            <div>
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Target Type</label>
+              <select x-model="form.targetType" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                <option value="category">Category (may optional search)</option>
+                <option value="product">Product (ID)</option>
+                <option value="url">URL</option>
+                <option value="register">Register (Sign-in)</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1" x-text="form.targetType === 'category' ? 'Category | search (hal. alcohol|CLVB)' : form.targetType === 'product' ? 'Product ID' : form.targetType === 'url' ? 'URL' : '(walang value)'"></label>
+              <input x-model="form.targetValue" type="text" placeholder="hal. alcohol|CLVB" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+            </div>
+            <div>
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Sort Order</label>
+              <input x-model.number="form.sortOrder" type="number" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+            </div>
+            <div class="flex items-end">
+              <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-slate-300">
+                <input type="checkbox" x-model="form.active" class="w-4 h-4 accent-emerald-600"> Active
+              </label>
+            </div>
+            <div class="sm:col-span-2">
+              <button @click="save()" :disabled="saving" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 disabled:opacity-50" x-text="saving ? 'SAVING...' : '💾 SAVE BANNER'"></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESTOCK REQUESTS SECTION                                       -->
+    <div x-show="$store.app.section === 'restock-requests'" x-transition.opacity>
+      <div x-data="restockPanel" class="space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">🚨 Restock Requests <span class="text-[10px] text-gray-400 dark:text-[#7878aa] font-normal">(mga out-of-stock item na hinihiling ng customers — mag-restock!)</span></h3>
+          <div class="flex items-center gap-2">
+            <div class="flex rounded-lg overflow-hidden border border-gray-200 dark:border-[#222255]">
+              <button @click="setFilter('pending')" class="text-xs px-3 py-2" :class="filter === 'pending' ? 'bg-amber-500 text-white font-semibold' : 'bg-gray-50 dark:bg-[#181848] text-gray-500 dark:text-[#7878aa]'">PENDING</button>
+              <button @click="setFilter('fulfilled')" class="text-xs px-3 py-2" :class="filter === 'fulfilled' ? 'bg-emerald-600 text-white font-semibold' : 'bg-gray-50 dark:bg-[#181848] text-gray-500 dark:text-[#7878aa]'">DONE</button>
+              <button @click="setFilter('dismissed')" class="text-xs px-3 py-2" :class="filter === 'dismissed' ? 'bg-gray-500 text-white font-semibold' : 'bg-gray-50 dark:bg-[#181848] text-gray-500 dark:text-[#7878aa]'">SKIP</button>
+              <button @click="setFilter('')" class="text-xs px-3 py-2" :class="filter === '' ? 'bg-cyan-600 text-white font-semibold' : 'bg-gray-50 dark:bg-[#181848] text-gray-500 dark:text-[#7878aa]'">ALL</button>
+            </div>
+            <button @click="load()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">REFRESH</button>
+          </div>
+        </div>
+        <div x-show="loading" class="text-xs text-gray-400">Loading...</div>
+        <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+          <template x-for="x in data" :key="x.id">
+            <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-[#222255] last:border-0">
+              <span class="text-lg shrink-0">🔔</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-bold text-gray-800 dark:text-slate-200 truncate" x-text="x.productName || ('Product #' + x.productId)"></p>
+                <p class="text-[11px] text-gray-500 dark:text-[#7878aa] truncate" x-text="(x.customerName || 'customer') + ' · ' + (x.createdAt ? new Date(x.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')"></p>
+                <span class="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full" :class="x.status === 'pending' ? 'bg-amber-100 text-amber-700' : x.status === 'fulfilled' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'" x-text="x.status.toUpperCase()"></span>
+              </div>
+              <template x-if="x.status === 'pending'">
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <button @click="resolve(x, 'fulfilled')" class="text-[10px] px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700">✔ DONE</button>
+                  <button @click="resolve(x, 'dismissed')" class="text-[10px] px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-[#181848] text-gray-500 dark:text-[#7878aa] font-medium hover:bg-gray-200">✕</button>
+                </div>
+              </template>
+            </div>
+          </template>
+          <p x-show="!data.length" class="text-xs text-center text-gray-400 dark:text-[#7878aa] py-8">Walang request sa filter na ito.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUCT SUGGESTIONS SECTION                                   -->
+    <div x-show="$store.app.section === 'product-suggestions'" x-transition.opacity>
+      <div x-data="productSuggestPanel" class="space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">💡 Product Suggestions <span class="text-[10px] text-gray-400 dark:text-[#7878aa] font-normal">(produktong hinihiling ng customers na idagdag sa catalog)</span></h3>
+          <div class="flex items-center gap-2">
+            <div class="flex rounded-lg overflow-hidden border border-gray-200 dark:border-[#222255]">
+              <button @click="setFilter('pending')" class="text-xs px-3 py-2" :class="filter === 'pending' ? 'bg-amber-500 text-white font-semibold' : 'bg-gray-50 dark:bg-[#181848] text-gray-500 dark:text-[#7878aa]'">PENDING</button>
+              <button @click="setFilter('approved')" class="text-xs px-3 py-2" :class="filter === 'approved' ? 'bg-emerald-600 text-white font-semibold' : 'bg-gray-50 dark:bg-[#181848] text-gray-500 dark:text-[#7878aa]'">APPROVED</button>
+              <button @click="setFilter('dismissed')" class="text-xs px-3 py-2" :class="filter === 'dismissed' ? 'bg-gray-500 text-white font-semibold' : 'bg-gray-50 dark:bg-[#181848] text-gray-500 dark:text-[#7878aa]'">SKIP</button>
+              <button @click="setFilter('')" class="text-xs px-3 py-2" :class="filter === '' ? 'bg-cyan-600 text-white font-semibold' : 'bg-gray-50 dark:bg-[#181848] text-gray-500 dark:text-[#7878aa]'">ALL</button>
+            </div>
+            <button @click="load()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">REFRESH</button>
+          </div>
+        </div>
+        <div x-show="loading" class="text-xs text-gray-400">Loading...</div>
+        <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+          <template x-for="x in data" :key="x.id">
+            <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-[#222255] last:border-0">
+              <span class="text-lg shrink-0">💡</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-bold text-gray-800 dark:text-slate-200 truncate" x-text="x.name + (x.brand ? ' (' + x.brand + ')' : '')"></p>
+                <p class="text-[11px] text-gray-500 dark:text-[#7878aa] truncate" x-text="(x.customerName || 'customer') + ' · ' + (x.createdAt ? new Date(x.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')"></p>
+                <p x-show="x.note" class="text-[11px] text-gray-500 dark:text-[#7878aa] italic truncate" x-text="'“' + x.note + '”'"></p>
+                <span class="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full" :class="x.status === 'pending' ? 'bg-amber-100 text-amber-700' : x.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'" x-text="x.status.toUpperCase()"></span>
+              </div>
+              <template x-if="x.status === 'pending'">
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <button @click="review(x, true)" class="text-[10px] px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700">✔ APPROVE</button>
+                  <button @click="review(x, false)" class="text-[10px] px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-[#181848] text-gray-500 dark:text-[#7878aa] font-medium hover:bg-gray-200">✕</button>
+                </div>
+              </template>
+            </div>
+          </template>
+          <p x-show="!data.length" class="text-xs text-center text-gray-400 dark:text-[#7878aa] py-8">Walang suggestion sa filter na ito.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SARI-SARI STORE APPLICATIONS SECTION                        -->
+    <div x-show="$store.app.section === 'sari-sari'" x-transition.opacity>
+      <div x-data="sariSariPanel" class="space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">🏪 Sari-Sari Store Applications <span class="text-[10px] text-gray-400 dark:text-[#7878aa] font-normal">(DTI o store front photo submissions - i-approve para sa wholesale)</span></h3>
+          <div class="flex items-center gap-2">
+            <span class="text-xs px-3 py-2 rounded-lg border border-amber-500 text-amber-600 dark:text-amber-400 font-medium">⏳ PENDING: <b x-text="_pending"></b></span>
+            <button @click="load()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">REFRESH</button>
+          </div>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <button @click="setFilter('pending')" class="text-xs px-3 py-2 rounded-lg font-medium" :class="filter === 'pending' ? 'bg-amber-500 text-white' : 'border border-amber-500 text-amber-600 dark:text-amber-400'">PENDING</button>
+          <button @click="setFilter('approved')" class="text-xs px-3 py-2 rounded-lg font-medium" :class="filter === 'approved' ? 'bg-emerald-600 text-white' : 'border border-emerald-600 text-emerald-600 dark:text-emerald-400'">APPROVED</button>
+          <button @click="setFilter('rejected')" class="text-xs px-3 py-2 rounded-lg font-medium" :class="filter === 'rejected' ? 'bg-red-500 text-white' : 'border border-red-500 text-red-500'">REJECTED</button>
+          <button @click="setFilter('')" class="text-xs px-3 py-2 rounded-lg border border-gray-300 dark:border-[#222255] text-gray-600 dark:text-slate-300">ALL</button>
+        </div>
+        <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead class="bg-gray-50 dark:bg-[#0d0d25]/50">
+                <tr class="border-b border-gray-200 dark:border-[#222255] text-left text-[10px] text-gray-500 dark:text-[#7878aa] uppercase tracking-wider">
+                  <th class="px-3 py-2">Store</th>
+                  <th class="px-3 py-2">Customer</th>
+                  <th class="px-3 py-2">Contact</th>
+                  <th class="px-3 py-2">DTI / PHOTO</th>
+                  <th class="px-3 py-2">Date</th>
+                  <th class="px-3 py-2">Status</th>
+                  <th class="px-3 py-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="a in apps" :key="a.id">
+                  <tr class="border-b border-gray-100 dark:border-[#1a1a44] hover:bg-gray-50 dark:hover:bg-[#181848]/50">
+                    <td class="px-3 py-2 font-medium text-gray-700 dark:text-slate-200" x-text="a.storeName || '—'"></td>
+                    <td class="px-3 py-2" x-text="a.customerName"></td>
+                    <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]"><span x-text="a.phone || '—'"></span><br><span class="text-[10px]" x-text="a.email"></span></td>
+                    <td class="px-3 py-2"><a :href="a.dtiFile" target="_blank" class="text-cyan-600 dark:text-cyan-400 font-bold">VIEW ↗</a></td>
+                    <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="a.createdAt"></td>
+                    <td class="px-3 py-2">
+                      <span class="px-2 py-0.5 rounded-full text-[9px] font-bold"
+                        :class="a.status === 'pending' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' : a.status === 'approved' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'"
+                        x-text="a.status.toUpperCase()"></span>
+                    </td>
+                    <td class="px-3 py-2 whitespace-nowrap">
+                      <template x-if="a.status === 'pending'">
+                        <span>
+                          <button @click="review(a, true)" class="text-[10px] px-2.5 py-1.5 rounded bg-emerald-600 text-white font-bold hover:bg-emerald-700">✔ APPROVE</button>
+                          <button @click="review(a, false)" class="text-[10px] px-2.5 py-1.5 rounded border border-red-500 text-red-500 hover:bg-red-500/10 ml-1">✕ REJECT</button>
+                        </span>
+                      </template>
+                      <template x-if="a.status !== 'pending'"><span class="text-gray-400 dark:text-[#4a4a7a] text-[10px]">—</span></template>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="apps.length === 0"><td colspan="7" class="px-3 py-8 text-center text-gray-400 text-xs">Walang applications</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GOOGLE LOGIN SECTION (customer accounts)                       -->
+    <div x-show="$store.app.section === 'google-auth'" x-transition.opacity>
+      <div x-data="googleAuthPanel" class="space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">🔑 Google Login <span class="text-[10px] text-gray-400 dark:text-[#7878aa] font-normal">(customer accounts sa online shop - sign in with Gmail)</span></h3>
+          <div class="flex items-center gap-2">
+            <button @click="load()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">REFRESH</button>
+            <button @click="save()" :disabled="saving" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 disabled:opacity-50" x-text="saving ? 'SAVING...' : '💾 SAVE'"></button>
+          </div>
+        </div>
+        <div x-show="msg" x-transition.opacity class="text-xs px-4 py-3 rounded-lg border" :class="msgOk ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'" x-text="msg"></div>
+        <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+          <div class="px-4 py-2.5 border-b border-gray-100 dark:border-[#222255] bg-gray-50 dark:bg-[#0d0d25]/50">
+            <h4 class="text-[11px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">GOOGLE OAUTH SETTINGS</h4>
+          </div>
+          <div class="p-4 space-y-3">
+            <div>
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">OAuth Client ID</label>
+              <input x-model="f.clientId" type="text" placeholder="xxxx.apps.googleusercontent.com" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+            </div>
+            <div>
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">OAuth Client Secret <span x-show="hasSecret" class="text-emerald-600 dark:text-emerald-400" x-text="'(' + masked + ')'"></span></label>
+              <input x-model="f.clientSecret" type="password" placeholder="GOCSPX-..." class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+            </div>
+            <div class="flex items-center justify-between">
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa]">Enable Google Sign-In</label>
+              <button @click="f.enabled = !f.enabled" class="relative w-11 h-6 rounded-full transition-colors" :class="f.enabled ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-[#222255]'">
+                <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform" :class="f.enabled ? 'translate-x-5' : ''"></span>
+              </button>
+            </div>
+            <p class="text-[11px] text-gray-400 dark:text-[#7878aa] leading-relaxed">Sa Google Cloud Console (console.cloud.google.com): APIs &amp; Services → Credentials → Create OAuth Client ID → <b>Web application</b> → Authorized redirect URI: <code class="text-[10px] bg-gray-100 dark:bg-[#181848] px-1 py-0.5 rounded break-all">https://shop.jumongdev.com/api/dashboard/auth/google/callback</code> → i-paste dito ang Client ID + Secret.</p>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -2184,6 +2599,55 @@ tailwind.config = {
           <p class="text-[10px] text-gray-400 mt-2">Charged at checkout on shop.jumongdev.com. Orders at or above the Free Delivery minimum get ₱0 fee. Confirming an order reserves the items from HQ stock; cancelling returns them.</p>
         </div>
 
+        <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">💰 DELIVERY REMITTANCE</h4>
+            <button @click="loadRemittances()" class="text-[10px] text-gray-500 dark:text-[#7878aa] hover:text-cyan-600">REFRESH</button>
+          </div>
+          <template x-if="remit.payments.length === 0">
+            <p class="text-xs text-gray-400 dark:text-[#7878aa] text-center py-3">Walang pending payments — lahat ay na-remit na o wala pang nakolekta</p>
+          </template>
+          <div class="space-y-2 max-h-64 overflow-y-auto">
+            <template x-for="p in remit.payments" :key="p.id">
+              <div class="flex items-center justify-between gap-2 border border-gray-100 dark:border-[#222255] rounded-lg px-3 py-2">
+                <div class="min-w-0">
+                  <p class="text-xs font-bold text-gray-700 dark:text-slate-200" x-text="p.orderNo + ' · ' + p.customerName"></p>
+                  <p class="text-[10px] text-gray-400">
+                    <span class="px-1 py-0.5 rounded text-[9px] font-bold" :class="p.method === 'cash' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'" x-text="p.method.toUpperCase()"></span>
+                    <span class="ml-1" x-text="'₱' + fmt(p.amount) + ' · ' + p.driverName + ' · ' + p.createdAt"></span>
+                    <a x-show="p.gcashPic" :href="p.gcashPic" target="_blank" class="text-blue-600 font-bold ml-1">PICTURE ↗</a>
+                  </p>
+                </div>
+                <button @click="remitPayment(p)" class="text-[10px] px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 shrink-0">✔ ACCEPT</button>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">🌙 E-COMMERCE DAY (CLOSE DAY)</h4>
+            <button @click="loadEcomShift()" class="text-[10px] text-gray-500 dark:text-[#7878aa] hover:text-cyan-600">REFRESH</button>
+          </div>
+          <template x-if="ecomShift.shift">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mb-3">
+              <div class="bg-gray-50 dark:bg-[#181848] rounded-lg py-2"><p class="text-lg font-black text-gray-800 dark:text-slate-200" x-text="ecomShift.shift.deliveredOrders"></p><p class="text-[9px] text-gray-400">Delivered</p></div>
+              <div class="bg-gray-50 dark:bg-[#181848] rounded-lg py-2"><p class="text-lg font-black text-gray-800 dark:text-slate-200">₱<span x-text="fmt(ecomShift.shift.deliveredTotal)"></span></p><p class="text-[9px] text-gray-400">Delivered Total</p></div>
+              <div class="bg-gray-50 dark:bg-[#181848] rounded-lg py-2"><p class="text-lg font-black text-emerald-600">₱<span x-text="fmt(ecomShift.shift.cashTotal)"></span></p><p class="text-[9px] text-gray-400">Cash</p></div>
+              <div class="bg-gray-50 dark:bg-[#181848] rounded-lg py-2"><p class="text-lg font-black text-blue-600">₱<span x-text="fmt(ecomShift.shift.gcashTotal)"></span></p><p class="text-[9px] text-gray-400">GCash</p></div>
+            </div>
+          </template>
+          <p class="text-[11px] text-gray-500 dark:text-[#7878aa] mb-2" x-text="'Carried over bukas: ' + ecomShift.carriedOver.length + ' orders'"></p>
+          <template x-if="ecomShift.carriedOver.length > 0">
+            <div class="space-y-1 max-h-28 overflow-y-auto mb-2">
+              <template x-for="c in ecomShift.carriedOver" :key="c.id">
+                <div class="text-[10px] text-gray-500" x-text="c.orderNo + ' · ' + c.customerName + ' · ' + c.status.toUpperCase()"></div>
+              </template>
+            </div>
+          </template>
+          <button @click="closeDay()" class="text-xs px-4 py-2 rounded-lg bg-amber-500 text-white font-medium hover:bg-amber-600">🌙 CLOSE DAY</button>
+        </div>
+
         <div x-show="detailOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" @click.self="detailOpen=false">
           <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[#222255]">
@@ -2207,8 +2671,44 @@ tailwind.config = {
               </div>
               <div class="text-xs">
                 <div class="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Delivery Address</div>
-                <div class="text-gray-700 dark:text-slate-200" x-text="detail?.address || '—'"></div>
+                <div class="text-gray-700 dark:text-slate-200 font-bold" x-text="(detail?.block || '') + (detail?.lot ? ' Lot ' + detail.lot : '')"></div>
+                <div class="text-gray-700 dark:text-slate-200 font-bold text-violet-700 dark:text-violet-400" x-text="detail?.subdivision || ''"></div>
+                <div class="text-gray-700 dark:text-slate-200" x-text="detail?.address || ''"></div>
                 <div x-show="detail?.deliveryNote" class="text-[11px] text-amber-600 dark:text-amber-400 mt-1" x-text="'Note: ' + detail?.deliveryNote"></div>
+              </div>
+              <div class="text-xs rounded-lg border border-gray-200 dark:border-[#222255] p-3">
+                <div class="text-[10px] uppercase tracking-wide text-gray-400 mb-1.5">🚚 Driver</div>
+                <div class="flex items-center gap-2">
+                  <select x-model="assignDriverId" class="flex-1 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1.5 text-gray-700 dark:text-slate-200">
+                    <option value="">-- Pumili ng driver --</option>
+                    <template x-for="d in drivers" :key="d.id">
+                      <option :value="d.id" x-text="d.name"></option>
+                    </template>
+                  </select>
+                  <button @click="assignDriver()" class="text-[10px] px-3 py-1.5 rounded-lg bg-violet-600 text-white font-bold hover:bg-violet-700" :disabled="!assignDriverId">ASSIGN</button>
+                </div>
+                <p class="text-[10px] text-gray-400 mt-1.5" x-show="detail?.driverName">
+                  Nakatalaga: <b class="text-violet-600 dark:text-violet-400" x-text="detail?.driverName"></b>
+                  <template x-if="detail?.paidStatus === 'paid'"><span class="text-emerald-600 font-bold"> · ✅ PAID</span></template>
+                </p>
+              </div>
+              <div class="text-xs" x-show="detailPayments.length > 0">
+                <div class="text-[10px] uppercase tracking-wide text-gray-400 mb-1.5">💳 Payment History</div>
+                <div class="space-y-1.5">
+                  <template x-for="p in detailPayments" :key="p.id">
+                    <div class="flex items-center justify-between gap-2 rounded-lg border border-gray-100 dark:border-[#222255] px-2.5 py-1.5">
+                      <div>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold" :class="p.method === 'cash' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'" x-text="p.method.toUpperCase()"></span>
+                        <span class="ml-1.5 font-bold" x-text="fmt(p.amount)"></span>
+                        <span class="text-[10px] text-gray-400 ml-1.5" x-text="p.driverName + ' · ' + p.createdAt"></span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span x-show="p.gcashRef" class="text-[10px] text-gray-500" x-text="p.gcashRef"></span>
+                        <a x-show="p.gcashPic" :href="p.gcashPic" target="_blank" class="text-[10px] font-bold text-blue-600 dark:text-blue-400">PICTURE ↗</a>
+                      </div>
+                    </div>
+                  </template>
+                </div>
               </div>
               <div class="text-xs">
                 <div class="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Payment</div>
@@ -2217,12 +2717,12 @@ tailwind.config = {
                   <span x-show="detail?.gcashRef" class="text-[11px] text-gray-500" x-text="' · Ref: ' + detail?.gcashRef"></span>
                 </div>
               </div>
-              <div>
-                <div class="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Items</div>
+              <div class="text-xs">
+                <div class="text-[10px] uppercase tracking-wide text-gray-400 mb-1.5">Items <span x-show="detailPick.total > 0" class="text-cyan-600 dark:text-cyan-400 font-bold" x-text="'· PICKED ' + detailPick.picked + '/' + detailPick.total"></span></div>
                 <div class="rounded-lg border border-gray-200 dark:border-[#222255] overflow-hidden">
                   <table class="w-full text-xs">
                     <thead class="bg-gray-50 dark:bg-[#181848] text-[10px] text-gray-500 dark:text-[#7878aa] uppercase">
-                      <tr><th class="px-2 py-1.5 text-left">Item</th><th class="px-2 py-1.5 text-center">Qty</th><th class="px-2 py-1.5 text-right">Amount</th></tr>
+                      <tr><th class="px-2 py-1.5 text-left">Item</th><th class="px-2 py-1.5 text-center">Qty</th><th class="px-2 py-1.5 text-right">Amount</th><th class="px-2 py-1.5 text-center">Pick</th></tr>
                     </thead>
                     <tbody>
                       <template x-for="(it,ii) in detailItems" :key="ii">
@@ -2233,9 +2733,12 @@ tailwind.config = {
                           </td>
                           <td class="px-2 py-1.5 text-center" x-text="it.qty"></td>
                           <td class="px-2 py-1.5 text-right font-medium">&#8369;<span x-text="fmt(it.total)"></span></td>
+                          <td class="px-2 py-1.5 text-center">
+                            <input type="checkbox" :checked="!!it.picked" @change="togglePick(it.id, $event.target.checked)" class="w-4 h-4 accent-cyan-600" :disabled="detail?.status === 'pending' || detail?.status === 'cancelled'">
+                          </td>
                         </tr>
                       </template>
-                      <template x-if="detailLoading"><tr><td colspan="3" class="px-2 py-3 text-center text-gray-400">Loading items...</td></tr></template>
+                      <template x-if="detailLoading"><tr><td colspan="4" class="px-2 py-3 text-center text-gray-400">Loading items...</td></tr></template>
                     </tbody>
                   </table>
                 </div>
@@ -2243,21 +2746,112 @@ tailwind.config = {
                   <div class="flex justify-between"><span>Subtotal</span><span>&#8369;<span x-text="fmt(subtotal())"></span></span></div>
                   <div class="flex justify-between"><span>Delivery Fee</span><span>&#8369;<span x-text="fmt(detail?.deliveryFee || 0)"></span></span></div>
                   <div class="flex justify-between font-bold text-gray-700 dark:text-slate-200"><span>TOTAL</span><span>&#8369;<span x-text="fmt(detail?.total || 0)"></span></span></div>
+                  <div class="flex justify-between font-bold text-amber-600 dark:text-amber-400" x-show="detailTotalPoints > 0">
+                    <span>⭐ Points <span x-text="detailPointsLabel"></span></span>
+                    <span x-text="detailPointsText"></span>
+                  </div>
+                </div>
+                <div x-show="pickComplete" class="mt-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-300 dark:border-emerald-700 px-3 py-2 text-[11px] font-bold text-emerald-700 dark:text-emerald-300">✅ Kumpleto na ang lahat ng item — i-assign na ang driver sa ibaba.</div>
+              </div>
+              <div class="text-xs" x-show="detailTimeline.length > 0">
+                <div class="text-[10px] uppercase tracking-wide text-gray-400 mb-1.5">🕐 Order Trail</div>
+                <div class="rounded-lg border border-gray-100 dark:border-[#222255] px-2.5 py-2 space-y-1">
+                  <template x-for="(t,ti) in detailTimeline" :key="ti">
+                    <div class="flex gap-2 text-[11px]">
+                      <span class="text-gray-400 shrink-0" x-text="t.at"></span>
+                      <span class="font-bold" :class="t.status === 'cancelled' ? 'text-red-500' : t.status === 'delivered' ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-700 dark:text-slate-200'" x-text="t.status"></span>
+                      <span class="text-gray-400" x-text="t.note || ('by ' + t.actor)"></span>
+                    </div>
+                  </template>
                 </div>
               </div>
               <div class="flex flex-wrap gap-2 justify-end pt-1 border-t border-gray-200 dark:border-[#222255]">
+                <button @click="openReceipt()" x-show="(detail?.status || '') !== 'cancelled'" class="text-xs px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700">🖨️ PRINT RECEIPT</button>
+                <button @click="openEdit()" x-show="detail?.status === 'pending' || detail?.status === 'confirmed'" class="text-xs px-4 py-2 rounded-lg bg-amber-500 text-white font-medium hover:bg-amber-600">✏️ EDIT ITEMS</button>
                 <template x-if="(detail?.status || '') === 'pending'">
                   <button @click="setStatus('confirmed')" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">✔ CONFIRM ORDER</button>
                 </template>
-                <template x-if="(detail?.status || '') === 'confirmed'">
+                <template x-if="(detail?.status || '') === 'confirmed' && !!detail?.driverId">
                   <button @click="setStatus('shipped')" class="text-xs px-4 py-2 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-700">🚚 MARK SHIPPED</button>
                 </template>
-                <template x-if="(detail?.status || '') === 'shipped'">
+                <template x-if="(detail?.status || '') === 'confirmed' && !detail?.driverId">
+                  <span class="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg px-2.5 py-2">⚠ I-assign muna ang driver (🚚 DRIVER card sa itaas) — saka lang pwede i-ship</span>
+                </template>
+                <template x-if="(detail?.status || '') === 'shipped' && !!detail?.driverId">
                   <button @click="setStatus('delivered')" class="text-xs px-4 py-2 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700">✅ MARK DELIVERED</button>
+                </template>
+                <template x-if="(detail?.status || '') === 'shipped' && !detail?.driverId">
+                  <span class="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg px-2.5 py-2">⚠ I-assign muna ang driver — saka lang pwede i-deliver</span>
                 </template>
                 <template x-if="['pending','confirmed','shipped'].includes(detail?.status || '')">
                   <button @click="setStatus('cancelled')" class="text-xs px-4 py-2 rounded-lg border border-red-300 dark:border-red-900 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">✕ CANCEL ORDER</button>
                 </template>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- EDIT ITEMS MODAL -->
+        <div x-show="editOpen" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" @click.self="editOpen=false">
+          <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[#222255]">
+              <span class="text-xs font-bold text-gray-700 dark:text-slate-200">✏️ Edit Items — <span class="font-mono" x-text="detail?.orderNo"></span> <span class="text-amber-500">(bago i-assign sa driver)</span></span>
+              <button @click="editOpen=false" class="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 text-sm px-2">✕</button>
+            </div>
+            <div class="p-4 space-y-3">
+              <div class="space-y-2">
+                <template x-for="(it,i) in editItems" :key="i">
+                  <div class="flex items-center gap-2 border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2">
+                    <div class="flex-1 min-w-0">
+                      <p class="text-xs font-medium text-gray-700 dark:text-slate-200 truncate" x-text="it.productName"></p>
+                      <p class="text-[10px] text-gray-400" x-text="it.unitName + ' · ' + fmt(it.price)"></p>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                      <button @click="editQty(i,-1)" class="w-7 h-7 rounded-lg bg-gray-100 dark:bg-[#222255] text-gray-700 dark:text-white font-black text-sm">−</button>
+                      <span class="text-xs font-bold w-6 text-center text-gray-700 dark:text-slate-200" x-text="it.qty"></span>
+                      <button @click="editQty(i,1)" class="w-7 h-7 rounded-lg bg-gray-100 dark:bg-[#222255] text-gray-700 dark:text-white font-black text-sm">+</button>
+                    </div>
+                    <span class="text-xs font-bold w-16 text-right text-gray-700 dark:text-slate-200" x-text="fmt(it.price * it.qty)"></span>
+                    <button @click="editRemove(i)" class="text-red-500 font-black text-sm px-1">✕</button>
+                  </div>
+                </template>
+                <div x-show="editItems.length === 0" class="text-xs text-gray-400 text-center py-3">Walang items — mag-add sa ibaba</div>
+              </div>
+              <div>
+                <p class="text-[10px] uppercase tracking-wide text-gray-400 mb-1.5">ADD ITEM</p>
+                <input x-model="editQ" @input="searchEdit()" type="text" placeholder="Search product..." class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                <div class="max-h-40 overflow-y-auto mt-1 space-y-1">
+                  <template x-for="p in editResults" :key="p.id">
+                    <button @click="addEdit(p)" class="w-full text-left border border-gray-100 dark:border-[#222255] rounded-lg px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-[#181848]">
+                      <span class="text-xs text-gray-700 dark:text-slate-200 truncate block" x-text="p.name"></span>
+                      <span class="text-[10px] text-gray-400" x-text="fmt(p.price)"></span>
+                    </button>
+                  </template>
+                </div>
+              </div>
+              <div class="flex justify-between text-xs font-bold border-t border-gray-200 dark:border-[#222255] pt-2 text-gray-700 dark:text-slate-200">
+                <span>TOTAL (may delivery fee)</span><span x-text="fmt(editSubtotal)"></span>
+              </div>
+              <div class="flex gap-2 justify-end">
+                <button @click="editOpen=false" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa]">CANCEL</button>
+                <button @click="saveEdit()" class="text-xs px-4 py-2 rounded-lg bg-emerald-600 text-white font-medium">💾 SAVE ITEMS</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ORDER RECEIPT MODAL -->
+        <div x-show="receiptOpen" x-cloak class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" @click.self="closeReceipt()">
+          <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-full max-w-md">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[#222255]">
+              <span class="text-xs font-bold text-gray-700 dark:text-slate-200">🧾 Order Receipt — <span class="font-mono" x-text="detail?.orderNo"></span></span>
+              <button @click="closeReceipt()" class="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 text-sm px-2">✕</button>
+            </div>
+            <div class="p-4">
+              <div id="receiptPrint" class="bg-white text-black font-mono text-[11px] leading-tight p-4 rounded-lg border border-gray-200" style="width:300px;margin:0 auto;white-space:pre-line" x-text="receiptText"></div>
+              <div class="flex gap-2 justify-end mt-4 print:hidden">
+                <button @click="closeReceipt()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa]">CLOSE</button>
+                <button @click="window.print()" class="text-xs px-4 py-2 rounded-lg bg-blue-600 text-white font-medium">🖨️ PRINT</button>
               </div>
             </div>
           </div>
@@ -2268,7 +2862,9 @@ tailwind.config = {
       <div x-show="$store.app.section === 'posqr'" x-transition.opacity>
         <div x-data="posQrPanel" class="space-y-4">
           <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">📱 POS QR Codes</h3>
-          <p class="text-[11px] text-gray-500 dark:text-[#7878aa]">Upload a QR image + title, then push to selected POS terminals. Pushed via the remote agents — the QR appears below the PAY button on each POS screen (title on top, click to enlarge).</p>
+          <p class="text-[11px] text-gray-500 dark:text-[#7878aa]">Upload a QR image + title, then push to selected POS terminals. Pushed via the remote agents — the QR appears below the PAY button on each POS screen (title on top, click to enlarge). <span class="text-violet-500 font-semibold">Ang cloud list sa ibaba ang siya ring QR na ipinapakita sa DRIVER APP (GCash collection sa door).</span></p>
+
+          <div x-show="cloudMsg" x-transition.opacity class="text-xs px-4 py-3 rounded-lg border" :class="cloudMsgOk ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'" x-text="cloudMsg"></div>
 
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl p-4">
@@ -2312,6 +2908,29 @@ tailwind.config = {
                 <button @click="pushAll()" :disabled="pushing" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 disabled:opacity-50">PUSH TO SELECTED</button>
                 <span x-show="msg" class="text-[10px] text-gray-400" x-text="msg"></span>
               </div>
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-200 dark:border-[#222255] flex items-center justify-between">
+              <span class="text-xs font-bold text-gray-700 dark:text-slate-200">🔗 CLOUD QR LIST (driver app / shared)</span>
+              <button @click="saveCloud()" class="text-[10px] px-3 py-1.5 rounded-lg bg-violet-600 text-white font-bold hover:bg-violet-700">💾 SAVE TO CLOUD</button>
+            </div>
+            <div class="p-3 space-y-2">
+              <template x-for="q in cloud" :key="q.id || q.file">
+                <div class="flex items-center gap-3 border border-gray-100 dark:border-[#1a1a3e] rounded-lg p-2">
+                  <img :src="'/assets/' + q.file" class="w-10 h-10 object-contain bg-white rounded border border-gray-200 dark:border-[#222255]">
+                  <div class="flex-1 min-w-0">
+                    <p class="text-xs font-bold text-gray-700 dark:text-slate-200 truncate" x-text="q.header || '(no title)'"></p>
+                    <p class="text-[10px] text-gray-400 truncate" x-text="q.file"></p>
+                  </div>
+                  <label class="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-[#7878aa] shrink-0">
+                    <input type="checkbox" :checked="q.isActive" @change="q.isActive = $event.target.checked" class="rounded accent-emerald-600"> ACTIVE
+                  </label>
+                  <button @click="removeCloud(q)" class="text-[10px] px-2 py-1 rounded border border-red-300 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0">✕</button>
+                </div>
+              </template>
+              <div x-show="cloud.length === 0" class="text-[11px] text-gray-400 text-center py-2">Wala pang QR sa cloud — mag-upload at mag-push, o i-save ang listahan dito.</div>
             </div>
           </div>
 
@@ -2466,17 +3085,22 @@ tailwind.config = {
           <p class="text-[11px] text-gray-500 dark:text-[#7878aa]">Mga sagot ng bot sa mga tanong ng customer. Sagutan ang mga may <b class="text-amber-500">SAGUTIN</b> badge — hindi sila ginagamit hanggang may sagot. Pagkatapos mag-reply ang bot, i-click ang ✅ TAMA o ✏️ I-CORRECT para turuan ito.</p>
 
           <div class="flex gap-2 flex-wrap items-center">
+            <button @click="pendingOnly = !pendingOnly; load()" class="text-xs px-3 py-2 rounded-lg font-medium transition"
+              :class="pendingOnly ? 'bg-amber-500 text-white' : 'border border-amber-500 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10'">
+              ⏳ PENDING <span x-show="$store.app._kbBadge > 0" class="ml-1 font-bold" x-text="$store.app._kbBadge"></span>
+            </button>
             <select x-model="filterCategory" @change="load()" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
               <option value="">All Categories</option>
               <option value="business">Business</option>
               <option value="project">Project</option>
               <option value="approved-reply">Approved Replies</option>
             </select>
-            <span class="text-xs text-gray-400 dark:text-[#7878aa]" x-text="'Total: ' + entries.length"></span>
+            <span class="text-xs text-gray-400 dark:text-[#7878aa]" x-text="'Total: ' + filtered.length"></span>
             <span class="flex-1"></span>
             <button @click="ingestProject()" class="text-xs px-3 py-2 rounded-lg border border-cyan-600 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-600/10">📥 INGEST PROJECT</button>
             <button @click="openAdd()" class="text-xs px-3 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">+ ADD ENTRY</button>
           </div>
+          <p x-show="pendingOnly" class="text-[11px] text-amber-600 dark:text-amber-400">Mga tanong ng customer na hindi alam ng bot — i-type ang sagot at i-click ang SAGUTIN. Sa susunod ay sasagot na ito ng bot.</p>
 
           <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
             <div class="overflow-x-auto max-h-[480px] overflow-y-auto">
@@ -2491,7 +3115,7 @@ tailwind.config = {
                   </tr>
                 </thead>
                 <tbody>
-                  <template x-for="(k, i) in entries" :key="i">
+                  <template x-for="(k, i) in filtered" :key="i">
                     <tr class="border-b border-gray-100 dark:border-[#1a1a44] hover:bg-gray-50 dark:hover:bg-[#181848]/50">
                       <td class="px-2 py-2">
                         <span class="px-1.5 py-0.5 rounded text-[9px] font-medium"
@@ -2512,13 +3136,22 @@ tailwind.config = {
                         </template>
                       </td>
                       <td class="px-2 py-2 whitespace-nowrap">
-                        <button @click="openEdit(k)" class="text-[10px] px-2 py-1 rounded bg-cyan-600 text-white hover:bg-cyan-700">EDIT</button>
-                        <button @click="toggleActive(k)" class="text-[10px] px-2 py-1 rounded border border-gray-300 dark:border-[#222255] text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-[#181848]" x-text="k.active ? 'DEACTIVATE' : 'ACTIVATE'"></button>
-                        <button @click="remove(k)" class="text-[10px] px-2 py-1 rounded border border-red-500 text-red-500 hover:bg-red-500/10">DEL</button>
+                        <template x-if="k.source === 'auto-pending' && !k.answer && !k.active">
+                          <div class="flex items-center gap-1.5">
+                            <input x-model="answers[k.id]" type="text" placeholder="Type answer... (Enter = save)"
+                              @keydown.enter="quickAnswer(k)" class="w-44 text-xs bg-gray-50 dark:bg-[#181848] border border-amber-300 dark:border-amber-700 rounded-lg px-2 py-1.5 text-gray-700 dark:text-slate-200">
+                            <button @click="quickAnswer(k)" class="text-[10px] px-2.5 py-1.5 rounded bg-amber-500 text-white hover:bg-amber-600 font-bold">SAGUTIN</button>
+                          </div>
+                        </template>
+                        <template x-if="!(k.source === 'auto-pending' && !k.answer && !k.active)">
+                          <button @click="openEdit(k)" class="text-[10px] px-2 py-1 rounded bg-cyan-600 text-white hover:bg-cyan-700">EDIT</button>
+                          <button @click="toggleActive(k)" class="text-[10px] px-2 py-1 rounded border border-gray-300 dark:border-[#222255] text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-[#181848]" x-text="k.active ? 'DEACTIVATE' : 'ACTIVATE'"></button>
+                          <button @click="remove(k)" class="text-[10px] px-2 py-1 rounded border border-red-500 text-red-500 hover:bg-red-500/10">DEL</button>
+                        </template>
                       </td>
                     </tr>
                   </template>
-                  <tr x-show="entries.length === 0">
+                  <tr x-show="filtered.length === 0">
                     <td colspan="5" class="px-2 py-6 text-center text-gray-400 text-xs">Walang entries</td>
                   </tr>
                 </tbody>

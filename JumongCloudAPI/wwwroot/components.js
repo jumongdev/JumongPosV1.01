@@ -33,14 +33,19 @@ Alpine.store('app', {
     _sidebarOpen: window.innerWidth < 768 ? false : localStorage.getItem('sidebar') !== 'collapsed',
     _stBadge: 0,
     _shopBadge: 0,
+    _kbBadge: 0,
+    _ssBadge: 0,
+    _restockBadge: 0,
+    _suggBadge: 0,
     groupOpen: {},
     groupParents: {
       'ai-chat': 'grp-ai', 'ai-kb': 'grp-ai',
       'health': 'grp-system', 'suspect1pc': 'grp-system',
       'rpt-sales': 'grp-reports', 'rpt-invcost': 'grp-reports', 'rpt-shifts': 'grp-reports', 'analytics': 'grp-reports', 'rpt-invval': 'grp-reports',
-      'grp-reports': 'grp-pos', 'products': 'grp-pos', 'grp-inv': 'grp-pos', 'online-orders': 'grp-pos', 'shop-content': 'grp-pos',
+      'grp-reports': 'grp-pos', 'products': 'grp-pos', 'grp-inv': 'grp-pos',
+      'online-orders': 'grp-ecom', 'shop-content': 'grp-ecom', 'msgr-bot': 'grp-ecom', 'sari-sari': 'grp-ecom', 'promo-banners': 'grp-ecom', 'restock-requests': 'grp-ecom', 'product-suggestions': 'grp-ecom',
       'st-receiving': 'grp-inv', 'st-trail': 'grp-inv', 'st-transfer': 'grp-inv',
-      'settings': 'grp-settings', 'pospromo': 'grp-settings', 'posqr': 'grp-settings', 'branding': 'grp-settings'
+      'settings': 'grp-settings', 'pospromo': 'grp-settings', 'posqr': 'grp-settings', 'branding': 'grp-settings', 'google-auth': 'grp-settings'
     },
     toggleGroup(id) {
       this.groupOpen[id] = !this.groupOpen[id];
@@ -52,7 +57,7 @@ Alpine.store('app', {
       if (id === 'grp-pos' || id === 'grp-reports' || id === 'grp-inv') {
         if (id === 'grp-reports') return ['rpt-sales', 'rpt-invcost', 'rpt-shifts', 'analytics', 'rpt-invval'].includes(this.section);
         if (id === 'grp-inv') return this.section === 'stock' || ['st-receiving', 'st-trail', 'st-transfer'].includes(this.section);
-        return this.section === 'products' || this.section === 'stock' || this.section === 'rpt-sales' || this.section === 'rpt-invcost' || this.section === 'rpt-shifts' || this.section === 'analytics' || this.section === 'rpt-invval' || this.section === 'online-orders';
+        return this.section === 'products' || this.section === 'stock' || this.section === 'rpt-sales' || this.section === 'rpt-invcost' || this.section === 'rpt-shifts' || this.section === 'analytics' || this.section === 'rpt-invval';
       }
       if (id === 'grp-inv' && this.section === 'stock') return true;
       const parent = this.groupParents[this.section];
@@ -480,7 +485,7 @@ Alpine.store('app', {
       }
       this.loading = true;
       try {
-        this.d = await fetchJSON(API + '/products/master/download');
+        this.d = await fetchJSON(API + '/products/master?noImages=true');
         Alpine.store('app').cache.master = { data: this.d, t: Date.now() };
       } catch (e) { this.d = [] }
       this.loading = false;
@@ -519,9 +524,18 @@ Alpine.store('app', {
     },
     margin(p) { return p.price > 0 ? ((p.price - p.cost) / p.price * 100).toFixed(1) : '0.0' },
     marginClass(m) { const v = parseFloat(m); return v > 20 ? 'text-emerald-400' : v > 0 ? 'text-amber-400' : 'text-red-400' },
-    openEditor(id) {
+    async openEditor(id) {
       Alpine.store('app').editingId = id || null;
-      Alpine.store('app').editingProductData = id ? this.d.find(x => x.id === id) || null : null;
+      if (id) {
+        const local = this.d.find(x => x.id === id);
+        Alpine.store('app').editingProductData = local ? { ...local, units: [] } : null;
+        try {
+          const r = await fetchJSON(API + '/products/master/' + id);
+          Alpine.store('app').editingProductData = { ...r.product, units: r.units || [] };
+        } catch (e) { /* keep local data */ }
+      } else {
+        Alpine.store('app').editingProductData = null;
+      }
       Alpine.store('app').editorOpen = true;
     },
     closeEditor() { Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null; Alpine.store('app').editingProductData = null },
@@ -542,8 +556,16 @@ Alpine.store('app', {
       } catch (e) { toast('Delete failed: ' + e.message, 'error') }
     },
     get editingProduct() { const id = Alpine.store('app').editingId; return id ? this.d.find(x => x.id === id) : null },
-    async toggleFlag(x, field, val) {
-      const prev = x[field];
+    async saveOnlinePrice(x, val) {
+      const num = parseFloat(val);
+      const saved = (num > 0) ? num : 0;
+      x.onlinePrice = saved;
+      try {
+        await fetch(API + '/products/master/' + x.id + '/flags', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ onlinePrice: saved }) });
+        toast('Online price saved: ' + (saved > 0 ? '₱' + saved.toFixed(2) : 'default') + ' — ' + (x.name || ''));
+      } catch (e) { toast('Save failed: ' + e.message, 'error'); }
+    },
+    async toggleFlag(x, field, val) {      const prev = x[field];
       x[field] = val;
       try {
         const body = {};
@@ -793,12 +815,31 @@ Alpine.store('app', {
 
   /* ΓöÇΓöÇ Customers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('customersList', () => ({
-    d: [], loading: true,
+    d: [], loading: true, orders: [], ordersOpen: false, ordersName: '', ordersLoading: false, ptsFilter: 'all',
     async init() { window.addEventListener('load-customers', () => this.load()); await this.load() },
     async load() {
       this.loading = true;
       try { this.d = await fetchJSON(API + '/customers?' + Alpine.store('app').storeParam.replace('&', '')) } catch (e) { this.d = [] }
       this.loading = false;
+    },
+    setPtsFilter(f) { this.ptsFilter = f; },
+    get withStar() { return this.d.filter(x => !!x.qrCode).length },
+    get withoutStar() { return this.d.filter(x => !x.qrCode).length },
+    get filtered() {
+      if (this.ptsFilter === 'star') return this.d.filter(x => !!x.qrCode);
+      if (this.ptsFilter === 'nostar') return this.d.filter(x => !x.qrCode);
+      return this.d;
+    },
+    async viewOrders(x) {
+      this.ordersName = x.name || '';
+      this.orders = []; this.ordersOpen = true; this.ordersLoading = true;
+      try { this.orders = await fetchJSON(API + '/customers/' + x.id + '/orders') } catch (e) { this.orders = [] }
+      this.ordersLoading = false;
+    },
+    closeOrders() { this.ordersOpen = false; },
+    statusCls(s) {
+      const m = { pending: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300', confirmed: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300', shipped: 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300', arrived: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300', delivered: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400', cancelled: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' };
+      return m[s] || 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300';
     }
   }));
 
@@ -1098,10 +1139,14 @@ Alpine.store('app', {
   Alpine.data('onlineOrdersPanel', () => ({
     data: [], search: '', filter: '', loading: false, pendingCount: 0,
     detailOpen: false, detail: null, detailItems: [], detailLoading: false,
+    detailPayments: [], drivers: [], assignDriverId: '',
+    detailTimeline: [], detailPick: { picked: 0, total: 0 },
+    receiptOpen: false, editOpen: false, editItems: [], editQ: '', editResults: [], editTimer: null,
+    remit: { shifts: [], payments: [] }, ecomShift: { shift: null, carriedOver: [] },
     settings: { deliveryFee: 0, freeDeliveryMin: 0 }, settingsSaved: '',
     init() {
-      if (Alpine.store('app').section === 'online-orders') { this.load(); this.loadSettings(); }
-      this.$watch('$store.app.section', v => { if (v === 'online-orders') { this.load(); this.loadSettings(); } });
+      if (Alpine.store('app').section === 'online-orders') { this.load(); this.loadSettings(); this.loadRemittances(); this.loadEcomShift(); }
+      this.$watch('$store.app.section', v => { if (v === 'online-orders') { this.load(); this.loadSettings(); this.loadRemittances(); this.loadEcomShift(); } });
       this.loadBadge();
       setInterval(() => this.loadBadge(), 30000);
     },
@@ -1152,15 +1197,163 @@ Alpine.store('app', {
       this.detail = o;
       this.detailOpen = true;
       this.detailItems = [];
+      this.detailPayments = [];
+      this.detailTimeline = [];
+      this.detailPick = { picked: 0, total: 0 };
       this.detailLoading = true;
+      this.assignDriverId = o.driverId || '';
       try {
         const r = await fetchJSON(API + '/shop/orders/' + o.id);
         this.detail = r.order;
         this.detailItems = r.items || [];
+        this.detailPayments = r.payments || [];
+        this.detailTimeline = r.timeline || [];
+        this.detailPick = r.pickProgress || { picked: 0, total: 0 };
+        this.assignDriverId = r.order.driverId || '';
+        if (this.drivers.length === 0) this.loadDrivers();
       } catch (e) { this.detailItems = [] }
       this.detailLoading = false;
     },
+    async togglePick(itemId, checked) {
+      try {
+        await fetchJSON(API + '/orders/' + this.detail.id + '/pick', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId, picked: checked, pickedBy: 'Admin' }) });
+        await this.openDetail(this.detail);
+      } catch (e) { toast(e.message, 'error'); }
+    },
+    async loadRemittances() {
+      try { this.remit = await fetchJSON(API + '/remittances'); } catch (e) { this.remit = { shifts: [], payments: [] }; }
+    },
+    async remitPayment(p) {
+      try {
+        await fetchJSON(API + '/payments/' + p.id + '/remit', { method: 'POST' });
+        toast('Remitted: ' + p.orderNo + ' ' + p.method + ' ' + fmt(p.amount));
+        await this.loadRemittances();
+      } catch (e) { toast(e.message, 'error'); }
+    },
+    async loadEcomShift() {
+      try { this.ecomShift = await fetchJSON(API + '/ecom-shift'); } catch (e) { this.ecomShift = { shift: null, carriedOver: [] }; }
+    },
+    async closeDay() {
+      if (!confirm('Isara ang e-commerce day? Ang mga hindi nai-deliver ay dadalhin bukas.')) return;
+      try {
+        await fetchJSON(API + '/ecom-shift/close', { method: 'POST' });
+        toast('CLOSED — bagong shift na bukas para bukas');
+        await this.loadEcomShift();
+      } catch (e) { toast(e.message, 'error'); }
+    },
+    async loadDrivers() {
+      try { this.drivers = await fetchJSON(API + '/drivers'); } catch (e) { this.drivers = []; }
+    },
+    async assignDriver() {
+      if (!this.assignDriverId) return;
+      try {
+        const r = await fetch(API + '/orders/' + this.detail.id + '/assign-driver', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ driverId: Number(this.assignDriverId) }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || 'Assign failed');
+        const drv = this.drivers.find(d => d.id === Number(this.assignDriverId));
+        this.detail.driverName = drv ? drv.name : 'Driver';
+        this.detail.driverId = Number(this.assignDriverId);
+        if (this.detail.status === 'confirmed') this.detail.status = 'shipped';
+        toast('Driver assigned: ' + (drv ? drv.name : '') + ' — order marked SHIPPED');
+        this.load();
+      } catch (e) { toast(e.message || 'Assign failed', 'error'); }
+    },
     subtotal() { return (this.detailItems || []).reduce((s, it) => s + it.total, 0) },
+    get pickComplete() {
+      return this.detailPick.total > 0 && this.detailPick.picked >= this.detailPick.total && (this.detail?.status || '') === 'confirmed';
+    },
+    get detailTotalPoints() { return Number(this.detail?.totalPoints || 0); },
+    get detailPointsLabel() {
+      const d = this.detail || {};
+      return d.paidStatus === 'paid' ? '(earned)' : '(to earn)';
+    },
+    get detailPointsText() {
+      const tp = Number(this.detail?.totalPoints || 0);
+      const ap = Number(this.detail?.awardPoints || 0);
+      return tp.toFixed(2) + ' pts → +' + ap.toFixed(2) + ' point' + (ap > 1 ? 's' : '');
+    },
+    get receiptText() {
+      const o = this.detail || {};
+      const items = this.detailItems || [];
+      const withPts = items.filter(it => Number(it.points || 0) > 0);
+      const noPts = items.filter(it => !(Number(it.points || 0) > 0));
+      const tp = Number(o.totalPoints || 0);
+      const ap = Number(o.awardPoints || 0);
+      const verb = o.paidStatus === 'paid' ? 'earned' : 'to earn';
+      const padN = (t, n) => { t = String(t); while (t.length < n) t += ' '; return t; };
+      const dt = String(o.createdAt || '').slice(0, 16).replace('T', ' ');
+      const itemLine = (it) => padN(String(it.productName || '').slice(0, 29), 30) + ' x' + it.qty + ' ' + Number(it.total).toFixed(2);
+      const L = [];
+      L.push('        ANDENGS SUPERSTORE');
+      L.push('     --- Online Order Receipt ---');
+      L.push('----------------------------');
+      L.push('Order: ' + (o.orderNo || ''));
+      if (dt) L.push('Date:  ' + dt);
+      L.push('Customer: ' + (o.customerName || ''));
+      if (o.phone) L.push('Phone: ' + o.phone);
+      L.push('Address: Blk ' + (o.block || '-') + ' Lot ' + (o.lot || '-') + (o.subdivision ? ', ' + o.subdivision : ''));
+      if (o.address) L.push('  ' + o.address);
+      if (o.deliveryNote) L.push('Note: ' + o.deliveryNote);
+      L.push('----------------------------');
+      if (withPts.length) {
+        L.push('-- WITH POINTS --');
+        withPts.forEach(it => L.push(itemLine(it)));
+        L.push('----------------------------');
+        L.push('⭐ TOTAL: ' + tp.toFixed(2) + ' pts -> ' + (ap >= 1 ? '+' + ap.toFixed(2) + ' point' + (ap > 1 ? 's' : '') + ' (' + verb + ')' : '+0.00 (kulang pa para sa 1 point)'));
+        L.push('----------------------------');
+      }
+      if (noPts.length) {
+        L.push('-- WALANG POINTS --');
+        noPts.forEach(it => L.push(itemLine(it)));
+        L.push('----------------------------');
+      }
+      const sub = items.reduce((s, it) => s + Number(it.total || 0), 0);
+      L.push(padN('SUBTOTAL', 38) + sub.toFixed(2));
+      L.push(padN('DELIVERY FEE', 38) + Number(o.deliveryFee || 0).toFixed(2));
+      L.push(padN('TOTAL', 38) + Number(o.total || 0).toFixed(2));
+      if (withPts.length && ap < 1) L.push('⭐ Points ' + verb + ': ' + tp.toFixed(2) + ' pts -> +0.00 (P200 = 1 point)');
+      L.push('Payment: ' + (o.paymentMethod || 'COD'));
+      L.push('----------------------------');
+      L.push('        Salamat po!');
+      L.push('     Mag-order muli :)');
+      return L.join('\n');
+    },
+    openReceipt() { this.receiptOpen = true; },
+    closeReceipt() { this.receiptOpen = false; },
+    openEdit() {
+      this.editItems = (this.detailItems || []).map(it => ({ productId: it.productId, productName: it.productName, unitName: it.unitName || 'PC', qty: it.qty, price: Number(it.price || 0) }));
+      this.editQ = ''; this.editResults = [];
+      this.editOpen = true;
+    },
+    editQty(i, d) { this.editItems[i].qty = Math.max(1, (this.editItems[i].qty || 1) + d); },
+    editRemove(i) { this.editItems.splice(i, 1); },
+    get editSubtotal() { return this.editItems.reduce((s, it) => s + it.price * it.qty, 0) + Number(this.detail?.deliveryFee || 0); },
+    async searchEdit() {
+      clearTimeout(this.editTimer);
+      const q = (this.editQ || '').trim();
+      this.editTimer = setTimeout(async () => {
+        if (!q) { this.editResults = []; return; }
+        try { this.editResults = await fetchJSON(API + '/shop/catalog/search?q=' + encodeURIComponent(q) + '&limit=15'); }
+        catch (e) { this.editResults = []; }
+      }, 300);
+    },
+    addEdit(p) {
+      if (this.editItems.some(x => x.productId === p.id)) { toast('Nasa listahan na ang item', 'error'); return; }
+      this.editItems.push({ productId: p.id, productName: p.name, unitName: 'PC', qty: 1, price: Number(p.price || 0) });
+      this.editQ = ''; this.editResults = [];
+    },
+    async saveEdit() {
+      try {
+        const items = this.editItems.map(it => ({ productId: it.productId, unitName: it.unitName, qty: it.qty }));
+        const r = await fetch(API + '/shop/orders/' + this.detail.id + '/items', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.message || ('HTTP ' + r.status));
+        toast('Items updated — bagong total: ' + fmt(j.total || 0) + ' ✓', 'success');
+        this.editOpen = false;
+        await this.openDetail(this.detail);
+        this.load();
+      } catch (e) { toast(e.message || 'Save failed', 'error'); }
+    },
     async setStatus(st) {
       if (!this.detail) return;
       const no = this.detail.orderNo;
@@ -1173,6 +1366,7 @@ Alpine.store('app', {
         if (!r.ok) throw new Error(j.message || ('HTTP ' + r.status));
         this.detail.status = st;
         toast(st.toUpperCase() + ' OK', 'success');
+        if (st === 'confirmed') this.openReceipt();
         this.load();
       } catch (e) {
         toast(e.message || 'Error updating status', 'error');
@@ -1278,10 +1472,31 @@ Alpine.store('app', {
 
   Alpine.data('posQrPanel', () => ({
     d: [], sel: {}, header: '', imgUrl: '', imgPreview: '', fileName: '', pushing: false, restartPos: false,
-    statuses: [], msg: '',
+    statuses: [], msg: '', cloud: [], cloudMsg: '', cloudMsgOk: true,
     async init() {
       if (Alpine.store('app').section === 'posqr') await this.load();
-      this.$watch('$store.app.section', v => { if (v === 'posqr') this.load(); });
+      this.$watch('$store.app.section', v => { if (v === 'posqr') { this.load(); this.loadCloud(); } });
+    },
+    async loadCloud() {
+      try {
+        const j = await fetchJSON(API + '/payment-qrs');
+        this.cloud = (j.qrs || []).map(q => ({ id: q.id, header: q.header, file: q.file, isActive: q.isActive, sortOrder: q.sortOrder }));
+      } catch (e) { }
+    },
+    async saveCloud() {
+      try {
+        const r = await fetch(API + '/payment-qrs', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ qrs: this.cloud.map((q, i) => ({ id: q.id, header: q.header, file: q.file, isActive: q.isActive, sortOrder: i })) })
+        });
+        if (!r.ok) throw new Error('Save failed');
+        this.cloudMsgOk = true;
+        this.cloudMsg = 'Cloud QR list saved — makikita na ng driver app.';
+        await this.loadCloud();
+      } catch (e) { this.cloudMsgOk = false; this.cloudMsg = 'Save error: ' + e.message; }
+    },
+    removeCloud(q) {
+      this.cloud = this.cloud.filter(x => x !== q);
     },
     async load() {
       try {
@@ -1339,6 +1554,12 @@ Alpine.store('app', {
       this.msg = 'Commands sent. Waiting for agents...';
       await this.poll(tgt);
       this.pushing = false;
+      if (this.fileName) {
+        const existing = this.cloud.find(q => q.file === this.fileName);
+        if (existing) existing.header = this.header.trim() || existing.header;
+        else this.cloud.push({ id: 0, header: this.header.trim(), file: this.fileName, isActive: true });
+        await this.saveCloud();
+      }
     },
     async poll(tgt) {
       for (let n = 0; n < 14; n++) {
@@ -1414,13 +1635,16 @@ Alpine.store('app', {
 
   Alpine.data('aiChatPanel', () => ({
     msgs: [], input: '', sending: false, typing: false, error: '',
-    stats: null, statsTimer: null, sources: [],
+    stats: { total: 0, ok: 0, fail: 0, avgMs: 0, maxMs: 0, recent: [] }, statsTimer: null, sources: [],
     async init() {
       await this.loadStats();
       this.statsTimer = setInterval(() => { if (Alpine.store('app').section === 'ai-chat') this.loadStats(); }, 15000);
     },
     async loadStats() {
-      try { this.stats = await fetchJSON(API + '/chat/stats'); } catch (e) { }
+      try {
+        const s = await fetchJSON(API + '/chat/stats');
+        this.stats = s || this.stats;
+      } catch (e) { }
     },
     async send() {
       const m = this.input.trim();
@@ -1468,15 +1692,34 @@ Alpine.store('app', {
   }));
 
   Alpine.data('kbPanel', () => ({
-    entries: [], reviews: [], filterCategory: '',
-    editorOpen: false, editingId: null,
+    entries: [], reviews: [], filterCategory: '', pendingOnly: false,
+    answers: {}, editorOpen: false, editingId: null,
     form: { category: 'business', keywords: '', question: '', answer: '', active: true },
-    async init() { await this.load(); await this.loadReviews(); },
+    async init() { await this.load(); await this.loadReviews(); await this.refreshBadge(); },
+    get filtered() {
+      let list = this.entries;
+      if (this.pendingOnly) list = list.filter(k => k.source === 'auto-pending' && !k.answer && !k.active);
+      return list;
+    },
     async load() {
       try {
         const url = API + '/chat/kb' + (this.filterCategory ? '?category=' + encodeURIComponent(this.filterCategory) : '');
         this.entries = await fetchJSON(url);
       } catch (e) { this.entries = []; }
+    },
+    async refreshBadge() {
+      try { const r = await fetchJSON(API + '/chat/kb/pending-count'); Alpine.store('app')._kbBadge = r.count || 0; } catch (e) {}
+    },
+    async quickAnswer(k) {
+      const a = (this.answers[k.id] || '').trim();
+      if (!a) { toast('Type an answer first'); return; }
+      try {
+        await fetchJSON(API + '/chat/kb/' + k.id, { method: 'PUT', body: JSON.stringify({ answer: a, active: true }), headers: { 'Content-Type': 'application/json' } });
+        toast('Answer saved — alam na ng bot!');
+        delete this.answers[k.id];
+        await this.load();
+        await this.refreshBadge();
+      } catch (e) { toast(e.message || 'Save failed'); }
     },
     async loadReviews() {
       try { this.reviews = await fetchJSON(API + '/chat/kb/reviews?limit=50'); } catch (e) { this.reviews = []; }
@@ -1528,8 +1771,158 @@ Alpine.store('app', {
   }));
 
   /* ── Shop Content (landing page content editor) ─────────────────────── */
+  Alpine.data('sariSariPanel', () => ({
+    apps: [], filter: 'pending', _pending: 0,
+    async init() { await this.load(); await this.refreshBadge(); },
+    setFilter(f) { this.filter = f; this.load(); },
+    async load() {
+      try {
+        const url = API + '/sari-sari/applications' + (this.filter ? '?status=' + this.filter : '');
+        this.apps = await fetchJSON(url);
+        if (this.filter !== 'pending') await this.refreshBadge();
+      } catch (e) { this.apps = []; }
+    },
+    async refreshBadge() {
+      try { const r = await fetchJSON(API + '/sari-sari/pending-count'); this._pending = r.count || 0; Alpine.store('app')._ssBadge = this._pending; } catch (e) {}
+    },
+    async review(a, approve) {
+      if (!confirm((approve ? 'APPROVE' : 'REJECT') + ' application ng ' + (a.customerName || 'customer') + (a.storeName ? ' (' + a.storeName + ')' : '') + '?')) return;
+      try {
+        await fetchJSON(API + '/sari-sari/applications/' + a.id + '/review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ approve }) });
+        toast(approve ? 'Approved - wholesale access granted' : 'Rejected');
+        await this.load();
+      } catch (e) { toast(e.message || 'Review failed', 'error'); }
+    }
+  }));
+
+  Alpine.data('restockPanel', () => ({
+    data: [], filter: 'pending', loading: false,
+    async init() { await this.load(); },
+    setFilter(f) { this.filter = f; this.load(); },
+    async load() {
+      this.loading = true;
+      try {
+        const url = API + '/restock-requests' + (this.filter ? '?status=' + this.filter : '');
+        this.data = await fetchJSON(url);
+        if (this.filter !== 'pending') await this.refreshBadge();
+      } catch (e) { this.data = []; }
+      this.loading = false;
+    },
+    async refreshBadge() {
+      try { const r = await fetchJSON(API + '/restock-requests/pending-count'); Alpine.store('app')._restockBadge = r.count || 0; } catch (e) {}
+    },
+    async resolve(x, st) {
+      try {
+        await fetchJSON(API + '/restock-requests/' + x.id + '/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: st }) });
+        toast(st === 'fulfilled' ? 'Restock request marked DONE' : 'Dismissed');
+        await this.load();
+      } catch (e) { toast(e.message || 'Failed', 'error'); }
+    }
+  }));
+
+  Alpine.data('productSuggestPanel', () => ({
+    data: [], filter: 'pending', loading: false,
+    async init() { await this.load(); },
+    setFilter(f) { this.filter = f; this.load(); },
+    async load() {
+      this.loading = true;
+      try {
+        const url = API + '/product-suggestions' + (this.filter ? '?status=' + this.filter : '');
+        this.data = await fetchJSON(url);
+        if (this.filter !== 'pending') await this.refreshBadge();
+      } catch (e) { this.data = []; }
+      this.loading = false;
+    },
+    async refreshBadge() {
+      try { const r = await fetchJSON(API + '/product-suggestions/pending-count'); Alpine.store('app')._suggBadge = r.count || 0; } catch (e) {}
+    },
+    async review(x, approve) {
+      try {
+        await fetchJSON(API + '/product-suggestions/' + x.id + '/review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ approve }) });
+        toast(approve ? 'Suggestion approved' : 'Dismissed');
+        await this.load();
+      } catch (e) { toast(e.message || 'Failed', 'error'); }
+    }
+  }));
+
+  Alpine.data('googleAuthPanel', () => ({
+    f: { clientId: '', clientSecret: '', enabled: false },
+    hasSecret: false, masked: '', saving: false, msg: '', msgOk: true,    async init() { await this.load(); },
+    async load() {
+      try {
+        const r = await fetchJSON(API + '/google-auth');
+        this.f.clientId = r.clientId || '';
+        this.f.clientSecret = '';
+        this.f.enabled = !!r.enabled;
+        this.hasSecret = !!r.hasSecret;
+        this.masked = r.clientSecret || '';
+      } catch (e) { this.msg = 'Load failed: ' + e.message; this.msgOk = false; }
+    },
+    async save() {
+      this.saving = true; this.msg = '';
+      try {
+        await fetchJSON(API + '/google-auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.f) });
+        this.msg = 'Google login settings saved' + (this.f.enabled ? ' - gumagana na ang Sign in sa shop!' : ' (disabled)');
+        this.msgOk = true;
+        await this.load();
+      } catch (e) { this.msg = 'Save failed: ' + e.message; this.msgOk = false; }
+      this.saving = false;
+    }
+  }));
+
+  Alpine.data('promoBannersPanel', () => ({
+    banners: [], pointsRate: 200, loading: false, saving: false, msg: '', msgOk: true,
+    form: { id: 0, targetType: 'category', targetValue: '', sortOrder: 0, active: true, file: null },
+    async init() { await this.load(); },
+    async load() {
+      try {
+        const r = await fetchJSON(API + '/promo-banners');
+        this.banners = r.banners || [];
+        this.pointsRate = r.pointsRate || 200;
+      } catch (e) { this.banners = []; }
+    },
+    openAdd() {
+      this.form = { id: 0, targetType: 'category', targetValue: '', sortOrder: this.banners.length + 1, active: true, file: null };
+      document.getElementById('pbFile').value = '';
+    },
+    openEdit(b) {
+      this.form = { id: b.id, targetType: b.targetType, targetValue: b.targetValue, sortOrder: b.sortOrder, active: b.active, file: null };
+      document.getElementById('pbFile').value = '';
+    },
+    onFile(e) { this.form.file = e.target.files[0] || null; },
+    async save() {
+      if (!this.form.id && !this.form.file) { toast('Mag-upload ng image para sa bagong banner (o gamitin ang edit)', 'error'); return; }
+      if (this.form.targetType === 'category' && !this.form.targetValue) { toast('Ilagay ang category (at opsiyonal na search)', 'error'); return; }
+      this.saving = true; this.msg = '';
+      try {
+        const fd = new FormData();
+        if (this.form.id) fd.append('id', this.form.id);
+        fd.append('targetType', this.form.targetType);
+        fd.append('targetValue', this.form.targetValue);
+        fd.append('sortOrder', this.form.sortOrder);
+        fd.append('active', this.form.active ? 'true' : 'false');
+        if (this.form.file) fd.append('image', this.form.file);
+        const r = await fetch(API + '/promo-banners', { method: 'POST', body: fd });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || 'Save failed');
+        this.msg = 'Banner saved!';
+        this.msgOk = true;
+        await this.load();
+      } catch (e) { this.msg = e.message; this.msgOk = false; }
+      this.saving = false;
+    },
+    async remove(b) {
+      if (!confirm('Delete banner #' + b.id + '?')) return;
+      try {
+        await fetchJSON(API + '/promo-banners/' + b.id, { method: 'DELETE' });
+        await this.load();
+      } catch (e) { toast(e.message, 'error'); }
+    }
+  }));
+
   Alpine.data('shopContentPanel', () => ({
-    c: {}, loaded: false, saving: false,
+    c: {}, loaded: false, saving: false, suggestions: [],
+    async init() { await this.load(); await this.loadSuggestions(); },
     fields: [
       { k: 'hero_title', label: 'Hero Title', g: 'HERO', t: 'text' },
       { k: 'hero_subtitle', label: 'Hero Subtitle', g: 'HERO', t: 'textarea' },
@@ -1548,22 +1941,78 @@ Alpine.store('app', {
       { k: 'phone', label: 'Phone Number', g: 'CONTACT / ABOUT', t: 'text' },
       { k: 'messenger_link', label: 'Messenger Link (m.me/...)', g: 'CONTACT / ABOUT', t: 'text' },
       { k: 'facebook_link', label: 'Facebook Link', g: 'CONTACT / ABOUT', t: 'text' },
-      { k: 'about_text', label: 'About Us Text', g: 'CONTACT / ABOUT', t: 'textarea' }
+      { k: 'about_text', label: 'About Us Text', g: 'CONTACT / ABOUT', t: 'textarea' },
+      { k: 'subdivisions', label: 'Subdivisions (isang subdivision bawat linya — para sa locked picker)', g: 'DELIVERY', t: 'textarea' }
     ],
-    get groups() { return ['HERO', 'WHOLESALE', 'TRUST BADGES', 'CONTACT / ABOUT'] },
+    get groups() { return ['HERO', 'WHOLESALE', 'TRUST BADGES', 'CONTACT / ABOUT', 'DELIVERY'] },
     async load() {
-      try { this.c = await fetchJSON(API + '/dashboard/shop-content'); this.loaded = true; }
-      catch (e) { this.loaded = false; }
+      try { this.c = await fetchJSON(API + '/shop/content'); this.loaded = true; } catch (e) { this.loaded = false; }
+    },
+    async loadSuggestions() {
+      try { this.suggestions = await fetchJSON(API + '/subdivision-suggestions?status=pending'); } catch (e) { this.suggestions = []; }
+    },
+    async approveSuggestion(s) {
+      try {
+        await fetchJSON(API + '/subdivision-suggestions/' + s.id + '/approve', { method: 'POST' });
+        toast('Approved: ' + s.name + ' — nasa picker na!');
+        await this.loadSuggestions();
+        await this.load();
+      } catch (e) { toast(e.message || 'Failed', 'error'); }
+    },
+    async dismissSuggestion(s) {
+      try {
+        await fetchJSON(API + '/subdivision-suggestions/' + s.id + '/dismiss', { method: 'POST' });
+        await this.loadSuggestions();
+      } catch (e) { toast(e.message || 'Failed', 'error'); }
     },
     async save() {
       this.saving = true;
       try {
-        const r = await fetchJSON(API + '/dashboard/shop-content', {
+        const r = await fetchJSON(API + '/shop-content', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.c)
         });
         toast('Shop content saved (' + (r.saved || 0) + ' fields)');
       } catch (e) { toast('Save failed: ' + e.message, 'error'); }
       this.saving = false;
+    }
+  }));
+
+  Alpine.data('messengerBotPanel', () => ({
+    f: { pageId: '', pageToken: '', verifyToken: '', enabled: false },
+    hasToken: false, pageTokenMasked: '', webhookUrl: '',
+    saving: false, testing: false, loaded: false, msg: '', msgOk: true,
+    async load() {
+      try {
+        const r = await fetchJSON(API + '/messenger/config');
+        this.f.pageId = r.pageId || '';
+        this.f.pageToken = '';
+        this.f.verifyToken = r.verifyToken || '';
+        this.f.enabled = !!r.enabled;
+        this.hasToken = !!r.hasToken;
+        this.pageTokenMasked = r.pageToken || '';
+        this.webhookUrl = r.webhookUrl || '';
+        this.loaded = true;
+      } catch (e) { this.msg = 'Load failed: ' + e.message; this.msgOk = false; }
+    },
+    async save() {
+      this.saving = true; this.msg = '';
+      try {
+        const body = { pageId: this.f.pageId, pageToken: this.f.pageToken, verifyToken: this.f.verifyToken, enabled: this.f.enabled };
+        await fetchJSON(API + '/messenger/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        this.msg = 'Messenger bot config saved. ' + (this.hasToken || this.f.pageToken ? 'Pumunta na sa Meta webhook setup (tingnan ang SETUP GUIDE).' : '');
+        this.msgOk = true;
+        await this.load();
+      } catch (e) { this.msg = 'Save failed: ' + e.message; this.msgOk = false; }
+      this.saving = false;
+    },
+    async test() {
+      this.testing = true; this.msg = '';
+      try {
+        const r = await fetchJSON(API + '/messenger/test', { method: 'POST' });
+        this.msg = r.ok ? '✅ ' + r.detail : '❌ ' + r.detail;
+        this.msgOk = !!r.ok;
+      } catch (e) { this.msg = 'Test failed: ' + e.message; this.msgOk = false; }
+      this.testing = false;
     }
   }));
 

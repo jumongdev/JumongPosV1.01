@@ -925,5 +925,227 @@ public static class PgDatabaseHelper
             SELECT 'business', 'return, refund, ibalik, sira', 'Pwede bang mag-return o mag-refund?', '', false, 'seed'
             WHERE NOT EXISTS (SELECT 1 FROM chat_kb WHERE source = 'seed' AND question = 'Pwede bang mag-return o mag-refund?');";
         try { kbSeed.ExecuteNonQuery(); } catch { }
+
+        // Migration: Messenger bot config (Facebook/Meta Messenger API) + per-chat history
+        using var msgrMig = conn.CreateCommand();
+        msgrMig.CommandText = @"
+            CREATE TABLE IF NOT EXISTS messenger_bot (
+                id INTEGER PRIMARY KEY,
+                page_id TEXT NOT NULL DEFAULT '',
+                page_token TEXT NOT NULL DEFAULT '',
+                verify_token TEXT NOT NULL DEFAULT '',
+                enabled BOOLEAN NOT NULL DEFAULT FALSE,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            INSERT INTO messenger_bot (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+            CREATE TABLE IF NOT EXISTS messenger_convos (
+                id SERIAL PRIMARY KEY,
+                psid TEXT NOT NULL DEFAULT '',
+                page_id TEXT NOT NULL DEFAULT '',
+                history JSONB NOT NULL DEFAULT '[]',
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_messenger_convos_psid ON messenger_convos (psid)";
+        try { msgrMig.ExecuteNonQuery(); } catch { }
+
+        // Migration: customer accounts (Google sign-in) + addresses + sessions + sari-sari applications
+        using var custMig = conn.CreateCommand();
+        custMig.CommandText = @"
+            ALTER TABLE customers ADD COLUMN IF NOT EXISTS google_sub TEXT;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_google_sub ON customers (google_sub) WHERE google_sub IS NOT NULL AND google_sub <> '';
+            ALTER TABLE customers ADD COLUMN IF NOT EXISTS is_sari_sari BOOLEAN NOT NULL DEFAULT FALSE;
+            CREATE TABLE IF NOT EXISTS customer_addresses (
+                id SERIAL PRIMARY KEY,
+                customer_id INTEGER NOT NULL,
+                label TEXT NOT NULL DEFAULT '',
+                name TEXT NOT NULL DEFAULT '',
+                phone TEXT NOT NULL DEFAULT '',
+                address TEXT NOT NULL DEFAULT '',
+                is_default BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE TABLE IF NOT EXISTS customer_sessions (
+                token TEXT PRIMARY KEY,
+                customer_id INTEGER NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '30 days'
+            );
+            CREATE TABLE IF NOT EXISTS google_auth (
+                id INTEGER PRIMARY KEY,
+                client_id TEXT NOT NULL DEFAULT '',
+                client_secret TEXT NOT NULL DEFAULT '',
+                enabled BOOLEAN NOT NULL DEFAULT FALSE,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            INSERT INTO google_auth (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+            CREATE TABLE IF NOT EXISTS sari_sari_applications (
+                id SERIAL PRIMARY KEY,
+                customer_id INTEGER NOT NULL,
+                store_name TEXT NOT NULL DEFAULT '',
+                dti_file TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                reviewed_at TIMESTAMPTZ,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS idx_sari_apps_status ON sari_sari_applications (status);
+            ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS customer_id INTEGER;
+            CREATE TABLE IF NOT EXISTS customer_favorites (
+                id SERIAL PRIMARY KEY,
+                customer_id INTEGER NOT NULL,
+                product_id INTEGER NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_customer_favorites ON customer_favorites (customer_id, product_id);
+            ALTER TABLE customer_addresses ADD COLUMN IF NOT EXISTS block TEXT NOT NULL DEFAULT '';
+            ALTER TABLE customer_addresses ADD COLUMN IF NOT EXISTS lot TEXT NOT NULL DEFAULT '';
+            ALTER TABLE customer_addresses ADD COLUMN IF NOT EXISTS subdivision TEXT NOT NULL DEFAULT '';
+            ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS block TEXT NOT NULL DEFAULT '';
+            ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS lot TEXT NOT NULL DEFAULT '';
+            ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS subdivision TEXT NOT NULL DEFAULT '';
+            CREATE TABLE IF NOT EXISTS subdivision_suggestions (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL DEFAULT '',
+                customer_id INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS driver_id INTEGER;
+            ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS paid_status TEXT NOT NULL DEFAULT 'unpaid';
+            ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
+            ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ;
+            CREATE TABLE IF NOT EXISTS order_payments (
+                id SERIAL PRIMARY KEY,
+                order_id INTEGER NOT NULL,
+                driver_id INTEGER NOT NULL DEFAULT 0,
+                method TEXT NOT NULL DEFAULT 'cash',
+                amount NUMERIC NOT NULL DEFAULT 0,
+                gcash_ref TEXT NOT NULL DEFAULT '',
+                gcash_pic TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            ALTER TABLE order_payments ADD COLUMN IF NOT EXISTS remitted BOOLEAN NOT NULL DEFAULT FALSE;
+            ALTER TABLE order_payments ADD COLUMN IF NOT EXISTS remitted_at TIMESTAMPTZ;
+            ALTER TABLE order_payments ADD COLUMN IF NOT EXISTS remitted_by TEXT NOT NULL DEFAULT '';
+            ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS arrived_at TIMESTAMPTZ;
+            ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS cancelled_reason TEXT NOT NULL DEFAULT '';
+            ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS cancelled_by INTEGER;
+            ALTER TABLE customers ADD COLUMN IF NOT EXISTS qr_code TEXT;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_qr_code ON customers (qr_code) WHERE qr_code IS NOT NULL AND qr_code <> '';
+            CREATE TABLE IF NOT EXISTS order_timeline (
+                id SERIAL PRIMARY KEY,
+                order_id INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT '',
+                note TEXT NOT NULL DEFAULT '',
+                actor TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE TABLE IF NOT EXISTS order_pick_items (
+                id SERIAL PRIMARY KEY,
+                order_id INTEGER NOT NULL,
+                item_id INTEGER NOT NULL,
+                picked BOOLEAN NOT NULL DEFAULT FALSE,
+                picked_by TEXT NOT NULL DEFAULT '',
+                picked_at TIMESTAMPTZ
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_order_pick_items ON order_pick_items (order_id, item_id);
+            CREATE TABLE IF NOT EXISTS driver_shifts (
+                id SERIAL PRIMARY KEY,
+                driver_id INTEGER NOT NULL,
+                shift_date DATE NOT NULL DEFAULT CURRENT_DATE,
+                status TEXT NOT NULL DEFAULT 'open',
+                started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                ended_at TIMESTAMPTZ,
+                delivered_orders INTEGER NOT NULL DEFAULT 0,
+                cash_total NUMERIC NOT NULL DEFAULT 0,
+                gcash_total NUMERIC NOT NULL DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS ecom_shifts (
+                id SERIAL PRIMARY KEY,
+                shift_date DATE NOT NULL DEFAULT CURRENT_DATE,
+                status TEXT NOT NULL DEFAULT 'open',
+                delivered_orders INTEGER NOT NULL DEFAULT 0,
+                delivered_total NUMERIC NOT NULL DEFAULT 0,
+                cash_total NUMERIC NOT NULL DEFAULT 0,
+                gcash_total NUMERIC NOT NULL DEFAULT 0,
+                remitted_total NUMERIC NOT NULL DEFAULT 0,
+                carried_over_orders INTEGER NOT NULL DEFAULT 0,
+                closed_at TIMESTAMPTZ,
+                closed_by TEXT NOT NULL DEFAULT ''
+            );
+            INSERT INTO ecom_shifts (shift_date, status) SELECT CURRENT_DATE, 'open' WHERE NOT EXISTS (SELECT 1 FROM ecom_shifts WHERE status = 'open');
+            UPDATE customers SET qr_code = 'AS-' || UPPER(SUBSTRING(MD5(id::text || created_at::text) FROM 1 FOR 6))
+                WHERE (qr_code IS NULL OR qr_code = '') AND google_sub IS NOT NULL AND google_sub <> '';
+            CREATE TABLE IF NOT EXISTS promo_banners (
+                id SERIAL PRIMARY KEY,
+                image_url TEXT NOT NULL DEFAULT '',
+                target_type TEXT NOT NULL DEFAULT 'url',
+                target_value TEXT NOT NULL DEFAULT '',
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            ALTER TABLE master_products ADD COLUMN IF NOT EXISTS online_price NUMERIC NOT NULL DEFAULT 0;
+            CREATE TABLE IF NOT EXISTS payment_qrs (
+                id SERIAL PRIMARY KEY,
+                header TEXT NOT NULL DEFAULT '',
+                file TEXT NOT NULL DEFAULT '',
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE TABLE IF NOT EXISTS restock_requests (
+                id SERIAL PRIMARY KEY,
+                product_id INTEGER NOT NULL,
+                product_name TEXT NOT NULL DEFAULT '',
+                customer_id INTEGER NOT NULL,
+                customer_name TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                resolved_at TIMESTAMPTZ
+            );
+            CREATE INDEX IF NOT EXISTS idx_restock_requests_status ON restock_requests (status);
+            CREATE INDEX IF NOT EXISTS idx_restock_requests_product ON restock_requests (product_id);
+            CREATE TABLE IF NOT EXISTS product_suggestions (
+                id SERIAL PRIMARY KEY,
+                customer_id INTEGER NOT NULL,
+                customer_name TEXT NOT NULL DEFAULT '',
+                name TEXT NOT NULL,
+                brand TEXT NOT NULL DEFAULT '',
+                note TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                reviewed_at TIMESTAMPTZ
+            );
+            CREATE INDEX IF NOT EXISTS idx_product_suggestions_status ON product_suggestions (status);";
+        try { custMig.ExecuteNonQuery(); } catch { }
+
+        // Seed: subdivision list para sa locked delivery picker (editable sa Shop Content panel)
+        using var subSeed = conn.CreateCommand();
+        subSeed.CommandText = @"INSERT INTO shop_content (key, value) VALUES ('subdivisions', 'Pasinaya North
+Pasinaya West
+Pagsibol 1&2
+Ciudad Neuvo Phase 1
+Ciudad Neuvo Phase 2
+Ciudad Neuvo Phase 3
+Ciudad Neuvo Phase 4
+Ciudad Neuvo Phase 5
+Hills View Royal Phase 1
+Hills View Royal Phase 2
+Hills View Royal Phase 3
+Hills View Royal Phase 4
+Hills View Royal Phase 5
+Pasinaya Homes Central
+Pagsibol Village South west phase 5
+Pagsibol Village South 3B
+Pagsibol Village South 4A
+Pagsinnag Place South
+Pasinaya Homes Pasinaraw Prime Central
+Pasinaya Homes Prime North
+Pagsinag Place West
+Pagsinag Place North East
+Pasinaya Homes Hilaga
+Pagsinag Place East') ON CONFLICT (key) DO NOTHING";
+        try { subSeed.ExecuteNonQuery(); } catch { }
     }
 }
