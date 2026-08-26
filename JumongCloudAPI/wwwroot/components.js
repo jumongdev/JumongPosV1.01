@@ -486,10 +486,22 @@ Alpine.store('app', {
       if (tb && typeof MutationObserver !== 'undefined') {
         new MutationObserver(() => setTimeout(() => this.watchThumbs(), 60)).observe(tb, { childList: true, subtree: true });
       }
+      if (!this._thumbScrollBound) {
+        this._thumbScrollBound = () => setTimeout(() => this.watchThumbs(), 80);
+        window.addEventListener('scroll', this._thumbScrollBound, { passive: true });
+        setTimeout(() => this.watchThumbs(), 200);
+      }
     },
     // Lazy image thumbnails - list endpoint is noImages=true (perf), so fetch per-row on demand (IO-gated, cached)
     watchThumbs() {
       const els = document.querySelectorAll('#masterTable td[data-tid]');
+      // Direct near-viewport load first (scroll fallback - IO alone proved unreliable in the shop too)
+      const vh = window.innerHeight;
+      els.forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.top < vh + 600 && r.bottom > -600) this.loadThumb(Number(el.dataset.tid));
+      });
+      if (typeof IntersectionObserver === 'undefined') return;
       if (!this._thumbObs) {
         this._thumbObs = new IntersectionObserver(entries => {
           entries.forEach(en => { if (en.isIntersecting) this.loadThumb(Number(en.target.dataset.tid)); });
