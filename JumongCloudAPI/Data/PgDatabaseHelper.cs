@@ -1119,7 +1119,39 @@ public static class PgDatabaseHelper
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 reviewed_at TIMESTAMPTZ
             );
-            CREATE INDEX IF NOT EXISTS idx_product_suggestions_status ON product_suggestions (status);";
+            CREATE INDEX IF NOT EXISTS idx_product_suggestions_status ON product_suggestions (status);
+            CREATE TABLE IF NOT EXISTS promo_groups (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL DEFAULT '',
+                buy_qty INTEGER NOT NULL DEFAULT 0,
+                free_qty INTEGER NOT NULL DEFAULT 1,
+                free_product_id INTEGER NOT NULL DEFAULT 0,
+                active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE TABLE IF NOT EXISTS promo_group_items (
+                id SERIAL PRIMARY KEY,
+                promo_group_id INTEGER NOT NULL REFERENCES promo_groups(id) ON DELETE CASCADE,
+                product_id INTEGER NOT NULL,
+                slot INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_promo_group_items_group ON promo_group_items (promo_group_id);
+            CREATE TABLE IF NOT EXISTS promo_free_queue (
+                id SERIAL PRIMARY KEY,
+                order_id INTEGER NOT NULL DEFAULT 0,
+                order_no TEXT NOT NULL DEFAULT '',
+                customer_id INTEGER NOT NULL DEFAULT 0,
+                customer_name TEXT NOT NULL DEFAULT '',
+                promo_group_id INTEGER NOT NULL DEFAULT 0,
+                product_id INTEGER NOT NULL DEFAULT 0,
+                product_name TEXT NOT NULL DEFAULT '',
+                qty INTEGER NOT NULL DEFAULT 1,
+                status TEXT NOT NULL DEFAULT 'queued',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                processed_at TIMESTAMPTZ
+            );
+            CREATE INDEX IF NOT EXISTS idx_promo_free_queue_status ON promo_free_queue (status);";
         try { custMig.ExecuteNonQuery(); } catch { }
 
         // Seed: subdivision list para sa locked delivery picker (editable sa Shop Content panel)

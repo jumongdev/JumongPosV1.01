@@ -108,7 +108,9 @@ tailwind.config = {
             { id:'msgr-bot', icon:'🤖', label:'Messenger Bot' },
             { id:'sari-sari', icon:'🏪', label:'Sari-Sari Apps' },
             { id:'restock-requests', icon:'🚨', label:'Restock Requests' },
-            { id:'product-suggestions', icon:'💡', label:'Product Suggestions' }
+            { id:'product-suggestions', icon:'💡', label:'Product Suggestions' },
+            { id:'promo-groups', icon:'🎁', label:'Promo Groups' },
+            { id:'promo-free-queue', icon:'⏳', label:'Free Item Queue' }
         ]},
         { id:'shop', icon:'🛍️', label:'ONLINE SHOP' },
         { id:'grp-settings', icon:'⚙️', label:'SETTINGS', items:[
@@ -193,8 +195,8 @@ tailwind.config = {
             <span class="text-lg shrink-0" x-text="item.icon"></span>
             <span class="nav-label text-xs" x-show="$store.app._sidebarOpen" x-text="item.label"></span>
             <span class="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
-              x-show="(item.id==='online-orders' && $store.app._shopBadge > 0) || (item.id==='ai-kb' && $store.app._kbBadge > 0) || (item.id==='sari-sari' && $store.app._ssBadge > 0) || (item.id==='restock-requests' && $store.app._restockBadge > 0) || (item.id==='product-suggestions' && $store.app._suggBadge > 0)"
-              x-text="item.id==='online-orders' ? $store.app._shopBadge : item.id==='ai-kb' ? $store.app._kbBadge : item.id==='sari-sari' ? $store.app._ssBadge : item.id==='restock-requests' ? $store.app._restockBadge : $store.app._suggBadge"></span>
+              x-show="(item.id==='online-orders' && $store.app._shopBadge > 0) || (item.id==='ai-kb' && $store.app._kbBadge > 0) || (item.id==='sari-sari' && $store.app._ssBadge > 0) || (item.id==='restock-requests' && $store.app._restockBadge > 0) || (item.id==='product-suggestions' && $store.app._suggBadge > 0) || (item.id==='promo-free-queue' && $store.app._promoQBadge > 0)"
+              x-text="item.id==='online-orders' ? $store.app._shopBadge : item.id==='ai-kb' ? $store.app._kbBadge : item.id==='sari-sari' ? $store.app._ssBadge : item.id==='restock-requests' ? $store.app._restockBadge : item.id==='product-suggestions' ? $store.app._suggBadge : $store.app._promoQBadge"></span>
           </a>
         </div>
       </template>
@@ -2428,6 +2430,123 @@ tailwind.config = {
             </div>
           </template>
           <p x-show="!data.length" class="text-xs text-center text-gray-400 dark:text-[#7878aa] py-8">Walang suggestion sa filter na ito.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROMO GROUPS SECTION                                          -->
+    <div x-show="$store.app.section === 'promo-groups'" x-transition.opacity>
+      <div x-data="promoGroupsPanel" class="space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">🎁 Promo Groups <span class="text-[10px] text-gray-400 dark:text-[#7878aa] font-normal">(buy X get free — combine qty ng items, libre ang napiling product)</span></h3>
+          <div class="flex items-center gap-2">
+            <button @click="newGroup()" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">+ NEW GROUP</button>
+            <button @click="load()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">REFRESH</button>
+          </div>
+        </div>
+        <div x-show="msg" x-transition.opacity class="text-xs px-4 py-3 rounded-lg border" :class="msgOk ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'" x-text="msg"></div>
+
+        <!-- Group form -->
+        <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl p-4 space-y-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">PROMO NAME</label>
+              <input x-model="form.name" type="text" placeholder="hal. Mismo 60+1" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+            </div>
+            <div>
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BUY (kabuuang qty ng lahat ng items)</label>
+              <input x-model.number="form.buyQty" type="number" min="1" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+            </div>
+          </div>
+          <div class="space-y-2">
+            <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block">GROUP ITEMS</label>
+            <template x-for="(it, i) in form.items" :key="i">
+              <div class="flex items-center gap-2">
+                <span class="text-[11px] font-bold text-gray-400 w-6" x-text="(i + 1) + '.'"></span>
+                <select x-model.number="it.productId" class="flex-1 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                  <option value="0">-- Pumili ng item --</option>
+                  <template x-for="p in products" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
+                </select>
+                <button @click="removeItem(i)" x-show="form.items.length > 2" class="text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg p-1.5" title="Remove item">✕</button>
+              </div>
+            </template>
+            <button @click="addItem()" class="text-[11px] px-3 py-1.5 rounded-lg bg-violet-600 text-white font-medium hover:bg-violet-700">+ ADD ITEM</button>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">GET FREE (ikaw ang pipili)</label>
+              <select x-model.number="form.freeProductId" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                <option value="0">-- Pumili ng free item --</option>
+                <template x-for="it in selectedItems()" :key="it.productId"><option :value="it.productId" x-text="productName(it.productId)"></option></template>
+              </select>
+            </div>
+            <div>
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">FREE QTY (ilan ang libre)</label>
+              <input x-model.number="form.freeQty" type="number" min="1" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+            </div>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-slate-300">
+              <input type="checkbox" x-model="form.active" class="w-4 h-4 accent-emerald-600"> Active
+            </label>
+            <div class="flex items-center gap-2">
+              <button @click="newGroup()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CLEAR</button>
+              <button @click="save()" :disabled="saving" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 disabled:opacity-50" x-text="saving ? 'SAVING...' : (form.id ? 'UPDATE GROUP' : 'SAVE GROUP')"></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Group list -->
+        <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+          <template x-for="g in groups" :key="g.id">
+            <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-[#222255] last:border-0">
+              <span class="text-lg shrink-0">🎁</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-bold text-gray-800 dark:text-slate-200 truncate" x-text="g.name"></p>
+                <p class="text-[11px] text-gray-500 dark:text-[#7878aa] truncate" x-text="'Items: ' + (g.items || []).map(x => x.name).join(' + ')"></p>
+                <p class="text-[11px] text-gray-500 dark:text-[#7878aa]" x-text="'Buy ' + g.buyQty + ' (total) → FREE ' + g.freeQty + ' x ' + (g.freeName || '')"></p>
+                <span class="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full" :class="g.active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'" x-text="g.active ? 'ACTIVE' : 'OFF'"></span>
+              </div>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button @click="openEdit(g)" class="text-[10px] px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">EDIT</button>
+                <button @click="del(g)" class="text-[10px] px-3 py-1.5 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700">DEL</button>
+              </div>
+            </div>
+          </template>
+          <p x-show="!groups.length" class="text-xs text-center text-gray-400 dark:text-[#7878aa] py-8">Wala pang promo group. Gumawa ng isa gamit ang form sa itaas.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- FREE ITEM QUEUE SECTION                                        -->
+    <div x-show="$store.app.section === 'promo-free-queue'" x-transition.opacity>
+      <div x-data="promoFreeQueuePanel" class="space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">⏳ Free Item Queue <span class="text-[10px] text-gray-400 dark:text-[#7878aa] font-normal">(libreng item na naka-queue kasi walang stock nung nag-order — i-PROCESS kapag may stock na)</span></h3>
+          <div class="flex items-center gap-2">
+            <div class="flex rounded-lg overflow-hidden border border-gray-200 dark:border-[#222255]">
+              <button @click="setFilter('queued')" class="text-xs px-3 py-2" :class="filter === 'queued' ? 'bg-amber-500 text-white font-semibold' : 'bg-gray-50 dark:bg-[#181848] text-gray-500 dark:text-[#7878aa]'">QUEUED</button>
+              <button @click="setFilter('processed')" class="text-xs px-3 py-2" :class="filter === 'processed' ? 'bg-emerald-600 text-white font-semibold' : 'bg-gray-50 dark:bg-[#181848] text-gray-500 dark:text-[#7878aa]'">PROCESSED</button>
+              <button @click="setFilter('')" class="text-xs px-3 py-2" :class="filter === '' ? 'bg-cyan-600 text-white font-semibold' : 'bg-gray-50 dark:bg-[#181848] text-gray-500 dark:text-[#7878aa]'">ALL</button>
+            </div>
+            <button @click="load()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">REFRESH</button>
+          </div>
+        </div>
+        <div x-show="loading" class="text-xs text-gray-400">Loading...</div>
+        <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+          <template x-for="x in rows" :key="x.id">
+            <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-[#222255] last:border-0">
+              <span class="text-lg shrink-0">🎁</span>
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-bold text-gray-800 dark:text-slate-200 truncate" x-text="x.productName + ' x' + x.qty"></p>
+                <p class="text-[11px] text-gray-500 dark:text-[#7878aa] truncate" x-text="(x.orderNo || ('#' + x.orderId)) + ' · ' + (x.customerName || '')"></p>
+                <p class="text-[10px] text-gray-400 dark:text-[#7878aa]" x-text="x.createdAt ? new Date(x.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''"></p>
+              </div>
+              <span class="text-[10px] px-2 py-0.5 rounded-full shrink-0" :class="x.status === 'queued' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'" x-text="x.status.toUpperCase()"></span>
+              <button x-show="x.status === 'queued'" @click="process(x)" class="text-[10px] px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 shrink-0">✔ PROCESS</button>
+            </div>
+          </template>
+          <p x-show="!rows.length" class="text-xs text-center text-gray-400 dark:text-[#7878aa] py-8">Walang laman ang queue.</p>
         </div>
       </div>
     </div>

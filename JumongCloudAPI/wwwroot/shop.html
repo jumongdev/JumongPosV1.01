@@ -695,6 +695,42 @@ const SORTS = [
 ];
 let sortState = 'featured';
 let gridUnitSel = {};
+let promoGroups = [];
+async function loadPromoGroups() {
+  try {
+    const r = await fetchT(API + '/dashboard/promo-groups?active=true', {}, 10000);
+    promoGroups = await r.json();
+  } catch (e) { promoGroups = []; }
+}
+// Returns {group, freeCount, freeProduct} kapag eligible ang cart, o null
+function promoInfo() {
+  if (!promoGroups.length) return null;
+  for (const g of promoGroups) {
+    const pids = (g.items || []).map(x => x.productId);
+    let totalPcs = 0;
+    for (const c of cart) {
+      if (!pids.includes(c.id)) continue;
+      const p = catalog.find(x => x.id === c.id);
+      const u = (p && p.units || []).find(x => x.unitName === c.unitName);
+      totalPcs += c.qty * (u && u.qtyPerUnit > 0 ? Number(u.qtyPerUnit) : 1);
+    }
+    const freeCount = Math.floor(totalPcs / (g.buyQty || 1)) * (g.freeQty || 1);
+    if (freeCount > 0) {
+      const freeProduct = catalog.find(x => x.id === g.freeProductId);
+      if (freeProduct) return { group: g, freeCount, freeProduct };
+    }
+  }
+  return null;
+}
+function promoLineHtml() {
+  const pr = promoInfo();
+  if (!pr) return '';
+  const name = pr.freeProduct.name;
+  const short = name.length > 40 ? name.slice(0, 37) + '…' : name;
+  return '<div class="flex items-center justify-between gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2">' +
+    '<p class="text-[11px] font-bold text-emerald-700">🎁 FREE (' + pr.group.buyQty + '+' + pr.group.freeQty + '): ' + short + ' ×' + pr.freeCount + '</p>' +
+    '<span class="text-[11px] font-black text-emerald-700">₱0.00</span></div>';
+}
 function pickGridUnit(id, name) {
   gridUnitSel[id] = name;
   renderGrid();
@@ -1232,6 +1268,12 @@ function renderCart() {
       '</div>' +
     '</div>';
   }).join('');
+  const promoLine = promoLineHtml();
+  if (promoLine) {
+    const ph = document.createElement('div');
+    ph.innerHTML = promoLine;
+    wrap.appendChild(ph.firstElementChild);
+  }
   document.getElementById('cartSubtotal').textContent = fmt(cartTotal());
   const fee = feeFor(cartTotal());
   document.getElementById('cartFee').textContent = fee > 0 ? fmt(fee) : 'FREE';
@@ -1275,6 +1317,7 @@ function openCheckout() {
     const price = Number(u.price);
     return '<div class="flex justify-between gap-2"><span class="text-stone-500 truncate">' + (p ? p.name.slice(0, 34) + (p.name.length > 34 ? '…' : '') : '') + ' × ' + c.qty + ' ' + (u.unitName || '') + '</span><span class="font-semibold shrink-0">' + fmt(price * c.qty) + '</span></div>';
   }).join('') +
+    promoLineHtml() +
     '<div class="flex justify-between pt-1.5"><span class="text-stone-500">Delivery Fee</span><span class="font-semibold">' + (checkoutFee > 0 ? fmt(checkoutFee) : '<span class="text-emerald-600 font-bold">FREE</span>') + '</span></div>';
   document.getElementById('coTotal').textContent = fmt(sub + checkoutFee);
   closeCart();
@@ -1328,6 +1371,9 @@ async function placeOrder() {
     document.getElementById('okOrderNo').textContent = j.orderNo;
     document.getElementById('okPayment').textContent = 'Cash on Delivery';
     document.getElementById('okTotal').textContent = 'Total: ' + fmt(j.total);
+    if (j.promo && j.promo.freeItem) {
+      document.getElementById('okPayment').textContent += ' · 🎁 FREE: ' + j.promo.freeItem + (j.promo.queued ? ' (QUEUED — i-claim kapag may stock na)' : ' (kasama sa order)');
+    }
     closeCheckout();
     cart = [];
     saveCart();
@@ -1472,6 +1518,7 @@ renderTiles();
 updateBadge();
 loadMe();
 loadBanners();
+loadPromoGroups();
 switchView(sessionStorage.getItem('shop_view') === 'catalog' ? 'catalog' : 'home');
 // PWA - installable app
 if ('serviceWorker' in navigator) {

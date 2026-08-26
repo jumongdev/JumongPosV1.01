@@ -37,13 +37,14 @@ Alpine.store('app', {
     _ssBadge: 0,
     _restockBadge: 0,
     _suggBadge: 0,
+    _promoQBadge: 0,
     groupOpen: {},
     groupParents: {
       'ai-chat': 'grp-ai', 'ai-kb': 'grp-ai',
       'health': 'grp-system', 'suspect1pc': 'grp-system',
       'rpt-sales': 'grp-reports', 'rpt-invcost': 'grp-reports', 'rpt-shifts': 'grp-reports', 'analytics': 'grp-reports', 'rpt-invval': 'grp-reports',
       'grp-reports': 'grp-pos', 'products': 'grp-pos', 'grp-inv': 'grp-pos',
-      'online-orders': 'grp-ecom', 'shop-content': 'grp-ecom', 'msgr-bot': 'grp-ecom', 'sari-sari': 'grp-ecom', 'promo-banners': 'grp-ecom', 'restock-requests': 'grp-ecom', 'product-suggestions': 'grp-ecom',
+      'online-orders': 'grp-ecom', 'shop-content': 'grp-ecom', 'msgr-bot': 'grp-ecom', 'sari-sari': 'grp-ecom', 'promo-banners': 'grp-ecom', 'restock-requests': 'grp-ecom', 'product-suggestions': 'grp-ecom', 'promo-groups': 'grp-ecom', 'promo-free-queue': 'grp-ecom',
       'st-receiving': 'grp-inv', 'st-trail': 'grp-inv', 'st-transfer': 'grp-inv',
       'settings': 'grp-settings', 'pospromo': 'grp-settings', 'posqr': 'grp-settings', 'branding': 'grp-settings', 'google-auth': 'grp-settings'
     },
@@ -1909,6 +1910,78 @@ Alpine.store('app', {
         toast(approve ? 'Suggestion approved' : 'Dismissed');
         await this.load();
       } catch (e) { toast(e.message || 'Failed', 'error'); }
+    }
+  }));
+
+  Alpine.data('promoGroupsPanel', () => ({
+    groups: [], products: [], loading: true, saving: false, msg: '', msgOk: true,
+    form: { id: 0, name: '', buyQty: 60, freeQty: 1, freeProductId: 0, active: true, items: [{ productId: 0 }, { productId: 0 }, { productId: 0 }] },
+    async init() { await this.load(); },
+    async load() {
+      this.loading = true;
+      try { this.groups = await fetchJSON(API + '/promo-groups'); } catch (e) { this.groups = []; }
+      if (!this.products.length) {
+        try { this.products = await fetchJSON(API + '/products/master?noImages=true'); } catch (e) { this.products = []; }
+      }
+      this.loading = false;
+    },
+    addItem() { this.form.items.push({ productId: 0 }); },
+    removeItem(i) { if (this.form.items.length > 2) this.form.items.splice(i, 1); },
+    openEdit(g) {
+      this.form = { id: g.id, name: g.name, buyQty: g.buyQty, freeQty: g.freeQty, freeProductId: g.freeProductId, active: g.active, items: [] };
+      (g.items || []).forEach(x => this.form.items.push({ productId: x.productId }));
+      while (this.form.items.length < 3) this.form.items.push({ productId: 0 });
+    },
+    newGroup() { this.form = { id: 0, name: '', buyQty: 60, freeQty: 1, freeProductId: 0, active: true, items: [{ productId: 0 }, { productId: 0 }, { productId: 0 }] }; },
+    productName(id) { const p = this.products.find(x => x.id === id); return p ? p.name : ''; },
+    selectedItems() { return this.form.items.filter(x => x.productId > 0); },
+    async save() {
+      const items = this.selectedItems();
+      if (!this.form.name || items.length < 2 || this.form.buyQty <= 0 || this.form.freeQty <= 0 || !this.form.freeProductId) {
+        this.msg = 'Kumpletuhin: pangalan, 2+ items, buy qty, free qty, at free product'; this.msgOk = false; return;
+      }
+      this.saving = true; this.msg = '';
+      try {
+        const body = { name: this.form.name, buyQty: Number(this.form.buyQty), freeQty: Number(this.form.freeQty), freeProductId: this.form.freeProductId, active: this.form.active, items: items.map((x, i) => ({ productId: x.productId, slot: i })) };
+        const url = this.form.id ? API + '/promo-groups/' + this.form.id : API + '/promo-groups';
+        const r = await fetch(url, { method: this.form.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || 'Failed'); }
+        this.msg = 'Promo group saved!'; this.msgOk = true;
+        this.form.id = 0;
+        await this.load();
+      } catch (e) { this.msg = 'Save failed: ' + e.message; this.msgOk = false; }
+      this.saving = false;
+    },
+    async del(g) {
+      if (!confirm('Delete promo group "' + g.name + '"?')) return;
+      try { await fetchJSON(API + '/promo-groups/' + g.id, { method: 'DELETE' }); await this.load(); } catch (e) { toast(e.message, 'error'); }
+    }
+  }));
+
+  Alpine.data('promoFreeQueuePanel', () => ({
+    rows: [], filter: 'queued', loading: false,
+    async init() { await this.load(); await this.refreshBadge(); },
+    setFilter(f) { this.filter = f; this.load(); },
+    async load() {
+      this.loading = true;
+      try {
+        const url = API + '/promo-free-queue' + (this.filter ? '?status=' + this.filter : '');
+        this.rows = await fetchJSON(url);
+        if (this.filter !== 'queued') await this.refreshBadge();
+      } catch (e) { this.rows = []; }
+      this.loading = false;
+    },
+    async refreshBadge() {
+      try { const r = await fetchJSON(API + '/promo-free-queue?status=queued'); Alpine.store('app')._promoQBadge = (r || []).length; } catch (e) {}
+    },
+    async process(x) {
+      try {
+        const r = await fetch(API + '/promo-free-queue/' + x.id + '/process', { method: 'POST' });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) { toast(j.error || 'Process failed', 'error'); return; }
+        toast('PROCESSED: ' + j.productName + ' x' + j.qty, 'success');
+        await this.load(); await this.refreshBadge();
+      } catch (e) { toast('Process failed: ' + e.message, 'error'); }
     }
   }));
 
