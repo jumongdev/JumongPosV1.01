@@ -705,6 +705,8 @@
     let selectedCustomer = null;
     let pendingPay = null;
     let paperWidth = 80;
+    // Global text-fit helper for thermal printing (used by credit-pay voucher + all print builders).
+    const fit = s => { const str = String(s); const w = paperWidth <= 50 ? 32 : 48; return str.length > w ? str.slice(0, w - 1) + '~' : str; };
     let invMode = 'all';
     let invRows = [];
     let invPage = 1;
@@ -1939,12 +1941,16 @@
           openCreditBreakdown(customerId);
         }
         if (IN_APP && AndroidPrinter.isConnected()) {
-          const bal = Number(j.balance || 0);
-          const t = '<<CENTER>>JUMONG POS\n<<CENTER>>' + fit(session.storeName || '') + '\n<<CENTER>>─── CREDIT PAYMENT ───\n' +
-            (inv ? padDL('Invoice', inv) : '') + padDL('Customer', j.customerName) + padDL('Method', method) + padDL('Amount', '₱' + amt.toFixed(2)) +
-            padDL('Remaining', '₱' + bal.toFixed(2)) + '\n<<CENTER>>' + new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) + '\n<<CENTER>>THANK YOU!\n';
-          const pr = AndroidPrinter.print(t);
-          if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
+          try {
+            const bal = Number(j.balance || 0);
+            const t = '<<CENTER>>JUMONG POS\n<<CENTER>>' + fit(session.storeName || '') + '\n<<CENTER>>─── CREDIT PAYMENT ───\n' +
+              (inv ? padDL('Invoice', inv) : '') + padDL('Customer', j.customerName) + padDL('Method', method) + padDL('Amount', '₱' + amt.toFixed(2)) +
+              padDL('Remaining', '₱' + bal.toFixed(2)) + '\n<<CENTER>>' + new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) + '\n<<CENTER>>THANK YOU!\n';
+            const pr = AndroidPrinter.print(t);
+            if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
+          } catch (pe) {
+            toast('Payment OK, pero hindi na-print ang voucher: ' + pe.message, 'error');
+          }
         }
       } catch (e) {
         toast('Failed: ' + e.message, 'error');
