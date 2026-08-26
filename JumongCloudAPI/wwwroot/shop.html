@@ -181,7 +181,7 @@
 </div><!-- /catalogView -->
 
 <!-- ===== ABOUT / WHY US ===== -->
-<section class="max-w-6xl mx-auto px-4 mt-10">
+<section id="aboutSec" class="max-w-6xl mx-auto px-4 mt-10">
   <div class="rounded-2xl bg-white card-shadow p-6">
     <p class="font-black text-stone-900 mb-1.5">Why Shop With Andengs?</p>
     <p class="text-sm text-stone-600 leading-relaxed" id="aboutText">Andengs Superstore is a trusted local supermarket serving households and sari-sari stores with authentic products, fast delivery and easy pickup.</p>
@@ -194,7 +194,7 @@
 </section>
 
 <!-- ===== FOOTER ===== -->
-<footer class="bg-stone-900 text-stone-300 mt-10">
+<footer id="siteFooter" class="bg-stone-900 text-stone-300 mt-10">
   <div class="max-w-6xl mx-auto px-4 py-10 grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
     <div>
       <p class="font-black text-white mb-2">Andengs Superstore</p>
@@ -1092,6 +1092,11 @@ function switchView(v) {
   home.classList.toggle('hidden', v !== 'home');
   cat.classList.toggle('hidden', v !== 'catalog');
   if (sr) sr.classList.toggle('hidden', v !== 'catalog');
+  // About + footer: Home view lang (sagabal sa catalog scroll)
+  const ab = document.getElementById('aboutSec');
+  const ft = document.getElementById('siteFooter');
+  if (ab) ab.classList.toggle('hidden', v !== 'home');
+  if (ft) ft.classList.toggle('hidden', v !== 'home');
   if (v === 'catalog') watchImages();
   window.scrollTo({ top: 0 });
 }
