@@ -1090,7 +1090,7 @@ tailwind.config = {
             <template x-if="loading"><div class="flex justify-center py-8"><span class="spinner"></span></div></template>
             <template x-if="!loading && filtered.length===0"><div class="text-center py-8 text-gray-400">No products</div></template>
             <template x-if="filtered.length > 0">
-              <table class="w-full text-xs">
+              <table id="masterTable" class="w-full text-xs">
                 <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
                   <th class="text-center px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">ID</th>
                   <th class="text-center px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Image</th>
@@ -1114,7 +1114,10 @@ tailwind.config = {
                   <template x-for="(x,i) in filtered" :key="i">
                     <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                       <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.id"></td>
-                      <td class="px-3 py-2 text-center"><img x-show="x.imageData" :src="x.imageData" class="w-8 h-8 object-cover rounded mx-auto" :alt="x.name"><span x-show="!x.imageData" class="inline-block w-8 h-8 rounded bg-gray-100 dark:bg-[#181848] text-[8px] text-gray-400 flex items-center justify-center mx-auto">IMG</span></td>
+                      <td class="px-3 py-2 text-center" :data-tid="x.id">
+                        <img x-show="thumbs[x.id] && thumbs[x.id].startsWith('data:')" :src="thumbs[x.id]" class="w-8 h-8 object-cover rounded mx-auto" :alt="x.name">
+                        <span x-show="!thumbs[x.id] || !thumbs[x.id].startsWith('data:')" class="inline-block w-8 h-8 rounded bg-gray-100 dark:bg-[#181848] text-[8px] text-gray-400 flex items-center justify-center mx-auto">IMG</span>
+                      </td>
                       <td class="px-3 py-2 font-medium" :class="x.isActive === false ? 'line-through text-gray-400' : ''" x-text="x.name"></td>
                       <td class="px-3 py-2 text-center"><span x-show="x.isActive === false" class="text-[10px] font-bold px-2 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">INACTIVE</span><span x-show="x.isActive !== false" class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">ACTIVE</span></td>
                       <td class="px-3 py-2 text-center"><input type="checkbox" :checked="x.sellOnline !== false" @change="toggleFlag(x, 'sellOnline', $event.target.checked)" class="w-3.5 h-3.5 accent-cyan-600" title="Displayed in online shop"></td>

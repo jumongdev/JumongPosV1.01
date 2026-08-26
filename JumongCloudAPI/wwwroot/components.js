@@ -477,7 +477,33 @@ Alpine.store('app', {
   /* ΓöÇΓöÇ Master Products ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('masterProducts', () => ({
     d: [], loading: true, search: '', catFilter: '', status: 'active', stockTotals: {}, stockTotalsByName: {},
-    async init() { window.addEventListener('load-products', () => this.load()); if (Alpine.store('app').section === 'products') await this.load() },
+    thumbs: {}, _thumbObs: null,
+    async init() {
+      window.addEventListener('load-products', () => this.load());
+      if (Alpine.store('app').section === 'products') await this.load();
+      const tb = document.querySelector('#masterTable tbody');
+      if (tb && typeof MutationObserver !== 'undefined') {
+        new MutationObserver(() => setTimeout(() => this.watchThumbs(), 60)).observe(tb, { childList: true, subtree: true });
+      }
+    },
+    // Lazy image thumbnails - list endpoint is noImages=true (perf), so fetch per-row on demand (IO-gated, cached)
+    watchThumbs() {
+      const els = document.querySelectorAll('#masterTable td[data-tid]');
+      if (!this._thumbObs) {
+        this._thumbObs = new IntersectionObserver(entries => {
+          entries.forEach(en => { if (en.isIntersecting) this.loadThumb(Number(en.target.dataset.tid)); });
+        }, { rootMargin: '400px' });
+      }
+      els.forEach(el => this._thumbObs.observe(el));
+    },
+    async loadThumb(id) {
+      if (this.thumbs[id] !== undefined) return;
+      this.thumbs[id] = 'loading';
+      try {
+        const r = await fetchJSON(API + '/products/master/' + id);
+        this.thumbs[id] = (r.product && r.product.imageData) || '';
+      } catch (e) { this.thumbs[id] = ''; }
+    },
     async load(force) {
       if (!force) {
         const c = Alpine.store('app').cache.master;
@@ -490,6 +516,7 @@ Alpine.store('app', {
       } catch (e) { this.d = [] }
       this.loading = false;
       this.loadTotals();
+      setTimeout(() => this.watchThumbs(), 100);
     },
     async loadTotals() {
       const c = Alpine.store('app').cache.stockTotals;
