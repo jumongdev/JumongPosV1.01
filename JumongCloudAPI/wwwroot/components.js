@@ -1931,6 +1931,25 @@ Alpine.store('app', {
       if (!s) return [];
       return this.products.filter(p => (p.name || '').toLowerCase().includes(s) || (p.barcode || '').includes(s)).slice(0, 20);
     },
+    // Resolve typed text -> product id (exact name, o kaya unique na match)
+    resolveProduct(q) {
+      const s = (q || '').trim().toLowerCase();
+      if (!s) return 0;
+      const exact = this.products.find(p => (p.name || '').toLowerCase() === s);
+      if (exact) return exact.id;
+      const matches = this.products.filter(p => (p.name || '').toLowerCase().includes(s));
+      return matches.length === 1 ? matches[0].id : 0;
+    },
+    pickFirst(it) {
+      const r = this.searchResults(it.q);
+      if (r.length) { it.productId = r[0].id; it.q = r[0].name; }
+      it.open = false;
+    },
+    pickFreeFirst() {
+      const r = this.searchResults(this.freeQ);
+      if (r.length) { this.form.freeProductId = r[0].id; this.freeQ = r[0].name; }
+      this.freeOpen = false;
+    },
     addItem() { this.form.items.push({ productId: 0, q: '', open: false }); },
     removeItem(i) { if (this.form.items.length > 2) this.form.items.splice(i, 1); },
     openEdit(g) {
@@ -1947,9 +1966,12 @@ Alpine.store('app', {
     productName(id) { const p = this.products.find(x => x.id === id); return p ? p.name : ''; },
     selectedItems() { return this.form.items.filter(x => x.productId > 0); },
     async save() {
+      // Auto-resolve ang mga nai-type na pangalan (exact o unique match) — para hindi ma-reject kahit hindi nag-click sa list
+      this.form.items.forEach(it => { if (!it.productId) it.productId = this.resolveProduct(it.q); });
+      if (!this.form.freeProductId) this.form.freeProductId = this.resolveProduct(this.freeQ);
       const items = this.selectedItems();
       if (!this.form.name || items.length < 2 || this.form.buyQty <= 0 || this.form.freeQty <= 0 || !this.form.freeProductId) {
-        this.msg = 'Kumpletuhin: pangalan, 2+ items, buy qty, free qty, at free product'; this.msgOk = false; return;
+        this.msg = 'Kumpletuhin: pangalan, 2+ items, buy qty, free qty, at free product — siguraduhing NAPILI mula sa listahan (i-type at pindutin ang result, o Enter)'; this.msgOk = false; return;
       }
       this.saving = true; this.msg = '';
       try {
