@@ -2459,14 +2459,19 @@ tailwind.config = {
             </div>
           </div>
           <div class="space-y-2">
-            <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block">GROUP ITEMS</label>
+            <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block">GROUP ITEMS <span class="text-gray-400">(i-type para maghanap)</span></label>
             <template x-for="(it, i) in form.items" :key="i">
               <div class="flex items-center gap-2">
                 <span class="text-[11px] font-bold text-gray-400 w-6" x-text="(i + 1) + '.'"></span>
-                <select x-model.number="it.productId" class="flex-1 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                  <option value="0">-- Pumili ng item --</option>
-                  <template x-for="p in products" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
-                </select>
+                <div class="relative flex-1">
+                  <input x-model="it.q" @focus="it.open = true" @input="it.open = true" @click.outside="it.open = false" type="text" placeholder="Search product..." class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                  <div x-show="it.open" class="absolute z-20 left-0 right-0 top-full mt-1 bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-lg shadow-xl max-h-52 overflow-y-auto">
+                    <template x-for="p in searchResults(it.q)" :key="p.id">
+                      <button @click="it.productId = p.id; it.q = p.name; it.open = false" class="block w-full text-left px-3 py-1.5 text-[11px] hover:bg-violet-50 dark:hover:bg-[#181848] truncate" x-text="p.name"></button>
+                    </template>
+                    <p x-show="!searchResults(it.q).length" class="px-3 py-2 text-[11px] text-gray-400">Walang match — i-type pa</p>
+                  </div>
+                </div>
                 <button @click="removeItem(i)" x-show="form.items.length > 2" class="text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg p-1.5" title="Remove item">✕</button>
               </div>
             </template>
@@ -2474,11 +2479,16 @@ tailwind.config = {
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">GET FREE (ikaw ang pipili)</label>
-              <select x-model.number="form.freeProductId" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                <option value="0">-- Pumili ng free item --</option>
-                <template x-for="it in selectedItems()" :key="it.productId"><option :value="it.productId" x-text="productName(it.productId)"></option></template>
-              </select>
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">GET FREE <span class="text-gray-400">(lahat ng items — i-type para maghanap)</span></label>
+              <div class="relative">
+                <input x-model="freeQ" @focus="freeOpen = true" @input="freeOpen = true" @click.outside="freeOpen = false" type="text" placeholder="Search free product..." class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                <div x-show="freeOpen" class="absolute z-20 left-0 right-0 top-full mt-1 bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-lg shadow-xl max-h-52 overflow-y-auto">
+                  <template x-for="p in searchResults(freeQ)" :key="p.id">
+                    <button @click="form.freeProductId = p.id; freeQ = p.name; freeOpen = false" class="block w-full text-left px-3 py-1.5 text-[11px] hover:bg-violet-50 dark:hover:bg-[#181848] truncate" x-text="p.name"></button>
+                  </template>
+                  <p x-show="!searchResults(freeQ).length" class="px-3 py-2 text-[11px] text-gray-400">Walang match — i-type pa</p>
+                </div>
+              </div>
             </div>
             <div>
               <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">FREE QTY (ilan ang libre)</label>

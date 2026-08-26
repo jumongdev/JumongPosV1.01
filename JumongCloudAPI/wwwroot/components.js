@@ -1915,7 +1915,8 @@ Alpine.store('app', {
 
   Alpine.data('promoGroupsPanel', () => ({
     groups: [], products: [], loading: true, saving: false, msg: '', msgOk: true,
-    form: { id: 0, name: '', buyQty: 60, freeQty: 1, freeProductId: 0, active: true, items: [{ productId: 0 }, { productId: 0 }, { productId: 0 }] },
+    form: { id: 0, name: '', buyQty: 60, freeQty: 1, freeProductId: 0, active: true, items: [{ productId: 0, q: '', open: false }, { productId: 0, q: '', open: false }, { productId: 0, q: '', open: false }] },
+    freeQ: '', freeOpen: false,
     async init() { await this.load(); },
     async load() {
       this.loading = true;
@@ -1925,14 +1926,24 @@ Alpine.store('app', {
       }
       this.loading = false;
     },
-    addItem() { this.form.items.push({ productId: 0 }); },
+    searchResults(q) {
+      const s = (q || '').toLowerCase().trim();
+      if (!s) return [];
+      return this.products.filter(p => (p.name || '').toLowerCase().includes(s) || (p.barcode || '').includes(s)).slice(0, 20);
+    },
+    addItem() { this.form.items.push({ productId: 0, q: '', open: false }); },
     removeItem(i) { if (this.form.items.length > 2) this.form.items.splice(i, 1); },
     openEdit(g) {
       this.form = { id: g.id, name: g.name, buyQty: g.buyQty, freeQty: g.freeQty, freeProductId: g.freeProductId, active: g.active, items: [] };
-      (g.items || []).forEach(x => this.form.items.push({ productId: x.productId }));
-      while (this.form.items.length < 3) this.form.items.push({ productId: 0 });
+      (g.items || []).forEach(x => this.form.items.push({ productId: x.productId, q: this.productName(x.productId), open: false }));
+      while (this.form.items.length < 3) this.form.items.push({ productId: 0, q: '', open: false });
+      const fp = this.productName(g.freeProductId);
+      this.freeQ = fp; this.freeOpen = false;
     },
-    newGroup() { this.form = { id: 0, name: '', buyQty: 60, freeQty: 1, freeProductId: 0, active: true, items: [{ productId: 0 }, { productId: 0 }, { productId: 0 }] }; },
+    newGroup() {
+      this.form = { id: 0, name: '', buyQty: 60, freeQty: 1, freeProductId: 0, active: true, items: [{ productId: 0, q: '', open: false }, { productId: 0, q: '', open: false }, { productId: 0, q: '', open: false }] };
+      this.freeQ = ''; this.freeOpen = false;
+    },
     productName(id) { const p = this.products.find(x => x.id === id); return p ? p.name : ''; },
     selectedItems() { return this.form.items.filter(x => x.productId > 0); },
     async save() {
