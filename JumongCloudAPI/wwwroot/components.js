@@ -477,7 +477,7 @@ Alpine.store('app', {
   /* ΓöÇΓöÇ Master Products ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('masterProducts', () => ({
     d: [], loading: true, search: '', catFilter: '', status: 'active', stockTotals: {}, stockTotalsByName: {},
-    thumbs: {}, _thumbObs: null,
+    thumbs: {}, _thumbObs: null, batchBusy: false, batchDone: 0, batchTotal: 0,
     async init() {
       window.addEventListener('load-products', () => this.load());
       if (Alpine.store('app').section === 'products') await this.load();
@@ -571,8 +571,41 @@ Alpine.store('app', {
       Alpine.store('app').stockOpen = true;
       dispatchEvent(new CustomEvent('stock-dialog-open'));
     },
-    async deleteProduct(id) {
-      const p = this.d.find(x => x.id === id); if (!p) return;
+    // BATCH IMAGE UPLOAD - file names = barcode (e.g. 4800092112782.jpg), auto-matched to products
+    async batchUpload(e) {
+      const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      this.batchBusy = true; this.batchDone = 0; this.batchTotal = files.length;
+      const items = [];
+      for (const f of files) {
+        const bc = (f.name || '').replace(/\.[^.]+$/, '').trim();
+        const dataUrl = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => res(''); r.readAsDataURL(f); });
+        if (bc.length >= 3 && dataUrl.length > 100) items.push({ barcode: bc, imageData: dataUrl });
+      }
+      let updated = 0;
+      const notFound = [];
+      const CHUNK = 20000000;
+      for (let i = 0; i < items.length;) {
+        let size = 0, j = i;
+        for (; j < items.length && size + items[j].imageData.length < CHUNK; j++) size += items[j].imageData.length;
+        const chunk = items.slice(i, j);
+        try {
+          const r = await fetch(API + '/products/master/images/batch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: chunk }) });
+          const jr = await r.json();
+          if (!r.ok) throw new Error(jr.error || 'HTTP ' + r.status);
+          updated += (jr.updated || 0);
+          (jr.notFound || []).forEach(b => notFound.push(b));
+        } catch (err) { toast('Batch failed: ' + err.message, 'error'); break; }
+        this.batchDone = Math.min(items.length, j);
+        i = j;
+      }
+      this.batchBusy = false;
+      Alpine.store('app').cache.master = null;
+      this.load(true);
+      toast('Batch: ' + updated + ' na-update' + (notFound.length ? ' · ' + notFound.length + ' hindi nahanap (i-check ang pangalan ng file = barcode)' : ' · lahat OK!'), notFound.length ? 'error' : 'success');
+    },
+
+    async deleteProduct(id) {      const p = this.d.find(x => x.id === id); if (!p) return;
       if (!confirm('Delete "' + p.name + '"?')) return;
       try {
         const r = await fetch(API + '/products/master/' + id, { method: 'DELETE' });

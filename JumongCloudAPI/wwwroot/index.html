@@ -1083,6 +1083,9 @@ tailwind.config = {
                 </template>
               </select>
               <button @click="openEditor()" class="text-xs px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 transition-colors">+ ADD PRODUCT</button>
+              <button @click="document.getElementById('batchImgInput').click()" :disabled="batchBusy" class="text-xs px-3 py-1.5 rounded-lg bg-violet-600 text-white font-medium hover:bg-violet-700 transition-colors disabled:opacity-50" title="Pangalan ng file = barcode (hal. 4800092112782.jpg)">📷 BATCH UPLOAD</button>
+              <input id="batchImgInput" type="file" multiple accept="image/*" class="hidden" @change="batchUpload">
+              <span x-show="batchBusy" class="text-[11px] text-violet-600 dark:text-violet-400 font-medium" x-text="'Uploading ' + batchDone + '/' + batchTotal + '...'"></span>
               <button @click="load()" class="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">REFRESH</button>
             </div>
           </div>
