@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Andengs Superstore - Shop QR (Legal 4-cut)</title>
+<title>Andengs Superstore - Shop QR (Legal 4-in-row)</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { font-family: 'Segoe UI', Arial, sans-serif; background: #e5e5e5; padding: 20px; }
@@ -12,42 +12,42 @@
   .toolbar button:hover { background: #7c3aed; }
   .toolbar p { color: #555; font-size: 12px; margin-top: 8px; }
   .sheet {
-    width: 215.9mm; min-height: 279.4mm; margin: 0 auto; background: #fff;
-    padding: 7mm; display: grid; grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: repeat(2, 1fr); gap: 6mm; box-shadow: 0 4px 20px rgba(0,0,0,.25);
+    width: 355.6mm; min-height: 215.9mm; margin: 0 auto; background: #fff;
+    padding: 6mm; display: grid; grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: 1fr; gap: 5mm; box-shadow: 0 4px 20px rgba(0,0,0,.25);
   }
   .card {
     position: relative; border: 0.4mm dashed #c4b5fd; border-radius: 3mm;
     overflow: hidden; display: flex; flex-direction: column; text-align: center; color: #fff;
     background: linear-gradient(160deg, #5b21b6, #7c3aed);
   }
-  .scissor { position: absolute; font-size: 11px; color: #a78bfa; z-index: 2; background: #fff; line-height: 1; padding: 0 1px; }
+  .scissor { position: absolute; font-size: 10px; color: #a78bfa; z-index: 2; background: #fff; line-height: 1; padding: 0 1px; }
   .sc-tl { top: -1mm; left: -1mm; }
   .sc-tr { top: -1mm; right: -1mm; }
   .sc-bl { bottom: -1mm; left: -1mm; }
   .sc-br { bottom: -1mm; right: -1mm; }
-  .brand { padding-top: 5mm; line-height: 1.15; }
-  .brand .name { font-size: 7.2mm; font-weight: 900; letter-spacing: .3px; }
-  .brand .sub { font-size: 3.4mm; font-weight: 700; opacity: .85; letter-spacing: 1.8px; }
-  .qr-wrap { background: #fff; margin: 4.5mm auto 0; padding: 2.5mm; border-radius: 2.5mm; width: 56mm; }
+  .brand { padding-top: 6mm; line-height: 1.15; }
+  .brand .name { font-size: 7mm; font-weight: 900; letter-spacing: .3px; }
+  .brand .sub { font-size: 3.2mm; font-weight: 700; opacity: .85; letter-spacing: 1.6px; }
+  .qr-wrap { background: #fff; margin: 6mm auto 0; padding: 2.5mm; border-radius: 2.5mm; width: 60mm; }
   .qr-wrap img { width: 100%; display: block; }
-  .url { margin-top: 3.5mm; font-size: 6.4mm; font-weight: 900; letter-spacing: .8px; }
-  .tagline { margin-top: 1.5mm; font-size: 3.6mm; font-weight: 700; opacity: .95; }
-  .steps { margin-top: 3mm; font-size: 3.4mm; line-height: 1.75; opacity: .95; font-weight: 600; }
-  .cod { margin: 3.5mm auto 0; background: rgba(255,255,255,.16); border: 0.35mm solid rgba(255,255,255,.7); border-radius: 99mm; padding: 1.4mm 6mm; font-size: 3.2mm; font-weight: 800; letter-spacing: .6px; }
-  .footer { margin-top: 2.6mm; font-size: 2.6mm; opacity: .65; }
-  @page { size: Legal portrait; margin: 0; }
+  .url { margin-top: 5mm; font-size: 6.8mm; font-weight: 900; letter-spacing: .8px; }
+  .tagline { margin-top: 2mm; font-size: 3.8mm; font-weight: 700; opacity: .95; }
+  .steps { margin-top: 5mm; font-size: 3.7mm; line-height: 1.9; opacity: .95; font-weight: 600; }
+  .cod { margin: 6mm auto 0; background: rgba(255,255,255,.16); border: 0.35mm solid rgba(255,255,255,.7); border-radius: 99mm; padding: 1.5mm 6mm; font-size: 3.4mm; font-weight: 800; letter-spacing: .6px; }
+  .footer { margin-top: 5mm; font-size: 2.7mm; opacity: .65; }
+  @page { size: Legal landscape; margin: 0; }
   @media print {
     body { background: #fff; padding: 0; }
     .toolbar { display: none; }
-    .sheet { box-shadow: none; width: 215.9mm; min-height: 355.6mm; padding: 6mm; gap: 5mm; }
+    .sheet { box-shadow: none; width: 355.6mm; min-height: 215.9mm; padding: 6mm; gap: 5mm; }
   }
 </style>
 </head>
 <body>
   <div class="toolbar">
-    <button onclick="window.print()">🖨️ PRINT (LEGAL SIZE)</button>
-    <p>Legal paper &bull; 4 piraso bawat sheet &bull; i-cut sa may putol-putol na linya &bull; laki ng card ≈ 80mm x 165mm (ATM slip size)</p>
+    <button onclick="window.print()">🖨️ PRINT (LEGAL - LANDSCAPE)</button>
+    <p>Legal paper (landscape) &bull; 4 na piraso sa isang hilera bawat sheet &bull; i-cut sa may putol-putol na linya &bull; laki ng card ≈ 80mm x 200mm (ATM slip size)</p>
   </div>
 
   <div class="sheet">
