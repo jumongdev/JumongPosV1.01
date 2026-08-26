@@ -87,12 +87,12 @@
 <!-- ===== PROMO GROUPS (home) ===== -->
 <section id="promoSection" class="hidden max-w-6xl mx-auto px-4 mt-4">
   <p class="text-xs font-black text-stone-500 uppercase tracking-widest mb-2">🎁 Mga Promo</p>
-  <div id="promoGroupsRow" class="flex gap-3 overflow-x-auto scrollbar-hide"></div>
+  <div id="promoGroupsRow" class="flex flex-col gap-3"></div>
 </section>
 
 <!-- ===== LANDING EXTRAS (guest only) ===== -->
 <div id="landingExtras"><!-- ===== TRUST BADGES ===== -->
-<section class="max-w-6xl mx-auto px-4 -mt-8 relative z-10">
+<section class="max-w-6xl mx-auto px-4 mt-6">
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
     <div class="rounded-2xl bg-white card-shadow p-3.5 flex items-center gap-3">
       <span class="text-2xl">🚚</span>
@@ -718,7 +718,7 @@ function renderPromoGroups() {
   row.innerHTML = promoGroups.map(g => {
     const free = catalog.find(x => x.id === g.freeProductId);
     const items = (g.items || []).map(x => x.name).filter(Boolean).slice(0, 3);
-    return '<button onclick="promoClick(' + g.id + ')" class="shrink-0 w-64 text-left rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white p-4 card-shadow active:scale-[.98] transition">' +
+    return '<button onclick="promoClick(' + g.id + ')" class="w-full text-left rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white p-4 card-shadow active:scale-[.98] transition">' +
       '<p class="text-[10px] font-black uppercase tracking-widest text-white/70">🎁 Promo</p>' +
       '<p class="font-black text-base mt-1">' + escH(g.name) + '</p>' +
       '<p class="text-[11px] text-white/85 mt-1">Bumili ng ' + g.buyQty + ' pcs (kahit anong combo ng: ' + escH(items.join(' + ')) + ')</p>' +
