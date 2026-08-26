@@ -65,11 +65,10 @@
       <button id="searchBtn" onclick="searchBtnToggle()" aria-label="Search" class="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg flex items-center justify-center text-stone-400 hover:text-violet-700 hover:bg-violet-50 transition active:scale-90">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"/></svg>
       </button>
-      <input id="searchInput" type="search" placeholder="Search products..." oninput="debouncedSearch(this.value);onSearchTyping(this)" onfocus="showRecents()" onblur="setTimeout(hideRecents,150)" onkeydown="if(event.key==='Enter'){saveRecent(this.value.trim());searchEnter()}"
+      <input id="searchInput" type="search" placeholder="Search products..." oninput="debouncedSearch(this.value);onSearchTyping(this)" onkeydown="if(event.key==='Enter')searchEnter()"
         class="w-full bg-gray-100 rounded-xl pl-10 pr-10 py-2.5 text-sm outline-none focus:ring-2 focus:ring-violet-500/40 placeholder-stone-400">
       <button id="searchClear" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-gray-300 hover:bg-gray-400 text-white text-[10px] font-black flex items-center justify-center transition" aria-label="Clear search">✕</button>
     </div>
-    <div id="searchRecents" class="hidden mt-2 flex items-center gap-1.5 flex-wrap"></div>
   </div>
   <!-- promo banner -->
   <div id="promoBar" class="hidden max-w-6xl mx-auto px-4 pb-3">
@@ -142,11 +141,14 @@
 
 <!-- ===== MEMBER SHOP (categories left + products right) ===== -->
 <div id="memberShop" class="hidden">
-<div id="shop" class="max-w-6xl mx-auto px-4 pt-4 flex items-start gap-5">
-  <!-- LEFT: CATEGORIES (desktop) -->
-  <aside class="hidden lg:block w-56 shrink-0 sticky top-[150px] max-h-[calc(100vh-180px)] overflow-y-auto pr-1">
-    <p class="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-2">Categories</p>
-    <div id="sideCats" class="space-y-1"></div>
+<div id="shop" class="mx-auto px-4 lg:px-6 pt-4 flex items-start gap-5">
+  <!-- LEFT: FAVORITES (fixed) + CATEGORIES (scrollable) — desktop -->
+  <aside class="hidden lg:flex w-60 shrink-0 flex-col sticky top-[118px] max-h-[calc(100vh-140px)] pr-1">
+    <button id="favBtn" onclick="setFavOnly()" class="shrink-0 w-full flex items-center gap-2 text-xs font-black px-3 py-2.5 rounded-xl transition mb-2 active:scale-[.98] bg-white text-stone-600 border border-gray-200 hover:border-violet-400">
+      <span class="text-base">❤️</span><span>Favorites</span>
+    </button>
+    <p class="shrink-0 text-[10px] font-black text-stone-400 uppercase tracking-widest mb-2">Categories</p>
+    <div id="sideCats" class="flex-1 overflow-y-auto space-y-1"></div>
   </aside>
 
   <!-- RIGHT: SEARCH + PRODUCTS -->
@@ -157,6 +159,7 @@
     </div>
 
     <div class="py-4">
+      <div id="favHeader" class="hidden mb-3"></div>
       <div class="flex items-center justify-between mb-3">
         <p class="text-xs font-bold text-stone-500 uppercase tracking-wide" id="gridLabel">All Products</p>
         <div class="flex items-center gap-2">
@@ -165,7 +168,7 @@
           <span class="text-[11px] text-stone-400" id="gridCount"></span>
         </div>
       </div>
-      <div id="grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3"></div>
+      <div id="grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3"></div>
       <div id="gridEmpty" class="hidden text-center py-16">
         <p class="text-4xl mb-2">🛒</p>
         <p class="font-semibold text-stone-600">No products found</p>
@@ -480,44 +483,26 @@ function debouncedSearch(v) {
   debouncedSearch._t = setTimeout(() => { searchQ = v.trim().toLowerCase(); renderGrid(); }, 200);
 }
 
-// ─── SEARCH RECENTS + CLEAR ──────────────────────────
-const RECENT_KEY = 'shop_search_recents';
-function recentSearches() { try { const r = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); return Array.isArray(r) ? r : []; } catch (e) { return []; } }
-function saveRecent(q) { if (!q) return; let r = recentSearches().filter(x => x !== q); r.unshift(q); try { localStorage.setItem(RECENT_KEY, JSON.stringify(r.slice(0, 5))); } catch (e) {} }
 function onSearchTyping(el) { document.getElementById('searchClear').classList.toggle('hidden', !el.value); }
-function clearSearch() { const el = document.getElementById('searchInput'); el.value = ''; debouncedSearch(''); onSearchTyping(el); hideRecents(); el.focus(); }
-function showRecents() {
-  const wrap = document.getElementById('searchRecents');
-  const r = recentSearches();
-  if (!r.length || document.getElementById('searchInput').value) { wrap.classList.add('hidden'); return; }
-  wrap.innerHTML = '<span class="text-[10px] font-black text-stone-400 uppercase tracking-wide shrink-0">Recent</span>' +
-    r.map(q => '<button onpointerdown="useRecent(\'' + q.replace(/'/g, "\\'") + '\')" class="text-[11px] font-semibold text-stone-600 bg-white border border-gray-200 rounded-full px-3 py-1 hover:border-violet-300 hover:text-violet-700 transition active:scale-95">🔎 ' + q + '</button>').join('');
-  wrap.classList.remove('hidden');
-}
-function useRecent(q) { const el = document.getElementById('searchInput'); el.value = q; debouncedSearch(q); hideRecents(); onSearchTyping(el); }
-function hideRecents() { document.getElementById('searchRecents').classList.add('hidden'); }
+function clearSearch() { const el = document.getElementById('searchInput'); el.value = ''; debouncedSearch(''); onSearchTyping(el); el.focus(); }
 
 // ─── SEARCH KEYBOARD TOGGLE ──────────────────────────
 function searchBtnToggle() {
   const el = document.getElementById('searchInput');
   if (document.activeElement === el) {
     el.blur();
-    hideRecents();
   } else {
     el.focus();
-    showRecents();
   }
 }
 function searchEnter() {
   document.getElementById('searchInput').blur();
-  hideRecents();
 }
 document.addEventListener('touchstart', e => {
   const wrap = document.getElementById('searchWrap');
   const el = document.getElementById('searchInput');
   if (wrap && el && !wrap.contains(e.target) && document.activeElement === el) {
     el.blur();
-    hideRecents();
   }
 }, { passive: true });
 
@@ -644,8 +629,10 @@ function renderChips() {
 
 function setFavOnly() {
   favOnly = !favOnly;
-  if (favOnly) { activeCat = 'all'; activeGroup = 'all'; }
-  renderTiles(); renderChips(); renderGrid();
+  if (favOnly) { activeCat = 'all'; activeGroup = 'all'; if (!myOrders.length) loadOrders(); }
+  const fb = document.getElementById('favBtn');
+  if (fb) fb.className = 'shrink-0 w-full flex items-center gap-2 text-xs font-black px-3 py-2.5 rounded-xl transition mb-2 active:scale-[.98] ' + (favOnly ? 'bg-violet-700 text-white shadow' : 'bg-white text-stone-600 border border-gray-200 hover:border-violet-400');
+  renderTiles(); renderChips(); renderSideCats(); renderGrid();
 }
 
 function chip(val, label, active) {
@@ -749,9 +736,35 @@ function visibleProducts() {
 function renderGrid() {
   const g = document.getElementById('grid');
   const list = visibleProducts();
-  document.getElementById('gridLabel').textContent = searchQ ? 'Search: "' + searchQ.trim() + '"' : (activeCat === 'all' ? 'All Products' : activeCat);
+  document.getElementById('gridLabel').textContent = searchQ ? 'Search: "' + searchQ.trim() + '"' : (favOnly ? '❤️ Favorites' : (activeCat === 'all' ? 'All Products' : activeCat));
   const gc = document.getElementById('gridCount');
   if (gc) gc.textContent = list.length + ' item' + (list.length === 1 ? '' : 's');
+  const fh = document.getElementById('favHeader');
+  if (favOnly && fh) {
+    const last = myOrders[0];
+    if (last) {
+      const stMap2 = { pending: ['Pending', 'bg-amber-400'], confirmed: ['Confirmed', 'bg-blue-400'], shipped: ['Shipped', 'bg-violet-400'], delivered: ['Delivered', 'bg-emerald-400'], cancelled: ['Cancelled', 'bg-red-400'] };
+      const [lbl, cls] = stMap2[last.status] || stMap2.pending;
+      fh.classList.remove('hidden');
+      fh.innerHTML =
+        '<div class="rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white p-4 card-shadow">' +
+          '<div class="flex items-center justify-between">' +
+            '<p class="text-[10px] font-black uppercase tracking-widest text-white/70">🕐 Last Order</p>' +
+            '<span class="text-[10px] font-black px-2 py-0.5 rounded-full ' + cls + ' text-white">' + lbl.toUpperCase() + '</span>' +
+          '</div>' +
+          '<p class="font-black text-sm mt-1">' + escH(last.orderNo) + '</p>' +
+          '<p class="text-[11px] text-white/80 mt-0.5">' + escH(last.createdAt || '') + ' • ' + (last.paymentMethod || '') + '</p>' +
+          '<div class="mt-2 flex items-center justify-between gap-2">' +
+            '<p class="font-black text-base">Total: ' + fmt(last.total) + '</p>' +
+            '<button onclick="openHistory()" class="text-[11px] font-bold bg-white/20 hover:bg-white/30 rounded-lg px-2.5 py-1.5 transition">View all →</button>' +
+          '</div>' +
+        '</div>';
+    } else {
+      fh.classList.add('hidden');
+    }
+  } else if (fh) {
+    fh.classList.add('hidden');
+  }
   const ge = document.getElementById('gridEmpty');
   if (list.length) {
     ge.classList.add('hidden');
@@ -1352,6 +1365,7 @@ async function loadOrders() {
   wrap.innerHTML = html;
   const hwrap = document.getElementById('historyList');
   if (hwrap && !document.getElementById('historyModal').classList.contains('hidden')) hwrap.innerHTML = html;
+  if (favOnly) renderGrid();
 }
 
 // ─── ORDER HISTORY (bottom nav tab) ──────────────────
