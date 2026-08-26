@@ -44,7 +44,7 @@
 
 <!-- ===== TOP BAR (search + cart lang) ===== -->
 <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-200/70">
-  <div class="max-w-6xl mx-auto px-4 py-3">
+  <div class="max-w-6xl mx-auto px-4 py-2">
     <div id="searchRow" class="flex items-center gap-2.5">
       <div id="searchWrap" class="relative flex-1">
         <button id="searchBtn" onclick="searchBtnToggle()" aria-label="Search" class="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg flex items-center justify-center text-stone-400 hover:text-violet-700 hover:bg-violet-50 transition active:scale-90">
@@ -131,9 +131,9 @@
 
 <!-- ===== MEMBER SHOP (categories left + products right) ===== -->
 <div id="memberShop" class="hidden">
-<div id="shop" class="mx-auto px-4 lg:px-6 pt-4 flex items-start gap-5">
+<div id="shop" class="mx-auto px-4 lg:px-6 pt-1 flex items-start gap-5">
   <!-- LEFT: FAVORITES (fixed) + CATEGORIES (scrollable) — lahat ng screen -->
-  <aside class="flex w-[74px] lg:w-60 shrink-0 flex-col sticky top-[118px] max-h-[calc(100vh-140px)] pr-1">
+  <aside class="flex w-[74px] lg:w-60 shrink-0 flex-col sticky top-[calc(env(safe-area-inset-top)+54px)] max-h-[calc(100vh-70px)] pr-1">
     <button id="favBtn" onclick="setFavOnly()" title="Favorites" class="shrink-0 w-full flex items-center justify-center lg:justify-start gap-1 lg:gap-2 text-[10px] lg:text-xs font-black px-1 lg:px-3 py-2 lg:py-2.5 rounded-xl transition mb-2 active:scale-[.98] bg-white text-stone-600 border border-gray-200 hover:border-violet-400">
       <span class="text-lg lg:text-base">❤️</span><span class="lg:hidden">Fav</span><span class="hidden lg:inline">Favorites</span>
     </button>
@@ -148,7 +148,7 @@
       <div id="catChips" class="py-2.5 flex gap-2 overflow-x-auto scrollbar-hide"></div>
     </div>
 
-    <div class="py-4">
+    <div class="pt-0.5 pb-4">
       <div id="favHeader" class="hidden mb-3"></div>
       <div class="flex items-center justify-between mb-3">
         <p class="text-xs font-bold text-stone-500 uppercase tracking-wide" id="gridLabel">All Products</p>
