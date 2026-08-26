@@ -12,7 +12,7 @@
   .toolbar button:hover { background: #7c3aed; }
   .toolbar p { color: #555; font-size: 12px; margin-top: 8px; }
   .sheet {
-    width: 215.9mm; min-height: 355.6mm; margin: 0 auto; background: #fff;
+    width: 215.9mm; min-height: 330.2mm; margin: 0 auto; background: #fff;
     padding: 6mm; display: grid; grid-template-columns: repeat(3, 1fr);
     grid-template-rows: repeat(2, 1fr); gap: 5mm; box-shadow: 0 4px 20px rgba(0,0,0,.25);
   }
@@ -37,18 +37,18 @@
   .steps { font-size: 3.3mm; line-height: 1.9; opacity: .95; font-weight: 600; }
   .cod { margin: 0 auto; background: rgba(255,255,255,.16); border: 0.35mm solid rgba(255,255,255,.7); border-radius: 99mm; padding: 1.4mm 5mm; font-size: 3mm; font-weight: 800; letter-spacing: .5px; }
   .footer { font-size: 2.5mm; opacity: .65; }
-  @page { size: Legal portrait; margin: 0; }
+  @page { size: 8.5in 13in; margin: 0; }
   @media print {
     body { background: #fff; padding: 0; }
     .toolbar { display: none; }
-    .sheet { box-shadow: none; width: 215.9mm; min-height: 355.6mm; padding: 6mm; gap: 5mm; }
+    .sheet { box-shadow: none; width: 215.9mm; min-height: 330.2mm; padding: 6mm; gap: 5mm; }
   }
 </style>
 </head>
 <body>
   <div class="toolbar">
-    <button onclick="window.print()">🖨️ PRINT (LEGAL - PORTRAIT)</button>
-    <p>Legal paper (portrait) &bull; 6 na piraso bawat sheet (3 columns x 2 rows) &bull; i-cut sa may putol-putol na linya &bull; card ≈ 65mm x 170mm</p>
+    <button onclick="window.print()">🖨️ PRINT (8.5 x 13)</button>
+    <p>Papel: 8.5" x 13" (portrait) &bull; 6 na piraso bawat sheet (3 columns x 2 rows) &bull; i-cut sa may putol-putol na linya &bull; card ≈ 65mm x 155mm</p>
   </div>
 
   <div class="sheet">
