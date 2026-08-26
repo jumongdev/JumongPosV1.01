@@ -439,7 +439,7 @@ public partial class SalesForm : Form
         if (prod != null && totalPieces > available)
         {
             MessageBox.Show(
-                $"Insufficient stock for '{prod.Name}'.\nRequested: {totalPieces} pcs\nAvailable: {available} pcs",
+                $"Insufficient stock for '{prod.Name}'.\nRequested: {totalPieces} pcs\nAvailable: {available} pcs{HeldNote(item.ProductId)}",
                 "Out of Stock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
@@ -540,7 +540,7 @@ public partial class SalesForm : Form
         if (newPieces > available)
         {
             MessageBox.Show(
-                $"Insufficient stock for '{product.Name}'.\nRequested: {newPieces} pcs\nAvailable: {available} pcs",
+                $"Insufficient stock for '{product.Name}'.\nRequested: {newPieces} pcs\nAvailable: {available} pcs{HeldNote(product.Id)}",
                 "Out of Stock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
@@ -583,6 +583,23 @@ public partial class SalesForm : Form
         if (SyncService.StoreId != "STORE-20260602-7159") return localStock;
         var live = SyncService.GetLiveStockAsync(new[] { productId }).GetAwaiter().GetResult();
         return live.TryGetValue(productId, out var serverQty) ? Math.Min(localStock, serverQty) : localStock;
+    }
+
+    /// <summary>
+    /// HQ-only: kung may aktibong online order na may hawak na stock ng product na 'to, ibalik ang
+    /// note para sa guard message (e.g. " — 5 pcs naka hold sa online order"). Empty kung wala.
+    /// </summary>
+    private string HeldNote(int productId)
+    {
+        if (SyncService.StoreId != "STORE-20260602-7159") return "";
+        try
+        {
+            var held = SyncService.GetHeldStockAsync(new[] { productId }).GetAwaiter().GetResult();
+            if (held.TryGetValue(productId, out var pcs) && pcs > 0)
+                return $" — {pcs} pcs naka hold sa online order";
+        }
+        catch { }
+        return "";
     }
 
     private void ShowSearchPopup(string initialSearch)
@@ -700,7 +717,7 @@ public partial class SalesForm : Form
             var totalPieces = items.Where(x => x.ProductId == item.ProductId).Sum(x => x.Quantity * x.QtyPerUnit);
             if (totalPieces > prod.StockQty)
             {
-                var msg = $"'{prod.Name}' — needs {totalPieces} pcs, only {prod.StockQty} available";
+                var msg = $"'{prod.Name}' — needs {totalPieces} pcs, only {prod.StockQty} available{HeldNote(item.ProductId)}";
                 if (!stockIssues.Contains(msg)) stockIssues.Add(msg);
             }
         }
@@ -754,7 +771,7 @@ public partial class SalesForm : Form
             var pieces = g.Sum(x => x.Quantity * x.QtyPerUnit);
             var available = Math.Min(prod.StockQty, liveStock.TryGetValue(g.Key, out var sv) ? sv : prod.StockQty);
             if (pieces > available)
-                liveIssues.Add($"'{prod.Name}' — needs {pieces} pcs, only {available} available (live check)");
+                liveIssues.Add($"'{prod.Name}' — needs {pieces} pcs, only {available} available (live check){HeldNote(g.Key)}");
         }
         if (liveIssues.Count > 0)
         {

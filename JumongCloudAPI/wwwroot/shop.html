@@ -1188,18 +1188,44 @@ function addToCart(id) {
 function setQty(id, qty) {
   const row = cart.find(c => c.id === id);
   if (!row) return;
-  if (qty <= 0) { cart = cart.filter(c => c.id !== id); }
-  else {
-    const p = catalog.find(x => x.id === id);
-    if (p) {
-      const u = defUnit(p);
-      const need = (u && u.qtyPerUnit > 1 ? u.qtyPerUnit : 1);
-      const avail = Math.floor(stockOf(p) / need);
-      if (qty > avail) { qty = avail; toast('Only ' + avail + ' available', 'error'); }
-    }
-    row.qty = qty;
+  if (qty <= 0) { cart = cart.filter(c => c.id !== id); saveCart(); return; }
+  const p = catalog.find(x => x.id === id);
+  if (p) {
+    const u = (row.unitName && (p.units || []).find(x => x.unitName === row.unitName)) || defUnit(p);
+    const need = (u && u.qtyPerUnit > 1 ? u.qtyPerUnit : 1);
+    const avail = Math.floor(stockOf(p) / need);
+    if (avail <= 0) { toast('Out of stock na', 'error'); return; }
+    if (qty > avail) { qty = avail; toast('Only ' + avail + ' available — naka-adjust', 'error'); }
   }
+  row.qty = qty;
   saveCart();
+}
+function setQtyTyped(id, v) {
+  const row = cart.find(c => c.id === id);
+  if (!row) return;
+  const n = parseInt(v, 10);
+  if (isNaN(n) || n <= 0) { cart = cart.filter(c => c.id !== id); saveCart(); renderCart(); return; }
+  const p = catalog.find(x => x.id === id);
+  if (p) {
+    const u = (row.unitName && (p.units || []).find(x => x.unitName === row.unitName)) || defUnit(p);
+    const need = (u && u.qtyPerUnit > 1 ? u.qtyPerUnit : 1);
+    const avail = Math.floor(stockOf(p) / need);
+    if (avail <= 0) { toast('Out of stock na', 'error'); return; }
+    if (n > avail) { toast('Only ' + avail + ' available', 'error'); row.qty = avail; }
+    else row.qty = n;
+  }
+  const inp = document.getElementById('cq-' + id);
+  if (inp) inp.value = row.qty;
+  saveCart();
+  renderCartTotals();
+}
+function renderCartTotals() {
+  document.getElementById('cartSubtotal').textContent = fmt(cartTotal());
+  const fee = feeFor(cartTotal());
+  document.getElementById('cartFee').textContent = fee > 0 ? fmt(fee) : 'FREE';
+  document.getElementById('cartFee').className = 'font-semibold ' + (fee > 0 ? 'text-stone-600' : 'text-emerald-600');
+  document.getElementById('cartTotal').textContent = fmt(cartTotal() + fee);
+  updateBadge();
 }
 
 function saveCart() {
@@ -1375,7 +1401,7 @@ function renderCart() {
         '<button onclick="setQty(' + p.id + ', 0)" class="text-stone-300 hover:text-red-500 text-xs font-bold">✕</button>' +
         '<div class="flex items-center gap-2">' +
           '<button onclick="setQty(' + p.id + ', ' + (c.qty - 1) + ')" class="w-7 h-7 rounded-lg border border-gray-200 font-black text-stone-600 hover:bg-gray-50">−</button>' +
-          '<span class="w-7 text-center text-sm font-bold">' + c.qty + '</span>' +
+          '<input id="cq-' + p.id + '" type="number" inputmode="numeric" min="0" max="999" value="' + c.qty + '" oninput="setQtyTyped(' + p.id + ', this.value)" class="w-12 h-7 text-center text-sm font-bold border border-gray-200 rounded-lg focus:border-violet-500 focus:outline-none">' +
           '<button onclick="setQty(' + p.id + ', ' + (c.qty + 1) + ')" class="w-7 h-7 rounded-lg border border-gray-200 font-black text-stone-600 hover:bg-gray-50">+</button>' +
         '</div>' +
       '</div>' +
@@ -1387,11 +1413,7 @@ function renderCart() {
     ph.innerHTML = promoLine;
     wrap.appendChild(ph.firstElementChild);
   }
-  document.getElementById('cartSubtotal').textContent = fmt(cartTotal());
-  const fee = feeFor(cartTotal());
-  document.getElementById('cartFee').textContent = fee > 0 ? fmt(fee) : 'FREE';
-  document.getElementById('cartFee').className = 'font-semibold ' + (fee > 0 ? 'text-stone-600' : 'text-emerald-600');
-  document.getElementById('cartTotal').textContent = fmt(cartTotal() + fee);
+  renderCartTotals();
   document.querySelectorAll('[data-mono2]').forEach(el => {
     const id = Number(el.dataset.mono2);
     if (imgCache[id]) applyImg2(id, imgCache[id]);

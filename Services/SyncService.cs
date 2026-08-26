@@ -790,6 +790,37 @@ public static class SyncService
     }
 
     /// <summary>
+    /// HQ-ONLY: fetches how many pcs of each product are HELD by active online orders
+    /// (pending/confirmed/shipped/arrived). Used by the POS sale guards to tell the cashier
+    /// "X pcs naka hold sa online order" when a product can't be sold. Empty dict for non-HQ
+    /// or on failure (caller just omits the note). Same pattern as GetLiveStockAsync.
+    /// </summary>
+    public static async Task<Dictionary<int, int>> GetHeldStockAsync(IEnumerable<int> productIds)
+    {
+        var result = new Dictionary<int, int>();
+        if (StoreId != "STORE-20260602-7159") return result;
+        try
+        {
+            var ids = productIds.Distinct().ToList();
+            if (ids.Count == 0) return result;
+            var url = ApiUrl.TrimEnd('/') + "/dashboard/warehouse/stock-held?ids=" + string.Join(",", ids);
+            var resp = await _client.GetAsync(url).ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode) return result;
+            var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array) return result;
+            foreach (var el in doc.RootElement.EnumerateArray())
+            {
+                if (el.TryGetProperty("productId", out var pidEl) && pidEl.TryGetInt32(out var pid) &&
+                    el.TryGetProperty("heldPcs", out var qEl) && qEl.TryGetInt32(out var q))
+                    result[pid] = q;
+            }
+        }
+        catch { }
+        return result;
+    }
+
+    /// <summary>
     /// HQ-ONLY: fetches the per-channel end-shift snapshot from the server (retail is computed
     /// locally; this adds mobile wholesale / e-commerce / server received / transfers-out lines).
     /// Returns null for non-HQ stores or on failure (callers simply omit the channel section).

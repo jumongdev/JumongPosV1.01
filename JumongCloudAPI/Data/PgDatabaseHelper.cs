@@ -1151,7 +1151,8 @@ public static class PgDatabaseHelper
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 processed_at TIMESTAMPTZ
             );
-            CREATE INDEX IF NOT EXISTS idx_promo_free_queue_status ON promo_free_queue (status);";
+            CREATE INDEX IF NOT EXISTS idx_promo_free_queue_status ON promo_free_queue (status);
+            ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS stock_held BOOLEAN NOT NULL DEFAULT FALSE;";
         try { custMig.ExecuteNonQuery(); } catch { }
 
         // Seed: subdivision list para sa locked delivery picker (editable sa Shop Content panel)
