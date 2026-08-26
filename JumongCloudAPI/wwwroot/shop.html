@@ -699,7 +699,7 @@ const SORTS = [
   { k: 'name', l: '🔤 Name: A to Z' },
   { k: 'stock', l: '📦 In stock first' }
 ];
-let sortState = 'name';
+let sortState = 'featured';
 let gridUnitSel = {};
 let promoGroups = [];
 async function loadPromoGroups() {
@@ -868,11 +868,21 @@ function setSort(k) {
 }
 function applySort(list) {
   const arr = list.slice();
+  const stockFirst = (x, y) => ((stockOf(x) <= 0 ? 1 : 0) - (stockOf(y) <= 0 ? 1 : 0)) || (x.name || '').localeCompare(y.name || '');
+  const catAtoZ = (x, y) => {
+    const ca = String(x.category || '').toLowerCase().trim() || '~';
+    const cb = String(y.category || '').toLowerCase().trim() || '~';
+    return ca.localeCompare(cb) || (x.name || '').localeCompare(y.name || '');
+  };
   switch (sortState) {
     case 'price-asc': arr.sort((a, b) => unitPrice(a, defUnit(a)) - unitPrice(b, defUnit(b))); break;
     case 'price-desc': arr.sort((a, b) => unitPrice(b, defUnit(b)) - unitPrice(a, defUnit(a))); break;
     case 'name': arr.sort((a, b) => (a.name || '').localeCompare(b.name || '')); break;
-    case 'stock': arr.sort((a, b) => (stockOf(a) <= 0 ? 1 : 0) - (stockOf(b) <= 0 ? 1 : 0) || (a.name || '').localeCompare(b.name || '')); break;
+    case 'stock': arr.sort(stockFirst); break;
+    default:
+      // featured default: All Products/group = category A→Z then name; clicked category / search / favorites = in-stock first
+      if (searchQ || favOnly || activeCat !== 'all') arr.sort(stockFirst);
+      else arr.sort(catAtoZ);
   }
   return arr;
 }
