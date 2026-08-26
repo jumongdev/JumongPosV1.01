@@ -144,8 +144,8 @@
 <div id="shop" class="mx-auto px-4 lg:px-6 pt-4 flex items-start gap-5">
   <!-- LEFT: FAVORITES (fixed) + CATEGORIES (scrollable) — lahat ng screen -->
   <aside class="flex w-[74px] lg:w-60 shrink-0 flex-col sticky top-[118px] max-h-[calc(100vh-140px)] pr-1">
-    <button id="favBtn" onclick="setFavOnly()" class="shrink-0 w-full flex items-center justify-center lg:justify-start gap-1 lg:gap-2 text-[10px] lg:text-xs font-black px-1 lg:px-3 py-2 lg:py-2.5 rounded-xl transition mb-2 active:scale-[.98] bg-white text-stone-600 border border-gray-200 hover:border-violet-400">
-      <span class="text-sm lg:text-base">❤️</span><span>Fav</span>
+    <button id="favBtn" onclick="setFavOnly()" title="Favorites" class="shrink-0 w-full flex items-center justify-center lg:justify-start gap-1 lg:gap-2 text-[10px] lg:text-xs font-black px-1 lg:px-3 py-2 lg:py-2.5 rounded-xl transition mb-2 active:scale-[.98] bg-white text-stone-600 border border-gray-200 hover:border-violet-400">
+      <span class="text-lg lg:text-base">❤️</span><span class="hidden lg:inline">Favorites</span>
     </button>
     <p class="shrink-0 text-[9px] lg:text-[10px] font-black text-stone-400 uppercase tracking-widest mb-2 text-center lg:text-left">Cats</p>
     <div id="sideCats" class="flex-1 overflow-y-auto space-y-1"></div>
@@ -1551,6 +1551,15 @@ function setCarousel() {
 function showCarousel(i) { carouselIdx = i; setCarousel(); }
 function carPrev() { showCarousel(((carouselIdx - 1) % promoBanners.length + promoBanners.length) % promoBanners.length); }
 function carNext() { showCarousel((carouselIdx + 1) % promoBanners.length); }
+const CAT_ICONS = {
+  alcohol:'🍺', 'beer':'🍺', biscuit:'🍪', 'body care':'🧼', cakes:'🍰', candy:'🍬',
+  'canned goods':'🥫', coffee:'☕', condiments:'🧂', seasoning:'🧂', drinks:'🥤',
+  'soft drinks':'🥤', noodles:'🍜', 'powdered milk':'🥛', 'fresh milk':'🥛', rice:'🍚',
+  snacks:'🍟', sugar:'🍯', toiletries:'🧻', detergent:'🧴', shampoo:'🧴', 'hair care':'💇',
+  cleaning:'🧽', ice:'🧊', water:'💧', 'laundry':'🧺', 'baby care':'🍼', 'household':'🏠'
+};
+function catIcon(c) { return CAT_ICONS[(c || '').toLowerCase().trim()] || '📦'; }
+
 function renderSideCats() {
   const el = document.getElementById('sideCats');
   if (!el || !catalog.length) return;
@@ -1558,8 +1567,8 @@ function renderSideCats() {
   catalog.forEach(p => { counts[p.category] = (counts[p.category] || 0) + 1; });
   const cats = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
   const active = activeCat === 'all' ? 'all' : activeCat;
-  let html = '<button onclick="setCat(\'all\')" class="w-full text-left text-[9px] lg:text-xs font-bold px-1 lg:px-3 py-1.5 lg:py-2 rounded-lg lg:rounded-xl transition flex items-center justify-between gap-1 ' + (active === 'all' ? 'bg-violet-700 text-white' : 'text-stone-600 hover:bg-gray-100') + '"><span class="truncate">🛒 All</span><span class="opacity-70 hidden lg:inline text-[10px] shrink-0">' + catalog.length + '</span></button>';
-  html += cats.map(c => '<button onclick="setCat(\'' + escH(c) + '\')" class="w-full text-left text-[9px] lg:text-xs font-bold px-1 lg:px-3 py-1.5 lg:py-2 rounded-lg lg:rounded-xl transition flex items-center justify-between gap-1 ' + (active === c ? 'bg-violet-700 text-white' : 'text-stone-600 hover:bg-gray-100') + '"><span class="truncate">' + escH(c) + '</span><span class="opacity-70 hidden lg:inline text-[10px] shrink-0">' + counts[c] + '</span></button>').join('');
+  let html = '<button onclick="setCat(\'all\')" title="All Products" class="w-full text-left text-[9px] lg:text-xs font-bold px-1 lg:px-3 py-1.5 lg:py-2 rounded-lg lg:rounded-xl transition flex items-center justify-center lg:justify-between gap-1 ' + (active === 'all' ? 'bg-violet-700 text-white' : 'text-stone-600 hover:bg-gray-100') + '"><span class="lg:hidden text-[20px] leading-none">🛒</span><span class="hidden lg:inline truncate">🛒 All</span><span class="opacity-70 hidden lg:inline text-[10px] shrink-0">' + catalog.length + '</span></button>';
+  html += cats.map(c => '<button onclick="setCat(\'' + escH(c) + '\')" title="' + escH(c) + '" class="w-full text-left text-[9px] lg:text-xs font-bold px-1 lg:px-3 py-1.5 lg:py-2 rounded-lg lg:rounded-xl transition flex items-center justify-center lg:justify-between gap-1 ' + (active === c ? 'bg-violet-700 text-white' : 'text-stone-600 hover:bg-gray-100') + '"><span class="lg:hidden text-[20px] leading-none">' + catIcon(c) + '</span><span class="hidden lg:inline truncate">' + escH(c) + '</span><span class="opacity-70 hidden lg:inline text-[10px] shrink-0">' + counts[c] + '</span></button>').join('');
   el.innerHTML = html;
 }
 async function loadBanners() {
