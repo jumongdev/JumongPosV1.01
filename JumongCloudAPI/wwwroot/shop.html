@@ -581,7 +581,7 @@ async function loadCatalog() {
     catalog = cached.items || cached;
     member = member || !!(cached.member);
     isSariSari = !!(cached.isSariSari);
-    categories = [...new Set(catalog.map(p => p.category).filter(Boolean))];
+    categories = [...new Set(catalog.map(p => p.category).filter(Boolean))].sort((a, b) => String(a).toLowerCase().localeCompare(String(b).toLowerCase()));
     renderChips();
     renderGrid();
   }
@@ -594,7 +594,7 @@ async function loadCatalog() {
     member = !!j.member;
     isSariSari = !!j.isSariSari;
     try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), items: catalog, member, isSariSari })); } catch (e) { /* storage full - ignore */ }
-    categories = [...new Set(catalog.map(p => p.category).filter(Boolean))];
+    categories = [...new Set(catalog.map(p => p.category).filter(Boolean))].sort((a, b) => String(a).toLowerCase().localeCompare(String(b).toLowerCase()));
     renderChips();
     renderGrid();
   } catch (e) {
@@ -1772,7 +1772,7 @@ function renderSideCats() {
   if (!el || !catalog.length) return;
   const counts = {};
   catalog.forEach(p => { counts[p.category] = (counts[p.category] || 0) + 1; });
-  const cats = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  const cats = Object.keys(counts).sort((a, b) => String(a).toLowerCase().localeCompare(String(b).toLowerCase()));
   const active = activeCat === 'all' ? 'all' : activeCat;
   let html = '<button onclick="setCat(\'all\')" title="All Products" class="w-full text-[10px] lg:text-xs font-bold px-1 lg:px-3 py-2.5 lg:py-2 rounded-lg lg:rounded-xl transition flex items-center justify-center lg:justify-between gap-1 ' + (active === 'all' ? 'bg-violet-700 text-white' : 'text-stone-600 hover:bg-gray-100') + '"><span class="break-words leading-tight">🛒 All</span><span class="opacity-70 hidden lg:inline text-[10px] shrink-0">' + catalog.length + '</span></button>';
   html += cats.map(c => '<button onclick="setCat(\'' + escH(c) + '\')" title="' + escH(c) + '" class="w-full text-[10px] lg:text-xs font-bold px-1 lg:px-3 py-2.5 lg:py-2 rounded-lg lg:rounded-xl transition flex items-center justify-center lg:justify-between gap-1 ' + (active === c ? 'bg-violet-700 text-white' : 'text-stone-600 hover:bg-gray-100') + '"><span class="break-words leading-tight">' + escH(c) + '</span><span class="opacity-70 hidden lg:inline text-[10px] shrink-0">' + counts[c] + '</span></button>').join('');
