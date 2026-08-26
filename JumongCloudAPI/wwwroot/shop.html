@@ -50,7 +50,7 @@
         <button id="searchBtn" onclick="searchBtnToggle()" aria-label="Search" class="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg flex items-center justify-center text-stone-400 hover:text-violet-700 hover:bg-violet-50 transition active:scale-90">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"/></svg>
         </button>
-        <input id="searchInput" type="search" placeholder="Search products..." oninput="debouncedSearch(this.value);onSearchTyping(this)" onkeydown="if(event.key==='Enter')searchEnter()"
+        <input id="searchInput" type="search" placeholder="Search products..." onfocus="searchFocus()" oninput="debouncedSearch(this.value);onSearchTyping(this)" onkeydown="if(event.key==='Enter')searchEnter()"
           class="w-full bg-gray-100 rounded-xl pl-10 pr-10 py-2.5 text-sm outline-none focus:ring-2 focus:ring-violet-500/40 placeholder-stone-400">
         <button id="searchClear" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-gray-300 hover:bg-gray-400 text-white text-[10px] font-black flex items-center justify-center transition" aria-label="Clear search">✕</button>
       </div>
@@ -621,9 +621,29 @@ function renderChips() {
 function setFavOnly() {
   favOnly = !favOnly;
   if (favOnly) { activeCat = 'all'; activeGroup = 'all'; if (!myOrders.length) loadOrders(); }
-  const fb = document.getElementById('favBtn');
-  if (fb) fb.className = 'shrink-0 w-full flex items-center gap-2 text-xs font-black px-3 py-2.5 rounded-xl transition mb-2 active:scale-[.98] ' + (favOnly ? 'bg-violet-700 text-white shadow' : 'bg-white text-stone-600 border border-gray-200 hover:border-violet-400');
+  applyFavBtn();
   renderTiles(); renderChips(); renderSideCats(); renderGrid();
+}
+function applyFavBtn() {
+  const fb = document.getElementById('favBtn');
+  if (!fb) return;
+  fb.className = 'shrink-0 w-full flex items-center justify-center lg:justify-start gap-1 lg:gap-2 text-[10px] lg:text-xs font-black px-1 lg:px-3 py-2 lg:py-2.5 rounded-xl transition mb-2 active:scale-[.98] ' + (favOnly ? 'bg-violet-700 text-white shadow' : 'bg-white text-stone-600 border border-gray-200 hover:border-violet-400');
+}
+// Pag-tap sa search bar: balik sa All ang catalog (at sa mobile, lumipat sa Catalog view)
+function searchFocus() {
+  if (window.innerWidth < 1024 && currentView !== 'catalog') switchView('catalog');
+  if (activeCat !== 'all' || activeGroup !== 'all' || favOnly || searchQ) {
+    activeCat = 'all';
+    activeGroup = 'all';
+    favOnly = false;
+    searchQ = '';
+    const si = document.getElementById('searchInput');
+    if (si && si.value) { si.value = ''; onSearchTyping(si); }
+    applyFavBtn();
+    renderChips();
+    renderSideCats();
+    renderGrid();
+  }
 }
 
 function chip(val, label, active) {
