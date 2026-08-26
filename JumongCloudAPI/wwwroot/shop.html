@@ -148,7 +148,7 @@
       <span class="text-lg lg:text-base">❤️</span><span class="lg:hidden">Fav</span><span class="hidden lg:inline">Favorites</span>
     </button>
     <p class="shrink-0 text-[9px] lg:text-[10px] font-black text-stone-400 uppercase tracking-widest mb-2 text-center lg:text-left">Cats</p>
-    <div id="sideCats" class="flex-1 overflow-y-auto space-y-1.5 lg:space-y-1"></div>
+    <div id="sideCats" class="flex-1 overflow-y-auto divide-y divide-stone-100"></div>
   </aside>
 
   <!-- RIGHT: SEARCH + PRODUCTS -->
@@ -1572,8 +1572,8 @@ function renderSideCats() {
   catalog.forEach(p => { counts[p.category] = (counts[p.category] || 0) + 1; });
   const cats = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
   const active = activeCat === 'all' ? 'all' : activeCat;
-  let html = '<button onclick="setCat(\'all\')" title="All Products" class="w-full text-[10px] lg:text-xs font-bold px-1 lg:px-3 py-2.5 lg:py-2 rounded-lg lg:rounded-xl transition flex items-center justify-center lg:justify-between gap-1 ' + (active === 'all' ? 'bg-violet-700 text-white' : 'text-stone-600 hover:bg-gray-100') + '"><span class="truncate">🛒 All</span><span class="opacity-70 hidden lg:inline text-[10px] shrink-0">' + catalog.length + '</span></button>';
-  html += cats.map(c => '<button onclick="setCat(\'' + escH(c) + '\')" title="' + escH(c) + '" class="w-full text-[10px] lg:text-xs font-bold px-1 lg:px-3 py-2.5 lg:py-2 rounded-lg lg:rounded-xl transition flex items-center justify-center lg:justify-between gap-1 ' + (active === c ? 'bg-violet-700 text-white' : 'text-stone-600 hover:bg-gray-100') + '"><span class="truncate">' + escH(c) + '</span><span class="opacity-70 hidden lg:inline text-[10px] shrink-0">' + counts[c] + '</span></button>').join('');
+  let html = '<button onclick="setCat(\'all\')" title="All Products" class="w-full text-[10px] lg:text-xs font-bold px-1 lg:px-3 py-2.5 lg:py-2 rounded-lg lg:rounded-xl transition flex items-center justify-center lg:justify-between gap-1 ' + (active === 'all' ? 'bg-violet-700 text-white' : 'text-stone-600 hover:bg-gray-100') + '"><span class="break-words leading-tight">🛒 All</span><span class="opacity-70 hidden lg:inline text-[10px] shrink-0">' + catalog.length + '</span></button>';
+  html += cats.map(c => '<button onclick="setCat(\'' + escH(c) + '\')" title="' + escH(c) + '" class="w-full text-[10px] lg:text-xs font-bold px-1 lg:px-3 py-2.5 lg:py-2 rounded-lg lg:rounded-xl transition flex items-center justify-center lg:justify-between gap-1 ' + (active === c ? 'bg-violet-700 text-white' : 'text-stone-600 hover:bg-gray-100') + '"><span class="break-words leading-tight">' + escH(c) + '</span><span class="opacity-70 hidden lg:inline text-[10px] shrink-0">' + counts[c] + '</span></button>').join('');
   el.innerHTML = html;
 }
 async function loadBanners() {
