@@ -737,7 +737,7 @@ function promoClick(gid) {
   promoOrderItems = (g.items || []).map(it => {
     const p = catalog.find(x => x.id === it.productId);
     const u = (p && (p.units || []).find(x => x.unitName === 'pc')) || defUnit(p);
-    return { productId: it.productId, name: p ? p.name : (it.name || ''), price: u ? Number(u.price) : 0, unitName: u ? u.unitName : 'PC', qty: 0 };
+    return { productId: it.productId, name: p ? p.name : (it.name || ''), price: u ? Number(u.price) : 0, unitName: u ? u.unitName : 'PC', qty: 0, stock: p ? Math.floor(stockOf(p)) : 0 };
   });
   renderPromoOrder();
   document.getElementById('promoOrderModal').classList.remove('hidden');
@@ -752,7 +752,7 @@ function renderPromoOrder() {
     '<div class="flex items-center gap-3 py-3 border-b border-gray-100 last:border-0">' +
       '<div class="flex-1 min-w-0">' +
         '<p class="text-[13px] font-semibold text-stone-800 clamp2 leading-snug">' + escH(it.name) + '</p>' +
-        '<p class="text-xs text-stone-400 mt-0.5">' + fmt(it.price) + ' / ' + it.unitName + '</p>' +
+        '<p class="text-xs text-stone-400 mt-0.5">' + fmt(it.price) + ' / ' + it.unitName + (it.stock != null ? ' · stock: ' + it.stock : '') + '</p>' +
       '</div>' +
       '<div class="flex items-center gap-2 shrink-0">' +
         '<button onclick="promoQty(' + i + ', -1)" class="w-8 h-8 rounded-lg border border-gray-200 font-black text-stone-600 hover:bg-gray-50">−</button>' +
