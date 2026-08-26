@@ -662,6 +662,7 @@ Alpine.store('app', {
   /* ΓöÇΓöÇ Product Editor ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('productEditor', () => ({
     name: '', barcode: '', category: '', price: 0, cost: 0, imageData: '',
+    removeImage: false,
     pointsExempt: false, pointsPerUnit: 0, isActive: true, sellOnline: true,
     units: [], productId: null, categories: [],
     async init() {
@@ -671,11 +672,12 @@ Alpine.store('app', {
     },
     open(id) {
       this.productId = id || null;
+      this.removeImage = false;
       const p = Alpine.store('app').editingProductData;
       if (id && p) { this.name = p.name; this.barcode = p.barcode || ''; this.category = p.category || ''; this.price = p.price; this.cost = p.cost; this.imageData = p.imageData || ''; this.pointsExempt = p.pointsExempt || false; this.pointsPerUnit = p.pointsPerUnit || 0; this.isActive = p.isActive !== false; this.sellOnline = p.sellOnline !== false; this.units = (p.units || []).map(u => ({ ...u })) }
       else { this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.sellOnline = true; this.units = [] }
     },
-    reset() { this.productId = null; this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.sellOnline = true; this.units = []; Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null; Alpine.store('app').editingProductData = null },
+    reset() { this.productId = null; this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.removeImage = false; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.sellOnline = true; this.units = []; Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null; Alpine.store('app').editingProductData = null },
     addCategory() {
       var name = prompt('Enter new category name:');
       if (!name || !name.trim()) return;
@@ -699,7 +701,7 @@ Alpine.store('app', {
       const data = {
         name: this.name, barcode: this.barcode, category: this.category,
         price: parseFloat(this.price) || 0, cost: parseFloat(this.cost) || 0,
-        imageData: this.imageData, isActive: this.isActive,
+        imageData: this.imageData, removeImage: this.removeImage, isActive: this.isActive,
         sellOnline: this.sellOnline,
         pointsExempt: this.pointsExempt, pointsPerUnit: parseInt(this.pointsPerUnit) || 0,
         units: this.units.filter(u => u.unitName).map(u => ({ ...u, cost: (u.qtyPerUnit || 1) * (parseFloat(this.cost) || 0), pointsPerUnit: parseInt(u.pointsPerUnit) || 0 }))
@@ -718,9 +720,14 @@ Alpine.store('app', {
     },
     previewImage(e) {
       const file = e.target.files[0]; if (!file) return;
+      this.removeImage = false;
       const reader = new FileReader();
       reader.onload = (ev) => { this.imageData = ev.target.result };
       reader.readAsDataURL(file);
+    },
+    clearImage() {
+      this.imageData = '';
+      this.removeImage = true;
     }
   }));
 
