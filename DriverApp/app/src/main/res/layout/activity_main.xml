@@ -1,0 +1,818 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#10102a"
+    android:fitsSystemWindows="true"
+    android:padding="16dp">
+
+    <!-- ═══ LOGIN SCREEN ═══ -->
+    <LinearLayout
+        android:id="@+id/loginScreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🚚"
+            android:textSize="48sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Andengs Delivery"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:layout_marginTop="8dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Driver app · Andengs Superstore"
+            android:textColor="#8b8bb5"
+            android:textSize="12sp"
+            android:layout_marginTop="2dp" />
+
+        <EditText
+            android:id="@+id/lgUser"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="20dp"
+            android:hint="Username"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#5a5a8a"
+            android:background="@drawable/bg_input"
+            android:paddingLeft="14dp"
+            android:paddingRight="14dp"
+            android:inputType="text"
+            android:autofillHints="username" />
+
+        <EditText
+            android:id="@+id/lgPass"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="10dp"
+            android:hint="Password"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#5a5a8a"
+            android:background="@drawable/bg_input"
+            android:paddingLeft="14dp"
+            android:paddingRight="14dp"
+            android:inputType="textPassword"
+            android:autofillHints="password" />
+
+        <Button
+            android:id="@+id/btnLogin"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="14dp"
+            android:text="SIGN IN"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:background="@drawable/bg_primary" />
+
+        <TextView
+            android:id="@+id/lgErr"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:textColor="#ef4444"
+            android:textSize="12sp"
+            android:gravity="center"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/btnDownload"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:layout_marginTop="14dp"
+            android:text="📲 DOWNLOAD APK (Android)"
+            android:textColor="#a78bfa"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:background="@drawable/bg_outline" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="v2.0.0 · native"
+            android:textColor="#5a5a8a"
+            android:textSize="10sp"
+            android:layout_marginTop="18dp" />
+    </LinearLayout>
+
+    <!-- ═══ MAIN (DELIVERIES) ═══ -->
+    <LinearLayout
+        android:id="@+id/mainScreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🚚 My Deliveries"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/drvName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#8b8bb5"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/btnReturnHq"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:text="🏠 HQ"
+                android:textColor="#10b981"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:background="@drawable/bg_outline_green" />
+
+            <TextView
+                android:id="@+id/btnCollectOnly"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
+                android:text="TO COLLECT"
+                android:textColor="#fbbf24"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:background="@drawable/badge_amber" />
+
+            <TextView
+                android:id="@+id/btnRefresh"
+                android:layout_width="40dp"
+                android:layout_height="34dp"
+                android:layout_marginLeft="6dp"
+                android:text="↻"
+                android:textColor="#8b5cf6"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:background="@drawable/bg_outline" />
+
+            <TextView
+                android:id="@+id/btnLogout"
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:layout_marginLeft="6dp"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:text="EXIT"
+                android:textColor="#f87171"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:background="@drawable/bg_outline_red" />
+        </LinearLayout>
+
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/refreshLayout"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="10dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+                <ListView
+                    android:id="@+id/orderList"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:divider="@null"
+                    android:dividerHeight="8dp" />
+
+                <TextView
+                    android:id="@+id/listEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="Wala pang nakatalagang delivery"
+                    android:textColor="#5a5a8a"
+                    android:textSize="12sp"
+                    android:padding="30dp"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+    </LinearLayout>
+
+    <!-- ═══ ORDER DETAIL ═══ -->
+    <LinearLayout
+        android:id="@+id/detailScreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <TextView
+                android:id="@+id/btnBackDetail"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:text="←"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:gravity="center" />
+            <TextView
+                android:id="@+id/tvDetailOrder"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/tvPaidBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
+                android:textColor="#10b981"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:background="@drawable/badge_green"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#1a1a44"
+            android:padding="14dp"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:id="@+id/tvDetailCustomer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/tvDetailPhone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#8b8bb5"
+                android:textSize="12sp"
+                android:layout_marginTop="2dp" />
+            <TextView
+                android:id="@+id/tvDetailAddr"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#8b8bb5"
+                android:textSize="12sp"
+                android:layout_marginTop="2dp" />
+            <TextView
+                android:id="@+id/tvDetailPay"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#8b8bb5"
+                android:textSize="12sp"
+                android:layout_marginTop="2dp" />
+            <TextView
+                android:id="@+id/tvDetailNote"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#8b8bb5"
+                android:textSize="12sp"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ITEMS"
+            android:textColor="#8b8bb5"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:layout_marginTop="14dp"
+            android:layout_marginBottom="6dp" />
+
+        <LinearLayout
+            android:id="@+id/detailItems"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="#1a1a44"
+            android:padding="14dp">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="TOTAL"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/tvDetailTotal"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/btnArrived"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:layout_marginTop="8dp"
+            android:text="📍 ARRIVED AT CUSTOMER"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:background="@drawable/bg_cyan" />
+
+        <TextView
+            android:id="@+id/btnCancel"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginTop="8dp"
+            android:text="✖ CANCEL ORDER"
+            android:textColor="#f87171"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:background="@drawable/bg_outline_red" />
+
+        <TextView
+            android:id="@+id/btnCollect"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="8dp"
+            android:text="💵 COLLECT PAYMENT"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:background="@drawable/bg_primary" />
+    </LinearLayout>
+
+    <!-- ═══ PAYMENT ═══ -->
+    <LinearLayout
+        android:id="@+id/payScreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <TextView
+                android:id="@+id/btnPayBack"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:text="←"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:gravity="center" />
+            <TextView
+                android:id="@+id/tvPayOrder"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="TOTAL"
+            android:textColor="#8b8bb5"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:layout_marginTop="6dp" />
+        <TextView
+            android:id="@+id/tvPayTotal"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF"
+            android:textSize="34sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="10dp">
+            <TextView
+                android:id="@+id/btnMCash"
+                android:layout_width="0dp"
+                android:layout_height="42dp"
+                android:layout_weight="1"
+                android:text="CASH"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:background="@drawable/bg_method_sel" />
+            <TextView
+                android:id="@+id/btnMGcash"
+                android:layout_width="0dp"
+                android:layout_height="42dp"
+                android:layout_weight="1"
+                android:layout_marginLeft="8dp"
+                android:text="GCASH"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:background="@drawable/bg_method" />
+            <TextView
+                android:id="@+id/btnMSplit"
+                android:layout_width="0dp"
+                android:layout_height="42dp"
+                android:layout_weight="1"
+                android:layout_marginLeft="8dp"
+                android:text="SPLIT"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:background="@drawable/bg_method" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/cashRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="12dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CASH RECEIVED"
+                android:textColor="#8b8bb5"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+            <EditText
+                android:id="@+id/etPayCash"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="6dp"
+                android:hint="Halaga ng cash (hal. 500)"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#5a5a8a"
+                android:background="@drawable/bg_input"
+                android:paddingLeft="14dp"
+                android:paddingRight="14dp"
+                android:inputType="numberDecimal" />
+            <TextView
+                android:id="@+id/tvChange"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#34d399"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_marginTop="6dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/gcashRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="12dp"
+            android:visibility="gone">
+            <EditText
+                android:id="@+id/etGAmt"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:hint="GCash amount"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#5a5a8a"
+                android:background="@drawable/bg_input"
+                android:paddingLeft="14dp"
+                android:paddingRight="14dp"
+                android:inputType="numberDecimal" />
+            <EditText
+                android:id="@+id/etGRef"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:hint="GCash reference / account"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#5a5a8a"
+                android:background="@drawable/bg_input"
+                android:paddingLeft="14dp"
+                android:paddingRight="14dp" />
+            <TextView
+                android:id="@+id/btnTakePic"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="8dp"
+                android:text="📷 KUHAAN NG PROOF PICTURE"
+                android:textColor="#67e8f9"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:background="@drawable/bg_outline_cyan" />
+            <TextView
+                android:id="@+id/tvPicName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#8b8bb5"
+                android:textSize="11sp"
+                android:layout_marginTop="4dp" />
+            <ImageView
+                android:id="@+id/ivPayQr1"
+                android:layout_width="match_parent"
+                android:layout_height="120dp"
+                android:layout_marginTop="10dp"
+                android:scaleType="fitCenter" />
+            <TextView
+                android:id="@+id/tvQrHeader1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#8b8bb5"
+                android:textSize="11sp"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/splitRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="12dp"
+            android:visibility="gone">
+            <EditText
+                android:id="@+id/etSCash"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:hint="Cash part"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#5a5a8a"
+                android:background="@drawable/bg_input"
+                android:paddingLeft="14dp"
+                android:paddingRight="14dp"
+                android:inputType="numberDecimal" />
+            <EditText
+                android:id="@+id/etSG"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:hint="GCash part"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#5a5a8a"
+                android:background="@drawable/bg_input"
+                android:paddingLeft="14dp"
+                android:paddingRight="14dp"
+                android:inputType="numberDecimal" />
+            <EditText
+                android:id="@+id/etSRef"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:hint="GCash reference (para sa gcash part)"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#5a5a8a"
+                android:background="@drawable/bg_input"
+                android:paddingLeft="14dp"
+                android:paddingRight="14dp" />
+            <TextView
+                android:id="@+id/btnTakePic2"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="8dp"
+                android:text="📷 KUHAAN NG PROOF PICTURE"
+                android:textColor="#67e8f9"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:background="@drawable/bg_outline_cyan" />
+            <TextView
+                android:id="@+id/tvPicName2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#8b8bb5"
+                android:textSize="11sp"
+                android:layout_marginTop="4dp" />
+            <ImageView
+                android:id="@+id/ivPayQr2"
+                android:layout_width="match_parent"
+                android:layout_height="120dp"
+                android:layout_marginTop="10dp"
+                android:scaleType="fitCenter" />
+            <TextView
+                android:id="@+id/tvQrHeader2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#8b8bb5"
+                android:textSize="11sp"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvPayErr"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#ef4444"
+            android:textSize="12sp"
+            android:layout_marginTop="8dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/btnAccept"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="10dp"
+            android:text="✔ ACCEPT PAYMENT"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:background="@drawable/bg_primary" />
+    </LinearLayout>
+
+    <!-- ═══ UPDATE DIALOG (center) ═══ -->
+    <FrameLayout
+        android:id="@+id/updateOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#B0000000"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_input"
+            android:padding="18dp"
+            android:layout_gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📲 May bagong bersyon ng app!"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/updVersion"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#a78bfa"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginTop="6dp" />
+            <LinearLayout
+                android:id="@+id/updChangelog"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="10dp" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="16dp">
+                <TextView
+                    android:id="@+id/btnUpdateLater"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:text="LATER"
+                    android:textColor="#a8a29e"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    android:background="@drawable/bg_outline" />
+                <TextView
+                    android:id="@+id/btnUpdateGo"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:layout_marginLeft="10dp"
+                    android:text="UPDATE"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    android:background="@drawable/bg_primary" />
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- ═══ CANCEL MODAL ═══ -->
+    <FrameLayout
+        android:id="@+id/cancelOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#80000000"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#1a1a44"
+            android:padding="16dp"
+            android:layout_gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="✖ I-cancel ang order"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+            <EditText
+                android:id="@+id/etReason"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:minHeight="70dp"
+                android:hint="Dahilan ng cancellation (min 3 letters)"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#5a5a8a"
+                android:background="@drawable/bg_input"
+                android:padding="12dp"
+                android:inputType="textMultiLine" />
+            <TextView
+                android:id="@+id/tvCancelErr"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#ef4444"
+                android:textSize="12sp"
+                android:layout_marginTop="6dp"
+                android:visibility="gone" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="12dp">
+                <TextView
+                    android:id="@+id/btnCancelClose"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:text="CLOSE"
+                    android:textColor="#a8a29e"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    android:background="@drawable/bg_outline" />
+                <TextView
+                    android:id="@+id/btnCancelGo"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:layout_marginLeft="10dp"
+                    android:text="CANCEL ORDER"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    android:background="@drawable/bg_red" />
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+</FrameLayout>

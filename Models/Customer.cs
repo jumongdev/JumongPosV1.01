@@ -10,6 +10,7 @@ public class Customer
     public string Email { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
     public int LoyaltyPoints { get; set; }
+    public string? QrCode { get; set; }
     public decimal CreditBalance { get; set; }
     public decimal CreditLimit { get; set; }
     public bool IsActive { get; set; } = true;

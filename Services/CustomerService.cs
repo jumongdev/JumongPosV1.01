@@ -272,10 +272,24 @@ public class CustomerService
             Email = rdr["Email"].ToString() ?? "",
             Address = rdr["Address"]?.ToString() ?? "",
             LoyaltyPoints = Convert.ToInt32(rdr["LoyaltyPoints"]),
+            QrCode = rdr["QrCode"] != DBNull.Value ? rdr["QrCode"].ToString() : "",
             CreditBalance = rdr["CreditBalance"] != DBNull.Value ? Convert.ToDecimal(rdr["CreditBalance"]) : 0,
             CreditLimit = rdr["CreditLimit"] != DBNull.Value ? Convert.ToDecimal(rdr["CreditLimit"]) : 0,
             IsActive = rdr["IsActive"] != DBNull.Value ? Convert.ToBoolean(rdr["IsActive"]) : true,
             CreatedAt = DateTime.SpecifyKind(DateTime.Parse(rdr["CreatedAt"].ToString()!), DateTimeKind.Local)
         };
+    }
+
+    public static Customer? GetByQrCode(string qrCode)
+    {
+        if (string.IsNullOrWhiteSpace(qrCode)) return null;
+        using var conn = DatabaseHelper.GetConnection();
+        conn.Open();
+        var sql = "SELECT * FROM Customers WHERE QrCode = @qr AND IsActive = 1 LIMIT 1";
+        using var cmd = new SQLiteCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@qr", qrCode.Trim());
+        using var rdr = cmd.ExecuteReader();
+        if (rdr.Read()) return Map(rdr);
+        return null;
     }
 }

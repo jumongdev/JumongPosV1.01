@@ -20,7 +20,7 @@ public class PrinterService
         }
     }
 
-    public static void PrintReceipt(Sale sale, string cashierName = "Admin", Customer? customer = null)
+    public static void PrintReceipt(Sale sale, string cashierName = "Admin", Customer? customer = null, bool includeShopQr = true)
     {
         var printerName = GetSetting("PrinterName");
         if (string.IsNullOrEmpty(printerName))
@@ -41,7 +41,7 @@ public class PrinterService
         if (lineChars < 20) lineChars = 20;
         if (lineChars > 48) lineChars = 48;
 
-        var lines = BuildReceiptLines(sale, cashierName, customer, lineChars);
+        var lines = BuildReceiptLines(sale, cashierName, customer, lineChars, includeShopQr);
         ExtendPaperIfNeeded(doc, lines.Count);
 
         doc.PrintPage += (sender, e) =>
@@ -108,7 +108,7 @@ public class PrinterService
         public TextAlign Align { get; set; } = TextAlign.Left;
     }
 
-    private static List<LineEntry> BuildReceiptLines(Sale sale, string cashierName, Customer? customer = null, int lineChars = 32)
+    private static List<LineEntry> BuildReceiptLines(Sale sale, string cashierName, Customer? customer = null, int lineChars = 32, bool includeShopQr = true)
     {
         var lines = new List<LineEntry>();
 
@@ -193,10 +193,40 @@ public class PrinterService
         lines.Add(new LineEntry { Text = "Change", RightText = sale.Change.ToString("N2"), Spacing = 14 });
         lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Spacing = 12 });
         lines.Add(new LineEntry { Text = footer, Align = TextAlign.Center, Bold = true, Spacing = 20 });
+
+        if (includeShopQr)
+        {
+            lines.Add(new LineEntry { Text = "", Spacing = 10 });
+            lines.Add(new LineEntry { Text = "Order online: shop.jumongdev.com", Align = TextAlign.Center, Bold = true, Spacing = 12 });
+            foreach (var qrLine in ShopQrAscii)
+                if (qrLine.Length > 0)
+                    lines.Add(new LineEntry { Text = qrLine, Align = TextAlign.Center, Spacing = 10 });
+            lines.Add(new LineEntry { Text = "Scan para sa aming online shop!", Align = TextAlign.Center, Bold = true, Spacing = 14 });
+            lines.Add(new LineEntry { Text = "", Spacing = 8 });
+        }
+
         lines.Add(new LineEntry { Text = "", Spacing = 8 });
 
         return lines;
     }
+
+    private static readonly string[] ShopQrAscii = {
+        "",
+        "  █▀▀▀▀▀█    █ █▄▄█ █▀▀▀▀▀█",
+        "  █ ███ █ █  ▄▄▄▄ ▀ █ ███ █",
+        "  █ ▀▀▀ █ █▄▀▄ ▄▄▄█ █ ▀▀▀ █",
+        "  ▀▀▀▀▀▀▀ █ █ █ █▄█ ▀▀▀▀▀▀▀",
+        "  ▀▄█▀▀▀▀▄▄█ ▄█▀▀ ▄ ▀█▀▀▀▄",
+        "  ▀█▄▀▀▀▀▄▄▄█▄▄ ▀██ ▄▀▀▀ ▀█",
+        "  █ █  ▄▀█▄▄▄▀█▀▀▀█▀▀█▀▄▀█▀",
+        "  █ ▄▀▀ ▀▀█▄█   █▀ █ ██▀ ▀█",
+        "  ▀  ▀ ▀▀▀▄▀▀█▀▀█▄█▀▀▀█▄▀",
+        "  █▀▀▀▀▀█ ▄█▄▄ ▀▀ █ ▀ █▄▀▀▀",
+        "  █ ███ █ █▄▄█▀█ ████▀█▄█▄▄",
+        "  █ ▀▀▀ █ ▀▄▀▄▄▀▀▄█▀▄▄▄█▀ █",
+        "  ▀▀▀▀▀▀▀ ▀ ▀ ▀▀▀▀  ▀▀▀▀▀▀▀",
+        "",
+    };
 
     public static void PrintDetailedEndShiftReport(decimal totalSales, decimal totalCash, decimal totalEWallet,
         decimal totalCredit, decimal totalVoided, decimal cashOnHand, decimal difference,

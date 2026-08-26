@@ -69,6 +69,19 @@ public static class UpdateService
                 return false;
             }
 
+            // I-verify na ang downloaded file ay isang TALAGANG Windows exe (MZ header) —
+            // ang isang multipart/HTML na "download" ay may tamang laki pero hindi gumagana
+            using (var verify = File.OpenRead(newPath))
+            {
+                var head = new byte[2];
+                verify.Read(head, 0, 2);
+                if (head[0] != 0x4D || head[1] != 0x5A) // 'M' 'Z'
+                {
+                    if (File.Exists(newPath)) File.Delete(newPath);
+                    return false;
+                }
+            }
+
             // Write batch: waits, copies new exe over old, starts new exe, cleans up
             var batch = Path.Combine(Path.GetTempPath(), "jumong_update.bat");
             File.WriteAllText(batch, 

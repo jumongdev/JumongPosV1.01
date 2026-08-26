@@ -101,11 +101,11 @@ public partial class ReportsForm : Form
         if (activeItems.Count < fullSale.Items.Count)
         {
             var adjusted = new Sale { InvoiceNo = fullSale.InvoiceNo, SaleDate = fullSale.SaleDate, SubTotal = activeItems.Sum(x => x.TotalPrice), Discount = 0, Tax = 0, GrandTotal = activeItems.Sum(x => x.TotalPrice), AmountPaid = activeItems.Sum(x => x.TotalPrice), Change = 0, PaymentMethod = fullSale.PaymentMethod, OrderType = fullSale.OrderType, Items = activeItems };
-            PrinterService.PrintReceipt(adjusted, "Reprint (Void Adjusted)", customer);
+            PrinterService.PrintReceipt(adjusted, "Reprint (Void Adjusted)", customer, includeShopQr: false);
         }
         else
         {
-            PrinterService.PrintReceipt(fullSale, "Reprint", customer);
+            PrinterService.PrintReceipt(fullSale, "Reprint", customer, includeShopQr: false);
         }
     }
 

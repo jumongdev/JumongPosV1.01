@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Andengs Superstore - Naic, Cavite</title>
+<meta name="theme-color" id="metaTheme" content="#5b21b6">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/png" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Andengs Shop">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  * { -webkit-tap-highlight-color: transparent; }
+  html, body { background: #f6f6f7; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+  .landing-bg { background: linear-gradient(160deg, #5b21b6 0%, #4f46e5 45%, #1e1b4b 100%); }
+  .safe-top { padding-top: env(safe-area-inset-top); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+</style>
+</head>
+<body class="safe-top safe-bottom">
+  <!-- HERO -->
+  <section class="landing-bg text-white">
+    <div class="max-w-6xl mx-auto px-5 pt-14 pb-16 sm:pt-20 text-center">
+      <div class="w-20 h-20 mx-auto rounded-3xl bg-white/15 backdrop-blur flex items-center justify-center text-4xl font-black shadow-xl" id="brandLogo">A</div>
+      <p class="mt-4 text-xs font-black tracking-[0.35em] uppercase text-white/70">Naic, Cavite</p>
+      <h1 class="mt-2 text-4xl sm:text-6xl font-black leading-tight" id="brandTitle">Andengs Superstore</h1>
+      <p class="mt-4 text-sm sm:text-lg text-white/85 max-w-xl mx-auto">Groceries, paninda at pang-araw-araw na pangangailangan — order online, i-deliver namin o i-pickup sa tindahan.</p>
+      <a href="https://shop.jumongdev.com/" class="mt-8 inline-flex items-center gap-2 bg-white text-stone-900 font-black rounded-2xl px-10 py-4 text-base shadow-2xl hover:scale-105 active:scale-95 transition">
+        🛒 SHOP ONLINE
+      </a>
+      <div class="mt-6 grid grid-cols-3 gap-2.5 max-w-md mx-auto">
+        <div class="bg-white/10 rounded-2xl px-3 py-3">
+          <p class="text-xl">🚚</p>
+          <p class="text-[10px] font-bold mt-1">Delivery around Naic</p>
+        </div>
+        <div class="bg-white/10 rounded-2xl px-3 py-3">
+          <p class="text-xl">💵</p>
+          <p class="text-[10px] font-bold mt-1">COD &amp; GCash</p>
+        </div>
+        <div class="bg-white/10 rounded-2xl px-3 py-3">
+          <p class="text-xl">🏪</p>
+          <p class="text-[10px] font-bold mt-1">Store Pickup</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="max-w-6xl mx-auto px-5 py-10">
+    <div class="bg-white rounded-3xl shadow-sm p-6 sm:p-8">
+      <h2 class="font-black text-stone-900 text-lg">Bakit sa Andengs Superstore?</h2>
+      <p class="mt-2 text-sm text-stone-600 leading-relaxed" id="aboutText">Kumpletong groceries para sa bahay at negosyo — authentic products, mabilis na delivery at madaling pickup. Retail at wholesale/bulk orders welcome.</p>
+      <div class="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-stone-600">
+        <p class="flex gap-2 items-start"><span>🚚</span><span id="coverageText">We deliver around the Naic area - message us to confirm your barangay.</span></p>
+        <p class="flex gap-2 items-start"><span>🏪</span><span id="addressText">Andengs Superstore, Naic, Cavite</span></p>
+        <p class="flex gap-2 items-start"><span>📞</span><span id="phoneText">09xx-xxx-xxxx</span></p>
+      </div>
+      <a href="https://shop.jumongdev.com/" class="mt-6 inline-flex items-center gap-2 bg-violet-700 hover:bg-violet-800 text-white font-black rounded-2xl px-8 py-3.5 text-sm transition active:scale-95">
+        MAGSIMULA NANG MAG-ORDER →
+      </a>
+    </div>
+  </section>
+
+  <footer class="border-t border-gray-200 py-6 text-center text-xs text-stone-400">Andengs Superstore · Naic, Cavite · <a href="https://shop.jumongdev.com/" class="text-violet-700 font-bold">shop.jumongdev.com</a></footer>
+
+<script>
+const API = 'https://admin.jumongdev.com/api';
+const CONTENT_DEFAULTS = {
+  delivery_coverage: 'We deliver around the Naic area - message us to confirm your barangay.',
+  pickup_address: 'Andengs Superstore, Naic, Cavite',
+  phone: '09xx-xxx-xxxx',
+  about_text: 'Kumpletong groceries para sa bahay at negosyo - authentic products, mabilis na delivery at madaling pickup. Retail at wholesale/bulk orders welcome.'
+};
+function set(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; }
+function esc(s) { return (s + '').replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+(async function load() {
+  try {
+    const r = await fetch(API + '/dashboard/branding', { signal: AbortSignal.timeout(8000) });
+    const b = await r.json();
+    if (b && b.appTitle) document.getElementById('brandTitle').textContent = b.appTitle;
+    if (b && b.logoUrl) document.getElementById('brandLogo').innerHTML = '<img src="' + esc(b.logoUrl) + '" class="w-full h-full object-cover rounded-3xl" alt="logo">';
+    if (b && b.primaryColor && /^#[0-9a-fA-F]{3,8}$/.test(b.primaryColor)) {
+      document.getElementById('metaTheme').content = b.primaryColor;
+      const st = document.createElement('style');
+      st.textContent = '.landing-bg{background:linear-gradient(160deg,' + b.primaryColor + ' 0%, #4f46e5 45%, #1e1b4b 100%)!important}.bg-violet-700{background:' + b.primaryColor + '!important}.hover\\:bg-violet-800:hover{background:' + b.primaryColor + 'dd!important}';
+      document.head.appendChild(st);
+    }
+  } catch (e) {}
+  try {
+    const r = await fetch(API + '/dashboard/shop/content', { signal: AbortSignal.timeout(8000) });
+    const j = await r.json();
+    set('aboutText', j.about_text || CONTENT_DEFAULTS.about_text);
+    set('coverageText', j.delivery_coverage || CONTENT_DEFAULTS.delivery_coverage);
+    set('addressText', j.pickup_address || CONTENT_DEFAULTS.pickup_address);
+    set('phoneText', j.phone || CONTENT_DEFAULTS.phone);
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>

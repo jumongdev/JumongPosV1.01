@@ -12,24 +12,6 @@ public partial class OrderTypeForm : Form
     public OrderTypeForm()
     {
         InitializeComponent();
-
-        var onlineEnabled = true;
-        try
-        {
-            using var conn = DatabaseHelper.GetConnection();
-            conn.Open();
-            using var cmd = new SQLiteCommand("SELECT Value FROM Settings WHERE Key = 'EnableOnlineOrders'", conn);
-            var val = cmd.ExecuteScalar()?.ToString();
-            onlineEnabled = val != "false";
-        }
-        catch { }
-
-        if (!onlineEnabled)
-        {
-            btnOnline.Visible = false;
-            ClientSize = new Size(380, 225);
-        }
-
         DebugHelper.AddFormLabel(this);
     }
 
@@ -48,7 +30,7 @@ public partial class OrderTypeForm : Form
         var textColor = Color.FromArgb(44, 44, 44);
 
         Text = "Order Type";
-        ClientSize = new Size(380, 275);
+        ClientSize = new Size(380, 225);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         StartPosition = FormStartPosition.CenterParent;
         MaximizeBox = false;
@@ -101,22 +83,6 @@ public partial class OrderTypeForm : Form
         };
         btnCounter.Click += (s, e) => SelectType("Counter");
 
-        btnOnline = new Button
-        {
-            Text = "ONLINE ORDER",
-            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-            FlatStyle = FlatStyle.Flat,
-            FlatAppearance = { BorderSize = 0, MouseOverBackColor = Color.FromArgb(180, 100, 30) },
-            BackColor = Color.FromArgb(230, 126, 34),
-            ForeColor = Color.White,
-            Location = new Point(30, 205),
-            Size = new Size(320, 45),
-            Cursor = Cursors.Hand
-        };
-        btnOnline.Click += (s, e) => SelectType("Online");
-
-        Controls.AddRange(new Control[] { pnlHeader, btnWalkIn, btnCounter, btnOnline });
+        Controls.AddRange(new Control[] { pnlHeader, btnWalkIn, btnCounter });
     }
-
-    private Button btnOnline = null!;
 }

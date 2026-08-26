@@ -42,6 +42,29 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
+// driver.jumongdev.com -> landing page (app info + APK download, no web login — the app is native now)
+app.Use(async (ctx, next) =>
+{
+    var host = ctx.Request.Host.Host?.ToLowerInvariant() ?? "";
+    if (host == "driver.jumongdev.com" && (ctx.Request.Path == "/" || ctx.Request.Path == "/index.html"))
+    {
+        ctx.Request.Path = "/driver-landing.html";
+    }
+    await next();
+});
+
+// jumongdev.com / www.jumongdev.com -> brand landing page (clean URL)
+app.Use(async (ctx, next) =>
+{
+    var host = ctx.Request.Host.Host?.ToLowerInvariant() ?? "";
+    if ((host == "jumongdev.com" || host == "www.jumongdev.com") &&
+        (ctx.Request.Path == "/" || ctx.Request.Path == "/index.html"))
+    {
+        ctx.Request.Path = "/landing.html";
+    }
+    await next();
+});
+
 // shop.jumongdev.com -> serve shop.html (clean URL, no /shop.html in the address bar)
 app.Use(async (ctx, next) =>
 {

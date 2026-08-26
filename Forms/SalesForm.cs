@@ -171,7 +171,8 @@ public partial class SalesForm : Form
         if (_selectedCustomer != null)
         {
             var c = _selectedCustomer;
-            lblCustomerInfo.Text = $"{c.Name}  ·  {c.DisplayPhone}  ·  Credit: \u20b1{c.CreditBalance:N2}  ·  Points: {c.LoyaltyPoints}";
+            var eligible = !string.IsNullOrEmpty(c.QrCode) ? "  ·  ⭐EARN" : "  ·  ⛔no points";
+            lblCustomerInfo.Text = $"{c.Name}  ·  {c.DisplayPhone}  ·  Credit: \u20b1{c.CreditBalance:N2}  ·  Points: {c.LoyaltyPoints}{eligible}";
             lblCustomerInfo.ForeColor = _orderType == "Online" ? CAmberMid : CBlueMid;
             lblOrderChip.Text = _orderType;
             lblOrderChip.Visible = true;
@@ -182,7 +183,47 @@ public partial class SalesForm : Form
             lblCustomerInfo.ForeColor = CTextMuted;
             lblOrderChip.Text = "Walk-in";
             lblOrderChip.Visible = false;
+            lblOrderChip.ForeColor = CTextMuted;
         }
+        // SCAN QR ay para sa customer track lang — nakatago sa walk-in (walang customer)
+        if (_btnScanQr != null) _btnScanQr.Visible = _selectedCustomer != null;
+    }
+
+    // 📱 Customer QR scan (barcode scanner input) — online-registered customers earn points
+    private void ScanCustomerQr()
+    {
+        using var qrForm = new Form
+        {
+            Text = "📱 Scan Customer QR",
+            Width = 380,
+            Height = 160,
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            BackColor = CCard
+        };
+        var lbl = new Label { Text = "I-scan ang QR code ng customer (o i-type ang Customer ID):", Top = 14, Left = 16, Width = 330, ForeColor = CText };
+        var txt = new TextBox { Top = 44, Left = 16, Width = 330, BackColor = CInputBg, ForeColor = CText, BorderStyle = BorderStyle.FixedSingle };
+        var ok = new Button { Text = "ATTACH", Top = 82, Left = 200, Width = 140, BackColor = CBlueMid, ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+        var cancel = new Button { Text = "Cancel", Top = 82, Left = 16, Width = 120, FlatStyle = FlatStyle.Flat };
+        qrForm.Controls.AddRange(new Control[] { lbl, txt, ok, cancel });
+        ok.Click += (s, e) => { qrForm.DialogResult = DialogResult.OK; };
+        cancel.Click += (s, e) => { qrForm.DialogResult = DialogResult.Cancel; };
+        txt.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { qrForm.DialogResult = DialogResult.OK; } };
+        if (qrForm.ShowDialog(this) != DialogResult.OK) return;
+        var code = txt.Text.Trim();
+        if (code.Length == 0) return;
+        var customer = CustomerService.GetByQrCode(code);
+        if (customer == null)
+        {
+            MessageBox.Show("Hindi nahanap ang customer. Siguraduhin na ang customer ay naka-register online (may QR) at na-download ang customer list (Settings → SYNC FROM CLOUD).", "Customer Not Found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        _selectedCustomer = customer;
+        _orderType = "Walk-in";
+        UpdateCustomerDisplay();
+        MessageBox.Show($"{customer.Name} attached — {(string.IsNullOrEmpty(customer.QrCode) ? "⛔ hindi mag-e-earn ng points" : "⭐ eligible sa points")}", "Customer Attached", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private void SetupCartGrid()
@@ -760,21 +801,25 @@ public partial class SalesForm : Form
 
         if (_selectedCustomer != null)
         {
-            var pointsRate = int.Parse(DatabaseHelper.GetSetting("PointsRate", "200"));
-            var ptsEarned = 0;
-            foreach (var item in _cart)
+            // Points ONLY for online-registered customers (may QR code); manual/walk-in accounts = zero points
+            if (!string.IsNullOrEmpty(_selectedCustomer.QrCode))
             {
-                if (item.PointsExempt) continue;
-                if (item.PointsPerUnit > 0)
-                    ptsEarned += item.PointsPerUnit * item.Quantity;
-                else
-                    ptsEarned += (int)(item.TotalPrice / pointsRate);
+                var pointsRate = int.Parse(DatabaseHelper.GetSetting("PointsRate", "200"));
+                var ptsEarned = 0;
+                foreach (var item in _cart)
+                {
+                    if (item.PointsExempt) continue;
+                    if (item.PointsPerUnit > 0)
+                        ptsEarned += item.PointsPerUnit * item.Quantity;
+                    else
+                        ptsEarned += (int)(item.TotalPrice / pointsRate);
+                }
+                var ptsUsed = payForm.PointsUsed;
+                var newPts = _selectedCustomer.LoyaltyPoints + ptsEarned - ptsUsed;
+                if (newPts < 0) newPts = 0;
+                _selectedCustomer.LoyaltyPoints = newPts;
+                CustomerService.UpdateLoyaltyPoints(_selectedCustomer.Id, newPts);
             }
-            var ptsUsed = payForm.PointsUsed;
-            var newPts = _selectedCustomer.LoyaltyPoints + ptsEarned - ptsUsed;
-            if (newPts < 0) newPts = 0;
-            _selectedCustomer.LoyaltyPoints = newPts;
-            CustomerService.UpdateLoyaltyPoints(_selectedCustomer.Id, newPts);
         }
 
         if (payForm.PaymentMethod == "Credit" && _selectedCustomer != null)
@@ -975,7 +1020,29 @@ public partial class SalesForm : Form
             AutoSize = true
         };
 
-        _pnlCustomerBar.Controls.AddRange(new Control[] { lblCustIcon, lblCustomerInfo, lblOrderChip });
+        var btnScanQr = new Button
+        {
+            Text = "📱 SCAN QR",
+            Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = CBlueMid,
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand,
+            AutoSize = false,
+            Size = new Size(88, 26),
+            Margin = new Padding(0),
+            Visible = false
+        };
+        btnScanQr.FlatAppearance.BorderSize = 0;
+        btnScanQr.Click += (s, e) => ScanCustomerQr();
+        _btnScanQr = btnScanQr;
+        UpdateCustomerDisplay();
+
+        _pnlCustomerBar.Controls.AddRange(new Control[] { lblCustIcon, lblCustomerInfo, lblOrderChip, btnScanQr });
+
+        btnScanQr.Dock = DockStyle.Right;
+        lblOrderChip.Dock = DockStyle.Right;
+        lblCustomerInfo.Dock = DockStyle.Fill;
 
         _pnlSearch = new Panel { BackColor = CCard };
         _pnlSearch.Paint += (s, e) =>
@@ -1555,6 +1622,7 @@ public partial class SalesForm : Form
 
     private Panel _pnlTopbar = null!;
     private Panel _pnlCustomerBar = null!;
+    private Button _btnScanQr = null!;
     private Panel _pnlSearch = null!;
     public void ApplyTheme()
     {

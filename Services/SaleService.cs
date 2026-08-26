@@ -233,10 +233,31 @@ public class SaleService
                 Quantity = Convert.ToInt32(itemsRdr["Quantity"]),
                 TotalPrice = Convert.ToDecimal(itemsRdr["TotalPrice"]),
                 UnitName = itemsRdr["UnitName"].ToString() ?? "",
-                QtyPerUnit = Convert.ToInt32(itemsRdr["QtyPerUnit"])
+                QtyPerUnit = Convert.ToInt32(itemsRdr["QtyPerUnit"]),
+                PointsEarned = itemsRdr["PointsEarned"] != DBNull.Value ? Convert.ToInt32(itemsRdr["PointsEarned"]) : 0
             });
         }
         return sale;
+    }
+
+    /// <summary>Deduct the loyalty points that were awarded on the given (voided) sale items, mirroring the award guard (points only for online-registered customers with QR).</summary>
+    private static void ReverseSalePoints(SQLiteConnection conn, SQLiteTransaction trans, int customerId, int ptsAwarded)
+    {
+        if (ptsAwarded <= 0) return;
+        using var checkQr = new SQLiteCommand("SELECT COALESCE(QrCode, '') FROM Customers WHERE Id = @cid", conn, trans);
+        checkQr.Parameters.AddWithValue("@cid", customerId);
+        var qr = Convert.ToString(checkQr.ExecuteScalar()) ?? "";
+        if (string.IsNullOrEmpty(qr)) return; // walang QR = hindi nag-earn ng points
+
+        var getPts = new SQLiteCommand("SELECT LoyaltyPoints FROM Customers WHERE Id = @cid", conn, trans);
+        getPts.Parameters.AddWithValue("@cid", customerId);
+        var curPts = Convert.ToInt32(getPts.ExecuteScalar());
+        var newPts = Math.Max(0, curPts - ptsAwarded);
+
+        var updPts = new SQLiteCommand("UPDATE Customers SET LoyaltyPoints = @pts WHERE Id = @cid", conn, trans);
+        updPts.Parameters.AddWithValue("@pts", newPts);
+        updPts.Parameters.AddWithValue("@cid", customerId);
+        updPts.ExecuteNonQuery();
     }
 
     public static List<Sale> GetSales(DateTime? from = null, DateTime? to = null, string? invoiceNo = null, bool? synced = null, string? paymentMethod = null)
@@ -471,6 +492,13 @@ public class SaleService
                 }
             }
 
+            // Reverse loyalty points awarded on this sale (stored per-item at sale time)
+            if (sale.CustomerId.HasValue)
+            {
+                var ptsAwarded = sale.Items.Where(x => !x.IsVoided).Sum(x => x.PointsEarned);
+                ReverseSalePoints(conn, trans, sale.CustomerId.Value, ptsAwarded);
+            }
+
             trans.Commit();
             var updatedSale = GetById(saleId);
             if (updatedSale != null)
@@ -595,6 +623,7 @@ public class SaleService
             var qpu = rdr["QtyPerUnit"] != DBNull.Value ? Convert.ToInt32(rdr["QtyPerUnit"]) : 1;
             var restockQty = qty * qpu;
             var total = Convert.ToDecimal(rdr["TotalPrice"]);
+            var ptsEarned = rdr["PointsEarned"] != DBNull.Value ? Convert.ToInt32(rdr["PointsEarned"]) : 0;
             rdr.Close();
 
             var getStock = new SQLiteCommand("SELECT StockQty FROM Products WHERE Id = @pid", conn);
@@ -669,6 +698,10 @@ public class SaleService
                 updCust.Parameters.AddWithValue("@cid", customerId.Value);
                 updCust.ExecuteNonQuery();
             }
+
+            // Reverse loyalty points awarded on this item
+            if (customerId.HasValue && ptsEarned > 0)
+                ReverseSalePoints(conn, trans, customerId.Value, ptsEarned);
 
             trans.Commit();
             _ = SyncService.SyncVoidLog(new VoidLog { SaleId = saleId, SaleItemId = itemId, Action = "VoidItem", Reason = reason, InvoiceNo = invoiceNo, ProductName = productName, Quantity = qty, Amount = total, UserId = voidedByUserId, UserName = voidedByUserName, CreatedAt = now });

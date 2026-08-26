@@ -29,7 +29,7 @@ public partial class SelectCustomerForm : Form
         dgvCustomers.DataSource = results.Select(c => new
         {
             c.Id,
-            c.Name,
+            Name = string.IsNullOrEmpty(c.QrCode) ? c.Name : "⭐ " + c.Name,
             Phone = c.Phone,
             Address = string.IsNullOrEmpty(c.Address) ? "—" : c.Address,
             Credit = c.CreditBalance.ToString("N2"),

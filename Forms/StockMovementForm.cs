@@ -192,11 +192,11 @@ public partial class StockMovementForm : Form
                         PaymentMethod = sale.PaymentMethod, OrderType = sale.OrderType,
                         Items = activeItems
                     };
-                    PrinterService.PrintReceipt(adjusted, "Reprint (Void Adjusted)");
+                    PrinterService.PrintReceipt(adjusted, "Reprint (Void Adjusted)", includeShopQr: false);
                 }
                 else
                 {
-                    PrinterService.PrintReceipt(sale, sale.UserId?.ToString() ?? "System");
+                    PrinterService.PrintReceipt(sale, sale.UserId?.ToString() ?? "System", includeShopQr: false);
                 }
                 receipt.DialogResult = DialogResult.OK;
                 receipt.Close();

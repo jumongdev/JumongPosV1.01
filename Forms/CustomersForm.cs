@@ -36,7 +36,18 @@ public partial class CustomersForm : Form
             null or "" => CustomerService.GetAll(),
             _ => CustomerService.Search(keyword)
         };
-        dgvCustomers.DataSource = data;
+        dgvCustomers.DataSource = data.Select(c => new
+        {
+            c.Id,
+            Name = string.IsNullOrEmpty(c.QrCode) ? c.Name : "⭐ " + c.Name,
+            c.Phone,
+            c.Email,
+            c.Address,
+            c.LoyaltyPoints,
+            c.CreditBalance,
+            c.CreditLimit,
+            c.IsActive
+        }).ToList();
         UpdateMetrics(data);
     }
 

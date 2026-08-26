@@ -389,6 +389,7 @@
           <div class="menu-row" onclick="goProducts()"><span>📦</span>Product</div>
           <div class="menu-row" onclick="goInventory('all')"><span>📊</span>Inventory</div>
           <div class="menu-row" onclick="goSalesReport()"><span>🧾</span>Sales</div>
+          <div class="menu-row" onclick="goOnlineOrders()"><span>🛒</span>Online Orders</div>
           <div class="menu-row" onclick="goTransfers()"><span>🚚</span>Transfer</div>
           <div class="menu-row" onclick="goReceiving()"><span>📥</span>Receiving</div>
           <div class="menu-row" onclick="openCreditBilling()"><span>💳</span>Credit Billing</div>
@@ -408,6 +409,36 @@
           <div class="menu-row" onclick="goSetup()"><span>🖨️</span>Setup</div>
           <div class="menu-row" onclick="location.reload()"><span>🔄</span>Reload App</div>
         </div>
+      </div>
+    </div>
+
+    <!-- ONLINE ORDERS TAB (e-commerce fulfillment) -->
+    <div id="tabOnlineOrders" class="hidden px-4 pt-4 pb-36 space-y-3">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-white font-bold text-lg">🛒 Online Orders</h2>
+          <p class="text-gray-500 text-[11px]">Accept · Pick · Assign driver</p>
+        </div>
+        <button onclick="loadOnlineOrders()" class="text-cyan-400 text-xs font-bold border border-cyan-700 rounded-lg px-3 py-1.5">REFRESH</button>
+      </div>
+      <div class="flex gap-2 flex-wrap">
+        <button onclick="ooFilter='all';loadOnlineOrders()" id="ooFAll" class="text-[11px] px-3 py-1.5 rounded-full border font-bold">ALL</button>
+        <button onclick="ooFilter='pending';loadOnlineOrders()" id="ooFPending" class="text-[11px] px-3 py-1.5 rounded-full border font-bold">PENDING</button>
+        <button onclick="ooFilter='confirmed';loadOnlineOrders()" id="ooFConfirmed" class="text-[11px] px-3 py-1.5 rounded-full border font-bold">PREPARING</button>
+        <button onclick="ooFilter='shipped';loadOnlineOrders()" id="ooFShipped" class="text-[11px] px-3 py-1.5 rounded-full border font-bold">DELIVERY</button>
+      </div>
+      <div id="ooList" class="space-y-2.5"></div>
+      <p id="ooEmpty" class="hidden text-center text-gray-500 text-xs py-10">Wala pang online orders</p>
+    </div>
+
+    <!-- ONLINE ORDER DETAIL MODAL -->
+    <div id="ooDetailModal" class="hidden fixed inset-0 z-[60] flex items-end justify-center bg-black/70" onclick="if(event.target===this)closeOoDetail()">
+      <div class="bg-[#16163a] w-full max-w-md rounded-t-3xl p-5 border border-[#222255] pb-8 max-h-[88vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-white font-bold" id="ooTitle">Order</p>
+          <button onclick="closeOoDetail()" class="text-red-400 text-lg font-bold">✕</button>
+        </div>
+        <div id="ooBody" class="space-y-3"></div>
       </div>
     </div>
 
@@ -915,6 +946,7 @@
       hide(document.getElementById('tabTransfers'));
       hide(document.getElementById('tabNewTransfer'));
       hide(document.getElementById('tabReceiving'));
+      hide(document.getElementById('tabOnlineOrders'));
       document.getElementById('navSell').classList.remove('active');
       document.getElementById('navInventory').classList.remove('active');
       if (tab === 'sell') { show(document.getElementById('tabSell')); document.getElementById('navSell').classList.add('active'); }
@@ -925,6 +957,301 @@
       if (tab === 'transfers') { show(document.getElementById('tabTransfers')); }
       if (tab === 'newtransfer') { show(document.getElementById('tabNewTransfer')); }
       if (tab === 'receiving') { show(document.getElementById('tabReceiving')); document.getElementById('recvSearch').focus(); }
+      if (tab === 'onlineorders') { show(document.getElementById('tabOnlineOrders')); loadOnlineOrders(); }
+    }
+
+    function goOnlineOrders() { closeBurgerMenu(); switchTab('onlineorders'); }
+
+    // ─── ONLINE ORDERS (e-commerce fulfillment) ───────────────
+    let ooFilter = 'all';
+    let ooCur = null;
+    let ooAutoPrintedKey = null;
+    let ooDrivers = [];
+
+    function goOnlineOrders2() { closeBurgerMenu(); switchTab('onlineorders'); }
+    function ooStatusCls(s) {
+      const m = { pending: 'bg-amber-500/20 text-amber-300', confirmed: 'bg-blue-500/20 text-blue-300', shipped: 'bg-violet-500/20 text-violet-300', arrived: 'bg-cyan-500/20 text-cyan-300', delivered: 'bg-emerald-500/20 text-emerald-300', cancelled: 'bg-red-500/20 text-red-300' };
+      return m[s] || 'bg-gray-500/20 text-gray-300';
+    }
+    async function loadOnlineOrders() {
+      const apiBase = API + '/dashboard';
+      try {
+        const r = await fetch(apiBase + '/shop/orders?limit=100');
+        const j = await r.json();
+        const list = (Array.isArray(j) ? j : []).filter(o => ooFilter === 'all' || o.status === ooFilter);
+        document.getElementById('ooEmpty').classList.toggle('hidden', list.length > 0);
+        ['ooFAll','ooFPending','ooFConfirmed','ooFShipped'].forEach(id => document.getElementById(id).classList.remove('active', 'bg-cyan-600'));
+        const map = { all: 'ooFAll', pending: 'ooFPending', confirmed: 'ooFConfirmed', shipped: 'ooFShipped' };
+        const btn = document.getElementById(map[ooFilter]);
+        if (btn) btn.classList.add('active', 'bg-cyan-600', 'text-white');
+        document.getElementById('ooList').innerHTML = list.map(o =>
+          '<div class="bg-[#1a1a44] rounded-2xl p-3.5 border border-[#222255]" onclick="openOnlineOrder(' + o.id + ')">' +
+            '<div class="flex items-center justify-between">' +
+              '<p class="text-white font-bold text-sm">' + (o.orderNo || '') + '</p>' +
+              '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ' + ooStatusCls(o.status) + '">' + (o.status || '').toUpperCase() + '</span>' +
+            '</div>' +
+            '<p class="text-gray-300 text-sm mt-1">' + (o.customerName || '') + '</p>' +
+            '<p class="text-gray-500 text-[11px]">Blk ' + (o.block || '-') + ' Lot ' + (o.lot || '-') + ', ' + (o.subdivision || '') + ' · ' + (o.phone || '') + '</p>' +
+            '<div class="flex items-center justify-between mt-2 pt-2 border-t border-[#222255]">' +
+              '<span class="text-[11px] text-gray-400">' + (o.driverName || 'No driver') + '</span>' +
+              '<span class="text-white font-bold">₱' + Number(o.total).toFixed(2) + '</span>' +
+            '</div>' +
+          '</div>').join('');
+      } catch (e) { toast('Failed to load orders: ' + e.message, 'error'); }
+    }
+    async function openOnlineOrder(id) {
+      const apiBase = API + '/dashboard';
+      try {
+        const r = await fetch(apiBase + '/shop/orders/' + id);
+        const j = await r.json();
+        ooCur = j.order;
+        ooCur.items = j.items || [];
+        const items = (j.items || []).map(it => {
+          return '<label class="flex items-center gap-3 bg-[#1a1a44] rounded-xl px-3 py-2.5 border border-[#222255]">' +
+            '<input type="checkbox" data-pick="' + it.id + '" ' + (it.picked ? 'checked' : '') + ' onchange="togglePick(' + id + ', ' + it.id + ', this.checked)" class="w-5 h-5 accent-cyan-500">' +
+            '<div class="flex-1 min-w-0"><p class="text-white text-sm">' + (it.productName || '') + '</p><p class="text-gray-500 text-[10px]">× ' + it.qty + ' ' + (it.unitName || '') + '</p></div>' +
+            '<span class="text-gray-300 text-sm font-bold">₱' + Number(it.total).toFixed(2) + '</span></label>';
+        }).join('');
+        const pickInfo = j.pickProgress ? '<p class="text-[11px] text-cyan-300">Picked: ' + (j.pickProgress.picked || 0) + '/' + (j.pickProgress.total || 0) + '</p>' : '';
+        const pickComplete = j.pickProgress && j.pickProgress.total > 0 && j.pickProgress.picked >= j.pickProgress.total;
+        const pickDoneBanner = pickComplete && ooCur.status === 'confirmed'
+          ? '<div class="rounded-xl bg-emerald-500/15 border border-emerald-500/40 px-3.5 py-2.5 text-emerald-300 text-[11px] font-bold">✅ Kumpleto na ang lahat ng item — i-print ang FINAL resibo at ibigay sa driver kasama ng items.</div>' +
+            '<button onclick="printOrderReceipt()" class="w-full bg-emerald-600 text-white font-black rounded-xl py-3 text-sm mt-2">🖨️ PRINT FINAL RECEIPT (para sa driver)</button>'
+          : '';
+        let actions = '';
+        if (ooCur.status !== 'cancelled') {
+          actions += '<button onclick="printOrderReceipt()" class="w-full bg-blue-600 text-white font-bold rounded-xl py-3 text-sm mb-2">??? PRINT RECEIPT (may points)</button>';
+        }
+        if (ooCur.status === 'pending' || ooCur.status === 'confirmed') {
+          actions += '<button onclick="ooEditMode()" class="w-full bg-amber-500 text-white font-bold rounded-xl py-3 text-sm mb-2">?? EDIT ITEMS (bago i-assign sa driver)</button>';
+        }
+        if (ooCur.status === 'pending') {
+          actions += '<button onclick="ooSetStatus(\'confirmed\')" class="w-full bg-cyan-600 text-white font-bold rounded-xl py-3 text-sm">✔ ACCEPT ORDER (Preparing)</button>';
+        }
+        if (ooCur.status === 'confirmed') {
+          actions += '<button onclick="printOnlineOrder()" class="w-full bg-indigo-600 text-white font-bold rounded-xl py-3 text-sm mb-2">?? PRINT PICK SLIP (staff)</button>';
+          actions += '<div class="flex items-center gap-2"><select id="ooDriverSel" class="flex-1 bg-[#181848] text-white text-sm border border-[#222255] rounded-xl px-3 py-2.5"><option value="">-- Assign driver --</option></select>' +
+            '<button onclick="ooAssignDriver()" class="bg-violet-600 text-white font-bold rounded-xl px-4 py-2.5 text-sm">ASSIGN</button></div>';
+        }
+        if (ooCur.status === 'shipped' || ooCur.status === 'arrived') {
+          actions += '<p class="text-center text-[11px] text-gray-400">Sa driver na: ' + (ooCur.driverName || '—') + '</p>';
+        }
+        if (ooCur.status === 'cancelled') {
+          actions += '<p class="text-center text-[11px] text-red-400">Cancelled: ' + (ooCur.cancelledReason || '') + '</p>';
+        }
+        document.getElementById('ooTitle').textContent = ooCur.orderNo + ' · ' + ooCur.customerName;
+        document.getElementById('ooBody').innerHTML =
+          '<div class="bg-[#1a1a44] rounded-xl p-3.5 text-sm space-y-1">' +
+            '<p class="text-white font-bold">' + (ooCur.customerName || '') + ' · ' + (ooCur.phone || '') + '</p>' +
+            '<p class="text-gray-400 text-xs">📍 Blk ' + (ooCur.block || '-') + ' Lot ' + (ooCur.lot || '-') + ', ' + (ooCur.subdivision || '') + (ooCur.address ? ' · ' + ooCur.address : '') + '</p>' +
+            '<p class="text-gray-400 text-xs">💳 ' + (ooCur.paymentMethod || '') + (ooCur.gcashRef ? ' · Ref: ' + ooCur.gcashRef : '') + '</p>' +
+            '<p class="text-gray-400 text-xs">📝 ' + (ooCur.deliveryNote || '—') + '</p>' +
+          '</div>' +
+          '<p class="text-[11px] text-gray-400 font-bold uppercase tracking-wide">Items — i-tick ang na-pick na</p>' +
+          '<div class="space-y-2">' + items + '</div>' + pickInfo + pickDoneBanner +
+          '<div class="flex items-center justify-between bg-[#1a1a44] rounded-xl px-3.5 py-3"><span class="text-white font-bold">TOTAL</span><span class="text-white font-black">₱' + Number(ooCur.total).toFixed(2) + '</span></div>' +
+          '<div class="space-y-2">' + actions + '</div>';
+        show(document.getElementById('ooDetailModal'));
+        if (ooCur.status === 'confirmed' && ooDrivers.length === 0) loadOoDrivers();
+        // AUTO-PRINT FINAL RECEIPT kapag kumpleto na ang lahat ng item (ibibigay sa driver)
+        if (pickComplete && ooCur.status === 'confirmed') {
+          const key = id + ':' + (j.pickProgress ? j.pickProgress.picked : 0) + ':' + (j.pickProgress ? j.pickProgress.total : 0);
+          if (ooAutoPrintedKey !== key && IN_APP && typeof AndroidPrinter !== 'undefined' && AndroidPrinter.isConnected()) {
+            ooAutoPrintedKey = key;
+            setTimeout(() => {
+              toast('🖨️ Piniprint ang FINAL resibo para sa driver...');
+              printOrderReceipt();
+            }, 700);
+          }
+        }
+      } catch (e) { toast('Failed: ' + e.message, 'error'); }
+    }
+    function closeOoDetail() { hide(document.getElementById('ooDetailModal')); }
+    async function loadOoDrivers() {
+      try {
+        const r = await fetch(API + '/dashboard' + '/drivers');
+        ooDrivers = await r.json();
+        const sel = document.getElementById('ooDriverSel');
+        if (sel) sel.innerHTML = '<option value="">-- Assign driver --</option>' + ooDrivers.map(d => '<option value="' + d.id + '">' + d.name + '</option>').join('');
+      } catch (e) {}
+    }
+    async function togglePick(orderId, itemId, picked) {
+      ooAutoPrintedKey = null;
+      try {
+        await fetch(API + '/dashboard' + '/orders/' + orderId + '/pick', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId, picked, pickedBy: session.username || 'Picker' }) });
+        openOnlineOrder(orderId);
+      } catch (e) { toast(e.message, 'error'); }
+    }
+    async function ooSetStatus(st) {
+      try {
+        const r = await fetch(API + '/dashboard' + '/shop/orders/' + ooCur.id + '/status', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: st }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.message || 'Failed');
+        toast('Order ' + st + ' ✓');
+        closeOoDetail();
+        loadOnlineOrders();
+        if (st === 'confirmed') {
+          setTimeout(() => {
+            if (IN_APP && typeof AndroidPrinter !== 'undefined' && AndroidPrinter.isConnected()) {
+              toast('🖨️ Piniprint ang resibo...');
+              printOrderReceipt();
+            } else {
+              toast('Confirmed ✓ — i-tap ang PRINT RECEIPT para sa resibo ng customer');
+            }
+          }, 600);
+        }
+      } catch (e) { toast(e.message, 'error'); }
+    }
+    async function ooAssignDriver() {
+      const did = document.getElementById('ooDriverSel').value;
+      if (!did) { toast('Pumili ng driver', 'error'); return; }
+      try {
+        const r = await fetch(API + '/dashboard' + '/orders/' + ooCur.id + '/assign-driver', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ driverId: Number(did) }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || 'Assign failed');
+        toast('Driver assigned — Out for delivery ✓');
+        closeOoDetail();
+        loadOnlineOrders();
+      } catch (e) { toast(e.message, 'error'); }
+    }
+    function printOnlineOrder() {
+      if (!IN_APP) { toast('Open the app (APK) to use Bluetooth', 'error'); return; }
+      const lines = [];
+      lines.push('ONLINE ORDER PICK SLIP');
+      lines.push('----------------------');
+      lines.push('Order: ' + ooCur.orderNo);
+      lines.push('Customer: ' + ooCur.customerName);
+      lines.push('Phone: ' + ooCur.phone);
+      lines.push('Address: Blk ' + (ooCur.block || '-') + ' Lot ' + (ooCur.lot || '-') + ', ' + (ooCur.subdivision || ''));
+      if (ooCur.address) lines.push(ooCur.address);
+      lines.push('Payment: ' + ooCur.paymentMethod + (ooCur.gcashRef ? ' (' + ooCur.gcashRef + ')' : ''));
+      lines.push('----------------------');
+      (ooCur.items || []).forEach(it => { lines.push((it.productName || '') + '  x' + it.qty); });
+      lines.push('----------------------');
+      lines.push('TOTAL: ' + ooCur.total.toFixed(2));
+      lines.push('');
+      const pr = AndroidPrinter.print(lines.join('\n'));
+      if (pr !== 'OK') toast(pr.replace('ERR:', ''), 'error');
+    }
+    // ─── EDIT ITEMS (pending/confirmed, bago i-assign sa driver) ───────
+    let ooEditItems = [], ooEditQ = '', ooEditResults = [], ooEditTimer = null;
+    function ooEditMode() {
+      ooEditItems = (ooCur.items || []).map(it => ({ pid: it.productId, name: it.productName, unit: it.unitName || 'PC', qty: it.qty, price: Number(it.price || 0) }));
+      ooEditQ = ''; ooEditResults = [];
+      renderOoEdit();
+    }
+    function renderOoEdit() {
+      const fee = Number(ooCur.deliveryFee || 0);
+      const total = ooEditItems.reduce((s, it) => s + it.price * it.qty, 0) + fee;
+      const rows = ooEditItems.map((it, i) =>
+        '<div class="flex items-center gap-2 bg-[#1a1a44] rounded-xl px-3 py-2 border border-[#222255]">' +
+          '<div class="flex-1 min-w-0"><p class="text-white text-[13px] truncate">' + (it.name || '') + '</p><p class="text-gray-500 text-[10px]">' + it.unit + ' · P' + Number(it.price).toFixed(2) + '</p></div>' +
+          '<div class="flex items-center gap-1">' +
+            '<button onclick="ooEditQty(' + i + ',-1)" class="w-7 h-7 rounded-lg bg-[#222255] text-white font-black">−</button>' +
+            '<span class="text-white font-bold text-sm w-6 text-center">' + it.qty + '</span>' +
+            '<button onclick="ooEditQty(' + i + ',1)" class="w-7 h-7 rounded-lg bg-[#222255] text-white font-black">+</button>' +
+          '</div>' +
+          '<span class="text-gray-300 font-bold text-sm w-16 text-right">' + (it.price * it.qty).toFixed(2) + '</span>' +
+          '<button onclick="ooEditRemove(' + i + ')" class="text-red-400 font-black px-1 text-base">✕</button>' +
+        '</div>').join('');
+      const results = ooEditResults.map(p =>
+        '<button onclick="ooAddResult(' + p.id + ', \'' + String(p.name || '').replace(/'/g, "\\'") + '\', ' + Number(p.price || 0) + ')" class="w-full text-left bg-[#1a1a44] rounded-xl px-3 py-2 border border-[#222255] mb-1">' +
+          '<p class="text-white text-[13px] truncate">' + (p.name || '') + '</p><p class="text-gray-500 text-[10px]">P' + Number(p.price || 0).toFixed(2) + '</p></button>').join('');
+      document.getElementById('ooTitle').textContent = (ooCur.orderNo || '') + ' · ✏️ Edit Items';
+      document.getElementById('ooBody').innerHTML =
+        '<div class="space-y-2">' + (rows || '<p class="text-gray-400 text-xs text-center py-3">Walang items — mag-add sa ibaba</p>') + '</div>' +
+        '<p class="text-[11px] text-gray-400 font-bold uppercase tracking-wide mt-3">ADD ITEM</p>' +
+        '<input id="ooEditSearch" type="text" placeholder="🔍 Search product..." value="' + ooEditQ + '" oninput="ooSearchAdd(this.value)" class="w-full bg-[#181848] text-white text-sm border border-[#222255] rounded-xl px-3 py-2.5">' +
+        '<div class="max-h-40 overflow-y-auto mt-1">' + results + '</div>' +
+        '<div class="flex items-center justify-between bg-[#1a1a44] rounded-xl px-3.5 py-3 mt-2"><span class="text-white font-bold">TOTAL</span><span class="text-white font-black">P' + total.toFixed(2) + '</span></div>' +
+        '<div class="grid grid-cols-2 gap-2 mt-2">' +
+          '<button onclick="ooCancelEdit()" class="bg-[#222255] text-white font-bold rounded-xl py-3 text-sm">CANCEL</button>' +
+          '<button onclick="ooSaveEdit()" class="bg-emerald-600 text-white font-black rounded-xl py-3 text-sm">💾 SAVE ITEMS</button>' +
+        '</div>';
+    }
+    function ooEditQty(i, d) {
+      ooEditItems[i].qty = Math.max(1, (ooEditItems[i].qty || 1) + d);
+      renderOoEdit();
+    }
+    function ooEditRemove(i) { ooEditItems.splice(i, 1); renderOoEdit(); }
+    async function ooSearchAdd(v) {
+      ooEditQ = v.trim();
+      clearTimeout(ooEditTimer);
+      ooEditTimer = setTimeout(async () => {
+        if (!ooEditQ) { ooEditResults = []; renderOoEdit(); return; }
+        try {
+          const r = await fetch(API + '/dashboard' + '/shop/catalog/search?q=' + encodeURIComponent(ooEditQ) + '&limit=15');
+          ooEditResults = await r.json();
+        } catch (e) { ooEditResults = []; }
+        renderOoEdit();
+      }, 300);
+    }
+    function ooAddResult(pid, name, price) {
+      if (ooEditItems.some(x => x.pid === pid)) { toast('Nasa listahan na ang item', 'error'); return; }
+      ooEditItems.push({ pid, name, unit: 'PC', qty: 1, price: Number(price || 0) });
+      ooEditQ = ''; ooEditResults = [];
+      renderOoEdit();
+    }
+    async function ooSaveEdit() {
+      try {
+        const items = ooEditItems.map(it => ({ productId: it.pid, unitName: it.unit, qty: it.qty }));
+        const r = await fetch(API + '/dashboard' + '/shop/orders/' + ooCur.id + '/items', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.message || 'Save failed');
+        toast('Items updated — bagong total: P' + Number(j.total || 0).toFixed(2) + ' ✓');
+        openOnlineOrder(ooCur.id);
+      } catch (e) { toast(e.message, 'error'); }
+    }
+    function ooCancelEdit() { openOnlineOrder(ooCur.id); }
+
+    function printOrderReceipt() {
+      if (!IN_APP) { toast('Open the app (APK) to use Bluetooth', 'error'); return; }
+      const o = ooCur;
+      const padN = (t, n) => { t = String(t); while (t.length < n) t += ' '; return t; };
+      const center = (t) => ' '.repeat(Math.max(0, Math.floor((44 - t.length) / 2))) + t;
+      const sep = '----------------------------';
+      const dt = String(o.createdAt || '').slice(0, 16).replace('T', ' ');
+      const withPts = (o.items || []).filter(it => Number(it.points || 0) > 0);
+      const noPts = (o.items || []).filter(it => !(Number(it.points || 0) > 0));
+      const tp = Number(o.totalPoints || 0);
+      const ap = Number(o.awardPoints || 0);
+      const verb = o.paidStatus === 'paid' ? 'earned' : 'to earn';
+      const itemLine = (it) => padN((it.productName || '').slice(0, 29), 30) + ' x' + it.qty + ' ' + Number(it.total).toFixed(2);
+      const L = [];
+      L.push(center('ANDENGS SUPERSTORE'));
+      L.push(center('--- Online Order Receipt ---'));
+      L.push(sep);
+      L.push('Order: ' + (o.orderNo || ''));
+      if (dt) L.push('Date:  ' + dt);
+      L.push('Customer: ' + (o.customerName || ''));
+      if (o.phone) L.push('Phone: ' + o.phone);
+      L.push('Address: Blk ' + (o.block || '-') + ' Lot ' + (o.lot || '-') + (o.subdivision ? ', ' + o.subdivision : ''));
+      if (o.address) L.push('  ' + o.address);
+      if (o.deliveryNote) L.push('Note: ' + o.deliveryNote);
+      L.push(sep);
+      if (withPts.length) {
+        L.push('-- WITH POINTS --');
+        withPts.forEach(it => L.push(itemLine(it)));
+        L.push(sep);
+        L.push('** TOTAL: ' + tp.toFixed(2) + ' pts -> ' + (ap >= 1 ? '+' + ap.toFixed(2) + ' point' + (ap > 1 ? 's' : '') + ' (' + verb + ')' : '+0.00 (kulang pa para sa 1 point)'));
+        L.push(sep);
+      }
+      if (noPts.length) {
+        L.push('-- WALANG POINTS --');
+        noPts.forEach(it => L.push(itemLine(it)));
+        L.push(sep);
+      }
+      const sub = (o.items || []).reduce((s, it) => s + Number(it.total || 0), 0);
+      L.push(padN('SUBTOTAL', 38) + sub.toFixed(2));
+      L.push(padN('DELIVERY FEE', 38) + Number(o.deliveryFee || 0).toFixed(2));
+      L.push(padN('TOTAL', 38) + Number(o.total || 0).toFixed(2));
+      if (withPts.length && ap < 1) L.push('** Points ' + verb + ': ' + tp.toFixed(2) + ' pts -> +0.00 (P200 = 1 point)');
+      L.push('Payment: ' + (o.paymentMethod || 'COD'));
+      L.push(sep);
+      L.push(center('Salamat po!'));
+      L.push(center('Mag-order muli :)'));
+      const pr = AndroidPrinter.print(L.join('\n'));
+      if (pr !== 'OK') toast(pr.replace('ERR:', ''), 'error');
     }
 
     // ─── MODERN PULL-TO-REFRESH (called by native app) ───────

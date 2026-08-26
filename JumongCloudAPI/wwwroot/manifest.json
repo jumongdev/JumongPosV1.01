@@ -1,8 +1,16 @@
 {
-  "name": "Jumong Order",
-  "short_name": "Jumong",
-  "start_url": "/order.html",
+  "name": "Andengs Superstore - Online Shop",
+  "short_name": "Andengs Shop",
+  "description": "Order groceries online from Andengs Superstore, Naic, Cavite. Free delivery around Naic.",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0a0a1a",
-  "theme_color": "#00f5ff"
+  "orientation": "portrait",
+  "background_color": "#f6f6f7",
+  "theme_color": "#5b21b6",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
 }

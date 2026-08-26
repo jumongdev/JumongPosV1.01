@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
+<title>Andengs Delivery</title>
+<meta name="theme-color" content="#5b21b6">
+<link rel="manifest" href="/manifest-driver.json">
+<link rel="icon" type="image/png" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Andengs Driver">
+<script>
+  // Polyfill para sa mga lumang WebView (Android 11) na walang Array.prototype.at
+  if (!Array.prototype.at) { Array.prototype.at = function (n) { n = Math.trunc(n) || 0; if (n < 0) n += this.length; return n < 0 || n >= this.length ? undefined : this[n]; }; }
+</script>
+<script src="https://cdn.tailwindcss.com" defer></script>
+<style>
+  * { -webkit-tap-highlight-color: transparent; }
+  html, body { background: #f6f6f7; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; color: #1c1917; }
+  .safe-top { padding-top: env(safe-area-inset-top); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  .card { background: #fff; border-radius: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px -12px rgba(0,0,0,.12); }
+  .hidden-el { display: none !important; }
+  #toastBox { position: fixed; top: calc(env(safe-area-inset-top) + 12px); left: 50%; transform: translateX(-50%); z-index: 100; width: calc(100% - 32px); max-width: 380px; }
+  .toast { animation: fadeIn .2s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .anim-up { animation: slideUp .28s ease-out; }
+  /* critical-css: pag ang Tailwind CDN ay mabagal/blocked, gumagana pa rin ang login screen */
+  .min-h-screen { min-height: 100vh; }
+  .flex { display: flex; } .flex-col { flex-direction: column; } .flex-1 { flex: 1; }
+  .items-center { align-items: center; } .items-start { align-items: flex-start; } .items-end { align-items: flex-end; }
+  .justify-center { justify-content: center; } .justify-between { justify-content: space-between; }
+  .hidden { display: none !important; }
+  .w-full { width: 100%; } .max-w-sm { max-width: 24rem; } .max-w-md { max-width: 28rem; }
+  .mx-auto { margin-left: auto; margin-right: auto; }
+  .px-4 { padding-left: 1rem; padding-right: 1rem; } .px-5 { padding-left: 1.25rem; padding-right: 1.25rem; }
+  .py-4 { padding-top: 1rem; padding-bottom: 1rem; } .p-6 { padding: 1.5rem; } .p-4 { padding: 1rem; } .p-3 { padding: .75rem; }
+  .text-center { text-align: center; } .text-left { text-align: left; } .text-right { text-align: right; }
+  .text-xs { font-size: .75rem; line-height: 1rem; } .text-sm { font-size: .875rem; line-height: 1.25rem; }
+  .text-lg { font-size: 1.125rem; line-height: 1.75rem; } .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+  .font-bold { font-weight: 700; } .font-black { font-weight: 900; } .font-extrabold { font-weight: 800; }
+  .mt-1 { margin-top: .25rem; } .mt-2 { margin-top: .5rem; } .mt-3 { margin-top: .75rem; } .mt-4 { margin-top: 1rem; }
+  .mb-1 { margin-bottom: .25rem; } .mb-2 { margin-bottom: .5rem; } .mb-5 { margin-bottom: 1.25rem; }
+  .space-y-2 > * + * { margin-top: .5rem; } .space-y-2\.5 > * + * { margin-top: .625rem; } .space-y-3 > * + * { margin-top: .75rem; }
+  .rounded-xl { border-radius: .75rem; } .rounded-2xl { border-radius: 1rem; } .rounded-lg { border-radius: .5rem; }
+  .border { border-width: 1px; } .border-2 { border-width: 2px; } .border-gray-200 { border-color: #e5e7eb; } .border-gray-100 { border-color: #f3f4f6; }
+  .border-violet-300 { border-color: #c4b5fd; } .border-red-200 { border-color: #fecaca; }
+  .bg-white { background: #fff; } .text-white { color: #fff; }
+  .text-stone-900 { color: #1c1917; } .text-stone-500 { color: #78716c; } .text-stone-400 { color: #a8a29e; }
+  .text-red-500 { color: #ef4444; } .text-violet-700 { color: #7c3aed; } .text-emerald-600 { color: #059669; }
+  .bg-violet-700 { background: #7c3aed; } .bg-emerald-600 { background: #059669; }
+  input, select, button { max-width: 100%; }
+</style>
+</head>
+<body class="safe-top safe-bottom">
+
+<!-- ERROR BANNER (para hindi na "white page" kung may problema) -->
+<div id="errBanner" class="hidden fixed top-0 left-0 right-0 z-[99] bg-red-600 text-white text-xs font-bold px-4 py-3 flex items-center justify-between gap-2" style="padding-top:max(env(safe-area-inset-top),12px)">
+  <span id="errText">May error ang app</span>
+  <button onclick="location.href='driver-app.html?v='+Date.now()+'&r=1'" class="shrink-0 bg-white text-red-600 font-black rounded-lg px-3 py-1.5">RELOAD</button>
+</div>
+<!-- UPDATE BAR (in-APK) -->
+<div id="updateBar" class="hidden fixed top-0 left-0 right-0 z-[98] bg-amber-500 text-white text-xs font-bold px-4 py-3 flex items-center justify-between gap-2" style="padding-top:max(env(safe-area-inset-top),12px)">
+  <span>📲 May bagong bersyon ng app!</span>
+  <button onclick="AndroidApp.downloadAndInstall('https://driver.jumongdev.com/updates/JumongDriver.apk')" class="shrink-0 bg-white text-amber-600 font-black rounded-lg px-3 py-1.5">UPDATE</button>
+</div>
+
+
+<!-- LOGIN -->
+<noscript><div style="padding:20px;font-family:sans-serif;text-align:center"><b>Andengs Delivery</b><br>Paki-enable ang JavaScript sa iyong browser para magamit ang driver app.</div></noscript>
+<div id="loginScreen" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:0 20px;">
+  <div style="width:100%;max-width:380px;background:#fff;border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:24px;box-sizing:border-box;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+      <div style="width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:24px;background:linear-gradient(135deg,#5b21b6,#4f46e5)">🚚</div>
+      <button onclick="openInstall()" style="font-size:10px;font-weight:700;color:#7c3aed;border:1px solid #c4b5fd;border-radius:8px;padding:6px 10px;background:#fff;cursor:pointer;">📲 INSTALL APP</button>
+    </div>
+    <h1 style="text-align:center;font-weight:800;font-size:18px;color:#1c1917;margin:12px 0 0;">Andengs Delivery</h1>
+    <p style="text-align:center;font-size:12px;color:#a8a29e;margin:0 0 20px;">Driver app · Andengs Superstore</p>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <input id="lgUser" type="text" placeholder="Username" style="width:100%;border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;font-size:14px;outline:none;box-sizing:border-box;">
+      <input id="lgPass" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" style="width:100%;border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;font-size:14px;outline:none;box-sizing:border-box;">
+      <button onclick="doLogin()" style="width:100%;background:#7c3aed;color:#fff;font-weight:700;border:none;border-radius:12px;padding:14px;font-size:14px;cursor:pointer;">SIGN IN</button>
+      <a href="/updates/JumongDriver.apk" style="display:block;text-align:center;border:2px solid #c4b5fd;color:#7c3aed;font-weight:700;border-radius:12px;padding:13px;font-size:13px;text-decoration:none;">📲 DOWNLOAD APK (Android)</a>
+    </div>
+    <p id="lgErr" class="hidden" style="text-align:center;font-size:12px;color:#ef4444;margin-top:12px;"></p>
+    <p style="text-align:center;font-size:10px;color:#a8a29e;margin-top:16px;">v1.1.50 · driver app</p>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="mainScreen" class="hidden max-w-md mx-auto px-4 py-4 space-y-3">
+    <p id="pullHint" class="hidden text-center text-[11px] text-stone-400 py-1">↓ hilahin pababa para i-refresh</p>
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <h1 class="font-extrabold text-stone-900">🚚 My Deliveries</h1>
+        <p class="text-[11px] text-stone-400" id="drvName"></p>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <button onclick="returnToHq()" class="text-[10px] font-bold text-emerald-700 border border-emerald-300 rounded-lg px-2.5 py-1.5">🏠 RETURN TO HQ</button>
+        <button onclick="openInstall()" class="text-[10px] font-bold text-violet-700 border border-violet-300 rounded-lg px-2.5 py-1.5">📲 INSTALL</button>
+        <button onclick="logout()" class="text-[11px] font-bold text-red-500 border border-red-200 rounded-lg px-3 py-1.5">SIGN OUT</button>
+      </div>
+    </div>
+  <div id="orderList" class="space-y-3"></div>
+  <p id="listEmpty" class="hidden text-center text-xs text-stone-400 py-10">Wala pang nakatalagang delivery</p>
+  <button onclick="logout()" class="w-full border-2 border-red-200 text-red-500 font-bold rounded-xl py-3 text-sm mt-2">🚪 SIGN OUT</button>
+</div>
+
+<!-- INSTALL MODAL -->
+<div id="installModal" class="hidden fixed inset-0 z-[90] bg-black/60 flex items-end sm:items-center justify-center" onclick="if(event.target===this)closeInstall()">
+  <div class="w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-3xl p-6 anim-up safe-bottom">
+    <div class="flex items-start justify-between">
+      <p class="font-extrabold text-stone-900 text-lg">📲 Install Driver App</p>
+      <button onclick="closeInstall()" class="p-1.5 -mr-1.5 hover:bg-gray-100 rounded-xl text-stone-500">✕</button>
+    </div>
+    <p class="text-xs text-stone-500 mt-1 leading-relaxed">I-install ang app para laging available kahit walang address bar — parang native app sa phone.</p>
+    <div class="mt-3 space-y-2 text-xs text-stone-600">
+      <p><b>Android (Chrome):</b> i-tap ang <b>📲 INSTALL</b> button sa ibaba, o ang ⋮ menu → <b>Install app</b></p>
+      <p><b>iPhone (Safari):</b> i-tap ang <b>Share ⬆️</b> → <b>Add to Home Screen</b> → <b>Add</b></p>
+    </div>
+    <button id="installBtn" onclick="doInstall()" class="hidden w-full bg-violet-700 hover:bg-violet-800 text-white font-black rounded-xl py-3.5 text-sm transition mt-4">📲 INSTALL NOW</button>
+    <button onclick="closeInstall()" class="w-full border-2 border-gray-200 text-stone-600 font-bold rounded-xl py-3 text-sm mt-2">CLOSE</button>
+  </div>
+</div>
+
+<!-- ORDER DETAIL -->
+<div id="detailScreen" class="hidden max-w-md mx-auto px-4 py-4 space-y-3">
+  <button onclick="backToList()" class="text-xs font-bold text-violet-700">← Back to deliveries</button>
+  <div id="detailBox" class="space-y-3"></div>
+</div>
+
+<!-- PAYMENT SCREEN -->
+<div id="payScreen" class="hidden max-w-md mx-auto px-4 py-4 space-y-3">
+  <button onclick="backToDetail()" class="text-xs font-bold text-violet-700">← Back</button>
+  <div class="card p-4">
+    <p class="text-[11px] text-stone-400 font-bold uppercase tracking-wide">Collect Payment</p>
+    <p class="text-2xl font-black text-stone-900 mt-1" id="payTotal">₱0.00</p>
+    <p class="text-[11px] text-stone-400" id="payOrderNo"></p>
+    <p class="text-[11px] text-stone-500 mt-1">Sukli para sa cash: <b id="payChange" class="text-emerald-600">₱0.00</b></p>
+  </div>
+  <div class="card p-4 space-y-3">
+    <p class="text-xs font-bold text-stone-500">PAYMENT METHOD</p>
+    <div class="grid grid-cols-3 gap-2">
+      <button id="mCash" onclick="setMethod('cash')" class="border-2 rounded-xl py-2.5 text-xs font-bold transition">💵 CASH</button>
+      <button id="mGcash" onclick="setMethod('gcash')" class="border-2 rounded-xl py-2.5 text-xs font-bold transition">📱 GCASH</button>
+      <button id="mSplit" onclick="setMethod('split')" class="border-2 rounded-xl py-2.5 text-xs font-bold transition">✂️ SPLIT</button>
+    </div>
+    <div id="cashRow">
+      <label class="text-[11px] text-stone-500 block mb-1">Cash na natanggap (input amount)</label>
+      <input id="payCash" type="number" inputmode="decimal" placeholder="e.g. 500" oninput="calcChange()" class="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-violet-500/40">
+    </div>
+    <div id="gcashRow" class="hidden space-y-2.5">
+      <div class="rounded-xl border border-violet-100 bg-violet-50 p-3">
+        <p class="text-[11px] text-violet-700 font-bold mb-2">📱 I-scan ng customer ang store GCash QR:</p>
+        <div id="payQrBox1" class="grid grid-cols-2 gap-2"></div>
+        <p class="text-[10px] text-violet-500 mt-1.5">Tapos punan sa ibaba: amount, ref ng customer, at proof picture.</p>
+      </div>
+      <label class="text-[11px] text-stone-500 block">GCash amount</label>
+      <input id="payGcashAmt" type="number" inputmode="decimal" placeholder="Amount" oninput="calcChange()" class="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-violet-500/40">
+      <label class="text-[11px] text-stone-500 block">GCash reference / account</label>
+      <input id="payGcashRef" type="text" placeholder="e.g. REF 123456 / name" class="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-violet-500/40">
+      <label class="text-[11px] text-stone-500 block">GCash proof picture (screenshot)</label>
+      <input id="payGcashPic" type="file" accept="image/*" capture="environment" class="w-full text-xs text-stone-500">
+    </div>
+    <div id="splitGcashRow" class="hidden space-y-2.5">
+      <div class="rounded-xl border border-violet-100 bg-violet-50 p-3">
+        <p class="text-[11px] text-violet-700 font-bold mb-2">📱 I-scan ng customer ang store GCash QR (para sa gcash part):</p>
+        <div id="payQrBox2" class="grid grid-cols-2 gap-2"></div>
+      </div>
+      <label class="text-[11px] text-stone-500 block">GCash part amount</label>
+      <input id="paySplitGcash" type="number" inputmode="decimal" placeholder="GCash part" oninput="calcChange()" class="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-violet-500/40">
+      <label class="text-[11px] text-stone-500 block">GCash reference / account</label>
+      <input id="paySplitRef" type="text" placeholder="e.g. REF 123456 / name" class="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-violet-500/40">
+      <label class="text-[11px] text-stone-500 block">GCash proof picture</label>
+      <input id="paySplitPic" type="file" accept="image/*" capture="environment" class="w-full text-xs text-stone-500">
+    </div>
+    <button id="payBtn" onclick="submitPayment()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl py-4 text-sm transition">✔ ACCEPT PAYMENT</button>
+    <p id="payErr" class="hidden text-center text-xs text-red-500"></p>
+  </div>
+</div>
+
+<!-- CANCEL MODAL -->
+<div id="cancelModal" class="hidden fixed inset-0 z-[90] bg-black/60 flex items-end sm:items-center justify-center" onclick="if(event.target===this)closeCancel()">
+  <div class="w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-3xl p-6 anim-up safe-bottom">
+    <p class="font-extrabold text-stone-900 text-lg">✖ Cancel Order</p>
+    <p class="text-xs text-stone-500 mt-1">Walang tao sa site? I-cancel ang order — ibabalik ang stock sa tindahan.</p>
+    <textarea id="cancelReason" rows="2" placeholder="Dahilan ng cancellation *" class="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-red-500/40 mt-3"></textarea>
+    <p id="cancelErr" class="hidden text-xs text-red-500 mt-2"></p>
+    <button onclick="confirmCancel()" class="w-full bg-red-500 hover:bg-red-600 text-white font-black rounded-xl py-3.5 text-sm transition mt-3">CONFIRM CANCEL</button>
+    <button onclick="closeCancel()" class="w-full border-2 border-gray-200 text-stone-600 font-bold rounded-xl py-3 text-sm mt-2">BACK</button>
+  </div>
+</div>
+
+<div id="toastBox"></div>
+
+<script>
+const API = 'https://admin.jumongdev.com/api/dashboard';
+let token = localStorage.getItem('drv_token') || '';
+let drvName = localStorage.getItem('drv_name') || '';
+let orders = [];
+let curOrder = null;
+let method = 'cash';
+let paymentQrs = [];
+
+function esc(s) { return (s + '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+const fmt = n => '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function toast(msg, type) {
+  const box = document.getElementById('toastBox');
+  const el = document.createElement('div');
+  el.className = 'toast mb-2 px-4 py-3 rounded-2xl text-sm font-semibold shadow-xl text-white ' + (type === 'error' ? 'bg-red-500' : 'bg-stone-900');
+  el.textContent = msg;
+  box.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2500);
+}
+async function api(path, opts) {
+  const r = await fetch(API + path, Object.assign({}, opts, {
+    headers: Object.assign({ 'Authorization': 'Bearer ' + token }, opts && opts.headers)
+  }));
+  return r;
+}
+
+async function loadPaymentQrs() {
+  try {
+    const r = await fetch(API + '/payment-qrs', { timeout: 8000 });
+    const j = await r.json();
+    paymentQrs = (j.qrs || []).filter(q => q.isActive);
+    renderPayQrs();
+  } catch (e) { paymentQrs = []; }
+}
+function renderPayQrs() {
+  const boxes = ['payQrBox1', 'payQrBox2'];
+  boxes.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = paymentQrs.length
+      ? paymentQrs.map(q =>
+          '<div class="rounded-xl bg-white p-2 text-center shadow-sm">' +
+            (q.file ? '<img src="https://admin.jumongdev.com/assets/' + encodeURIComponent(q.file) + '" alt="QR" class="w-full rounded-lg border border-gray-100" style="max-height:150px;object-fit:contain">' : '') +
+            (q.header ? '<p class="text-[10px] font-bold text-stone-600 mt-1 truncate">' + esc(q.header) + '</p>' : '') +
+          '</div>').join('')
+      : '<p class="col-span-2 text-[10px] text-violet-400 text-center py-1">Walang QR — i-set ng admin sa dashboard (POS QR panel)</p>';
+  });
+}
+
+// ─── INSTALL APP (PWA) ───────────────────────────────
+window.addEventListener('error', e => {
+  try { _diag.push('err:' + (e.message || e.type)); } catch (_) {}
+  try {
+    const errEl = document.getElementById('lgErr');
+    if (errEl) { errEl.textContent = 'Error: ' + (e.message || 'unknown'); errEl.classList.remove('hidden'); }
+    const b = document.getElementById('errBanner');
+    if (b) {
+      b.classList.remove('hidden');
+      document.getElementById('errText').textContent = 'Error: ' + (e.message || e.type || 'unknown');
+    }
+  } catch (_) {}
+});
+let _diag = [];
+try { _diag.push('ua:' + (navigator.userAgent || '').slice(0, 80)); } catch (_) {}
+window.addEventListener('unhandledrejection', e => {
+  try { _diag.push('rej:' + ((e.reason && (e.reason.message || e.reason)) || 'unknown')); } catch (_) {}
+});
+setTimeout(() => {
+  try {
+    const login = document.getElementById('loginScreen');
+    const main = document.getElementById('mainScreen');
+    _diag.push('loginVisible:' + !!(login && login.style.display !== 'none' && !login.classList.contains('hidden')));
+    _diag.push('mainVisible:' + !!(main && !main.classList.contains('hidden')));
+    _diag.push('tw:' + (typeof tailwind !== 'undefined'));
+    _diag.push('bodyChildren:' + document.body.children.length);
+    _diag.push('w:' + (window.innerWidth || 0) + 'x' + (window.innerHeight || 0));
+    _diag.push('url:' + location.pathname);
+    fetch('https://admin.jumongdev.com/api/dashboard/crash-report', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ app: 'driver-app', version: '1.1.50', device: navigator.platform || '', type: 'diag', log: _diag.join('\n').slice(0, 2000) })
+    }).catch(() => {});
+  } catch (_) {}
+}, 3000);
+setTimeout(() => {
+  try {
+    const main = document.getElementById('mainScreen');
+    const login = document.getElementById('loginScreen');
+    const visible = (main && !main.classList.contains('hidden') && main.style.display !== 'none') || (login && login.style.display !== 'none');
+    if (!visible) {
+      const isRetry = /[?&]r=1/.test(location.href);
+      if (!isRetry) { location.href = location.pathname + '?v=' + Date.now() + '&r=1'; return; }
+      const b = document.getElementById('errBanner');
+      if (b) { b.classList.remove('hidden'); document.getElementById('errText').textContent = 'Hindi ma-load ang app — pindutin ang RELOAD'; }
+    }
+  } catch (_) {}
+}, 6000);
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const b = document.getElementById('installBtn');
+  if (b) b.classList.remove('hidden');
+});
+window.addEventListener('appinstalled', () => { deferredPrompt = null; toast('App installed! ✓'); });
+function openInstall() { document.getElementById('installModal').classList.remove('hidden'); }
+function closeInstall() { document.getElementById('installModal').classList.add('hidden'); }
+function doInstall() {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+  } else {
+    toast('Gamitin ang browser menu: ⋮ → Install app (Android) o Share → Add to Home Screen (iPhone)', 'error');
+  }
+}
+
+if (token) { document.getElementById('drvName').textContent = drvName; show('main'); loadOrders(); }
+else show('loginScreen');
+loadPaymentQrs();
+(function checkDriverAppUpdate() {
+  if (!window.AndroidApp || typeof AndroidApp.getVersion !== 'function') return;
+  try {
+    const ver = String(AndroidApp.getVersion() || '');
+    const raw = String(AndroidApp.checkForUpdate('https://driver.jumongdev.com/updates/driver-version.json') || '');
+    const j = JSON.parse(raw);
+    if (j.version && j.version !== ver) {
+      const bar = document.getElementById('updateBar');
+      if (bar) bar.classList.remove('hidden');
+    }
+  } catch (e) {}
+})();
+
+function show(id) {
+  const map = { loginScreen: 'flex', mainScreen: 'block', detailScreen: 'block', payScreen: 'block' };
+  ['loginScreen', 'mainScreen', 'detailScreen', 'payScreen'].forEach(s => {
+    const el = document.getElementById(s);
+    if (!el) return;
+    if (s === id) { el.classList.remove('hidden'); el.style.display = (map[s] || 'block'); }
+    else { el.classList.add('hidden'); el.style.display = 'none'; }
+  });
+}
+
+function report(msg) {
+  try {
+    fetch('https://admin.jumongdev.com/api/dashboard/crash-report', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ app: 'driver-app', version: '1.1.50', device: navigator.platform || '', type: 'login', log: msg + '\nua:' + (navigator.userAgent || '').slice(0, 120) })
+    }).catch(() => {});
+  } catch (_) {}
+}
+function setErr(msg) {
+  const err = document.getElementById('lgErr');
+  if (err) { err.textContent = msg; err.classList.remove('hidden'); }
+}
+
+async function doLogin() {
+  const u = document.getElementById('lgUser').value.trim();
+  const p = document.getElementById('lgPass').value;
+  const err = document.getElementById('lgErr');
+  err.classList.add('hidden');
+  if (!u || !p) { err.textContent = 'Enter username and password'; err.classList.remove('hidden'); report('empty fields'); return; }
+  try {
+    const r = await fetch(API + '/driver/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: u, password: p }) });
+    report('status:' + r.status);
+    let j = {};
+    try { j = await r.json(); } catch (e) { report('json-parse-fail'); throw new Error('Unexpected server response (' + r.status + ')'); }
+    if (!r.ok) throw new Error(j.error || 'Login failed (' + r.status + ')');
+    token = j.token; drvName = j.name || u;
+    localStorage.setItem('drv_token', token);
+    localStorage.setItem('drv_name', drvName);
+    document.getElementById('drvName').textContent = drvName;
+    show('main');
+    loadOrders();
+  } catch (e) { err.textContent = e.message; err.classList.remove('hidden'); report('err:' + e.message); }
+}
+function logout() {
+  token = ''; localStorage.removeItem('drv_token'); localStorage.removeItem('drv_name');
+  document.getElementById('lgPass').value = '';
+  show('loginScreen');
+}
+
+async function loadOrders() {
+  try {
+    const r = await api('/driver/orders');
+    report('orders:' + r.status);
+    if (r.status === 401) { setErr('⚠ Hindi na-validate ang session — mag-login ulit'); logout(); return; }
+    orders = await r.json();
+    document.getElementById('listEmpty').classList.toggle('hidden', orders.length > 0);
+    const wrap = document.getElementById('orderList');
+    wrap.innerHTML = orders.map(o => {
+      const paid = o.paidStatus === 'paid';
+      return '<div class="card p-4" onclick="openDetail(' + o.id + ')">' +
+        '<div class="flex items-center justify-between">' +
+          '<p class="font-extrabold text-sm">' + o.orderNo + '</p>' +
+          (paid ? '<span class="text-[9px] font-black px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">PAID</span>' : '<span class="text-[9px] font-black px-2 py-1 rounded-full bg-amber-100 text-amber-700">TO COLLECT</span>') +
+        '</div>' +
+        '<p class="text-[13px] font-semibold mt-1.5">' + esc(o.customerName) + '</p>' +
+        '<p class="text-[11px] text-stone-400">📞 ' + esc(o.phone) + '</p>' +
+        '<p class="text-[11px] text-stone-500 mt-1">📍 Blk ' + esc(o.block || '-') + ' Lot ' + esc(o.lot || '-') + ', ' + esc(o.subdivision || '') + (o.address ? ' · ' + esc(o.address) : '') + '</p>' +
+        '<div class="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">' +
+          '<span class="text-[11px] text-stone-400">' + o.paymentMethod + '</span>' +
+          '<span class="font-black text-stone-900">' + fmt(o.total) + '</span>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch (e) { toast('Failed to load: ' + e.message, 'error'); }
+}
+
+async function openDetail(id) {
+  try {
+    const r = await api('/driver/orders/' + id);
+    if (r.status === 401) { setErr('⚠ Hindi na-validate ang session — mag-login ulit'); logout(); return; }
+    if (!r.ok) { toast('Order not found', 'error'); return; }
+    const j = await r.json();
+    curOrder = j.order;
+    const items = j.items.map(it =>
+      '<div class="flex justify-between text-sm"><span class="text-stone-600">' + esc(it.productName) + ' × ' + it.qty + ' ' + esc(it.unitName) + '</span><span class="font-semibold">' + fmt(it.total) + '</span></div>').join('');
+    document.getElementById('detailBox').innerHTML =
+      '<div class="card p-4">' +
+        '<div class="flex items-center justify-between">' +
+          '<p class="font-extrabold">' + curOrder.orderNo + '</p>' +
+          (curOrder.paidStatus === 'paid' ? '<span class="text-[9px] font-black px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">PAID</span>' : '<span class="text-[9px] font-black px-2 py-1 rounded-full bg-amber-100 text-amber-700">TO COLLECT</span>') +
+        '</div>' +
+        '<div class="mt-3 text-sm space-y-1">' +
+          '<p class="font-bold">' + esc(curOrder.customerName) + '</p>' +
+          '<p class="text-stone-500 text-xs">📞 ' + esc(curOrder.phone) + '</p>' +
+          '<p class="text-stone-500 text-xs">📍 <b>Blk ' + esc(curOrder.block || '-') + ' Lot ' + esc(curOrder.lot || '-') + '</b>, ' + esc(curOrder.subdivision || '') + (curOrder.address ? ' · ' + esc(curOrder.address) : '') + '</p>' +
+          (curOrder.deliveryNote ? '<p class="text-amber-600 text-xs">📝 ' + esc(curOrder.deliveryNote) + '</p>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="card p-4"><p class="text-[11px] text-stone-400 font-bold uppercase tracking-wide mb-2">Items</p><div class="space-y-1.5">' + items + '</div>' +
+        '<div class="flex justify-between font-black mt-2 pt-2 border-t border-gray-100"><span>Total</span><span>' + fmt(curOrder.total) + '</span></div></div>' +
+      (curOrder.paidStatus === 'paid'
+        ? '<p class="text-center text-xs text-emerald-600 font-bold py-2">✅ Bayad na ang order na ito</p>'
+        : '<div class="space-y-2">' +
+            '<button onclick="markArrived()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl py-3 text-sm transition">📍 ARRIVED AT CUSTOMER</button>' +
+            '<button onclick="openCancel()" class="w-full border-2 border-red-200 text-red-500 font-bold rounded-2xl py-3 text-sm transition">✖ CANCEL ORDER (walang tao)</button>' +
+            '<button onclick="openPay()" class="w-full bg-violet-700 hover:bg-violet-800 text-white font-black rounded-2xl py-4 text-sm transition">💵 COLLECT PAYMENT</button>' +
+          '</div>');
+    show('detail');
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+// CANCEL MODAL
+function openCancel() {
+  document.getElementById('cancelReason').value = '';
+  document.getElementById('cancelErr').classList.add('hidden');
+  document.getElementById('cancelModal').classList.remove('hidden');
+}
+function closeCancel() { document.getElementById('cancelModal').classList.add('hidden'); }
+async function confirmCancel() {
+  const reason = document.getElementById('cancelReason').value.trim();
+  const err = document.getElementById('cancelErr');
+  err.classList.add('hidden');
+  if (reason.length < 3) { err.textContent = 'Ilagay ang dahilan ng cancellation'; err.classList.remove('hidden'); return; }
+  try {
+    const r = await api('/driver/orders/' + curOrder.id + '/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'Cancel failed');
+    closeCancel();
+    toast('Order cancelled — ibinalik ang stock ✓');
+    backToList();
+  } catch (e) { err.textContent = e.message; err.classList.remove('hidden'); }
+}
+async function markArrived() {
+  try {
+    const r = await api('/driver/orders/' + curOrder.id + '/arrived', { method: 'POST' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'Failed');
+    toast('📍 Arrived at customer');
+    openDetail(curOrder.id);
+  } catch (e) { toast(e.message, 'error'); }
+}
+async function returnToHq() {
+  if (!confirm('Umuwi ka na ba sa tindahan? I-uulat nito ang iyong mga nakolektang payments para sa remittance.')) return;
+  try {
+    const r = await api('/driver/return-to-hq', { method: 'POST' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'Failed');
+    toast('🏠 Returned to HQ — nakolekta: ' + fmt(j.cashTotal) + ' cash · ' + fmt(j.gcashTotal) + ' gcash (' + j.delivered + ' orders)');
+  } catch (e) { toast(e.message, 'error'); }
+}
+function backToList() { curOrder = null; show('main'); loadOrders(); }
+function backToDetail() { show('detail'); }
+
+// ─── PULL-TO-REFRESH (swipe down) ────────────────────
+let pullStart = 0, pulling = false, pullDist = 0;
+function onMainScreen() {
+  const ms = document.getElementById('mainScreen');
+  return ms && !ms.classList.contains('hidden');
+}
+function refreshAll() {
+  loadOrders();
+  loadPaymentQrs();
+  toast('↻ Refreshing...');
+}
+document.addEventListener('touchstart', e => {
+  if (!onMainScreen() || e.touches.length !== 1) return;
+  if (window.scrollY > 0) return;
+  pullStart = e.touches[0].clientY; pulling = true; pullDist = 0;
+}, { passive: true });
+document.addEventListener('touchmove', e => {
+  if (!pulling) return;
+  const dy = e.touches[0].clientY - pullStart;
+  if (dy > 0 && window.scrollY <= 0) {
+    pullDist = Math.min(dy, 90);
+    const h = document.getElementById('pullHint');
+    if (h) {
+      h.classList.remove('hidden');
+      h.textContent = pullDist >= 70 ? '↻ bitawan para i-refresh' : '↓ hilahin pababa para i-refresh';
+    }
+  }
+}, { passive: true });
+document.addEventListener('touchend', () => {
+  const doRefresh = pullDist >= 70;
+  pulling = false; pullDist = 0;
+  const h = document.getElementById('pullHint');
+  if (h) h.classList.add('hidden');
+  if (doRefresh) refreshAll();
+});
+
+function openPay() {
+  method = 'cash';
+  setMethod('cash');
+  document.getElementById('payTotal').textContent = fmt(curOrder.total);
+  document.getElementById('payOrderNo').textContent = curOrder.orderNo + ' · ' + curOrder.customerName;
+  document.getElementById('payCash').value = '';
+  document.getElementById('payGcashAmt').value = '';
+  document.getElementById('payGcashRef').value = '';
+  document.getElementById('paySplitGcash').value = '';
+  document.getElementById('paySplitRef').value = '';
+  document.getElementById('payGcashPic').value = '';
+  document.getElementById('paySplitPic').value = '';
+  document.getElementById('payErr').classList.add('hidden');
+  document.getElementById('payChange').textContent = '₱0.00';
+  renderPayQrs();
+  show('pay');
+}
+function setMethod(m) {
+  method = m;
+  const base = 'border-gray-200 bg-white text-stone-700';
+  const sel = 'border-violet-700 bg-violet-50 text-violet-800 ring-1 ring-violet-700/20';
+  document.getElementById('mCash').className = 'border-2 rounded-xl py-2.5 text-xs font-bold transition ' + (m === 'cash' ? sel : base);
+  document.getElementById('mGcash').className = 'border-2 rounded-xl py-2.5 text-xs font-bold transition ' + (m === 'gcash' ? sel : base);
+  document.getElementById('mSplit').className = 'border-2 rounded-xl py-2.5 text-xs font-bold transition ' + (m === 'split' ? sel : base);
+  document.getElementById('cashRow').classList.toggle('hidden', m !== 'cash');
+  document.getElementById('gcashRow').classList.toggle('hidden', m !== 'gcash');
+  document.getElementById('splitGcashRow').classList.toggle('hidden', m !== 'split');
+  if (m === 'cash') document.getElementById('payCash').value = '';
+  calcChange();
+}
+function cashAmount() {
+  if (method === 'cash') return Number(document.getElementById('payCash').value) || 0;
+  if (method === 'gcash') return Number(document.getElementById('payGcashAmt').value) || 0;
+  return Number(document.getElementById('payCash').value) || 0;
+}
+function calcChange() {
+  const total = curOrder ? curOrder.total : 0;
+  let change = 0;
+  if (method === 'cash') change = (Number(document.getElementById('payCash').value) || 0) - total;
+  else if (method === 'gcash') change = 0;
+  else change = (Number(document.getElementById('payCash').value) || 0) - (total - (Number(document.getElementById('paySplitGcash').value) || 0));
+  document.getElementById('payChange').textContent = fmt(Math.max(0, change));
+}
+async function submitPayment() {
+  const total = curOrder.total;
+  const err = document.getElementById('payErr');
+  err.classList.add('hidden');
+  let payments = [];
+  if (method === 'cash') {
+    const cash = Number(document.getElementById('payCash').value) || 0;
+    if (cash < total) { err.textContent = 'Cash received is less than the total (' + fmt(total) + ')'; err.classList.remove('hidden'); return; }
+    payments.push({ method: 'cash', amount: total });
+  } else if (method === 'gcash') {
+    const amt = Number(document.getElementById('payGcashAmt').value) || 0;
+    const ref = document.getElementById('payGcashRef').value.trim();
+    if (Math.abs(amt - total) > 0.01) { err.textContent = 'GCash amount must equal the total (' + fmt(total) + ')'; err.classList.remove('hidden'); return; }
+    if (!ref) { err.textContent = 'Enter GCash reference / account'; err.classList.remove('hidden'); return; }
+    const pic = document.getElementById('payGcashPic').files[0];
+    if (!pic) { err.textContent = 'Take/upload the GCash proof picture'; err.classList.remove('hidden'); return; }
+    payments.push({ method: 'gcash', amount: amt, gcashRef: ref });
+  } else {
+    const cash = Number(document.getElementById('payCash').value) || 0;
+    const g = Number(document.getElementById('paySplitGcash').value) || 0;
+    const ref = document.getElementById('paySplitRef').value.trim();
+    if (Math.abs(cash + g - total) > 0.01) { err.textContent = 'Cash + GCash must equal the total (' + fmt(total) + ')'; err.classList.remove('hidden'); return; }
+    if (!ref) { err.textContent = 'Enter GCash reference for the split part'; err.classList.remove('hidden'); return; }
+    const pic = document.getElementById('paySplitPic').files[0];
+    if (!pic) { err.textContent = 'Take/upload the GCash proof picture'; err.classList.remove('hidden'); return; }
+    if (g > 0) payments.push({ method: 'gcash', amount: g, gcashRef: ref });
+    if (cash > 0) payments.push({ method: 'cash', amount: cash });
+  }
+  const fd = new FormData();
+  fd.append('payments', JSON.stringify(payments));
+  const pics = method === 'cash' ? [] : method === 'gcash' ? [document.getElementById('payGcashPic').files[0]] : [document.getElementById('paySplitPic').files[0], null];
+  pics.forEach((p, i) => { if (p) fd.append('pic' + i, p); });
+  const btn = document.getElementById('payBtn');
+  btn.disabled = true; btn.textContent = 'PROCESSING…';
+  try {
+    const r = await api('/driver/orders/' + curOrder.id + '/pay', { method: 'POST', body: fd });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'Payment failed');
+    toast('Payment accepted! ' + curOrder.orderNo + ' PAID ✅');
+    curOrder.paidStatus = 'paid';
+    backToList();
+  } catch (e) { err.textContent = e.message; err.classList.remove('hidden'); }
+  btn.disabled = false; btn.textContent = '✔ ACCEPT PAYMENT';
+}
+</script>
+</body>
+</html>

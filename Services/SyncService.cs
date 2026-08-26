@@ -1407,6 +1407,7 @@ public static class SyncService
                 var email = c.TryGetProperty("email", out var e) ? e.GetString() ?? "" : "";
                 var points = c.TryGetProperty("points", out var pt) ? pt.GetInt32() : 0;
                 var address = c.TryGetProperty("address", out var a) ? a.GetString() ?? "" : "";
+                var qrCode = c.TryGetProperty("qrCode", out var qr) ? qr.GetString() ?? "" : "";
 
                 using var conn = DatabaseHelper.GetConnection();
                 conn.Open();
@@ -1418,12 +1419,19 @@ public static class SyncService
 
                 if (existingId != null)
                 {
-                    using var upd = new SQLiteCommand("UPDATE Customers SET Phone=@p, Email=@e, LoyaltyPoints=@pts, IsActive=1, Address=@a WHERE Id=@id", conn);
+                    // Update by name — pero huwag i-overwrite ang Phone kung ginagamit ng ibang customer
+                    // (e-commerce registration duplicate phones ang nag-trigger ng UNIQUE conflict)
+                    using var upd = new SQLiteCommand(@"
+                        UPDATE Customers SET
+                            Phone = CASE WHEN NOT EXISTS (SELECT 1 FROM Customers WHERE Phone = @p AND Phone != '' AND Id != @id) THEN @p ELSE Phone END,
+                            Email=@e, LoyaltyPoints=@pts, IsActive=1, Address=@a, QrCode=@qr
+                        WHERE Id=@id", conn);
                     upd.Parameters.AddWithValue("id", Convert.ToInt32(existingId));
                     upd.Parameters.AddWithValue("p", phone);
                     upd.Parameters.AddWithValue("e", email);
                     upd.Parameters.AddWithValue("pts", points);
                     upd.Parameters.AddWithValue("a", address);
+                    upd.Parameters.AddWithValue("qr", qrCode);
                     upd.ExecuteNonQuery();
                 }
                 else
@@ -1435,23 +1443,33 @@ public static class SyncService
 
                     if (phoneId != null)
                     {
-                        using var upd = new SQLiteCommand("UPDATE Customers SET Name=@n, Email=@e, LoyaltyPoints=@pts, IsActive=1, Address=@a WHERE Id=@id", conn);
+                        using var upd = new SQLiteCommand("UPDATE Customers SET Name=@n, Email=@e, LoyaltyPoints=@pts, IsActive=1, Address=@a, QrCode=@qr WHERE Id=@id", conn);
                         upd.Parameters.AddWithValue("id", Convert.ToInt32(phoneId));
                         upd.Parameters.AddWithValue("n", name);
                         upd.Parameters.AddWithValue("e", email);
                         upd.Parameters.AddWithValue("pts", points);
                         upd.Parameters.AddWithValue("a", address);
+                    upd.Parameters.AddWithValue("qr", qrCode);
                         upd.ExecuteNonQuery();
                     }
                     else
                     {
-                        // 3) INSERT new
-                        using var ins = new SQLiteCommand("INSERT INTO Customers (Name, Phone, Email, LoyaltyPoints, IsActive, Address, CreatedAt) VALUES (@n, @p, @e, @pts, 1, @a, datetime('now','localtime'))", conn);
+                        // 3) INSERT new — kung ang phone ay may existing local customer (iba ang name),
+                        // i-insert nang walang phone para hindi mag-violate ng UNIQUE(Phone)
+                        var phoneSafe = phone;
+                        if (!string.IsNullOrEmpty(phone))
+                        {
+                            using var chk = new SQLiteCommand("SELECT 1 FROM Customers WHERE Phone = @p AND Phone != '' LIMIT 1", conn);
+                            chk.Parameters.AddWithValue("p", phone);
+                            if (chk.ExecuteScalar() != null) phoneSafe = "";
+                        }
+                        using var ins = new SQLiteCommand("INSERT INTO Customers (Name, Phone, Email, LoyaltyPoints, IsActive, Address, QrCode, CreatedAt) VALUES (@n, @p, @e, @pts, 1, @a, @qr, datetime('now','localtime'))", conn);
                         ins.Parameters.AddWithValue("n", name);
-                        ins.Parameters.AddWithValue("p", phone);
+                        ins.Parameters.AddWithValue("p", phoneSafe);
                         ins.Parameters.AddWithValue("e", email);
                         ins.Parameters.AddWithValue("pts", points);
                         ins.Parameters.AddWithValue("a", address);
+                        ins.Parameters.AddWithValue("qr", qrCode);
                         ins.ExecuteNonQuery();
                     }
                 }

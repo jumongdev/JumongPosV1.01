@@ -558,6 +558,10 @@ public class DatabaseHelper
         nameIdx.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_name ON Customers(Name)";
         nameIdx.ExecuteNonQuery();
 
+        // Customer QR code (online-registered loyalty eligibility)
+        using var qrCol = new SQLiteCommand("ALTER TABLE Customers ADD COLUMN QrCode TEXT", conn);
+        try { qrCol.ExecuteNonQuery(); } catch { /* already exists */ }
+
         // Fix any negative stock values
         using var fixStock = new SQLiteCommand("UPDATE Products SET StockQty = 0 WHERE StockQty < 0", conn);
         fixStock.ExecuteNonQuery();

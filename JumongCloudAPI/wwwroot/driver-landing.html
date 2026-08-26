@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Andengs Delivery — Driver App</title>
+<meta name="theme-color" content="#10102a">
+<link rel="icon" type="image/png" href="/icons/icon-192.png">
+<style>
+  * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: #10102a; color: #e5e7eb; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 20px; }
+  .card { width: 100%; max-width: 420px; background: #1a1a44; border: 1px solid #222255; border-radius: 20px; padding: 28px 24px; text-align: center; }
+  .logo { font-size: 56px; line-height: 1; }
+  h1 { font-size: 22px; margin: 12px 0 2px; color: #fff; }
+  .sub { font-size: 12px; color: #8b8bb5; margin-bottom: 18px; }
+  .btn { display: block; width: 100%; background: #7c3aed; color: #fff; font-weight: 800; font-size: 15px; text-decoration: none; border-radius: 14px; padding: 16px; margin-top: 6px; transition: transform .1s; }
+  .btn:active { transform: scale(.97); }
+  .verbox { margin-top: 18px; background: #10102a; border: 1px solid #222255; border-radius: 14px; padding: 14px; text-align: left; }
+  .verbox .vlabel { font-size: 10px; color: #5a5a8a; font-weight: 800; letter-spacing: 1px; }
+  .verbox .vnum { font-size: 20px; font-weight: 900; color: #a78bfa; }
+  .verbox ul { margin: 8px 0 0; padding: 0 0 0 18px; }
+  .verbox li { font-size: 12px; color: #c4c4e8; line-height: 1.6; }
+  .err { font-size: 11px; color: #5a5a8a; margin-top: 14px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">🚚</div>
+    <h1>Andengs Delivery</h1>
+    <p class="sub">Driver App · Andengs Superstore</p>
+
+    <a class="btn" href="/updates/JumongDriver.apk">📲 DOWNLOAD APP (Android)</a>
+
+    <div class="verbox">
+      <div class="vlabel">LATEST APP VERSION</div>
+      <div class="vnum" id="vLatest">...</div>
+      <div class="vlabel" style="margin-top:10px">ANO ANG BAGO</div>
+      <ul id="vChangelog"></ul>
+    </div>
+
+    <p class="err" id="vErr"></p>
+  </div>
+
+<script>
+  fetch('/updates/driver-version.json').then(r => r.json()).then(j => {
+    document.getElementById('vLatest').textContent = 'v' + (j.version || '?');
+    const items = String(j.changelog || '').split('\n').map(s => s.trim()).filter(s => s);
+    const ul = document.getElementById('vChangelog');
+    ul.innerHTML = items.length ? items.map(s => '<li>' + s.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</li>').join('') : '<li>Walang changelog</li>';
+  }).catch(e => {
+    document.getElementById('vLatest').textContent = 'v2.0.0';
+    document.getElementById('vErr').textContent = 'Hindi ma-load ang update info — i-download pa rin ang app sa itaas.';
+  });
+</script>
+</body>
+</html>
