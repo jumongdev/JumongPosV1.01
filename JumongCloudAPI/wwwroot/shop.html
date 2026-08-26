@@ -756,10 +756,15 @@ function renderPromoOrder() {
       '</div>' +
       '<div class="flex items-center gap-2 shrink-0">' +
         '<button onclick="promoQty(' + i + ', -1)" class="w-8 h-8 rounded-lg border border-gray-200 font-black text-stone-600 hover:bg-gray-50">−</button>' +
-        '<span class="w-8 text-center text-sm font-bold">' + it.qty + '</span>' +
+        '<input type="number" inputmode="numeric" min="0" max="999" value="' + it.qty + '" oninput="promoQtySet(' + i + ', this.value)" class="w-14 h-8 text-center text-sm font-bold border border-gray-200 rounded-lg focus:border-violet-500 focus:outline-none">' +
         '<button onclick="promoQty(' + i + ', 1)" class="w-8 h-8 rounded-lg bg-violet-700 text-white font-black hover:bg-violet-800">+</button>' +
       '</div>' +
     '</div>').join('');
+  renderPromoSummary();
+}
+function renderPromoSummary() {
+  const g = promoOrderGroup;
+  if (!g) return;
   const total = promoOrderItems.reduce((s, x) => s + x.qty, 0);
   const target = g.buyQty || 1;
   document.getElementById('promoTotalPcs').textContent = total;
@@ -774,6 +779,12 @@ function renderPromoOrder() {
 function promoQty(i, d) {
   promoOrderItems[i].qty = Math.max(0, promoOrderItems[i].qty + d);
   renderPromoOrder();
+}
+function promoQtySet(i, v) {
+  const st = promoOrderItems[i].stock || 0;
+  const n = parseInt(v, 10);
+  promoOrderItems[i].qty = Math.min(Math.max(isNaN(n) ? 0 : n, 0), st);
+  renderPromoSummary();
 }
 function promoAddAll() {
   let added = 0;
