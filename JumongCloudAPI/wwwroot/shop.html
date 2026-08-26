@@ -727,14 +727,75 @@ function renderPromoGroups() {
     '</button>';
   }).join('');
 }
+let promoOrderGroup = null;
+let promoOrderItems = [];
 function promoClick(gid) {
   const g = promoGroups.find(x => x.id === gid);
   if (!g || !(g.items || []).length) return;
   if (!member) { toast('Sign in with Google para mag-order', 'error'); setTimeout(signIn, 800); return; }
-  openDetail((g.items || [])[0].productId);
-  const free = catalog.find(x => x.id === g.freeProductId);
-  toast('🎁 Bumili ng ' + g.buyQty + ' pcs ng mga produkto → libre ' + g.freeQty + ' ' + (free ? free.name : '') + '!', 'ok');
+  promoOrderGroup = g;
+  promoOrderItems = (g.items || []).map(it => {
+    const p = catalog.find(x => x.id === it.productId);
+    const u = (p && (p.units || []).find(x => x.unitName === 'pc')) || defUnit(p);
+    return { productId: it.productId, name: p ? p.name : (it.name || ''), price: u ? Number(u.price) : 0, unitName: u ? u.unitName : 'PC', qty: 0 };
+  });
+  renderPromoOrder();
+  document.getElementById('promoOrderModal').classList.remove('hidden');
+  pushOverlay();
 }
+function renderPromoOrder() {
+  const g = promoOrderGroup;
+  if (!g) return;
+  document.getElementById('promoOrderName').textContent = g.name;
+  document.getElementById('promoTarget').textContent = 'target: ' + g.buyQty + ' pcs';
+  document.getElementById('promoOrderList').innerHTML = promoOrderItems.map((it, i) =>
+    '<div class="flex items-center gap-3 py-3 border-b border-gray-100 last:border-0">' +
+      '<div class="flex-1 min-w-0">' +
+        '<p class="text-[13px] font-semibold text-stone-800 clamp2 leading-snug">' + escH(it.name) + '</p>' +
+        '<p class="text-xs text-stone-400 mt-0.5">' + fmt(it.price) + ' / ' + it.unitName + '</p>' +
+      '</div>' +
+      '<div class="flex items-center gap-2 shrink-0">' +
+        '<button onclick="promoQty(' + i + ', -1)" class="w-8 h-8 rounded-lg border border-gray-200 font-black text-stone-600 hover:bg-gray-50">−</button>' +
+        '<span class="w-8 text-center text-sm font-bold">' + it.qty + '</span>' +
+        '<button onclick="promoQty(' + i + ', 1)" class="w-8 h-8 rounded-lg bg-violet-700 text-white font-black hover:bg-violet-800">+</button>' +
+      '</div>' +
+    '</div>').join('');
+  const total = promoOrderItems.reduce((s, x) => s + x.qty, 0);
+  const target = g.buyQty || 1;
+  document.getElementById('promoTotalPcs').textContent = total;
+  const freeName = (catalog.find(x => x.id === g.freeProductId) || {}).name || '';
+  document.getElementById('promoFreeNote').innerHTML = total >= target
+    ? '<p class="text-[11px] font-bold text-emerald-700">🎉 Kwalipikado! Libre ang ' + g.freeQty + ' x ' + escH(freeName) + ' (₱0) — awtomatikong lalabas sa cart</p>'
+    : '<p class="text-[11px] text-stone-500">Kailangan pang ' + Math.max(0, target - total) + ' pcs para sa libre (' + total + '/' + target + ')</p>';
+  const btn = document.getElementById('promoAddAll');
+  btn.textContent = 'ADD TO CART (' + total + ')';
+  btn.disabled = total === 0;
+}
+function promoQty(i, d) {
+  promoOrderItems[i].qty = Math.max(0, promoOrderItems[i].qty + d);
+  renderPromoOrder();
+}
+function promoAddAll() {
+  let added = 0;
+  for (const it of promoOrderItems) {
+    if (it.qty <= 0) continue;
+    const p = catalog.find(x => x.id === it.productId);
+    const avail = p ? Math.floor(stockOf(p)) : 0;
+    const inCart = inCartQty(it.productId);
+    const canAdd = Math.max(0, avail - inCart);
+    const q = Math.min(it.qty, canAdd);
+    if (q <= 0) { toast('Walang sapat na stock: ' + (it.name || '').slice(0, 30), 'error'); continue; }
+    const row = cart.find(c => c.id === it.productId);
+    if (row) row.qty += q;
+    else cart.push({ id: it.productId, qty: q, unitName: it.unitName || 'PC', price: it.price });
+    added += q;
+    if (q < it.qty) toast('Limitado ang stock ng ' + (it.name || '').slice(0, 30) + ' — ' + q + ' na lang', 'error');
+  }
+  saveCart();
+  closePromoOrder();
+  if (added) toast('Na-add sa cart: ' + added + ' pcs' + (promoInfo() ? ' · may libre ka! 🎁' : ''), 'ok');
+}
+function closePromoOrder() { document.getElementById('promoOrderModal').classList.add('hidden'); popOverlay(); }
 // Returns {group, freeCount, freeProduct} kapag eligible ang cart, o null
 function promoInfo() {
   if (!promoGroups.length) return null;
@@ -760,9 +821,17 @@ function promoLineHtml() {
   if (!pr) return '';
   const name = pr.freeProduct.name;
   const short = name.length > 40 ? name.slice(0, 37) + '…' : name;
-  return '<div class="flex items-center justify-between gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2">' +
-    '<p class="text-[11px] font-bold text-emerald-700">🎁 FREE (' + pr.group.buyQty + '+' + pr.group.freeQty + '): ' + short + ' ×' + pr.freeCount + '</p>' +
-    '<span class="text-[11px] font-black text-emerald-700">₱0.00</span></div>';
+  return '<div class="flex gap-3 py-3 items-center">' +
+    '<div class="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center text-xl shrink-0">🎁</div>' +
+    '<div class="flex-1 min-w-0">' +
+      '<p class="text-[13px] font-semibold text-emerald-800 clamp2 leading-snug">🎁 FREE: ' + short + '</p>' +
+      '<p class="text-xs text-emerald-600 mt-0.5">₱0.00 × ' + pr.freeCount + ' pc · libre sa ' + pr.group.buyQty + '+' + pr.group.freeQty + '</p>' +
+    '</div>' +
+    '<div class="flex flex-col items-end justify-between">' +
+      '<span class="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">FREE</span>' +
+      '<span class="text-sm font-black text-emerald-700">₱0.00</span>' +
+    '</div>' +
+  '</div>';
 }
 function pickGridUnit(id, name) {
   gridUnitSel[id] = name;
@@ -1973,6 +2042,26 @@ if (window.visualViewport) {
     <input id="sgBrand" type="text" placeholder="Brand (opsyonal)" class="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-violet-500/40 mb-2.5">
     <textarea id="sgNote" rows="2" placeholder="Notes (opsyonal) - hal. laki, packaging" class="w-full border border-gray-200 rounded-xl px-3.5 py-3 text-sm outline-none focus:ring-2 focus:ring-violet-500/40 mb-4"></textarea>
     <button id="sgSubmit" onclick="submitSuggestion()" class="w-full bg-violet-700 hover:bg-violet-800 text-white font-bold rounded-2xl py-3.5 text-sm transition active:scale-[.98]">SUBMIT SUGGESTION</button>
+  </div>
+</div>
+
+<!-- ===== PROMO ORDER OVERLAY ===== -->
+<div id="promoOrderModal" class="hidden fixed inset-0 z-[88] bg-black/60 flex items-end sm:items-center justify-center anim-in">
+  <div class="w-full sm:max-w-md bg-white sm:rounded-3xl rounded-t-3xl max-h-[90vh] flex flex-col anim-up safe-bottom">
+    <div class="sticky top-0 z-10 bg-white/95 backdrop-blur flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+      <p class="font-extrabold text-stone-900">🎁 <span id="promoOrderName"></span></p>
+      <button onclick="closePromoOrder()" class="p-2 -mr-2 hover:bg-gray-100 rounded-xl text-stone-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <div class="px-5 py-2 text-[11px] text-stone-500">Ilagay ang dami ng bawat produkto — ang KABUUANG pcs ang bibilangin para sa libre.</div>
+    <div id="promoOrderList" class="flex-1 overflow-y-auto px-5"></div>
+    <div class="border-t border-gray-100 px-5 py-4 space-y-2.5">
+      <div class="flex items-center justify-between">
+        <p class="text-xs font-bold text-stone-600">Kabuuang pcs: <span id="promoTotalPcs" class="font-black text-violet-700 text-base">0</span></p>
+        <p class="text-xs text-stone-400" id="promoTarget"></p>
+      </div>
+      <div id="promoFreeNote"></div>
+      <button id="promoAddAll" onclick="promoAddAll()" class="w-full bg-violet-700 hover:bg-violet-800 text-white font-bold rounded-2xl py-3.5 text-sm transition active:scale-[.98]">ADD TO CART (0)</button>
+    </div>
   </div>
 </div>
 
