@@ -953,6 +953,8 @@ public static class PgDatabaseHelper
         custMig.CommandText = @"
             ALTER TABLE customers ADD COLUMN IF NOT EXISTS google_sub TEXT;
             CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_google_sub ON customers (google_sub) WHERE google_sub IS NOT NULL AND google_sub <> '';
+            ALTER TABLE customers ADD COLUMN IF NOT EXISTS psid TEXT NOT NULL DEFAULT '';
+            CREATE INDEX IF NOT EXISTS idx_customers_psid ON customers (psid);
             ALTER TABLE customers ADD COLUMN IF NOT EXISTS is_sari_sari BOOLEAN NOT NULL DEFAULT FALSE;
             CREATE TABLE IF NOT EXISTS customer_addresses (
                 id SERIAL PRIMARY KEY,
