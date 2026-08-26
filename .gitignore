@@ -36,3 +36,9 @@ WarehouseApp/JumongWarehouse*.apk
 WarehouseApp/local.properties
 WarehouseApp/.idea/
 
+DriverApp/jumong_sign.keystore
+DriverApp/local.properties
+DriverApp/*.keystore
+DriverApp/build/
+DriverApp/.gradle/
+DriverApp/app/build/
