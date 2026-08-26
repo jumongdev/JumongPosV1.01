@@ -42,7 +42,7 @@ public class PrinterService
         if (lineChars > 48) lineChars = 48;
 
         var lines = BuildReceiptLines(sale, cashierName, customer, lineChars, includeShopQr);
-        ExtendPaperIfNeeded(doc, lines.Count);
+        ExtendPaperIfNeeded(doc, lines.Count + (lines.Any(x => x.IsQr) ? 30 : 0));
 
         doc.PrintPage += (sender, e) =>
         {
@@ -59,6 +59,12 @@ public class PrinterService
 
             foreach (var entry in lines)
             {
+                if (entry.IsQr)
+                {
+                    y += DrawShopQr(e.Graphics!, leftMargin, y, printW);
+                    continue;
+                }
+
                 Font f;
                 if (entry.Align == TextAlign.Center)
                     f = font9B;
@@ -106,6 +112,7 @@ public class PrinterService
         public bool Bold { get; set; }
         public int Spacing { get; set; } = 14;
         public TextAlign Align { get; set; } = TextAlign.Left;
+        public bool IsQr { get; set; }
     }
 
     private static List<LineEntry> BuildReceiptLines(Sale sale, string cashierName, Customer? customer = null, int lineChars = 32, bool includeShopQr = true)
@@ -198,10 +205,15 @@ public class PrinterService
         {
             lines.Add(new LineEntry { Text = "", Spacing = 10 });
             lines.Add(new LineEntry { Text = "Order online: shop.jumongdev.com", Align = TextAlign.Center, Bold = true, Spacing = 12 });
-            foreach (var qrLine in ShopQrAscii)
-                if (qrLine.Length > 0)
-                    lines.Add(new LineEntry { Text = qrLine, Align = TextAlign.Center, Spacing = 10 });
-            lines.Add(new LineEntry { Text = "Scan para sa aming online shop!", Align = TextAlign.Center, Bold = true, Spacing = 14 });
+            lines.Add(new LineEntry { IsQr = true, Spacing = 28 });
+            lines.Add(new LineEntry { Text = "Scan para sa aming online shop!", Align = TextAlign.Center, Bold = true, Spacing = 12 });
+            lines.Add(new LineEntry { Text = "", Spacing = 8 });
+            lines.Add(new LineEntry { Text = "PAANO MAG-REGISTER:", Align = TextAlign.Center, Bold = true, Spacing = 12 });
+            lines.Add(new LineEntry { Text = "1. I-scan ang QR o i-type ang shop.jumongdev.com", Spacing = 12 });
+            lines.Add(new LineEntry { Text = "2. I-click ang SIGN IN WITH GOOGLE", Spacing = 12 });
+            lines.Add(new LineEntry { Text = "3. Piliin ang iyong Gmail account", Spacing = 12 });
+            lines.Add(new LineEntry { Text = "4. Punuin ang pangalan at mobile number", Spacing = 12 });
+            lines.Add(new LineEntry { Text = "5. Mag-order na - Cash on Delivery ang bayad!", Spacing = 14 });
             lines.Add(new LineEntry { Text = "", Spacing = 8 });
         }
 
@@ -210,23 +222,29 @@ public class PrinterService
         return lines;
     }
 
-    private static readonly string[] ShopQrAscii = {
-        "",
-        "  █▀▀▀▀▀█    █ █▄▄█ █▀▀▀▀▀█",
-        "  █ ███ █ █  ▄▄▄▄ ▀ █ ███ █",
-        "  █ ▀▀▀ █ █▄▀▄ ▄▄▄█ █ ▀▀▀ █",
-        "  ▀▀▀▀▀▀▀ █ █ █ █▄█ ▀▀▀▀▀▀▀",
-        "  ▀▄█▀▀▀▀▄▄█ ▄█▀▀ ▄ ▀█▀▀▀▄",
-        "  ▀█▄▀▀▀▀▄▄▄█▄▄ ▀██ ▄▀▀▀ ▀█",
-        "  █ █  ▄▀█▄▄▄▀█▀▀▀█▀▀█▀▄▀█▀",
-        "  █ ▄▀▀ ▀▀█▄█   █▀ █ ██▀ ▀█",
-        "  ▀  ▀ ▀▀▀▄▀▀█▀▀█▄█▀▀▀█▄▀",
-        "  █▀▀▀▀▀█ ▄█▄▄ ▀▀ █ ▀ █▄▀▀▀",
-        "  █ ███ █ █▄▄█▀█ ████▀█▄█▄▄",
-        "  █ ▀▀▀ █ ▀▄▀▄▄▀▀▄█▀▄▄▄█▀ █",
-        "  ▀▀▀▀▀▀▀ ▀ ▀ ▀▀▀▀  ▀▀▀▀▀▀▀",
-        "",
+    // shop.jumongdev.com QR matrix (25x25, EC-M) - verified scannable via jsQR decode test.
+    // Drawn as graphics rectangles (not text) so thermal prints are crisp and phone-scannable.
+    private const int ShopQrSize = 25;
+    private static readonly string[] ShopQrMatrix = {
+        "1111111000010100101111111","1000001000010111101000001","1011101010000000101011101","1011101010011110001011101","1011101010100000101011101","1000001011010111101000001","1111111010101010101111111","0000000010101011100000000","1011111001001110001111100","0110000111011000100100010","1101111000100011100111011","0110000111111001101000001","1010001100011111111110111","1010010111101000100101010","1001101110100011010111011","1010000011100010010110001","1001011101111110111110100","0000000010010011100011000","1111111001000110101010111","1000001011110000100011000","1011101010011101111110100","1011101011110101111011111","1011101010100110110001101","1000001001011001101111001","1111111010101111001111111"
     };
+
+    private static float DrawShopQr(Graphics g, float x0, float y0, float printW)
+    {
+        const int quiet = 2;
+        var module = (printW * 0.85f) / (ShopQrSize + quiet * 2);
+        for (var r = 0; r < ShopQrSize; r++)
+        {
+            var row = ShopQrMatrix[r];
+            for (var c = 0; c < ShopQrSize; c++)
+            {
+                if (row[c] != '1') continue;
+                g.FillRectangle(Brushes.Black,
+                    x0 + (c + quiet) * module, y0 + (r + quiet) * module, module, module);
+            }
+        }
+        return (ShopQrSize + quiet * 2) * module;
+    }
 
     public static void PrintDetailedEndShiftReport(decimal totalSales, decimal totalCash, decimal totalEWallet,
         decimal totalCredit, decimal totalVoided, decimal cashOnHand, decimal difference,
