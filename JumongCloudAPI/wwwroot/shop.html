@@ -822,14 +822,23 @@ function renderGrid() {
   watchImages();
 }
 
-// lazy image load — per product fetch
+// lazy image load — per product fetch (IO + scroll fallback; IO alone proved unreliable)
 let imgObs;
+let imgScrollT;
+function isHiddenEl(el) { return !el.offsetWidth && !el.offsetHeight; }
+function loadNearbyImgs() {
+  const imgs = document.querySelectorAll('img[data-lazy]');
+  const vh = window.innerHeight;
+  imgs.forEach(img => {
+    if (isHiddenEl(img)) return;
+    const r = img.getBoundingClientRect();
+    if (r.top < vh + 600 && r.bottom > -600) loadImg(Number(img.dataset.lazy));
+  });
+}
 function watchImages() {
   const imgs = document.querySelectorAll('img[data-lazy]');
-  if (typeof IntersectionObserver === 'undefined') {
-    imgs.forEach(img => loadImg(Number(img.dataset.lazy)));
-    return;
-  }
+  loadNearbyImgs();
+  if (typeof IntersectionObserver === 'undefined') return;
   if (!imgObs) {
     imgObs = new IntersectionObserver(entries => {
       entries.forEach(en => { if (en.isIntersecting) loadImg(Number(en.target.dataset.lazy)); });
@@ -837,6 +846,10 @@ function watchImages() {
   }
   imgs.forEach(img => imgObs.observe(img));
 }
+window.addEventListener('scroll', () => {
+  clearTimeout(imgScrollT);
+  imgScrollT = setTimeout(loadNearbyImgs, 120);
+}, { passive: true });
 
 async function loadImg(id) {
   if (imgCache[id] !== undefined) { applyImg(id, imgCache[id]); return; }
@@ -1079,6 +1092,7 @@ function switchView(v) {
   home.classList.toggle('hidden', v !== 'home');
   cat.classList.toggle('hidden', v !== 'catalog');
   if (sr) sr.classList.toggle('hidden', v !== 'catalog');
+  if (v === 'catalog') watchImages();
   window.scrollTo({ top: 0 });
 }
 function scrollToTop() { switchView('home'); }
