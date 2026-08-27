@@ -66,6 +66,13 @@
       <span>📣</span><span id="promoText" class="truncate"></span>
     </div>
   </div>
+  <!-- profile complete banner (may login pero kulang ang phone/address) -->
+  <div id="profileBanner" class="hidden max-w-6xl mx-auto px-4 pb-2.5">
+    <button onclick="openProfile()" class="w-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg px-3 py-2.5 flex items-center justify-between gap-2 active:scale-[.98] transition">
+      <span class="flex items-center gap-2 text-left"><span>📝</span><span>Kumpletuhin ang iyong profile — magdagdag ng <span id="pbMissing" class="underline underline-offset-2">PHONE at ADDRESS</span></span></span>
+      <span class="shrink-0 bg-white/20 rounded-md px-2.5 py-1 whitespace-nowrap">I-UPDATE →</span>
+    </button>
+  </div>
 </header>
 
 <!-- ===== HOME VIEW (promos + banners only) ===== -->
@@ -1701,9 +1708,27 @@ async function loadMe() {
     if (b) b.classList.remove('hidden');
     if (profileOpen) renderProfile();
     applyMemberUI();
+    updateProfileBanner();
     loadFavs();
     renderChips();
   } catch (e) { member = false; applyMemberUI(); }
+}
+function updateProfileBanner() {
+  const bn = document.getElementById('profileBanner');
+  if (!bn) return;
+  const noPhone = !(me && me.phone);
+  const noAddr = !myAddresses.length;
+  const missing = member && (noPhone || noAddr);
+  bn.classList.toggle('hidden', !missing);
+  if (missing) {
+    const lbl = document.getElementById('pbMissing');
+    if (lbl) {
+      const parts = [];
+      if (noPhone) parts.push('PHONE');
+      if (noAddr) parts.push('ADDRESS');
+      lbl.textContent = parts.join(' at ');
+    }
+  }
 }
 function applyMemberUI() {
   const ms = document.getElementById('memberShop');
