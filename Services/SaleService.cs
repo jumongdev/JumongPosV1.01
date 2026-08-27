@@ -60,6 +60,8 @@ public class SaleService
             var saleId = Convert.ToInt32(cmd.ExecuteScalar());
 
             var trailList = new List<StockTrail>();
+            decimal ptsAcc = 0;
+            long lastPtsItemId = 0;
             foreach (var item in sale.Items)
             {
                 // Determine unit cost: use ProductUnit cost if unit has its own, else product base cost
@@ -74,15 +76,23 @@ public class SaleService
                     unitCost = result != null ? Convert.ToDecimal(result) : 0;
                 }
 
+                // Points: decimal accumulation per item, floored ONCE at the end (per-item truncation
+                // loses points: ₱100+₱100 = 1 point). The stored per-item floors are topped up on the
+                // last non-exempt item so SUM(PointsEarned) always equals the awarded total (void reversal).
                 var ptsEarned = 0;
                 if (!item.PointsExempt)
                 {
                     if (item.PointsPerUnit > 0)
+                    {
+                        ptsAcc += (decimal)item.PointsPerUnit * item.Quantity;
                         ptsEarned = item.PointsPerUnit * item.Quantity;
+                    }
                     else
                     {
                         var rate = int.Parse(DatabaseHelper.GetSetting("PointsRate", "200"));
-                        ptsEarned = (int)(item.TotalPrice / rate);
+                        var frac = item.TotalPrice / rate;
+                        ptsAcc += frac;
+                        ptsEarned = (int)Math.Floor(frac);
                     }
                 }
 
@@ -103,6 +113,7 @@ public class SaleService
                 itemCmd.ExecuteNonQuery();
                 using var itemIdCmd = new SQLiteCommand("SELECT last_insert_rowid()", conn);
                 item.Id = Convert.ToInt32(itemIdCmd.ExecuteScalar());
+                if (!item.PointsExempt) lastPtsItemId = item.Id;
 
                 var deductQty = item.Quantity * item.QtyPerUnit;
                 var getStock = new SQLiteCommand("SELECT StockQty FROM Products WHERE Id = @pid", conn);
@@ -148,6 +159,23 @@ public class SaleService
                     UserName = sale.CashierName ?? "",
                     CreatedAt = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss")
                 });
+            }
+
+            // Align stored per-item PointsEarned with the floored total (top-up sa huling non-exempt item)
+            if (lastPtsItemId > 0)
+            {
+                var totalEarned = (int)ptsAcc;
+                using var sumCmd = new SQLiteCommand("SELECT COALESCE(SUM(PointsEarned), 0) FROM SaleItems WHERE SaleId = @sid", conn);
+                sumCmd.Parameters.AddWithValue("@sid", saleId);
+                var storedSum = Convert.ToInt32(sumCmd.ExecuteScalar());
+                var diff = totalEarned - storedSum;
+                if (diff > 0)
+                {
+                    using var topCmd = new SQLiteCommand("UPDATE SaleItems SET PointsEarned = PointsEarned + @d WHERE Id = @iid", conn);
+                    topCmd.Parameters.AddWithValue("@d", diff);
+                    topCmd.Parameters.AddWithValue("@iid", lastPtsItemId);
+                    topCmd.ExecuteNonQuery();
+                }
             }
 
             trans.Commit();

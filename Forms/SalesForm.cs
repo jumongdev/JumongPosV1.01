@@ -822,15 +822,17 @@ public partial class SalesForm : Form
             if (!string.IsNullOrEmpty(_selectedCustomer.QrCode))
             {
                 var pointsRate = int.Parse(DatabaseHelper.GetSetting("PointsRate", "200"));
-                var ptsEarned = 0;
+                // decimal accumulation + floor ONCE (per-item truncation loses points: ₱100+₱100 = 1 point)
+                decimal acc = 0;
                 foreach (var item in _cart)
                 {
                     if (item.PointsExempt) continue;
                     if (item.PointsPerUnit > 0)
-                        ptsEarned += item.PointsPerUnit * item.Quantity;
+                        acc += (decimal)item.PointsPerUnit * item.Quantity;
                     else
-                        ptsEarned += (int)(item.TotalPrice / pointsRate);
+                        acc += item.TotalPrice / pointsRate;
                 }
+                var ptsEarned = (int)acc;
                 var ptsUsed = payForm.PointsUsed;
                 var newPts = _selectedCustomer.LoyaltyPoints + ptsEarned - ptsUsed;
                 if (newPts < 0) newPts = 0;
