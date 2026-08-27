@@ -1559,6 +1559,7 @@ tailwind.config = {
               <button @click="setPtsFilter('all')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="ptsFilter==='all' ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-gray-100 dark:bg-[#181848] text-gray-600 dark:text-slate-300 border-gray-200 dark:border-[#222255]'">ALL (<span x-text="d.length"></span>)</button>
               <button @click="setPtsFilter('star')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="ptsFilter==='star' ? 'bg-amber-500 text-white border-amber-500' : 'bg-amber-50 dark:bg-[#181848] text-amber-600 dark:text-amber-400 border-amber-200 dark:border-[#222255]'">⭐ WITH POINTS (<span x-text="withStar"></span>)</button>
               <button @click="setPtsFilter('nostar')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="ptsFilter==='nostar' ? 'bg-gray-700 text-white border-gray-700' : 'bg-gray-100 dark:bg-[#181848] text-gray-600 dark:text-slate-300 border-gray-200 dark:border-[#222255]'">⛔ WITHOUT (<span x-text="withoutStar"></span>)</button>
+              <button @click="setPtsFilter('nophone')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="ptsFilter==='nophone' ? 'bg-amber-500 text-white border-amber-500' : 'bg-amber-50 dark:bg-[#181848] text-amber-600 dark:text-amber-400 border-amber-200 dark:border-[#222255]'">📱 NO PHONE (<span x-text="noPhone"></span>)</button>
             </div>
           </div>
           <div class="overflow-x-auto">
@@ -1569,6 +1570,8 @@ tailwind.config = {
                 <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Name</th>
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Phone</th>
+                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Status</th>
+                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Address</th>
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Email</th>
                   <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">⭐ Points</th>
                   <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Credit Balance</th>
@@ -1579,7 +1582,18 @@ tailwind.config = {
                   <template x-for="(x,i) in filtered" :key="i">
                     <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                       <td class="px-3 py-2 font-medium" x-text="x.name"></td>
-                      <td class="px-3 py-2" x-text="x.phone || ''"></td>
+                      <td class="px-3 py-2">
+                        <template x-if="x.phone"><span x-text="x.phone"></span></template>
+                        <template x-if="!x.phone && x.googleSub">
+                          <button @click="openPhone(x)" class="text-[10px] font-bold px-2 py-1 rounded-lg bg-amber-500 text-white hover:bg-amber-600" title="May Gmail ang customer pero walang phone number — i-save dito">📱 I-SAVE PHONE</button>
+                        </template>
+                        <template x-if="!x.phone && !x.googleSub"><span class="text-gray-400">—</span></template>
+                      </td>
+                      <td class="px-3 py-2">
+                        <template x-if="x.isSariSari"><span class="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300" title="Verified sari-sari store">🏪 STORE</span></template>
+                        <template x-if="!x.isSariSari"><span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-[#181848] text-gray-500 dark:text-slate-400">REGULAR</span></template>
+                      </td>
+                      <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] max-w-[220px]" x-text="addrText(x) || '—'"></td>
                       <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.email || ''"></td>
                       <td class="px-3 py-2 text-right">
                         <span class="font-bold" :class="x.loyaltyPoints > 0 ? 'text-amber-500' : 'text-gray-400 dark:text-[#5a5a8a]'" x-text="x.loyaltyPoints"></span>
@@ -1640,11 +1654,25 @@ tailwind.config = {
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- ═══════════════════════════════════════════════ -->
-      <!-- USERS SECTION                                 -->
-      <!-- ═══════════════════════════════════════════════ -->
+        <!-- 📱 SAVE PHONE MODAL (Google customer na walang phone) -->
+        <div x-show="phoneOpen" class="fixed inset-0 z-[121] bg-black/50 flex items-center justify-center p-4" @click.self="closePhone()">
+          <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-full max-w-sm shadow-2xl">
+            <div class="px-4 py-3 border-b border-gray-100 dark:border-[#222255] flex items-center justify-between">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">📱 I-SAVE ANG PHONE</h3>
+              <button @click="closePhone()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-lg leading-none">✕</button>
+            </div>
+            <div class="p-4">
+              <p class="text-xs text-gray-600 dark:text-slate-300 mb-3"><span class="font-bold" x-text="phoneTarget ? phoneTarget.name : ''"></span> ay may <span class="font-bold text-violet-600 dark:text-violet-400">Gmail account</span> pero walang naka-save na mobile number — ilagay dito para makapag-earn siya ng points at makapag-order sa shop.</p>
+              <input x-model="phoneInput" type="tel" placeholder="0917xxxxxxx" class="w-full text-sm bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2.5 outline-none focus:border-amber-500" @keyup.enter="savePhone()">
+              <div class="flex gap-2 mt-4">
+                <button @click="closePhone()" class="flex-1 text-xs font-bold py-2.5 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-white/5">CANCEL</button>
+                <button @click="savePhone()" :disabled="phoneSaving" class="flex-1 text-xs font-bold py-2.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50" x-text="phoneSaving ? 'SAVING...' : '💾 SAVE PHONE'"></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div x-show="$store.app.section === 'users'" x-transition.opacity>
         <div x-data="usersList" class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
           <div class="px-4 py-3 border-b border-gray-100 dark:border-[#222255] flex items-center justify-between">

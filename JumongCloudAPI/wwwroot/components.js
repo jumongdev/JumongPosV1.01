@@ -896,6 +896,7 @@ Alpine.store('app', {
   /* ΓöÇΓöÇ Customers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('customersList', () => ({
     d: [], loading: true, orders: [], ordersOpen: false, ordersName: '', ordersLoading: false, ptsFilter: 'all',
+    phoneOpen: false, phoneTarget: null, phoneInput: '', phoneSaving: false,
     async init() { window.addEventListener('load-customers', () => this.load()); await this.load() },
     async load() {
       this.loading = true;
@@ -905,10 +906,35 @@ Alpine.store('app', {
     setPtsFilter(f) { this.ptsFilter = f; },
     get withStar() { return this.d.filter(x => !!x.qrCode).length },
     get withoutStar() { return this.d.filter(x => !x.qrCode).length },
+    get noPhone() { return this.d.filter(x => !!x.googleSub && !x.phone).length },
     get filtered() {
       if (this.ptsFilter === 'star') return this.d.filter(x => !!x.qrCode);
       if (this.ptsFilter === 'nostar') return this.d.filter(x => !x.qrCode);
+      if (this.ptsFilter === 'nophone') return this.d.filter(x => !!x.googleSub && !x.phone);
       return this.d;
+    },
+    addrText(x) {
+      const parts = [];
+      if (x.addrBlock) parts.push('Blk ' + x.addrBlock);
+      if (x.addrLot) parts.push('Lot ' + x.addrLot);
+      if (x.addrSubdivision) parts.push(x.addrSubdivision);
+      if (x.addrDetails) parts.push(x.addrDetails);
+      return parts.join(', ');
+    },
+    openPhone(x) { this.phoneTarget = x; this.phoneInput = x.phone || ''; this.phoneOpen = true; },
+    closePhone() { this.phoneOpen = false; this.phoneTarget = null; },
+    async savePhone() {
+      const p = (this.phoneInput || '').trim();
+      if (p.length < 10) { toast('Ilagay ang buong mobile number (09xx...)', 'error'); return; }
+      if (!this.phoneTarget) return;
+      this.phoneSaving = true;
+      try {
+        await fetchJSON(API + '/customers/' + this.phoneTarget.id + '/phone', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: p }) });
+        toast('Na-save ang phone ni ' + (this.phoneTarget.name || '') + ': ' + p, 'ok');
+        this.phoneOpen = false; this.phoneTarget = null;
+        await this.load();
+      } catch (e) { toast(e.message || 'Hindi na-save', 'error'); }
+      this.phoneSaving = false;
     },
     async viewOrders(x) {
       this.ordersName = x.name || '';
