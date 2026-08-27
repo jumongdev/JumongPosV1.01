@@ -1626,11 +1626,12 @@ tailwind.config = {
             </div>
             <div class="p-4">
               <template x-if="ordersLoading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
-              <template x-if="!ordersLoading && orders.length===0"><div class="text-center py-6 text-gray-400">Wala pang ONLINE order (e-commerce) ang customer na ito — ang mga counter/retail purchases ay wala dito</div></template>
+              <template x-if="!ordersLoading && orders.length===0"><div class="text-center py-6 text-gray-400">Wala pang transaction ang customer na ito (online, in-store, o wholesale)</div></template>
               <template x-if="orders.length > 0">
                 <table class="w-full text-xs">
                   <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
                     <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Order</th>
+                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Type</th>
                     <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
                     <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Total</th>
                     <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Status</th>
@@ -1640,7 +1641,14 @@ tailwind.config = {
                   <tbody>
                     <template x-for="(o,i) in orders" :key="i">
                       <tr class="border-b border-gray-50 dark:border-[#222255]/40">
-                        <td class="px-3 py-2 font-medium" x-text="o.orderNo"></td>
+                        <td class="px-3 py-2 font-medium">
+                          <span x-text="o.orderNo"></span>
+                          <template x-if="o.storeName"><span class="block text-[10px] text-gray-400" x-text="o.storeName"></span></template>
+                        </td>
+                        <td class="px-3 py-2">
+                          <span x-show="o.type !== 'ecommerce'" class="text-[9px] font-black px-1.5 py-0.5 rounded" :class="o.type === 'pos' ? 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300' : 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'" x-text="o.type === 'pos' ? '🏪 IN-STORE' : '📦 WHOLESALE'"></span>
+                          <span x-show="o.type === 'ecommerce'" class="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">🛒 ONLINE</span>
+                        </td>
                         <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="o.createdAt"></td>
                         <td class="px-3 py-2 text-right font-semibold">₱<span x-text="fmt(o.total)"></span></td>
                         <td class="px-3 py-2"><span class="text-[10px] font-bold px-1.5 py-0.5 rounded" :class="statusCls(o.status)" x-text="o.status"></span></td>
