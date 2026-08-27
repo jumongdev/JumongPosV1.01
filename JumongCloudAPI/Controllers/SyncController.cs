@@ -133,10 +133,24 @@ public class SyncController : ControllerBase
             using var conn = Data.PgDatabaseHelper.GetConnection();
             using var tx = conn.BeginTransaction();
 
+            // Resolve the CLOUD customer id: ang POS ay nagpapadala ng LOCAL customer id — i-remap sa
+            // cloud id via the unique customer NAME (customers.name ay UNIQUE). Kung walang match,
+            // i-keep ang ipinadala (walang pinsala — walang cloud customer na may local id).
+            int? cloudCid = payload.Sale.CustomerId;
+            if (!string.IsNullOrEmpty(payload.Sale.CustomerName))
+            {
+                using var res = conn.CreateCommand();
+                res.Transaction = tx;
+                res.CommandText = "SELECT id FROM customers WHERE name = @n LIMIT 1";
+                res.Parameters.AddWithValue("n", payload.Sale.CustomerName.Trim());
+                var rv = res.ExecuteScalar();
+                if (rv != null && rv != DBNull.Value) cloudCid = Convert.ToInt32(rv);
+            }
+
             using var cmd = new NpgsqlCommand(
-                "INSERT INTO sales (pos_id, store_id, invoice_no, sale_date, sub_total, discount, tax, grand_total, amount_paid, change, payment_method, customer_id, user_id, is_voided, reference_no, order_type, cash_paid, ew_paid, cashier_name, synced_at) " +
-                "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,@p12,@p13,@p14,@p15,@p16,@p17,NOW()) " +
-                "ON CONFLICT (store_id, pos_id) DO UPDATE SET invoice_no=@p1, sale_date=@p2, sub_total=@p3, discount=@p4, tax=@p5, grand_total=@p6, amount_paid=@p7, change=@p8, payment_method=@p9, customer_id=@p10, user_id=@p11, is_voided=@p12, reference_no=@p13, order_type=@p14, cash_paid=@p15, ew_paid=@p16, cashier_name=@p17, synced_at=NOW()",
+                "INSERT INTO sales (pos_id, store_id, invoice_no, sale_date, sub_total, discount, tax, grand_total, amount_paid, change, payment_method, customer_id, user_id, is_voided, reference_no, order_type, cash_paid, ew_paid, cashier_name, customer_name, synced_at) " +
+                "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,@p12,@p13,@p14,@p15,@p16,@p17,@p18,NOW()) " +
+                "ON CONFLICT (store_id, pos_id) DO UPDATE SET invoice_no=@p1, sale_date=@p2, sub_total=@p3, discount=@p4, tax=@p5, grand_total=@p6, amount_paid=@p7, change=@p8, payment_method=@p9, customer_id=@p10, user_id=@p11, is_voided=@p12, reference_no=@p13, order_type=@p14, cash_paid=@p15, ew_paid=@p16, cashier_name=@p17, customer_name=@p18, synced_at=NOW()",
                 conn, tx);
             cmd.Parameters.AddWithValue("p0", payload.Sale.PosId);
             cmd.Parameters.AddWithValue("@sid", sid);
@@ -149,7 +163,7 @@ public class SyncController : ControllerBase
             cmd.Parameters.AddWithValue("p7", payload.Sale.AmountPaid);
             cmd.Parameters.AddWithValue("p8", payload.Sale.Change);
             cmd.Parameters.AddWithValue("p9", payload.Sale.PaymentMethod);
-            cmd.Parameters.AddWithValue("p10", (object?)payload.Sale.CustomerId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("p10", (object?)cloudCid ?? DBNull.Value);
             cmd.Parameters.AddWithValue("p11", (object?)payload.Sale.UserId ?? DBNull.Value);
             cmd.Parameters.AddWithValue("p12", payload.Sale.IsVoided);
             cmd.Parameters.AddWithValue("p13", payload.Sale.ReferenceNo);
@@ -157,6 +171,7 @@ public class SyncController : ControllerBase
             cmd.Parameters.AddWithValue("p15", payload.Sale.CashPaid);
             cmd.Parameters.AddWithValue("p16", payload.Sale.EwPaid);
             cmd.Parameters.AddWithValue("p17", payload.Sale.CashierName ?? "");
+            cmd.Parameters.AddWithValue("p18", (object?)(payload.Sale.CustomerName?.Trim() ?? "") ?? "");
             cmd.ExecuteNonQuery();
 
             foreach (var item in payload.Items)
@@ -313,6 +328,7 @@ public class SyncSaleDto
     public decimal Change { get; set; }
     public string PaymentMethod { get; set; } = "Cash";
     public int? CustomerId { get; set; }
+    public string CustomerName { get; set; } = "";
     public int? UserId { get; set; }
     public bool IsVoided { get; set; }
     public string ReferenceNo { get; set; } = "";

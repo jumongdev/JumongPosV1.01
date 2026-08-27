@@ -1152,7 +1152,18 @@ public static class PgDatabaseHelper
                 processed_at TIMESTAMPTZ
             );
             CREATE INDEX IF NOT EXISTS idx_promo_free_queue_status ON promo_free_queue (status);
-            ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS stock_held BOOLEAN NOT NULL DEFAULT FALSE;";
+            ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS stock_held BOOLEAN NOT NULL DEFAULT FALSE;
+            ALTER TABLE sales ADD COLUMN IF NOT EXISTS customer_name TEXT;
+            CREATE TABLE IF NOT EXISTS customer_updates (
+                id SERIAL PRIMARY KEY,
+                customer_id INTEGER NOT NULL,
+                customer_name TEXT NOT NULL DEFAULT '',
+                message TEXT NOT NULL,
+                read_at TIMESTAMPTZ,
+                created_by TEXT NOT NULL DEFAULT 'Admin',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS idx_customer_updates_customer ON customer_updates (customer_id);";
         try { custMig.ExecuteNonQuery(); } catch { }
 
         // Seed: subdivision list para sa locked delivery picker (editable sa Shop Content panel)

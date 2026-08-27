@@ -195,6 +195,7 @@ public static class SyncService
                 Change = sale.Change,
                 PaymentMethod = sale.PaymentMethod,
                 CustomerId = sale.CustomerId,
+                CustomerName = sale.CustomerName ?? "",
                 UserId = sale.UserId,
                 IsVoided = sale.IsVoided,
                 ReferenceNo = sale.ReferenceNo,

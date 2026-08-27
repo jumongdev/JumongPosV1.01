@@ -54,6 +54,10 @@
           class="w-full bg-gray-100 rounded-xl pl-10 pr-10 py-2.5 text-sm outline-none focus:ring-2 focus:ring-violet-500/40 placeholder-stone-400">
         <button id="searchClear" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-gray-300 hover:bg-gray-400 text-white text-[10px] font-black flex items-center justify-center transition" aria-label="Clear search">✕</button>
       </div>
+      <button onclick="openUpdates()" class="relative p-2.5 rounded-xl hover:bg-gray-100 active:scale-95 transition shrink-0" aria-label="Updates" title="Mga update sa account mo">
+        <svg class="w-5 h-5 text-stone-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+        <span id="updBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">0</span>
+      </button>
       <button onclick="openCart()" class="relative p-2.5 rounded-xl hover:bg-gray-100 active:scale-95 transition shrink-0" aria-label="Cart">
         <svg class="w-5 h-5 text-stone-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
         <span id="cartBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">0</span>
@@ -1313,7 +1317,7 @@ function scrollToShop() {
 const PTR_TRIGGER = 80;
 let ptrActive = false, ptrStartY = 0, ptrLastY = 0;
 function ptrBusy() {
-  return !!(document.querySelector('#cartDrawer:not(.hidden), #checkoutModal:not(.hidden), #detailModal:not(.hidden), #profileModal:not(.hidden), #sortSheet:not(.hidden), #addrFormModal:not(.hidden), #successModal:not(.hidden), #historyModal:not(.hidden), #suggestModal:not(.hidden), #guestShop:not(.hidden)'));
+  return !!(document.querySelector('#cartDrawer:not(.hidden), #checkoutModal:not(.hidden), #detailModal:not(.hidden), #profileModal:not(.hidden), #sortSheet:not(.hidden), #addrFormModal:not(.hidden), #successModal:not(.hidden), #historyModal:not(.hidden), #updatesModal:not(.hidden), #receiptModal:not(.hidden), #suggestModal:not(.hidden), #guestShop:not(.hidden)'));
 }
 document.addEventListener('touchstart', e => {
   if (!member || ptrBusy() || window.scrollY > 0) return;
@@ -1595,10 +1599,10 @@ async function loadOrders() {
   if (favOnly) renderGrid();
 }
 
-// ─── ORDER HISTORY (bottom nav tab) ──────────────────
+// ─── ORDER HISTORY (bottom nav tab) — LAHAT ng transactions (online + in-store + wholesale) ──
 function openHistory() {
   if (!member) { signIn(); return; }
-  loadOrders();
+  loadHistory();
   document.getElementById('historyModal').classList.remove('hidden');
   pushOverlay();
 }
@@ -1606,6 +1610,146 @@ function closeHistory() {
   document.getElementById('historyModal').classList.add('hidden');
   popOverlay();
 }
+function orderCardHtml(o) {
+  const stMap = {
+    pending: ['Pending', 'bg-amber-100 text-amber-700'],
+    confirmed: ['Confirmed', 'bg-blue-100 text-blue-700'],
+    shipped: ['Shipped', 'bg-violet-100 text-violet-700'],
+    delivered: ['Delivered', 'bg-emerald-100 text-emerald-700'],
+    cancelled: ['Cancelled', 'bg-red-100 text-red-700']
+  };
+  const [label, cls] = stMap[o.status] || stMap.pending;
+  const items = (o.items || []).map(it =>
+    '<div class="flex justify-between gap-2 text-[11px]"><span class="text-stone-600 truncate">' + escH(it.productName) + ' × ' + it.qty + ' ' + escH(it.unitName || '') + '</span><span class="font-semibold">' + fmt(it.total) + '</span></div>').join('');
+  const pays = (o.payments || []).map(p =>
+    '<div class="flex items-center justify-between gap-2 text-[11px]">' +
+      '<span><b>' + fmt(p.amount) + '</b> via ' + (p.method === 'cash' ? '💵 Cash' : '📱 GCash') + (p.gcashRef ? ' (' + escH(p.gcashRef) + ')' : '') + '</span>' +
+      (p.gcashPic ? '<a href="' + p.gcashPic + '" target="_blank" class="text-blue-600 font-bold">PICTURE ↗</a>' : '') +
+    '</div>').join('');
+  const trail = (o.timeline || []).map(t =>
+    '<div class="flex gap-2 text-[10px]"><span class="text-stone-400 shrink-0">' + escH(t.at) + '</span><span class="font-bold ' + (t.status === 'cancelled' ? 'text-red-500' : 'text-stone-600') + '">' + escH(t.status) + '</span>' + (t.note ? '<span class="text-stone-400">— ' + escH(t.note) + '</span>' : '') + '</div>').join('');
+  return '<div class="border border-gray-200 rounded-xl p-3">' +
+    '<div class="flex items-center justify-between gap-2">' +
+      '<p class="font-extrabold text-stone-900 text-[13px]">' + o.orderNo + '</p>' +
+      '<span class="text-[9px] font-black px-2 py-0.5 rounded-full ' + cls + '">' + label.toUpperCase() + '</span>' +
+    '</div>' +
+    '<p class="text-[10px] text-stone-400 mt-0.5">' + o.createdAt + ' • ' + o.paymentMethod + (o.gcashRef ? ' (' + o.gcashRef + ')' : '') + '</p>' +
+    '<div class="mt-1.5 space-y-1">' + items + '</div>' +
+    (o.paidStatus === 'paid'
+      ? '<div class="mt-2 rounded-lg bg-emerald-50 border border-emerald-200 p-2 space-y-1">' +
+          '<p class="text-[11px] font-bold text-emerald-700">✅ PAID</p>' + pays +
+        '</div>'
+      : '') +
+    (trail ? '<div class="mt-2 rounded-lg bg-gray-50 border border-gray-100 p-2 space-y-0.5">' + trail + '</div>' : '') +
+    (Number(o.totalPoints || 0) > 0
+      ? '<p class="mt-2 text-[11px] font-bold text-amber-600">⭐ Points ' + (o.paidStatus === 'paid' ? 'earned' : 'to earn') + ': ' + Number(o.totalPoints).toFixed(2) + ' pts → +' + (o.awardPoints || 0) + '.00 point' + ((o.awardPoints || 0) > 1 ? 's' : '') + '</p>'
+      : '') +
+    '<p class="text-[12px] font-extrabold text-stone-800 mt-1.5">Total: ' + fmt(o.total) + '</p>' +
+  '</div>';
+}
+async function loadHistory() {
+  const wrap = document.getElementById('historyList');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="text-center py-8"><span class="spinner"></span></div>';
+  let orders = [], txns = [];
+  try { orders = await (await fetchT(API + '/dashboard/customer/orders', {}, 15000)).json(); } catch (e) {}
+  try { txns = await (await fetchT(API + '/dashboard/customer/transactions', {}, 15000)).json(); } catch (e) {}
+  myOrders = orders;
+  const shown = new Set(orders.map(o => 'e' + o.id));
+  const items = [];
+  for (const o of orders) items.push({ k: o.createdAt, h: orderCardHtml(o) });
+  for (const t of (txns || [])) {
+    if (t.type === 'ecommerce' && shown.has('e' + t.id)) continue;
+    items.push({
+      k: t.date,
+      h: '<div class="border border-gray-200 rounded-xl p-3">' +
+        '<div class="flex items-center justify-between gap-2">' +
+          '<p class="font-extrabold text-stone-900 text-[13px]">' + escH(t.refNo || '') + '</p>' +
+          '<span class="text-[9px] font-black px-2 py-0.5 rounded-full ' + (t.type === 'pos' ? 'bg-cyan-100 text-cyan-700' : 'bg-violet-100 text-violet-700') + '">' + (t.type === 'pos' ? '🏪 IN-STORE' : '📦 WHOLESALE') + '</span>' +
+        '</div>' +
+        '<p class="text-[10px] text-stone-400 mt-0.5">' + escH(t.date || '') + ' • ' + escH(t.storeName || '') + ' • ' + escH(t.paymentMethod || '') + '</p>' +
+        '<div class="mt-2 flex items-center justify-between gap-2">' +
+          '<p class="text-[12px] font-extrabold text-stone-800">Total: ' + fmt(t.total) + '</p>' +
+          '<button onclick="openReceipt(\'' + escH(t.storeId) + '\',\'' + escH(String(t.refNo).replace(/'/g, "\\'")) + '\')" class="text-[10px] font-bold bg-stone-900 text-white px-2.5 py-1.5 rounded-lg active:scale-95 transition">🧾 RESIBO</button>' +
+        '</div>' +
+      '</div>'
+    });
+  }
+  items.sort((a, b) => b.k.localeCompare(a.k));
+  wrap.innerHTML = items.map(i => i.h).join('') || '<p class="text-xs text-stone-400 text-center py-3">Wala ka pang transaction</p>';
+  if (favOnly) renderGrid();
+}
+async function openReceipt(storeId, invoiceNo) {
+  const m = document.getElementById('receiptModal');
+  const body = document.getElementById('receiptBody');
+  m.classList.remove('hidden');
+  pushOverlay();
+  body.innerHTML = '<div class="text-center py-8"><span class="spinner"></span></div>';
+  try {
+    const r = await fetchT(API + '/dashboard/customer/receipt?storeId=' + encodeURIComponent(storeId) + '&invoiceNo=' + encodeURIComponent(invoiceNo), {}, 15000);
+    if (!r.ok) { const j = await r.json().catch(() => ({})); body.innerHTML = '<p class="text-center text-stone-400 py-8 text-xs">' + escH(j.error || 'Hindi mahanap ang resibo') + '</p>'; return; }
+    const j = await r.json();
+    const s = j.sale, its = j.items || [];
+    body.innerHTML =
+      '<div class="font-mono text-[11px] text-stone-800">' +
+        '<p class="text-center font-black text-sm">ANDENGS SUPERSTORE</p>' +
+        '<p class="text-center text-stone-400 mb-2">' + escH(s.invoiceNo) + '</p>' +
+        '<p class="text-stone-400 mb-2">' + escH(s.date) + ' • cashier: ' + escH(s.cashier || '—') + '</p>' +
+        '<div class="border-t border-dashed border-stone-300 py-1 space-y-0.5">' + its.map(i =>
+          '<div class="flex justify-between gap-2"><span class="min-w-0">' + escH(i.name) + (i.qty > 1 ? ' × ' + i.qty + (i.unit ? ' ' + escH(i.unit) : '') : '') + '</span><span class="shrink-0">' + fmt(i.total) + '</span></div>').join('') +
+        '</div>' +
+        '<div class="border-t border-dashed border-stone-300 pt-1 space-y-0.5">' +
+          '<div class="flex justify-between"><span>Subtotal</span><span>' + fmt(s.subTotal) + '</span></div>' +
+          (s.discount > 0 ? '<div class="flex justify-between"><span>Discount</span><span>- ' + fmt(s.discount) + '</span></div>' : '') +
+          (s.tax > 0 ? '<div class="flex justify-between"><span>Tax</span><span>' + fmt(s.tax) + '</span></div>' : '') +
+          '<div class="flex justify-between font-black text-sm pt-0.5 border-t border-stone-200"><span>TOTAL</span><span>' + fmt(s.grandTotal) + '</span></div>' +
+          '<div class="flex justify-between"><span>Payment (' + escH(s.paymentMethod) + ')</span><span>' + fmt(s.amountPaid) + '</span></div>' +
+          (s.change > 0 ? '<div class="flex justify-between"><span>Change</span><span>' + fmt(s.change) + '</span></div>' : '') +
+        '</div>' +
+        '<p class="text-center text-stone-400 mt-3">Salamat sa inyong pagbili! 💜</p>' +
+      '</div>';
+  } catch (e) { body.innerHTML = '<p class="text-center text-stone-400 py-8 text-xs">Hindi ma-load ang resibo</p>'; }
+}
+function closeReceipt() { document.getElementById('receiptModal').classList.add('hidden'); popOverlay(); }
+
+// ─── ACCOUNT UPDATES (bell) ──────────────────────────
+let updUnread = 0;
+async function loadUpdates() {
+  if (!member) { const b = document.getElementById('updBadge'); if (b) b.classList.add('hidden'); return; }
+  try {
+    const r = await fetchT(API + '/dashboard/customer/updates', {}, 10000);
+    if (r.status === 401) return;
+    const j = await r.json();
+    updUnread = j.unreadCount || 0;
+    const b = document.getElementById('updBadge');
+    if (b) { b.textContent = updUnread; b.classList.toggle('hidden', updUnread === 0); }
+  } catch (e) {}
+}
+function openUpdates() {
+  if (!member) { signIn(); return; }
+  const m = document.getElementById('updatesModal');
+  const body = document.getElementById('updatesList');
+  m.classList.remove('hidden');
+  pushOverlay();
+  body.innerHTML = '<div class="text-center py-8"><span class="spinner"></span></div>';
+  fetchT(API + '/dashboard/customer/updates', {}, 10000)
+    .then(r => r.json())
+    .then(j => {
+      const ups = j.updates || [];
+      body.innerHTML = ups.length ? ups.map(u =>
+        '<div class="rounded-xl border p-3 ' + (u.isRead ? 'border-gray-200 bg-white' : 'border-amber-300 bg-amber-50') + '">' +
+          '<p class="text-[9px] font-black text-stone-400 uppercase tracking-wide">' + escH(u.at) + (u.isRead ? '' : ' • <span class="text-amber-600">BAGO</span>') + '</p>' +
+          '<p class="text-[13px] text-stone-800 mt-1 leading-snug">' + escH(u.message) + '</p>' +
+        '</div>').join('')
+        : '<p class="text-xs text-stone-400 text-center py-8">Wala pang update sa account mo</p>';
+      updUnread = 0;
+      const b = document.getElementById('updBadge');
+      if (b) b.classList.add('hidden');
+      fetchT(API + '/dashboard/customer/updates/read', { method: 'POST' }, 10000).catch(() => {});
+    })
+    .catch(() => { body.innerHTML = '<p class="text-xs text-stone-400 text-center py-8">Hindi ma-load ang updates</p>'; });
+}
+function closeUpdates() { document.getElementById('updatesModal').classList.add('hidden'); popOverlay(); }
 
 function trackLastOrder() {
   closeSuccess();
@@ -1628,7 +1772,7 @@ document.addEventListener('keydown', e => {
 });
 
 // ─── MOBILE BACK BUTTON (closes overlays like an app) ─
-const overlayPriority = ['addrFormModal', 'checkoutModal', 'cartDrawer', 'detailModal', 'profileModal', 'historyModal', 'suggestModal', 'sortSheet', 'successModal'];
+const overlayPriority = ['addrFormModal', 'checkoutModal', 'cartDrawer', 'detailModal', 'profileModal', 'historyModal', 'updatesModal', 'receiptModal', 'suggestModal', 'sortSheet', 'successModal'];
 let overlayStack = [];
 function overlayTop() {
   for (const id of overlayPriority) {
@@ -1656,6 +1800,8 @@ window.addEventListener('popstate', () => {
   else if (top === 'detailModal') closeDetail();
   else if (top === 'profileModal') closeProfile();
   else if (top === 'historyModal') closeHistory();
+  else if (top === 'updatesModal') closeUpdates();
+  else if (top === 'receiptModal') closeReceipt();
   else if (top === 'suggestModal') closeSuggest();
   else if (top === 'sortSheet') closeSort();
   else if (top === 'addrFormModal') closeAddrForm();
@@ -1709,6 +1855,7 @@ async function loadMe() {
     if (profileOpen) renderProfile();
     applyMemberUI();
     updateProfileBanner();
+    loadUpdates();
     loadFavs();
     renderChips();
   } catch (e) { member = false; applyMemberUI(); }
@@ -2181,11 +2328,34 @@ if (window.visualViewport) {
     <div class="sticky top-0 z-10 bg-white/95 backdrop-blur flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
       <p class="font-extrabold text-stone-900">🕐 My Orders</p>
       <div class="flex items-center gap-1">
-        <button onclick="loadOrders()" class="text-xs font-bold text-violet-700 px-3 py-1.5 rounded-lg hover:bg-violet-50 transition">REFRESH</button>
+        <button onclick="loadHistory()" class="text-xs font-bold text-violet-700 px-3 py-1.5 rounded-lg hover:bg-violet-50 transition">REFRESH</button>
         <button onclick="closeHistory()" class="p-2 -mr-2 hover:bg-gray-100 rounded-xl text-stone-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
       </div>
     </div>
     <div id="historyList" class="flex-1 overflow-y-auto px-5 py-4 space-y-2.5"></div>
+  </div>
+</div>
+
+<!-- ===== ACCOUNT UPDATES MODAL (bell) ===== -->
+<div id="updatesModal" class="hidden fixed inset-0 z-[85] bg-black/60 flex items-end sm:items-center justify-center anim-in">
+  <div class="w-full sm:max-w-md bg-white sm:rounded-3xl rounded-t-3xl max-h-[92vh] flex flex-col anim-up safe-bottom">
+    <div class="sticky top-0 z-10 bg-white/95 backdrop-blur flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+      <p class="font-extrabold text-stone-900">🔔 Mga Update sa Account</p>
+      <button onclick="closeUpdates()" class="p-2 -mr-2 hover:bg-gray-100 rounded-xl text-stone-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <p class="px-5 pt-3 text-[11px] text-stone-400">Dito makikita ang mga update sa iyong account — hal. mga naayos na points, resibo, credit, at iba pa.</p>
+    <div id="updatesList" class="flex-1 overflow-y-auto px-5 py-3 space-y-2"></div>
+  </div>
+</div>
+
+<!-- ===== RECEIPT MODAL (in-store / wholesale) ===== -->
+<div id="receiptModal" class="hidden fixed inset-0 z-[85] bg-black/60 flex items-end sm:items-center justify-center anim-in">
+  <div class="w-full sm:max-w-md bg-white sm:rounded-3xl rounded-t-3xl max-h-[92vh] flex flex-col anim-up safe-bottom">
+    <div class="sticky top-0 z-10 bg-white/95 backdrop-blur flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+      <p class="font-extrabold text-stone-900">🧾 Resibo</p>
+      <button onclick="closeReceipt()" class="p-2 -mr-2 hover:bg-gray-100 rounded-xl text-stone-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <div id="receiptBody" class="flex-1 overflow-y-auto px-6 py-4"></div>
   </div>
 </div>
 

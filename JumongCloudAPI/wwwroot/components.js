@@ -897,6 +897,7 @@ Alpine.store('app', {
   Alpine.data('customersList', () => ({
     d: [], loading: true, orders: [], ordersOpen: false, ordersName: '', ordersLoading: false, ptsFilter: 'all',
     phoneOpen: false, phoneTarget: null, phoneInput: '', phoneSaving: false,
+    upOpen: false, upTarget: null, upInput: '', upList: [], upSaving: false,
     async init() { window.addEventListener('load-customers', () => this.load()); await this.load() },
     async load() {
       this.loading = true;
@@ -943,6 +944,25 @@ Alpine.store('app', {
       this.ordersLoading = false;
     },
     closeOrders() { this.ordersOpen = false; },
+    // 📢 UPDATE sa account ng customer (makikita sa bell ng shop app)
+    async openUpdates(x) {
+      this.upTarget = x; this.upInput = ''; this.upList = []; this.upOpen = true;
+      try { this.upList = await fetchJSON(API + '/customers/' + x.id + '/updates') } catch (e) { this.upList = [] }
+    },
+    closeUpdateModal() { this.upOpen = false; this.upTarget = null; },
+    async saveUpdate() {
+      const m = (this.upInput || '').trim();
+      if (m.length < 3) { toast('Ilagay ang update message', 'error'); return; }
+      if (!this.upTarget) return;
+      this.upSaving = true;
+      try {
+        await fetchJSON(API + '/customers/' + this.upTarget.id + '/updates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: m }) });
+        toast('Na-post ang update kay ' + (this.upTarget.name || ''), 'ok');
+        this.upInput = '';
+        this.upList = await fetchJSON(API + '/customers/' + this.upTarget.id + '/updates');
+      } catch (e) { toast(e.message || 'Hindi na-post', 'error'); }
+      this.upSaving = false;
+    },
     statusCls(s) {
       const m = { pending: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300', confirmed: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300', shipped: 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300', arrived: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300', delivered: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400', cancelled: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' };
       return m[s] || 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300';
