@@ -334,38 +334,55 @@ public static class PgDatabaseHelper
                 
                 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_pos_id_key;
                 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_store_id_pos_id_key;
-                ALTER TABLE users ADD CONSTRAINT users_store_id_pos_id_key UNIQUE (store_id, pos_id);
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'users_store_id_pos_id_key') THEN
+                    ALTER TABLE users ADD CONSTRAINT users_store_id_pos_id_key UNIQUE (store_id, pos_id);
+                END IF;
                 
                 ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_pos_id_key;
                 ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_store_id_pos_id_key;
-                ALTER TABLE sales ADD CONSTRAINT sales_store_id_pos_id_key UNIQUE (store_id, pos_id);
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'sales_store_id_pos_id_key') THEN
+                    ALTER TABLE sales ADD CONSTRAINT sales_store_id_pos_id_key UNIQUE (store_id, pos_id);
+                END IF;
                 
                 ALTER TABLE sale_items DROP CONSTRAINT IF EXISTS sale_items_pos_id_key;
                 ALTER TABLE sale_items DROP CONSTRAINT IF EXISTS sale_items_store_id_pos_id_key;
-                ALTER TABLE sale_items ADD CONSTRAINT sale_items_store_id_pos_id_key UNIQUE (store_id, pos_id);
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'sale_items_store_id_pos_id_key') THEN
+                    ALTER TABLE sale_items ADD CONSTRAINT sale_items_store_id_pos_id_key UNIQUE (store_id, pos_id);
+                END IF;
                 
                 ALTER TABLE void_logs DROP CONSTRAINT IF EXISTS void_logs_pos_id_key;
                 ALTER TABLE void_logs DROP CONSTRAINT IF EXISTS void_logs_store_id_pos_id_key;
-                ALTER TABLE void_logs ADD CONSTRAINT void_logs_store_id_pos_id_key UNIQUE (store_id, pos_id);
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'void_logs_store_id_pos_id_key') THEN
+                    ALTER TABLE void_logs ADD CONSTRAINT void_logs_store_id_pos_id_key UNIQUE (store_id, pos_id);
+                END IF;
                 
                 ALTER TABLE stock_trails DROP CONSTRAINT IF EXISTS stock_trails_pos_id_key;
                 ALTER TABLE stock_trails DROP CONSTRAINT IF EXISTS stock_trails_store_id_pos_id_key;
-                ALTER TABLE stock_trails ADD CONSTRAINT stock_trails_store_id_pos_id_key UNIQUE (store_id, pos_id);
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'stock_trails_store_id_pos_id_key') THEN
+                    ALTER TABLE stock_trails ADD CONSTRAINT stock_trails_store_id_pos_id_key UNIQUE (store_id, pos_id);
+                END IF;
                 
                 ALTER TABLE credit_transactions DROP CONSTRAINT IF EXISTS credit_transactions_pos_id_key;
                 ALTER TABLE credit_transactions DROP CONSTRAINT IF EXISTS credit_transactions_store_id_pos_id_key;
-                ALTER TABLE credit_transactions ADD CONSTRAINT credit_transactions_store_id_pos_id_key UNIQUE (store_id, pos_id);
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'credit_transactions_store_id_pos_id_key') THEN
+                    ALTER TABLE credit_transactions ADD CONSTRAINT credit_transactions_store_id_pos_id_key UNIQUE (store_id, pos_id);
+                END IF;
                 
                 ALTER TABLE daily_closes DROP CONSTRAINT IF EXISTS daily_closes_pos_id_key;
                 ALTER TABLE daily_closes DROP CONSTRAINT IF EXISTS daily_closes_store_id_pos_id_key;
-                ALTER TABLE daily_closes ADD CONSTRAINT daily_closes_store_id_pos_id_key UNIQUE (store_id, pos_id);
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'daily_closes_store_id_pos_id_key') THEN
+                    ALTER TABLE daily_closes ADD CONSTRAINT daily_closes_store_id_pos_id_key UNIQUE (store_id, pos_id);
+                END IF;
                 
                 ALTER TABLE expenses DROP CONSTRAINT IF EXISTS expenses_pos_id_key;
                 ALTER TABLE expenses DROP CONSTRAINT IF EXISTS expenses_store_id_pos_id_key;
-                ALTER TABLE expenses ADD CONSTRAINT expenses_store_id_pos_id_key UNIQUE (store_id, pos_id);
+                IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'expenses_store_id_pos_id_key') THEN
+                    ALTER TABLE expenses ADD CONSTRAINT expenses_store_id_pos_id_key UNIQUE (store_id, pos_id);
+                END IF;
             END $$;
         ";
-        dropCmd.ExecuteNonQuery();
+        try { dropCmd.ExecuteNonQuery(); }
+        catch (Exception ex) { Console.Error.WriteLine($"[migration] unique-constraint block skipped: {ex.Message}"); }
 
         using var idxCmd = conn.CreateCommand();
         idxCmd.CommandText = @"
