@@ -1,6 +1,19 @@
 # JumongPOS — Full Project Guide for AI Agents
 
-## Latest Change (2026-08-27) — v1.1.62 (API + POS client) + web: CUSTOMER ACCOUNT — transactions sa lahat ng stores + 🔔 updates (bell) + online receipts + points fix
+## Latest Change (2026-08-31) — DriverApp v2.0.4: DATE + TIME sa deliveries list + order detail (buong petsa, may taon)
+
+**Request:** "mobile driver can you put date and time in list so i know when is that transaction vieising" — ang list ay mayroon nang date line mula v2.0.3 pero `MM-dd HH:mm` lang (walang taon, madaling malito), at ang order DETAIL screen ay walang petsa. Ngayon: buong format `MMM dd, yyyy · hh:mm a` (hal. `Aug 27, 2026 · 3:45 PM`, Asia/Manila) sa LIST + bagong 🕐 date line sa DETAIL.
+
+| File | Change |
+|---|---|
+| `DriverApp/app/src/main/java/com/jumong/driver/MainActivity.kt` | `fmtDate()` output format: `"MM-dd HH:mm"` → `"MMM dd, yyyy · hh:mm a"` (UTC parse → Asia/Manila, Locale.US — same two-SimpleDateFormat pattern as before). Bagong `tvDetailDate` field + binding (`findViewById`) + set sa `openDetail`: `tvDetailDate.text = "🕐 " + fmtDate(o.optString("createdAt"))`. |
+| `DriverApp/app/src/main/res/layout/activity_main.xml` | Detail screen header: bagong `tvDetailDate` TextView (right side, before tvPaidBadge, `#8b8bb5` 11sp, marginRight 4dp) — petsa/oras makikita sa tabi ng order number. |
+| `DriverApp/app/build.gradle` | versionCode 5 → 6, versionName `"2.0.3"` → `"2.0.4"`. |
+| `JumongCloudAPI/wwwroot/updates/driver-version.json` | `"2.0.4"` — changelog: "v2.0.4 - DATE + TIME SA LIST: Bawat order sa list: buong petsa at oras (hal. Aug 27, 2026 3:45 PM) · May petsa/oras din ang order detail screen". |
+
+**Deployed:** built/signed sa SERVER (gradle 8.14.3 dist, `JAVA_HOME` = Android Studio jbr, apksigner 37.0.0 — BUILD SUCCESSFUL 55s; V3.0 cert `CN=Jumong Warehouse` = same jumong_sign.keystore → in-place update). APK (2,608,213 B) → live `C:\JumongAPI\wwwroot\updates\JumongDriver.apk` + publish wwwroot copy + repo copy `DriverApp\JumongDriver.apk`; driver-version.json live (verified 200 + version 2.0.4). Drivers update via in-app UPDATE dialog. Git commit `e45dc9b` (pushed). NOTE: dev PC walang Android SDK — APK builds always sa server. WinRM session gotcha: `New-PSSession -ComputerName DESKTOP-I097OO9 -Credential <username-only>` may hang — always build the PSCredential object with the password.
+
+## Previous Change (2026-08-27) — v1.1.62 (API + POS client) + web: CUSTOMER ACCOUNT — transactions sa lahat ng stores + 🔔 updates (bell) + online receipts + points fix
 
 **Request:** "pwede ba yung transaction nya sa HQ na view nya sa mobile nya at pwede mag karoon ng update icon ang mobile customer... resibo number ganito points fix credit amount... naka link sa account # nila... kahit saaang store... at resibo nila online nakikita nila" — ang customer app ay nakakakita na ng LAHAT ng kanilang transactions (online + POS in-store kahit anong store + wholesale) na may receipt view, at may 🔔 bell para sa mga update/naayos na concern ng kanilang account.
 
