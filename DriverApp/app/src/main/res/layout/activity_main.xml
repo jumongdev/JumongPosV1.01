@@ -258,6 +258,13 @@
                 android:textSize="15sp"
                 android:textStyle="bold" />
             <TextView
+                android:id="@+id/tvDetailDate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#8b8bb5"
+                android:textSize="11sp"
+                android:layout_marginRight="4dp" />
+            <TextView
                 android:id="@+id/tvPaidBadge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

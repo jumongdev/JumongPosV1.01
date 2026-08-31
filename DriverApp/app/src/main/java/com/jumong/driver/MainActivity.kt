@@ -70,6 +70,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvDrvName: TextView
     private lateinit var listEmpty: TextView
     private lateinit var tvDetailOrder: TextView
+    private lateinit var tvDetailDate: TextView
     private lateinit var tvPaidBadge: TextView
     private lateinit var tvDetailCustomer: TextView
     private lateinit var tvDetailPhone: TextView
@@ -146,6 +147,7 @@ class MainActivity : AppCompatActivity() {
         tvDrvName = findViewById(R.id.drvName)
         listEmpty = findViewById(R.id.listEmpty)
         tvDetailOrder = findViewById(R.id.tvDetailOrder)
+        tvDetailDate = findViewById(R.id.tvDetailDate)
         tvPaidBadge = findViewById(R.id.tvPaidBadge)
         tvDetailCustomer = findViewById(R.id.tvDetailCustomer)
         tvDetailPhone = findViewById(R.id.tvDetailPhone)
@@ -328,7 +330,7 @@ class MainActivity : AppCompatActivity() {
             val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm", java.util.Locale.US)
             sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
             val d = sdf.parse(iso.take(16))
-            val out = java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.US)
+            val out = java.text.SimpleDateFormat("MMM dd, yyyy · hh:mm a", java.util.Locale.US)
             out.timeZone = java.util.TimeZone.getTimeZone("Asia/Manila")
             out.format(d)
         } catch (e: Exception) { iso.take(16).replace("T", " ") }
@@ -346,6 +348,7 @@ class MainActivity : AppCompatActivity() {
                 curItems = j.optJSONArray("items") ?: JSONArray()
                 val paid = o.optString("paidStatus") == "paid"
                 tvDetailOrder.text = o.optString("orderNo")
+                tvDetailDate.text = "🕐 " + fmtDate(o.optString("createdAt"))
                 tvPaidBadge.text = "PAID"
                 tvPaidBadge.visibility = if (paid) View.VISIBLE else View.GONE
                 tvDetailCustomer.text = o.optString("customerName")
