@@ -393,6 +393,20 @@ public class DatabaseHelper
             alter.ExecuteNonQuery();
         }
 
+        // Migrate: add TotalVoidReturns / TotalAdjustDown / TotalInventoryCostPrev to DailyClose (reconciliation reprint)
+        using var checkDcVoidRet = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('DailyClose') WHERE name = 'TotalVoidReturns'", conn);
+        if (Convert.ToInt32(checkDcVoidRet.ExecuteScalar()) == 0)
+        {
+            using var alter = new SQLiteCommand("ALTER TABLE DailyClose ADD COLUMN TotalVoidReturns REAL NOT NULL DEFAULT 0", conn);
+            alter.ExecuteNonQuery();
+            alter.CommandText = "ALTER TABLE DailyClose ADD COLUMN TotalAdjustDown REAL NOT NULL DEFAULT 0";
+            alter.ExecuteNonQuery();
+            alter.CommandText = "ALTER TABLE DailyClose ADD COLUMN TotalInventoryCostPrev REAL NOT NULL DEFAULT 0";
+            alter.ExecuteNonQuery();
+            alter.CommandText = "ALTER TABLE DailyClose ADD COLUMN TotalSaleTrailsCost REAL NOT NULL DEFAULT 0";
+            alter.ExecuteNonQuery();
+        }
+
         // AuditLog table
         var auditLogTable = "CREATE TABLE IF NOT EXISTS AuditLog (" +
             "Id INTEGER PRIMARY KEY AUTOINCREMENT," +

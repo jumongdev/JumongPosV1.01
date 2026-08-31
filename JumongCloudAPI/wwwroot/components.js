@@ -533,10 +533,10 @@ Alpine.store('app', {
     },
     async loadTotals() {
       const c = Alpine.store('app').cache.stockTotals;
-      if (c && Date.now() - c.t < 30000) { this.stockTotals = c.data; this.stockTotalsByName = c.byName; return }
+      if (c && Date.now() - c.t < 30000) { this.stockTotals = c.data; this.stockTotalsByName = c.byName; this.hqStockByBc = c.hq || {}; this.hqStockByName = c.hqByName || {}; return }
       try {
         const all = await fetchJSON(API + '/stock-status');
-        const byBc = {}, byName = {}, seen = {};
+        const byBc = {}, byName = {}, seen = {}, hqByBc = {}, hqByName = {};
         all.forEach(x => {
           const key = (x.barcode || '') + '|' + x.storeId;
           if (seen[key]) return;
@@ -544,13 +544,20 @@ Alpine.store('app', {
           const q = Number(x.stockQty) || 0;
           if (x.barcode) byBc[x.barcode] = (byBc[x.barcode] || 0) + q;
           else byName[x.name] = (byName[x.name] || 0) + q;
+          if (x.storeId === 'STORE-20260602-7159') {
+            if (x.barcode) hqByBc[x.barcode] = q;
+            else hqByName[x.name] = q;
+          }
         });
         this.stockTotals = byBc;
         this.stockTotalsByName = byName;
-        Alpine.store('app').cache.stockTotals = { data: byBc, byName: byName, t: Date.now() };
+        this.hqStockByBc = hqByBc;
+        this.hqStockByName = hqByName;
+        Alpine.store('app').cache.stockTotals = { data: byBc, byName: byName, hq: hqByBc, hqByName: hqByName, t: Date.now() };
       } catch (e) { /* keep previous totals */ }
     },
     totalStock(p) { if (!p) return 0; if (p.barcode) return this.stockTotals[p.barcode] || 0; return this.stockTotalsByName[p.name] || 0 },
+    hqStock(p) { if (!p) return 0; if (p.barcode) return this.hqStockByBc[p.barcode] || 0; return this.hqStockByName[p.name] || 0 },
     stockCls(q) { return q === 0 ? 'text-red-500' : q < 10 ? 'text-amber-500' : 'text-emerald-500' },
     get categories() { const c = []; this.d.forEach(x => { if (x.category && !c.includes(x.category)) c.push(x.category) }); return c.sort() },
     get inactiveCount() { return this.d.filter(x => x.isActive === false).length },

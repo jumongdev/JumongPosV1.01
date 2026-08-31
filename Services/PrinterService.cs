@@ -41,7 +41,9 @@ public class PrinterService
         if (lineChars < 20) lineChars = 20;
         if (lineChars > 48) lineChars = 48;
 
-        var lines = BuildReceiptLines(sale, cashierName, customer, lineChars, includeShopQr);
+        var showQr = includeShopQr &&
+            (SyncService.StoreId == "STORE-20260602-7159" || SyncService.StoreId == "STORE-20260602-AA36");
+        var lines = BuildReceiptLines(sale, cashierName, customer, lineChars, showQr);
         ExtendPaperIfNeeded(doc, lines.Count + (lines.Any(x => x.IsQr) ? 30 : 0));
 
         doc.PrintPage += (sender, e) =>
@@ -154,25 +156,31 @@ public class PrinterService
 
         lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Spacing = 12 });
 
-        var totalQty = sale.Items.Sum(x => x.Quantity);
+        var totalQty = sale.Items.Where(x => !x.IsVoided).Sum(x => x.Quantity);
+        var voidedQty = sale.Items.Where(x => x.IsVoided).Sum(x => x.Quantity);
         lines.Add(new LineEntry { Text = $"Total Items: {totalQty}", RightText = $"{sale.Items.Count} line(s)", Bold = true, Spacing = 14 });
         lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Spacing = 12 });
 
         foreach (var item in sale.Items)
         {
-            var nameLines = WrapText(item.ProductName, lineChars);
+            var voided = item.IsVoided;
+            var nameLines = WrapText(item.ProductName, lineChars - (voided ? 9 : 0));
             for (int i = 0; i < nameLines.Count; i++)
-                lines.Add(new LineEntry { Text = i == 0 ? nameLines[i] : "  " + nameLines[i], Bold = true, Spacing = 14 });
+            {
+                var txt = i == 0 ? nameLines[i] : "  " + nameLines[i];
+                if (voided && i == 0) txt += " [VOIDED]";
+                lines.Add(new LineEntry { Text = txt, Bold = true, Spacing = 14 });
+            }
             lines.Add(new LineEntry
             {
                 Text = $"  {item.Quantity}x {item.Price:N2}",
-                RightText = item.TotalPrice.ToString("N2"),
+                RightText = voided ? $"({item.TotalPrice.ToString("N2")})" : item.TotalPrice.ToString("N2"),
                 Spacing = 16
             });
         }
 
         lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Spacing = 12 });
-        lines.Add(new LineEntry { Text = "Sub Total", RightText = sale.SubTotal.ToString("N2"), Spacing = 14 });
+        lines.Add(new LineEntry { Text = "Sub Total", RightText = sale.Items.Where(x => !x.IsVoided).Sum(x => x.TotalPrice).ToString("N2"), Spacing = 14 });
 
         if (sale.Discount > 0)
             lines.Add(new LineEntry { Text = "Discount", RightText = sale.Discount.ToString("N2"), Spacing = 14 });
@@ -180,7 +188,11 @@ public class PrinterService
         if (sale.Tax > 0)
             lines.Add(new LineEntry { Text = "Tax", RightText = sale.Tax.ToString("N2"), Spacing = 14 });
 
-        lines.Add(new LineEntry { Text = "TOTAL", RightText = sale.GrandTotal.ToString("N2"), Bold = true, Spacing = 18 });
+        lines.Add(new LineEntry { Text = "TOTAL", RightText = sale.Items.Where(x => !x.IsVoided).Sum(x => x.TotalPrice).ToString("N2"), Bold = true, Spacing = 18 });
+
+        var voidedTotal = sale.Items.Where(x => x.IsVoided).Sum(x => x.TotalPrice);
+        if (voidedTotal > 0)
+            lines.Add(new LineEntry { Text = $"VOIDED ({voidedQty} pc)", RightText = $"({voidedTotal.ToString("N2")})", Bold = true, Spacing = 14 });
 
         if (sale.PaymentMethod == "Split")
         {
@@ -198,6 +210,17 @@ public class PrinterService
         }
 
         lines.Add(new LineEntry { Text = "Change", RightText = sale.Change.ToString("N2"), Spacing = 14 });
+
+        // Loyalty points: STAR members (QR code) only - show earned points + new balance
+        var ptsEarned = sale.Items.Where(x => !x.IsVoided).Sum(x => x.PointsEarned);
+        if (ptsEarned > 0 && customer != null)
+        {
+            lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Spacing = 12 });
+            lines.Add(new LineEntry { Text = "POINTS EARNED", RightText = "+" + ptsEarned.ToString(), Bold = true, Spacing = 14 });
+            lines.Add(new LineEntry { Text = "Total Points", RightText = customer.LoyaltyPoints.ToString(), Spacing = 14 });
+            lines.Add(new LineEntry { Text = "Points redeemable sa susunod na bili", Spacing = 14 });
+        }
+
         lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Spacing = 12 });
         lines.Add(new LineEntry { Text = footer, Align = TextAlign.Center, Bold = true, Spacing = 20 });
 
@@ -377,9 +400,11 @@ public class PrinterService
         List<Expense> expenses, List<(string InvoiceNo, string SaleDate, decimal Amount, string ReferenceNo)> gcashTxns,
         List<(string Name, decimal Amount)> creditCustomers, List<(string CustomerName, string PaymentMethod, decimal Amount, string Timestamp)> creditPayments,
         int denom1000, int denom500, int denom200, int denom100, int denom50, int denom20, decimal denomCoins,
-        decimal totalInventoryCost = 0, decimal totalCostSold = 0, decimal totalStockReceivedCost = 0, decimal previousInventory = 0,
+        decimal totalInventoryCost = 0, decimal totalCostSold = 0, decimal saleTrailsCost = 0, decimal totalStockReceivedCost = 0, decimal previousInventory = 0,
         decimal voidReturns = 0, decimal adjustDown = 0,
+        decimal adjDownTransfers = 0, decimal adjDownEcom = 0, decimal adjDownMobile = 0,
         int mobileSales = 0, decimal mobileTotal = 0, int ecomOrders = 0, decimal ecomTotal = 0, int receivedPcs = 0, int transferOutPcs = 0,
+        decimal ecomCollectedCash = 0, decimal ecomCollectedGcash = 0, decimal ecomRemitted = 0,
         (int Total, int Voided, int Deleted, decimal Lost, List<string> VoidedInvs, List<string> MissingInvs)? receiptAudit = null)
     {
         var printerName = GetSetting("PrinterName");
@@ -401,7 +426,7 @@ public class PrinterService
         if (lineChars < 20) lineChars = 20;
         if (lineChars > 48) lineChars = 48;
 
-        var lines = BuildAuditEndShiftReportLines(cashOnHand, difference, cashierName, timestamp, notes, totalSales, totalCash, totalEWallet, totalCredit, totalVoided, expenses, gcashTxns, creditCustomers, creditPayments, lineChars, denom1000, denom500, denom200, denom100, denom50, denom20, denomCoins, totalInventoryCost, totalCostSold, totalStockReceivedCost, previousInventory, voidReturns, adjustDown, mobileSales, mobileTotal, ecomOrders, ecomTotal, receivedPcs, transferOutPcs, receiptAudit);
+        var lines = BuildAuditEndShiftReportLines(cashOnHand, difference, cashierName, timestamp, notes, totalSales, totalCash, totalEWallet, totalCredit, totalVoided, expenses, gcashTxns, creditCustomers, creditPayments, lineChars, denom1000, denom500, denom200, denom100, denom50, denom20, denomCoins, totalInventoryCost, totalCostSold, saleTrailsCost, totalStockReceivedCost, previousInventory, voidReturns, adjustDown, adjDownTransfers, adjDownEcom, adjDownMobile, mobileSales, mobileTotal, ecomOrders, ecomTotal, receivedPcs, transferOutPcs, ecomCollectedCash, ecomCollectedGcash, ecomRemitted, receiptAudit);
         ExtendPaperIfNeeded(doc, lines.Count, 16);
 
         doc.PrintPage += (sender, e) =>
@@ -458,9 +483,11 @@ public class PrinterService
         List<Expense> expenses, List<(string InvoiceNo, string SaleDate, decimal Amount, string ReferenceNo)> gcashTxns,
         List<(string Name, decimal Amount)> creditCustomers, List<(string CustomerName, string PaymentMethod, decimal Amount, string Timestamp)> creditPayments, int lineChars,
         int denom1000, int denom500, int denom200, int denom100, int denom50, int denom20, decimal denomCoins,
-        decimal totalInventoryCost = 0, decimal totalCostSold = 0, decimal totalStockReceivedCost = 0, decimal previousInventory = 0,
+        decimal totalInventoryCost = 0, decimal totalCostSold = 0, decimal saleTrailsCost = 0, decimal totalStockReceivedCost = 0, decimal previousInventory = 0,
         decimal voidReturns = 0, decimal adjustDown = 0,
+        decimal adjDownTransfers = 0, decimal adjDownEcom = 0, decimal adjDownMobile = 0,
         int mobileSales = 0, decimal mobileTotal = 0, int ecomOrders = 0, decimal ecomTotal = 0, int receivedPcs = 0, int transferOutPcs = 0,
+        decimal ecomCollectedCash = 0, decimal ecomCollectedGcash = 0, decimal ecomRemitted = 0,
         (int Total, int Voided, int Deleted, decimal Lost, List<string> VoidedInvs, List<string> MissingInvs)? receiptAudit = null)
     {
         var lines = new List<LineEntry>();
@@ -564,9 +591,9 @@ public class PrinterService
         }
 
         // Inventory Reconciliation
-        if (previousInventory > 0 || totalCostSold > 0 || totalStockReceivedCost > 0 || totalInventoryCost > 0)
+        if (previousInventory > 0 || totalCostSold > 0 || saleTrailsCost != 0 || totalStockReceivedCost > 0 || totalInventoryCost > 0)
         {
-            var expected = previousInventory + totalStockReceivedCost + voidReturns - totalCostSold - adjustDown;
+            var expected = previousInventory + totalStockReceivedCost + voidReturns + saleTrailsCost + adjustDown;
             var variance = totalInventoryCost - expected;
             lines.Add(new LineEntry { Text = new string('=', lineChars), Align = TextAlign.Center, Spacing = 14 });
             lines.Add(new LineEntry { Text = "INVENTORY RECONCILIATION", Bold = true, Spacing = 14 });
@@ -575,14 +602,24 @@ public class PrinterService
                 lines.Add(new LineEntry { Text = "+ Stock Received", RightText = totalStockReceivedCost.ToString("N2"), Spacing = 14 });
             if (voidReturns > 0)
                 lines.Add(new LineEntry { Text = "+ Void Returns", RightText = voidReturns.ToString("N2"), Spacing = 14 });
-            lines.Add(new LineEntry { Text = "- Cost of Goods Sold", RightText = $"({totalCostSold.ToString("N2")})", Spacing = 14 });
-            if (adjustDown > 0)
-                lines.Add(new LineEntry { Text = "- Adjustments / Loss", RightText = $"({adjustDown.ToString("N2")})", Spacing = 14 });
+            lines.Add(new LineEntry { Text = "- Sales (inv trails, current cost)", RightText = $"({Math.Abs(saleTrailsCost).ToString("N2")})", Spacing = 14 });
+            if (adjDownTransfers != 0)
+                lines.Add(new LineEntry { Text = "- Transfers out (HQ->POS)", RightText = $"({Math.Abs(adjDownTransfers).ToString("N2")})", Spacing = 14 });
+            if (adjDownEcom != 0)
+                lines.Add(new LineEntry { Text = "- E-commerce (holds)", RightText = $"({Math.Abs(adjDownEcom).ToString("N2")})", Spacing = 14 });
+            if (adjDownMobile != 0)
+                lines.Add(new LineEntry { Text = "- Mobile wholesale", RightText = $"({Math.Abs(adjDownMobile).ToString("N2")})", Spacing = 14 });
+            var adjManual = Math.Abs(adjustDown) - Math.Abs(adjDownTransfers) - Math.Abs(adjDownEcom) - Math.Abs(adjDownMobile);
+            if (adjManual > 0)
+                lines.Add(new LineEntry { Text = "- Adjustments / Loss (manual)", RightText = $"({adjManual.ToString("N2")})", Spacing = 14 });
+            if (adjustDown != 0)
+                lines.Add(new LineEntry { Text = "Total Adjustments", RightText = $"({Math.Abs(adjustDown).ToString("N2")})", Bold = true, Spacing = 14 });
             lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Align = TextAlign.Center, Spacing = 12 });
             lines.Add(new LineEntry { Text = "Expected Inventory", RightText = expected.ToString("N2"), Bold = true, Spacing = 14 });
             lines.Add(new LineEntry { Text = "Actual Inventory", RightText = totalInventoryCost.ToString("N2"), Bold = true, Spacing = 14 });
             lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Align = TextAlign.Center, Spacing = 12 });
-            var label = variance == 0 ? "✔ BALANCED" : variance > 0 ? $"⚠ OVER by {variance:N2}" : $"❌ SHORT by {Math.Abs(variance):N2}";
+            var rounded = Math.Round(variance, 2);
+            var label = rounded == 0 ? "✔ BALANCED" : rounded > 0 ? $"⚠ OVER by {rounded:N2}" : $"❌ SHORT by {Math.Abs(rounded):N2}";
             lines.Add(new LineEntry { Text = label, Align = TextAlign.Center, Bold = true, Spacing = 18 });
         }
 
@@ -595,6 +632,16 @@ public class PrinterService
                 lines.Add(new LineEntry { Text = $"Wholesale (mobile): {mobileSales} sale(s)", RightText = mobileTotal.ToString("N2"), Spacing = 14 });
             if (ecomOrders > 0)
                 lines.Add(new LineEntry { Text = $"E-commerce: {ecomOrders} order(s)", RightText = ecomTotal.ToString("N2"), Spacing = 14 });
+            if (ecomCollectedCash > 0 || ecomCollectedGcash > 0)
+            {
+                lines.Add(new LineEntry { Text = "E-commerce collected (COD)", RightText = (ecomCollectedCash + ecomCollectedGcash).ToString("N2"), Spacing = 14 });
+                if (ecomCollectedCash > 0)
+                    lines.Add(new LineEntry { Text = "  Cash", RightText = ecomCollectedCash.ToString("N2"), Spacing = 14 });
+                if (ecomCollectedGcash > 0)
+                    lines.Add(new LineEntry { Text = "  Gcash", RightText = ecomCollectedGcash.ToString("N2"), Spacing = 14 });
+            }
+            if (ecomRemitted > 0)
+                lines.Add(new LineEntry { Text = "E-commerce remitted (dashboard)", RightText = ecomRemitted.ToString("N2"), Spacing = 14 });
             if (receivedPcs > 0)
                 lines.Add(new LineEntry { Text = $"Received (server): +{receivedPcs} pcs", Spacing = 14 });
             if (transferOutPcs > 0)

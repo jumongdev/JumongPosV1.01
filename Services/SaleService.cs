@@ -387,6 +387,7 @@ public class SaleService
                 UnitName = rdr["UnitName"].ToString() ?? "",
                 QtyPerUnit = rdr["QtyPerUnit"] != DBNull.Value ? Convert.ToInt32(rdr["QtyPerUnit"]) : 1,
                 UnitCost = rdr["UnitCost"] != DBNull.Value ? Convert.ToDecimal(rdr["UnitCost"]) : 0,
+                PointsEarned = rdr["PointsEarned"] != DBNull.Value ? Convert.ToInt32(rdr["PointsEarned"]) : 0,
                 IsVoided = rdr["IsVoided"] != DBNull.Value && Convert.ToBoolean(rdr["IsVoided"])
             });
         }
@@ -623,7 +624,7 @@ public class SaleService
         }
     }
 
-    public static void VoidItem(int itemId, string reason, int voidedByUserId, string voidedByUserName)
+    public static void VoidItem(int itemId, int voidQty, string reason, int voidedByUserId, string voidedByUserName)
     {
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
@@ -649,18 +650,56 @@ public class SaleService
             var barcode = rdr["Barcode"].ToString() ?? "";
             var qty = Convert.ToInt32(rdr["Quantity"]);
             var qpu = rdr["QtyPerUnit"] != DBNull.Value ? Convert.ToInt32(rdr["QtyPerUnit"]) : 1;
-            var restockQty = qty * qpu;
+            var price = Convert.ToDecimal(rdr["Price"]);
+            var unitName = rdr["UnitName"]?.ToString() ?? "";
+            var unitCost = rdr["UnitCost"] != DBNull.Value ? Convert.ToDecimal(rdr["UnitCost"]) : 0;
             var total = Convert.ToDecimal(rdr["TotalPrice"]);
             var ptsEarned = rdr["PointsEarned"] != DBNull.Value ? Convert.ToInt32(rdr["PointsEarned"]) : 0;
             rdr.Close();
 
+            var actualVoidQty = Math.Max(1, Math.Min(voidQty, qty));
+            var restockQty = actualVoidQty * qpu;
+            var voidedAmt = price * actualVoidQty;
+            var voidedPts = ptsEarned > 0 ? (int)Math.Round((decimal)ptsEarned * actualVoidQty / qty) : 0;
+
+            if (actualVoidQty < qty)
+            {
+                // PARTIAL: reduce the original row + insert a voided sibling row (record ng voided portion)
+                var remainQty = qty - actualVoidQty;
+                var remainPts = ptsEarned - voidedPts;
+                using var upd = new SQLiteCommand("UPDATE SaleItems SET Quantity = @q, TotalPrice = @tp, PointsEarned = @pe WHERE Id = @id", conn);
+                upd.Parameters.AddWithValue("@q", remainQty);
+                upd.Parameters.AddWithValue("@tp", price * remainQty);
+                upd.Parameters.AddWithValue("@pe", remainPts);
+                upd.Parameters.AddWithValue("@id", itemId);
+                upd.ExecuteNonQuery();
+
+                using var ins = new SQLiteCommand(
+                    "INSERT INTO SaleItems (SaleId, ProductId, ProductName, Barcode, Price, Quantity, TotalPrice, UnitName, QtyPerUnit, UnitCost, PointsEarned, IsVoided) " +
+                    "VALUES (@sid, @pid, @pn, @bc, @pr, @q, @tp, @un, @qpu, @uc, @pe, 1)", conn);
+                ins.Parameters.AddWithValue("@sid", saleId);
+                ins.Parameters.AddWithValue("@pid", productId);
+                ins.Parameters.AddWithValue("@pn", productName);
+                ins.Parameters.AddWithValue("@bc", barcode);
+                ins.Parameters.AddWithValue("@pr", price);
+                ins.Parameters.AddWithValue("@q", actualVoidQty);
+                ins.Parameters.AddWithValue("@tp", voidedAmt);
+                ins.Parameters.AddWithValue("@un", unitName);
+                ins.Parameters.AddWithValue("@qpu", qpu);
+                ins.Parameters.AddWithValue("@uc", unitCost);
+                ins.Parameters.AddWithValue("@pe", voidedPts);
+                ins.ExecuteNonQuery();
+            }
+            else
+            {
+                using var upd = new SQLiteCommand("UPDATE SaleItems SET IsVoided = 1 WHERE Id = @id", conn);
+                upd.Parameters.AddWithValue("@id", itemId);
+                upd.ExecuteNonQuery();
+            }
+
             var getStock = new SQLiteCommand("SELECT StockQty FROM Products WHERE Id = @pid", conn);
             getStock.Parameters.AddWithValue("@pid", productId);
             var stockBefore = Convert.ToInt32(getStock.ExecuteScalar());
-
-            var upd = new SQLiteCommand("UPDATE SaleItems SET IsVoided = 1 WHERE Id = @id", conn);
-            upd.Parameters.AddWithValue("@id", itemId);
-            upd.ExecuteNonQuery();
 
             var restock = new SQLiteCommand("UPDATE Products SET StockQty = StockQty + @qty WHERE Id = @pid", conn);
             restock.Parameters.AddWithValue("@qty", restockQty);
@@ -695,27 +734,27 @@ public class SaleService
             log.Parameters.AddWithValue("@r", reason);
             log.Parameters.AddWithValue("@inv", invoiceNo);
             log.Parameters.AddWithValue("@pn", productName);
-            log.Parameters.AddWithValue("@qty", qty);
-            log.Parameters.AddWithValue("@amt", total);
+            log.Parameters.AddWithValue("@qty", actualVoidQty);
+            log.Parameters.AddWithValue("@amt", voidedAmt);
             log.Parameters.AddWithValue("@uid", voidedByUserId);
             log.Parameters.AddWithValue("@uname", voidedByUserName);
             log.ExecuteNonQuery();
 
-            // Reverse credit balance if this was a credit sale
+            // Reverse credit balance if this was a credit sale (partial = portion only)
             if (paymentMethod == "Credit" && customerId.HasValue)
             {
                 var getBal = new SQLiteCommand("SELECT CreditBalance FROM Customers WHERE Id = @cid", conn);
                 getBal.Parameters.AddWithValue("@cid", customerId.Value);
                 var curBal = Convert.ToDecimal(getBal.ExecuteScalar());
-                var newBal = curBal - total;
+                var newBal = curBal - voidedAmt;
 
                 var insCt = new SQLiteCommand(
                     "INSERT INTO CreditTransactions (CustomerId, SaleId, Type, Description, Debit, Credit, Balance, UserId, UserName) " +
                     "VALUES (@cid, @sid, 'Void', @desc, 0, @amt, @bal, @uid, @uname)", conn);
                 insCt.Parameters.AddWithValue("@cid", customerId.Value);
                 insCt.Parameters.AddWithValue("@sid", saleId);
-                insCt.Parameters.AddWithValue("@desc", $"Void item {productName} x{qty} from {invoiceNo} - {reason}");
-                insCt.Parameters.AddWithValue("@amt", total);
+                insCt.Parameters.AddWithValue("@desc", $"Void item {productName} x{actualVoidQty} from {invoiceNo} - {reason}");
+                insCt.Parameters.AddWithValue("@amt", voidedAmt);
                 insCt.Parameters.AddWithValue("@bal", newBal);
                 insCt.Parameters.AddWithValue("@uid", voidedByUserId);
                 insCt.Parameters.AddWithValue("@uname", voidedByUserName);
@@ -727,12 +766,12 @@ public class SaleService
                 updCust.ExecuteNonQuery();
             }
 
-            // Reverse loyalty points awarded on this item
-            if (customerId.HasValue && ptsEarned > 0)
-                ReverseSalePoints(conn, trans, customerId.Value, ptsEarned);
+            // Reverse loyalty points awarded on this item (partial = prorata share)
+            if (customerId.HasValue && voidedPts > 0)
+                ReverseSalePoints(conn, trans, customerId.Value, voidedPts);
 
             trans.Commit();
-            _ = SyncService.SyncVoidLog(new VoidLog { SaleId = saleId, SaleItemId = itemId, Action = "VoidItem", Reason = reason, InvoiceNo = invoiceNo, ProductName = productName, Quantity = qty, Amount = total, UserId = voidedByUserId, UserName = voidedByUserName, CreatedAt = now });
+            _ = SyncService.SyncVoidLog(new VoidLog { SaleId = saleId, SaleItemId = itemId, Action = "VoidItem", Reason = reason, InvoiceNo = invoiceNo, ProductName = productName, Quantity = actualVoidQty, Amount = voidedAmt, UserId = voidedByUserId, UserName = voidedByUserName, CreatedAt = now });
             _ = SyncService.SyncStockTrail(new StockTrail { ProductId = productId, ProductName = productName, Barcode = barcode, QuantityAdded = restockQty, StockBefore = stockBefore, StockAfter = stockBefore + restockQty, Reference = $"{invoiceNo} - void ({reason})", UserId = userId, UserName = voidedByUserName, InvoiceNo = invoiceNo, CustomerName = "", CreatedAt = now });
             // Re-sync the sale so cloud knows which items are voided
             try

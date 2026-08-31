@@ -9,7 +9,7 @@ namespace JumongPosV1._01.Forms;
 public class EndShiftForm : Form
 {
     private readonly User _currentUser;
-    private decimal _totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, _creditPayCash, _creditPayEWallet, _totalExpenses, _totalCostSold, _totalStockReceivedCost, _voidReturns, _adjustDown;
+    private decimal _totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, _creditPayCash, _creditPayEWallet, _totalExpenses, _totalCostSold, _saleTrails, _totalStockReceivedCost, _voidReturns, _adjustDown, _prevReval, _adjDownTransfers, _adjDownEcom, _adjDownMobile;
     private decimal _openingBalance;
     private bool _denominationsEntered = false;
     private Label lblTotal1000 = null!, lblTotal500 = null!, lblTotal200 = null!, lblTotal100 = null!, lblTotal50 = null!, lblTotal20 = null!, lblTotalCoins = null!;
@@ -31,7 +31,7 @@ public class EndShiftForm : Form
 
     private void LoadTotals()
     {
-        (_totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, _creditPayCash, _creditPayEWallet, _totalExpenses, _totalCostSold, _totalStockReceivedCost, _voidReturns, _adjustDown) = DailyCloseService.GetShiftTotals();
+        (_totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, _creditPayCash, _creditPayEWallet, _totalExpenses, _totalCostSold, _saleTrails, _totalStockReceivedCost, _voidReturns, _adjustDown, _prevReval, _adjDownTransfers, _adjDownEcom, _adjDownMobile, _) = DailyCloseService.GetShiftTotals();
         lblDate.Text = TimeHelper.Now.ToString("MMMM dd, yyyy  hh:mm tt");
         var cashierName = string.IsNullOrEmpty(_currentUser.FullName) ? _currentUser.Username : _currentUser.FullName;
         lblCashierName.Text = cashierName;
@@ -122,7 +122,11 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
         TotalExpenses = _totalExpenses,
         TotalInventoryCost = totalInvCost,
         TotalCostSold = _totalCostSold,
+        TotalSaleTrailsCost = _saleTrails,
         TotalStockReceivedCost = _totalStockReceivedCost,
+        TotalVoidReturns = _voidReturns,
+        TotalAdjustDown = _adjustDown,
+        TotalInventoryCostPrev = _prevReval,
         OpeningCash = _openingBalance,
         UserId = _currentUser.Id, 
         UserName = cashierName, 
@@ -203,13 +207,15 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
     var printErrorMsg = "";
     var prevInv = DailyCloseService.GetLastInventoryCost();
     var channel = SyncService.GetEndShiftSnapshot();
-    var ch = channel ?? (0, 0m, 0, 0m, 0, 0);
+    var ch = channel ?? (0, 0m, 0, 0m, 0, 0, 0m, 0m, 0m);
     try
     {
         PrinterService.PrintAuditEndShiftReport(cashOnHand, diff, cashierName, now, txtNotes.Text.Trim(), _totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, expenses, gcashTxns, creditCustomers, creditPayments,
             (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value,
-            totalInvCost, _totalCostSold, _totalStockReceivedCost, prevInv, _voidReturns, _adjustDown,
+            totalInvCost, _totalCostSold, _saleTrails, _totalStockReceivedCost, _prevReval, _voidReturns, _adjustDown,
+            _adjDownTransfers, _adjDownEcom, _adjDownMobile,
             ch.MobileSales, ch.MobileTotal, ch.EcomOrders, ch.EcomTotal, ch.ReceivedPcs, ch.TransferOutPcs,
+            ch.EcomCollectedCash, ch.EcomCollectedGcash, ch.EcomRemitted,
             (receiptAudit.TotalReceipts, receiptAudit.VoidedCount, receiptAudit.DeletedCount, receiptAudit.LostValue, receiptAudit.VoidedInvoices, receiptAudit.MissingInvoices));
     }
     catch (Exception printEx)
@@ -225,8 +231,10 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
         {
             var ee = emailSvc.SendEndShiftReport(_totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, cashOnHand, diff, cashierName, _totalExpenses, expenses, gcashTxns, creditCustomers, creditPayments,
                 (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value,
-                totalInvCost, _totalCostSold, _totalStockReceivedCost, prevInv, _voidReturns, _adjustDown,
-                ch.MobileSales, ch.MobileTotal, ch.EcomOrders, ch.EcomTotal, ch.ReceivedPcs, ch.TransferOutPcs);
+                totalInvCost, _totalCostSold, _saleTrails, _totalStockReceivedCost, _prevReval, _voidReturns, _adjustDown,
+                _adjDownTransfers, _adjDownEcom, _adjDownMobile,
+                ch.MobileSales, ch.MobileTotal, ch.EcomOrders, ch.EcomTotal, ch.ReceivedPcs, ch.TransferOutPcs,
+                ch.EcomCollectedCash, ch.EcomCollectedGcash, ch.EcomRemitted);
             if (ee != null) emailErrorMsg = $"\n\nEmail error: {ee}";
         }
     }
@@ -382,7 +390,8 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
     
         var error = emailSvc.SendEndShiftReport(_totalSales, _totalCash, _totalEWallet, _totalCredit, _totalVoided, cashOnHand, diff, cashierName, _totalExpenses, expenses, gcashTxns, creditCustomers, creditPayments,
             (int)num1000.Value, (int)num500.Value, (int)num200.Value, (int)num100.Value, (int)num50.Value, (int)num20.Value, txtCoins.Value,
-            totalInvCost, _totalCostSold, _totalStockReceivedCost, DailyCloseService.GetLastInventoryCost(), _voidReturns, _adjustDown);
+            totalInvCost, _totalCostSold, _saleTrails, _totalStockReceivedCost, _prevReval, _voidReturns, _adjustDown,
+            _adjDownTransfers, _adjDownEcom, _adjDownMobile);
     if (error != null) 
     {
         MessageBox.Show($"Email error: {error}", "Email Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -430,10 +439,10 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
             var creditPayments = DailyCloseService.GetCreditPaymentsBetween(since, closeDate);
             var expenses = ExpenseService.GetExpensesBetween(since, closeDate);
             var cashOnHand = dc.Denom1000 * 1000m + dc.Denom500 * 500m + dc.Denom200 * 200m + dc.Denom100 * 100m + dc.Denom50 * 50m + dc.Denom20 * 20m + dc.DenomCoins;
-            var prevInv2 = DailyCloseService.GetPreviousInventoryCost(dc.Id);
+            var prevInvReprint = dc.TotalInventoryCostPrev > 0 ? dc.TotalInventoryCostPrev : DailyCloseService.GetPreviousInventoryCost(dc.Id);
             PrinterService.PrintAuditEndShiftReport(cashOnHand, dc.Difference, dc.UserName, closeDate, dc.Notes, dc.TotalSales, dc.TotalCash, dc.TotalEWallet, dc.TotalCredit, dc.TotalVoided, expenses, gcashTxns, creditCustomers, creditPayments,
                 dc.Denom1000, dc.Denom500, dc.Denom200, dc.Denom100, dc.Denom50, dc.Denom20, dc.DenomCoins,
-                dc.TotalInventoryCost, dc.TotalCostSold, dc.TotalStockReceivedCost, prevInv2);
+                dc.TotalInventoryCost, dc.TotalCostSold, dc.TotalSaleTrailsCost, dc.TotalStockReceivedCost, prevInvReprint, dc.TotalVoidReturns, dc.TotalAdjustDown);
         };
         var btnTrends = new Button { Text = "\uD83D\uDCCA TRENDS", Font = new Font("Segoe UI", 9F, FontStyle.Bold), Location = new Point(170, 10), Size = new Size(100, 30), BackColor = t2.AccentGreen, ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
         btnTrends.Click += (_, __) =>

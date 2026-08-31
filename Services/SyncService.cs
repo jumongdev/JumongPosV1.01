@@ -826,12 +826,12 @@ public static class SyncService
     /// locally; this adds mobile wholesale / e-commerce / server received / transfers-out lines).
     /// Returns null for non-HQ stores or on failure (callers simply omit the channel section).
     /// </summary>
-    public static (int MobileSales, decimal MobileTotal, int EcomOrders, decimal EcomTotal, int ReceivedPcs, int TransferOutPcs)? GetEndShiftSnapshot()
+    public static (int MobileSales, decimal MobileTotal, int EcomOrders, decimal EcomTotal, int ReceivedPcs, int TransferOutPcs, decimal EcomCollectedCash, decimal EcomCollectedGcash, decimal EcomRemitted)? GetEndShiftSnapshot()
     {
         if (StoreId != "STORE-20260602-7159") return null;
         try
         {
-            var url = ApiUrl.TrimEnd('/') + "/dashboard/dashboard/end-shift-snapshot?storeId=" + Uri.EscapeDataString(StoreId);
+            var url = ApiUrl.TrimEnd('/') + "/dashboard/end-shift-snapshot?storeId=" + Uri.EscapeDataString(StoreId);
             var resp = _client.GetAsync(url).GetAwaiter().GetResult();
             if (!resp.IsSuccessStatusCode) return null;
             var json = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
@@ -846,7 +846,10 @@ public static class SyncService
             decimal mTotal = mobile.ValueKind == JsonValueKind.Object && mobile.TryGetProperty("total", out var mt) && mt.TryGetDecimal(out var mtv) ? mtv : 0m;
             int eOrders = ecom.ValueKind == JsonValueKind.Object && ecom.TryGetProperty("orders", out var eo) && eo.TryGetInt32(out var eov) ? eov : 0;
             decimal eTotal = ecom.ValueKind == JsonValueKind.Object && ecom.TryGetProperty("total", out var et) && et.TryGetDecimal(out var etv) ? etv : 0m;
-            return (mSales, mTotal, eOrders, eTotal, g("receivedPcs"), g("transferOutPcs"));
+            decimal eCash = ecom.ValueKind == JsonValueKind.Object && ecom.TryGetProperty("collectedCash", out var ec) && ec.TryGetDecimal(out var ecv) ? ecv : 0m;
+            decimal eGcash = ecom.ValueKind == JsonValueKind.Object && ecom.TryGetProperty("collectedGcash", out var eg) && eg.TryGetDecimal(out var egv) ? egv : 0m;
+            decimal eRemit = ecom.ValueKind == JsonValueKind.Object && ecom.TryGetProperty("remitted", out var er) && er.TryGetDecimal(out var erv) ? erv : 0m;
+            return (mSales, mTotal, eOrders, eTotal, g("receivedPcs"), g("transferOutPcs"), eCash, eGcash, eRemit);
         }
         catch { return null; }
     }

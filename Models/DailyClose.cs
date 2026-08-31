@@ -12,7 +12,11 @@ public class DailyClose
     public decimal TotalExpenses { get; set; }
     public decimal TotalInventoryCost { get; set; }
     public decimal TotalCostSold { get; set; }
+    public decimal TotalSaleTrailsCost { get; set; }
     public decimal TotalStockReceivedCost { get; set; }
+    public decimal TotalVoidReturns { get; set; }
+    public decimal TotalAdjustDown { get; set; }
+    public decimal TotalInventoryCostPrev { get; set; }
     public int Denom1000 { get; set; }
     public int Denom500 { get; set; }
     public int Denom200 { get; set; }

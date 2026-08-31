@@ -55,9 +55,11 @@ public class EmailService
         List<(string Name, decimal Amount)> creditCustomers,
         List<(string CustomerName, string PaymentMethod, decimal Amount, string Timestamp)> creditPayments,
         int denom1000, int denom500, int denom200, int denom100, int denom50, int denom20, decimal denomCoins,
-        decimal totalInventoryCost = 0, decimal totalCostSold = 0, decimal totalStockReceivedCost = 0, decimal previousInventory = 0,
+        decimal totalInventoryCost = 0, decimal totalCostSold = 0, decimal saleTrailsCost = 0, decimal totalStockReceivedCost = 0, decimal previousInventory = 0,
         decimal voidReturns = 0, decimal adjustDown = 0,
-        int mobileSales = 0, decimal mobileTotal = 0, int ecomOrders = 0, decimal ecomTotal = 0, int receivedPcs = 0, int transferOutPcs = 0)
+        decimal adjDownTransfers = 0, decimal adjDownEcom = 0, decimal adjDownMobile = 0,
+        int mobileSales = 0, decimal mobileTotal = 0, int ecomOrders = 0, decimal ecomTotal = 0, int receivedPcs = 0, int transferOutPcs = 0,
+        decimal ecomCollectedCash = 0, decimal ecomCollectedGcash = 0, decimal ecomRemitted = 0)
     {
         if (!IsConfigured) return "Email not configured. Set SMTP settings first.";
 
@@ -178,19 +180,23 @@ tr:nth-child(even) td {{ background: #F8F8FC; }}
 </table>" : "<p style='color:#8C8CAA'>No debt collections this shift.</p>")}
 </div>
 
-{(previousInventory > 0 || totalCostSold > 0 || totalStockReceivedCost > 0 || totalInventoryCost > 0 ? $@"
+{(previousInventory > 0 || totalCostSold > 0 || saleTrailsCost != 0 || totalStockReceivedCost > 0 || totalInventoryCost > 0 ? $@"
 <div class=""section"">
 <h2>Inventory Reconciliation</h2>
 <table>
 <tr><th>Description</th><th style=""text-align:right"">Amount</th></tr>
-<tr><td>Previous Inventory</td><td style=""text-align:right"">Php {previousInventory:N2}</td></tr>
+<tr><td>Previous Inventory (revalued at current cost)</td><td style=""text-align:right"">Php {previousInventory:N2}</td></tr>
 {(totalStockReceivedCost > 0 ? $"<tr><td>+ Stock Received Today</td><td style='text-align:right'>Php {totalStockReceivedCost:N2}</td></tr>" : "")}
 {(voidReturns > 0 ? $"<tr><td>+ Void Returns Today</td><td style='text-align:right'>Php {voidReturns:N2}</td></tr>" : "")}
-<tr><td>- Cost of Goods Sold Today</td><td style=""text-align:right"">(Php {totalCostSold:N2})</td></tr>
-{(adjustDown > 0 ? $"<tr><td>- Adjustments / Loss Today</td><td style='text-align:right'>(Php {adjustDown:N2})</td></tr>" : "")}
-<tr class=""total-row""><td>Expected Inventory</td><td style=""text-align:right"">Php {(previousInventory + totalStockReceivedCost + voidReturns - totalCostSold - adjustDown):N2}</td></tr>
+<tr><td>- Sales (inv trails, current cost)</td><td style=""text-align:right"">(Php {Math.Abs(saleTrailsCost):N2})</td></tr>
+{(adjDownTransfers != 0 ? $"<tr><td>- Transfers out (HQ->POS)</td><td style='text-align:right'>(Php {Math.Abs(adjDownTransfers):N2})</td></tr>" : "")}
+{(adjDownEcom != 0 ? $"<tr><td>- E-commerce (holds)</td><td style='text-align:right'>(Php {Math.Abs(adjDownEcom):N2})</td></tr>" : "")}
+{(adjDownMobile != 0 ? $"<tr><td>- Mobile wholesale</td><td style='text-align:right'>(Php {Math.Abs(adjDownMobile):N2})</td></tr>" : "")}
+{(Math.Abs(adjustDown) - Math.Abs(adjDownTransfers) - Math.Abs(adjDownEcom) - Math.Abs(adjDownMobile) > 0 ? $"<tr><td>- Adjustments / Loss (manual)</td><td style='text-align:right'>(Php {Math.Abs(adjustDown) - Math.Abs(adjDownTransfers) - Math.Abs(adjDownEcom) - Math.Abs(adjDownMobile):N2})</td></tr>" : "")}
+{(adjustDown != 0 ? $"<tr><td>- Total Adjustments</td><td style='text-align:right'>(Php {Math.Abs(adjustDown):N2})</td></tr>" : "")}
+<tr class=""total-row""><td>Expected Inventory</td><td style=""text-align:right"">Php {(previousInventory + totalStockReceivedCost + voidReturns + saleTrailsCost + adjustDown):N2}</td></tr>
 <tr class=""total-row""><td>Actual Inventory</td><td style=""text-align:right"">Php {totalInventoryCost:N2}</td></tr>
-<tr class=""total-row""><td>Variance</td><td style=""text-align:right; color:{(previousInventory + totalStockReceivedCost + voidReturns - totalCostSold - adjustDown == totalInventoryCost ? "#27AE60" : "#E74C3C")}"">{(previousInventory + totalStockReceivedCost + voidReturns - totalCostSold - adjustDown == totalInventoryCost ? "✔" : "⚠")} Php {Math.Abs(totalInventoryCost - (previousInventory + totalStockReceivedCost + voidReturns - totalCostSold - adjustDown)):N2} {(previousInventory + totalStockReceivedCost + voidReturns - totalCostSold - adjustDown == totalInventoryCost ? "Balanced" : totalInventoryCost > previousInventory + totalStockReceivedCost + voidReturns - totalCostSold - adjustDown ? "OVER" : "SHORT")}</td></tr>
+<tr class=""total-row""><td>Variance</td><td style=""text-align:right; color:{(Math.Round(previousInventory + totalStockReceivedCost + voidReturns + saleTrailsCost + adjustDown - totalInventoryCost, 2) == 0 ? "#27AE60" : "#E74C3C")}"">{(Math.Round(previousInventory + totalStockReceivedCost + voidReturns + saleTrailsCost + adjustDown - totalInventoryCost, 2) == 0 ? "✔" : "⚠")} Php {Math.Abs(totalInventoryCost - (previousInventory + totalStockReceivedCost + voidReturns + saleTrailsCost + adjustDown)):N2} {(Math.Round(previousInventory + totalStockReceivedCost + voidReturns + saleTrailsCost + adjustDown - totalInventoryCost, 2) == 0 ? "Balanced" : totalInventoryCost > previousInventory + totalStockReceivedCost + voidReturns + saleTrailsCost + adjustDown ? "OVER" : "SHORT")}</td></tr>
 </table>
 </div>" : "")}
 
@@ -201,6 +207,8 @@ tr:nth-child(even) td {{ background: #F8F8FC; }}
 <tr><th>Channel</th><th style=""text-align:right"">Amount</th></tr>
 {(mobileSales > 0 ? $"<tr><td>Wholesale (mobile): {mobileSales} sale(s)</td><td style='text-align:right'>Php {mobileTotal:N2}</td></tr>" : "")}
 {(ecomOrders > 0 ? $"<tr><td>E-commerce: {ecomOrders} order(s)</td><td style='text-align:right'>Php {ecomTotal:N2}</td></tr>" : "")}
+{(ecomCollectedCash > 0 || ecomCollectedGcash > 0 ? $"<tr><td>E-commerce collected (COD)</td><td style='text-align:right'>Php {ecomCollectedCash + ecomCollectedGcash:N2} (cash {ecomCollectedCash:N2} / gcash {ecomCollectedGcash:N2})</td></tr>" : "")}
+{(ecomRemitted > 0 ? $"<tr><td>E-commerce remitted (dashboard)</td><td style='text-align:right'>Php {ecomRemitted:N2}</td></tr>" : "")}
 {(receivedPcs > 0 ? $"<tr><td>Received (server)</td><td style='text-align:right'>+{receivedPcs} pcs</td></tr>" : "")}
 {(transferOutPcs > 0 ? $"<tr><td>Transfers out (HQ->POS)</td><td style='text-align:right'>-{transferOutPcs} pcs</td></tr>" : "")}
 </table>

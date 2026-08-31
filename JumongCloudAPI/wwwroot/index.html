@@ -1113,6 +1113,7 @@ tailwind.config = {
                   <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Margin</th>
                   <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Units</th>
                   <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]" title="Total stock across all stores (server snapshot)">TOTAL STOCK</th>
+                  <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]" title="HQ server stock (STORE-20260602-7159) - authoritative live inventory used by e-commerce/mobile">SERVER STOCK</th>
                   <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Actions</th>
                 </tr></thead>
                 <tbody>
@@ -1150,6 +1151,7 @@ tailwind.config = {
                         <span x-show="!x.units || !x.units.length" class="text-gray-400">—</span>
                       </td>
                       <td class="px-3 py-2 text-right font-bold" :class="stockCls(totalStock(x))" x-text="totalStock(x)"></td>
+                      <td class="px-3 py-2 text-right font-semibold" :class="stockCls(hqStock(x))" x-text="hqStock(x)"></td>
                       <td class="px-3 py-2">
                         <button @click="openStock(x)" class="text-[10px] px-2 py-1 rounded bg-cyan-600 text-white hover:bg-cyan-700 mr-1" title="Stock per store (server + live POS)">VIEW STOCK</button>
                         <button @click="openEditor(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">EDIT</button>

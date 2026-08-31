@@ -754,8 +754,8 @@ public partial class ProductsForm : Form
 
                 // Latest end shift
                 string? closeDate = null;
-                decimal totalInvCost = 0, totalCOGS = 0, totalRecvCost = 0;
-                using (var dcCmd = new SQLiteCommand("SELECT CloseDate, TotalInventoryCost, TotalCostSold, TotalStockReceivedCost FROM DailyClose ORDER BY Id DESC LIMIT 1", conn))
+                decimal totalInvCost = 0, totalCOGS = 0, saleTrails = 0, totalRecvCost = 0, voidReturns = 0, adjustDown = 0, prevReval = 0;
+                using (var dcCmd = new SQLiteCommand("SELECT CloseDate, TotalInventoryCost, TotalCostSold, TotalSaleTrailsCost, TotalStockReceivedCost, TotalVoidReturns, TotalAdjustDown, TotalInventoryCostPrev FROM DailyClose ORDER BY Id DESC LIMIT 1", conn))
                 using (var r = dcCmd.ExecuteReader())
                 {
                     if (!r.Read())
@@ -767,31 +767,29 @@ public partial class ProductsForm : Form
                     closeDate = r.GetString(0);
                     totalInvCost = r.GetDecimal(1);
                     totalCOGS = r.GetDecimal(2);
-                    totalRecvCost = r.GetDecimal(3);
+                    saleTrails = r.IsDBNull(3) ? 0m : r.GetDecimal(3);
+                    totalRecvCost = r.IsDBNull(4) ? 0m : r.GetDecimal(4);
+                    voidReturns = r.IsDBNull(5) ? 0m : r.GetDecimal(5);
+                    adjustDown = r.IsDBNull(6) ? 0m : r.GetDecimal(6);
+                    prevReval = r.IsDBNull(7) ? 0m : r.GetDecimal(7);
                 }
 
-                // Previous shift
-                decimal prevInvCost = 0;
-                using (var pCmd = new SQLiteCommand("SELECT TotalInventoryCost FROM DailyClose WHERE CloseDate < @cd ORDER BY Id DESC LIMIT 1", conn))
-                {
-                    pCmd.Parameters.AddWithValue("@cd", closeDate);
-                    var o = pCmd.ExecuteScalar();
-                    if (o != DBNull.Value && o != null) prevInvCost = Convert.ToDecimal(o);
-                }
-
-                var expected = prevInvCost + totalRecvCost - totalCOGS;
+                var expected = prevReval + totalRecvCost + voidReturns + saleTrails - adjustDown;
                 var variance = totalInvCost - expected;
+                var rounded = Math.Round(variance, 2);
 
                 sb.AppendLine($"Close Date:    {closeDate}");
-                sb.AppendLine($"Prev. Inv:     {prevInvCost,14:N2}");
+                sb.AppendLine($"Prev. Inv:     {prevReval,14:N2}");
                 sb.AppendLine($"+ Received:    {totalRecvCost,14:N2}");
-                sb.AppendLine($"- COGS:        {totalCOGS,14:N2}");
+                sb.AppendLine($"+ Void Ret:    {voidReturns,14:N2}");
+                sb.AppendLine($"- Sales trails:{saleTrails,14:N2}");
+                sb.AppendLine($"- Adjust:      {adjustDown,14:N2}");
                 sb.AppendLine($"= Expected:    {expected,14:N2}");
                 sb.AppendLine($"Actual Inv:    {totalInvCost,14:N2}");
-                sb.AppendLine($"Variance:      {variance,14:N2} {(variance == 0 ? "[OK]" : (variance > 0 ? "[OVER]" : "[SHORT]"))}");
+                sb.AppendLine($"Variance:      {rounded,14:N2} {(rounded == 0 ? "[OK]" : (rounded > 0 ? "[OVER]" : "[SHORT]"))}");
                 sb.AppendLine();
 
-                if (variance == 0)
+                if (rounded == 0)
                 {
                     sb.AppendLine("Balanced. No issue.");
                     txt.Text = sb.ToString();

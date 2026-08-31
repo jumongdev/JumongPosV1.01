@@ -135,7 +135,7 @@ public partial class MainForm : Form
     {
         try
         {
-            var (totalSales, totalCash, totalEWallet, totalCredit, totalVoided, creditPayCash, creditPayEWallet, totalExpenses, _, _, _, _) = DailyCloseService.GetShiftTotals();
+            var (totalSales, totalCash, totalEWallet, totalCredit, totalVoided, creditPayCash, creditPayEWallet, totalExpenses, _, _, _, _, _, _, _, _, _, _) = DailyCloseService.GetShiftTotals();
             var expenses = ExpenseService.GetExpensesForCurrentShift();
             var gcashTxns = DailyCloseService.GetGcashTransactionsSinceLastClose();
             var creditCustomers = DailyCloseService.GetCreditCustomersSinceLastClose();

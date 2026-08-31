@@ -100,8 +100,7 @@ public partial class ReportsForm : Form
 
         if (activeItems.Count < fullSale.Items.Count)
         {
-            var adjusted = new Sale { InvoiceNo = fullSale.InvoiceNo, SaleDate = fullSale.SaleDate, SubTotal = activeItems.Sum(x => x.TotalPrice), Discount = 0, Tax = 0, GrandTotal = activeItems.Sum(x => x.TotalPrice), AmountPaid = activeItems.Sum(x => x.TotalPrice), Change = 0, PaymentMethod = fullSale.PaymentMethod, OrderType = fullSale.OrderType, Items = activeItems };
-            PrinterService.PrintReceipt(adjusted, "Reprint (Void Adjusted)", customer, includeShopQr: false);
+            PrinterService.PrintReceipt(fullSale, "Reprint (Void Adjusted)", customer, includeShopQr: false);
         }
         else
         {
@@ -138,12 +137,17 @@ public partial class ReportsForm : Form
         var choice = ShowItemPicker("Select item to void:", itemNames);
         if (choice < 0 || choice >= items.Count) return;
         var selected = items[choice];
+        var qtyText = Microsoft.VisualBasic.Interaction.InputBox($"Enter quantity to void for '{selected.ProductName}' (max {selected.Quantity}):", "Void Item Quantity", selected.Quantity.ToString());
+        if (string.IsNullOrWhiteSpace(qtyText)) return;
+        if (!int.TryParse(qtyText.Trim(), out var voidQty) || voidQty < 1) { MessageBox.Show("Invalid quantity.", "Void Item", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+        voidQty = Math.Min(voidQty, selected.Quantity);
         var reason = Microsoft.VisualBasic.Interaction.InputBox($"Enter reason for voiding '{selected.ProductName}':", "Void Item", "");
         if (string.IsNullOrWhiteSpace(reason)) return;
-        if (MessageBox.Show($"Void '{selected.ProductName}' x{selected.Quantity} (\u20b1{selected.TotalPrice:N2})?\nReason: {reason}", "Confirm Void Item", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+        var voidAmt = selected.Price * voidQty;
+        if (MessageBox.Show($"Void '{selected.ProductName}' x{voidQty} of {selected.Quantity} (\u20b1{voidAmt:N2})?\nReason: {reason}", "Confirm Void Item", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
         var voidUserId = _currentUser?.Id ?? 0;
         var voidUserName = !string.IsNullOrEmpty(_currentUser?.FullName) ? _currentUser.FullName : (_currentUser?.Username ?? "System");
-        try { SaleService.VoidItem(selected.Id, reason, voidUserId, voidUserName); MessageBox.Show("Item voided successfully. Stock has been restored.", "Voided", MessageBoxButtons.OK, MessageBoxIcon.Information); LoadReport(); }
+        try { SaleService.VoidItem(selected.Id, voidQty, reason, voidUserId, voidUserName); MessageBox.Show("Item voided successfully. Stock has been restored.", "Voided", MessageBoxButtons.OK, MessageBoxIcon.Information); LoadReport(); }
         catch (Exception ex) { MessageBox.Show($"Error voiding item: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
     }
 

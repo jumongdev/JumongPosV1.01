@@ -27,7 +27,8 @@ public class DailyCloseService
 
     public static (decimal TotalSales, decimal TotalCash, decimal TotalEWallet, decimal TotalCredit,
         decimal TotalVoided, decimal CreditPayCash, decimal CreditPayEWallet, decimal TotalExpenses,
-        decimal TotalCostSold, decimal TotalStockReceivedCost, decimal TotalVoidReturns, decimal TotalAdjustDown) GetShiftTotals()
+        decimal TotalCostSold, decimal TotalSaleTrailsCost, decimal TotalStockReceivedCost, decimal TotalVoidReturns, decimal TotalAdjustDown,
+        decimal TotalPrevReval, decimal AdjDownTransfers, decimal AdjDownEcom, decimal AdjDownMobile, decimal AdjDownManual) GetShiftTotals()
     {
         var since = GetLastCloseTime();
         using var conn = DatabaseHelper.GetConnection();
@@ -61,7 +62,7 @@ public class DailyCloseService
             }
             else
             {
-                return (0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m);
+                return (0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m);
             }
         }
 
@@ -111,7 +112,7 @@ public class DailyCloseService
             expCmd.Parameters.AddWithValue("@since_exp", since);
         var totalExpenses = Convert.ToDecimal(expCmd.ExecuteScalar());
 
-        // Total Cost of Goods Sold (non-voided items only)
+        // Total Cost of Goods Sold (sales report basis — historical UnitCost; NOT used in reconciliation)
         var cogsSql = $@"SELECT COALESCE(SUM(si.UnitCost * si.Quantity), 0)
             FROM SaleItems si JOIN Sales s ON si.SaleId = s.Id
             WHERE si.IsVoided = 0 AND {cond}";
@@ -119,6 +120,18 @@ public class DailyCloseService
         if (!string.IsNullOrEmpty(since))
             cogsCmd.Parameters.AddWithValue("@since", since);
         var totalCostSold = Convert.ToDecimal(cogsCmd.ExecuteScalar());
+
+        // Sale stock-trail deductions (INV- negative trails) valued at CURRENT cost — the
+        // reconciliation identity term (COGS excludes voided items; trails include them, so
+        // saleTrails + voidReturns cancel exactly — variance is a true identity).
+        var saleTrailSql = "SELECT COALESCE(SUM(p.Cost * st.QuantityAdded), 0) FROM StockTrail st " +
+                           "LEFT JOIN Products p ON st.ProductId = p.Id WHERE st.QuantityAdded < 0 AND st.Reference LIKE 'INV-%'";
+        if (!string.IsNullOrEmpty(since))
+            saleTrailSql += " AND st.CreatedAt > @since_st";
+        using var saleTrailCmd = new SQLiteCommand(saleTrailSql, conn);
+        if (!string.IsNullOrEmpty(since))
+            saleTrailCmd.Parameters.AddWithValue("@since_st", since);
+        var totalSaleTrailsCost = Convert.ToDecimal(saleTrailCmd.ExecuteScalar());
 
         // Total Stock Received cost (receivings + adjustments up; void returns reported separately)
         var recvSql = "SELECT COALESCE(SUM(p.Cost * st.QuantityAdded), 0) FROM StockTrail st " +
@@ -140,18 +153,47 @@ public class DailyCloseService
             voidRetCmd.Parameters.AddWithValue("@since_vr", since);
         var totalVoidReturns = Convert.ToDecimal(voidRetCmd.ExecuteScalar());
 
-        // Manual adjustments down (loss / spoilage / stock corrections — not sales)
-        var adjDownSql = "SELECT COALESCE(SUM(p.Cost * st.QuantityAdded), 0) FROM StockTrail st " +
+        // Manual adjustments down (loss / spoilage / stock corrections — not sales), broken down by source
+        var adjDownSql = "SELECT " +
+                         "COALESCE(SUM(p.Cost * st.QuantityAdded), 0), " +
+                         "COALESCE(SUM(CASE WHEN st.Reference LIKE 'Transfer #%' THEN p.Cost * st.QuantityAdded ELSE 0 END), 0), " +
+                         "COALESCE(SUM(CASE WHEN st.Reference LIKE 'SHOP-%' THEN p.Cost * st.QuantityAdded ELSE 0 END), 0), " +
+                         "COALESCE(SUM(CASE WHEN st.Reference LIKE 'WH-%' THEN p.Cost * st.QuantityAdded ELSE 0 END), 0) " +
+                         "FROM StockTrail st " +
                          "LEFT JOIN Products p ON st.ProductId = p.Id WHERE st.QuantityAdded < 0 AND st.Reference NOT LIKE 'INV-%'";
         if (!string.IsNullOrEmpty(since))
             adjDownSql += " AND st.CreatedAt > @since_ad";
         using var adjDownCmd = new SQLiteCommand(adjDownSql, conn);
         if (!string.IsNullOrEmpty(since))
             adjDownCmd.Parameters.AddWithValue("@since_ad", since);
-        var totalAdjustDown = Convert.ToDecimal(adjDownCmd.ExecuteScalar());
+        decimal totalAdjustDown = 0, adjDownTransfers = 0, adjDownEcom = 0, adjDownMobile = 0;
+        using (var adjRdr = adjDownCmd.ExecuteReader())
+        {
+            if (adjRdr.Read())
+            {
+                totalAdjustDown = Convert.ToDecimal(adjRdr[0]);
+                adjDownTransfers = Convert.ToDecimal(adjRdr[1]);
+                adjDownEcom = Convert.ToDecimal(adjRdr[2]);
+                adjDownMobile = Convert.ToDecimal(adjRdr[3]);
+            }
+        }
+        var adjDownManual = totalAdjustDown - adjDownTransfers - adjDownEcom - adjDownMobile;
+
+        // Previous inventory REVALUED at current costs: (current qty − shift trails) × current cost.
+        // Same cost basis as every other term => the reconciliation is an identity (variance 0 when complete).
+        // No previous close yet => 0 (opening stock unknown).
+        decimal totalPrevReval = 0;
+        if (!string.IsNullOrEmpty(since))
+        {
+            var prevSql = @"SELECT COALESCE(SUM((p.StockQty - COALESCE((SELECT SUM(st.QuantityAdded) FROM StockTrail st WHERE st.ProductId = p.Id AND st.CreatedAt > @since_pr), 0)) * COALESCE(p.Cost, 0)), 0) FROM Products p";
+            using var prevCmd = new SQLiteCommand(prevSql, conn);
+            prevCmd.Parameters.AddWithValue("@since_pr", since);
+            totalPrevReval = Convert.ToDecimal(prevCmd.ExecuteScalar());
+        }
 
         return (total, cash, ewallet, credit, voided, creditPayCash, creditPayEWallet, totalExpenses,
-            totalCostSold, totalStockReceivedCost, totalVoidReturns, totalAdjustDown);
+            totalCostSold, totalSaleTrailsCost, totalStockReceivedCost, totalVoidReturns, totalAdjustDown,
+            totalPrevReval, adjDownTransfers, adjDownEcom, adjDownMobile, adjDownManual);
     }
 
     public static string? SaveClose(DailyClose dc)
@@ -161,10 +203,12 @@ public class DailyCloseService
         try
         {
             var sql = @"INSERT INTO DailyClose (CloseDate, CreatedAt, TotalSales, TotalCash, TotalEWallet, TotalCredit,
-                        TotalVoided, TotalExpenses, TotalInventoryCost, TotalCostSold, TotalStockReceivedCost,
+                        TotalVoided, TotalExpenses, TotalInventoryCost, TotalCostSold, TotalSaleTrailsCost, TotalStockReceivedCost,
+                        TotalVoidReturns, TotalAdjustDown, TotalInventoryCostPrev,
                         OpeningCash, Denom1000, Denom500, Denom200, Denom100, Denom50, Denom20, DenomCoins,
                         CashOnHand, Difference, Notes, UserId, UserName)
-                        VALUES (@d, @ca, @ts, @tc, @te, @tcr, @tv, @texp, @tic, @tcs, @tsrc,
+                        VALUES (@d, @ca, @ts, @tc, @te, @tcr, @tv, @texp, @tic, @tcs, @tst, @tsrc,
+                        @tvr, @tad, @ticp,
                         @opn, @d1k, @d5h, @d2h, @d1h, @d50, @d20, @coins,
                         @coh, @diff, @notes, @uid, @uname)";
             using var cmd = new SQLiteCommand(sql, conn);
@@ -178,7 +222,11 @@ public class DailyCloseService
             cmd.Parameters.AddWithValue("@texp", dc.TotalExpenses);
             cmd.Parameters.AddWithValue("@tic", dc.TotalInventoryCost);
             cmd.Parameters.AddWithValue("@tcs", dc.TotalCostSold);
+            cmd.Parameters.AddWithValue("@tst", dc.TotalSaleTrailsCost);
             cmd.Parameters.AddWithValue("@tsrc", dc.TotalStockReceivedCost);
+            cmd.Parameters.AddWithValue("@tvr", dc.TotalVoidReturns);
+            cmd.Parameters.AddWithValue("@tad", dc.TotalAdjustDown);
+            cmd.Parameters.AddWithValue("@ticp", dc.TotalInventoryCostPrev);
             cmd.Parameters.AddWithValue("@opn", dc.OpeningCash);
             cmd.Parameters.AddWithValue("@d1k", dc.Denom1000);
             cmd.Parameters.AddWithValue("@d5h", dc.Denom500);
@@ -321,7 +369,11 @@ public class DailyCloseService
                 TotalExpenses = Convert.ToDecimal(rdr["TotalExpenses"]),
                 TotalInventoryCost = rdr["TotalInventoryCost"] != DBNull.Value ? Convert.ToDecimal(rdr["TotalInventoryCost"]) : 0m,
                 TotalCostSold = rdr["TotalCostSold"] != DBNull.Value ? Convert.ToDecimal(rdr["TotalCostSold"]) : 0m,
+                TotalSaleTrailsCost = rdr["TotalSaleTrailsCost"] != DBNull.Value ? Convert.ToDecimal(rdr["TotalSaleTrailsCost"]) : 0m,
                 TotalStockReceivedCost = rdr["TotalStockReceivedCost"] != DBNull.Value ? Convert.ToDecimal(rdr["TotalStockReceivedCost"]) : 0m,
+                TotalVoidReturns = rdr["TotalVoidReturns"] != DBNull.Value ? Convert.ToDecimal(rdr["TotalVoidReturns"]) : 0m,
+                TotalAdjustDown = rdr["TotalAdjustDown"] != DBNull.Value ? Convert.ToDecimal(rdr["TotalAdjustDown"]) : 0m,
+                TotalInventoryCostPrev = rdr["TotalInventoryCostPrev"] != DBNull.Value ? Convert.ToDecimal(rdr["TotalInventoryCostPrev"]) : 0m,
                 OpeningCash = Convert.ToDecimal(rdr["OpeningCash"]),
                 CashOnHand = Convert.ToDecimal(rdr["CashOnHand"]),
                 Difference = Convert.ToDecimal(rdr["Difference"]),

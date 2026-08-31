@@ -2315,6 +2315,7 @@
       try {
         const r = await fetch(API + '/dashboard/warehouse/sales/' + id + '/items');
         const items = await r.json();
+        window.lastSaleItems = items || [];
         document.getElementById('saleItemsTitle').textContent = 'SALE ' + label;
         const box = document.getElementById('saleItemsList');
         box.innerHTML = '';
@@ -2335,13 +2336,19 @@
     let currentSaleId = null;
     async function voidItem(itemId) {
       if (!currentSaleId) { toast('No sale selected', 'error'); return; }
+      const items = (window.lastSaleItems || []);
+      const it = items.find(x => x.id === itemId);
+      const maxQty = it ? (it.qty || 1) : 1;
+      const qtyText = prompt('Quantity to void? (max ' + maxQty + ')', String(maxQty)) || '';
+      const qty = parseInt(qtyText, 10);
+      if (isNaN(qty) || qty < 1) { toast('Invalid quantity', 'error'); return; }
       const reason = prompt('Reason for voiding this item?', '') || '';
-      if (!confirm('Void this item? Stock will be returned to the warehouse.')) return;
+      if (!confirm('Void ' + Math.min(qty, maxQty) + ' pc(s) of this item? Stock will be returned.')) return;
       try {
         const r = await fetch(API + '/dashboard/warehouse/sales/' + currentSaleId + '/void', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reason, userName: session.fullName || session.username || '', items: [{ itemId: itemId }] })
+          body: JSON.stringify({ reason, userName: session.fullName || session.username || '', items: [{ itemId: itemId, qty: qty }] })
         });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) { toast(j.error || 'Void failed', 'error'); return; }
