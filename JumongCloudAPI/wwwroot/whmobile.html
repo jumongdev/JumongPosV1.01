@@ -2762,7 +2762,11 @@
       const box = document.getElementById('recvModalBody');
       const boxq = Number(x.boxQty || 0);
       let body = '<div class="text-center pb-2"><p class="text-gray-400 text-[11px]">Current stock</p>' +
-        '<p class="text-white text-2xl font-bold">' + Number(x.stockQty || 0) + ' pcs' + (unitBoxQty(x) > 1 ? boxesText(x.stockQty, unitBoxQty(x), unitBoxLabel(x)) : '') + '</p></div>';
+        '<p class="text-white text-2xl font-bold">' + Number(x.stockQty || 0) + ' pcs' + (unitBoxQty(x) > 1 ? boxesText(x.stockQty, unitBoxQty(x), unitBoxLabel(x)) : '') + '</p>' +
+        (Number(x.stockParentId) > 0
+          ? '<p class="text-cyan-400 text-[10px] mt-1">🔗 Linked sa ' + (x.stockParentName || 'parent') + ' — available: ' + Math.floor((Number(x.stockParentStock) || 0) / Math.max(1, Number(x.linkRatio) || 1)) + ' (parent stock ' + (Number(x.stockParentStock) || 0) + ' ÷ ' + (Number(x.linkRatio) || 1) + ')</p>'
+          : '') +
+        '</div>';
       if (units.length > 0) {
         let chips = '';
         units.forEach((u, i) => {
@@ -2865,7 +2869,10 @@
         id: recvTarget.id, name: recvTarget.name, barcode: recvTarget.barcode || '',
         stock: Number(recvTarget.stockQty || 0), qty,
         unitName: units.length > 0 ? recvUnitName : (Number(recvTarget.boxQty || 0) > 1 ? 'box' : 'pc'),
-        unitQty: units.length > 0 ? recvUnitQty : (Number(recvTarget.boxQty || 0) > 1 ? Number(recvTarget.boxQty || 0) : 1)
+        unitQty: units.length > 0 ? recvUnitQty : (Number(recvTarget.boxQty || 0) > 1 ? Number(recvTarget.boxQty || 0) : 1),
+        stockParentId: Number(recvTarget.stockParentId || 0),
+        linkRatio: Number(recvTarget.linkRatio || 1),
+        stockParentName: recvTarget.stockParentName || ''
       });
       closeRecvModal();
       recvTarget = null;
@@ -2919,7 +2926,7 @@
           '<p class="text-[9px] text-cyan-400 text-center mt-1 font-bold">' + unitTxt + '</p>';
         box.appendChild(d);
       });
-      document.getElementById('btnSaveReceiving').textContent = 'SAVE RECEIVING (' + recvCart.reduce((s, i) => s + i.qty, 0) + ' pcs)';
+      document.getElementById('btnSaveReceiving').textContent = 'SAVE RECEIVING (' + recvCart.reduce((s, i) => s + (Number(i.stockParentId) > 0 ? i.qty * Math.max(1, Number(i.linkRatio) || 1) : i.qty), 0) + ' pcs)';
     }
 
     function clearRecvCart() { recvCart = []; renderRecvCart(); }
