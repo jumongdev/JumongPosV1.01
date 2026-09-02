@@ -1994,11 +1994,6 @@ async function renderProfile() {
   } else {
     qrBox.innerHTML = '<p class="text-[10px] text-stone-400 text-center">Mag-register online para makakuha ng QR at mag-earn ng points</p>';
   }
-  const st = document.getElementById('pfSariStatus');
-  const [label, cls] = ['Retail customer', 'bg-gray-100 text-gray-600'];
-  st.textContent = label;
-  st.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full ' + cls;
-  document.getElementById('sariApplyBox').classList.add('hidden');
   const wrap = document.getElementById('addrList');
   const addrLine = a => {
     const parts = [];

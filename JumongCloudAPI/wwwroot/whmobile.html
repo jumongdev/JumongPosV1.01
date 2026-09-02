@@ -1544,10 +1544,19 @@
       currentProduct = null;
     }
 
+    function effectiveStock(p) {
+      if (p && Number(p.stockParentId) > 0) {
+        const ratio = Math.max(1, Number(p.linkRatio) || 1);
+        const ps = Number(p.stockParentStock) || 0;
+        return Math.floor(ps / ratio);
+      }
+      return Number(p && p.stockQty) || 0;
+    }
+
     function increaseAllowedRow(c) {
       const used = cart.filter(x => x.productId === c.productId).reduce((s, x) => s + x.qty * (x.qtyPerUnit || 1), 0);
       const p = sellProdCache.find(x => x.id === c.productId);
-      const stock = Number(p && p.stockQty) || 0;
+      const stock = effectiveStock(p);
       if (used + (c.qtyPerUnit || 1) > stock) { toast('Not enough stock: ' + c.productName, 'error'); return false; }
       return true;
     }
@@ -1561,7 +1570,7 @@
         if (!increaseAllowedRow(existing)) return;
         existing.qty += 1;
       } else {
-        if (Number(currentProduct.stockQty) < (unit.qtyPerUnit || 1)) { toast('Not enough stock: ' + currentProduct.name, 'error'); return; }
+        if (Number(effectiveStock(currentProduct)) < (unit.qtyPerUnit || 1)) { toast('Not enough stock: ' + currentProduct.name, 'error'); return; }
         cart.push({ productId: currentProduct.id, productName: currentProduct.name, unitIndex: selectedUnitIndex, unitName: unit.unitName || 'Piece', price: unit.price || 0, qtyPerUnit: unit.qtyPerUnit || 1, qty: 1 });
       }
       renderCart();
@@ -2891,18 +2900,23 @@
         const d = document.createElement('div');
         d.className = 'card !mb-0';
         const unitQty = it.unitQty || 1;
-        const unitTxt = unitQty > 1
-          ? (it.qty % unitQty === 0
-              ? String(it.qty / unitQty) + ' ' + (it.unitName || 'box')
-              : String(Math.floor(it.qty / unitQty)) + ' ' + (it.unitName || 'box') + ' + ' + (it.qty % unitQty) + ' pc')
-          : String(it.qty) + ' pc';
+        const linked = !!(it.stockParentId > 0);
+        const ratio = linked ? Math.max(1, Number(it.linkRatio) || 1) : 1;
+        const parentQty = linked ? it.qty * ratio : 0;
+        const unitTxt = linked
+          ? '→ +' + parentQty + ' sa ' + (it.stockParentName || 'parent')
+          : (unitQty > 1
+              ? (it.qty % unitQty === 0
+                  ? String(it.qty / unitQty) + ' ' + (it.unitName || 'box')
+                  : String(Math.floor(it.qty / unitQty)) + ' ' + (it.unitName || 'box') + ' + ' + (it.qty % unitQty) + ' pc')
+              : String(it.qty) + ' pc');
         d.innerHTML = '<div class="flex items-center justify-between mb-1"><p class="text-white text-xs font-bold flex-1 pr-2">' + it.name + '</p>' +
           '<button class="text-red-400 text-xs font-bold" onclick="removeRecvItem(' + i + ')">✕</button></div>' +
           '<p class="text-gray-500 text-[10px] mb-2">' + (it.barcode || '—') + ' • stock ' + it.stock + (unitQty > 1 ? ' • ' + unitQty + ' pcs per ' + (it.unitName || 'box') : '') + '</p>' +
           '<div class="flex items-center gap-2"><button class="qty-btn" onclick="recvQtyStep(' + i + ',-1)">−</button>' +
           '<span class="flex-1 text-center text-white font-bold">' + it.qty + ' pcs</span>' +
           '<button class="qty-btn" onclick="recvQtyStep(' + i + ',1)">+</button></div>' +
-          '<p class="text-[9px] text-cyan-400 text-center mt-1 font-bold">' + unitTxt + ' total</p>';
+          '<p class="text-[9px] text-cyan-400 text-center mt-1 font-bold">' + unitTxt + '</p>';
         box.appendChild(d);
       });
       document.getElementById('btnSaveReceiving').textContent = 'SAVE RECEIVING (' + recvCart.reduce((s, i) => s + i.qty, 0) + ' pcs)';

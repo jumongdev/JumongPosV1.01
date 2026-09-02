@@ -1,5 +1,20 @@
 # JumongPOS — Full Project Guide for AI Agents
 
+## Latest Change (2026-09-02) — STOCK LINK Phase 2: MOBILE (whapp) link-aware + profile popup hotfix + sari-sari tier removal (v1.1.68 API)
+
+**Requests:** (1) mobile receiving ng linked child (MILO BOX) ay dapat pumasok sa PARENT (20 box = +840 sa MILO by-12), hindi sa sariling row; (2) profile popup nawala para sa mga walang address/mobile (renderProfile crash); (3) sari-sari tier removal (pang-kalahatan na e-commerce). **Phase 1 (POS client + ecom reserve)** = nasa nakaraang entry; ito ang Phase 2.
+
+### Ang mga ayos (v1.1.68 API + web)
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **`ResolveHqStockLink(conn, tx, posId, barcode)`** helper — HQ products row → master barcode → `stock_parent_id/link_ratio` → parent barcode → HQ parent pos_id (+ mult). Ginamit sa: **`WhCreateReceiving`** (hq: +qty×ratio sa PARENT, trail sa parent), **`WhSell`** (hq: guard + deduct PARENT qty×qpu×ratio, trail sa parent; `stock_deduction` ng sale item = qty×qpu×ratio), **`WhVoidSale`** at **`WhEditSale`** (hq restore → PARENT). **`WhGetProducts`** (hq) + `stockParentId/linkRatio/stockParentName/stockParentStock` (parent stock para sa derived availability). Version → "1.1.68" (2 places). |
+| `JumongCloudAPI/wwwroot/whmobile.html` | **`effectiveStock(p)`** (linked child → floor(parentStock ÷ ratio)) — ginamit sa SELL guards (addToCart + increaseAllowedRow). **`renderRecvCart`**: linked child → conversion note "→ +N sa {parent}" (hal. 20 box → +840 sa MILO CHOCO DRINK 24G (BY 12)). |
+| `JumongCloudAPI/wwwroot/shop.html` | **Profile popup hotfix**: tinanggal ang leftover `pfSariStatus`/`sariApplyBox` refs sa `renderProfile()` (na-crash → walang address EDIT/add). Sari-sari removal (nakaraang entry) ay buo. |
+| Sari-sari removal (buod) | v1.1.67: ShopCatalog/ShopProduct walang tiers (price = mp.price, units sa lahat); DELETE `/customer/sari-sari/apply` + `/sari-sari/applications*` + `IsSariSari()`; dashboard 🏪 panel/badges + Online Price column tinanggal; shop.html isSariSari/heartbeat/apply box zero refs. DB columns/tables naiwan (dormant). |
+
+**Verified live:** version 1.1.68; WhGetProducts hq → BOX 5949 = `stockParentId 310, linkRatio 42, stockParentName "MILO CHOCO DRINK 24G (BY 12)", stockParentStock 31`; whmobile effectiveStock live; shop live walang pfSariStatus. **Scope note:** transfers (HQ→POS) ng linked children = HINDI pa kasama (susunod). GOTCHA: ang stockParentName subquery ay dapat i-JOIN ang parent (mp3), hindi ang same-barcode product (mp2) — kung hindi, pangalan ng child ang lumalabas.
+
 ## Latest Change (2026-09-02) — STOCK LINK FEATURE (v1.1.70 client + v1.1.65 API): linked child products na ang stock ay nanggagaling sa parent (1 child = N parent)
 
 **Request:** "para wala ng unit unit we make separate item as long as he got different barcode just link the item to main source of stock para isang bilang lang" — ang units model ay hindi kayang magkaroon ng sariling image/barcode/listing ang bawat packaging sa e-commerce. Desisyon: **isahan na model** — bawat packaging = sariling master product (barcode/image/presyo), naka-**LINK** sa isang stock base (parent) na may ratio. Ang existing units items ay HINDI ginagalaw; ang user ang magko-convert nang unti-unti. Walang ginawang test items/links — ikaw ang gagawa sa dashboard.
