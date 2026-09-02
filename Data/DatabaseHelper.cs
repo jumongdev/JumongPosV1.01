@@ -465,6 +465,17 @@ public class DatabaseHelper
             alter.ExecuteNonQuery();
         }
 
+        // Migrate: add STOCK LINK columns to Products (Stock Link feature 2026-09-02)
+        // StockParentId = local Id ng parent product (0 = hindi linked); StockLinkRatio = 1 child = N parent
+        using var checkSP = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('Products') WHERE name = 'StockParentId'", conn);
+        if (Convert.ToInt32(checkSP.ExecuteScalar()) == 0)
+        {
+            using var alter = new SQLiteCommand("ALTER TABLE Products ADD COLUMN StockParentId INTEGER NOT NULL DEFAULT 0", conn);
+            alter.ExecuteNonQuery();
+            alter.CommandText = "ALTER TABLE Products ADD COLUMN StockLinkRatio INTEGER NOT NULL DEFAULT 1";
+            alter.ExecuteNonQuery();
+        }
+
         // Migrate: add PointsPerUnit to ProductUnits
         using var checkPuP = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('ProductUnits') WHERE name = 'PointsPerUnit'", conn);
         if (Convert.ToInt32(checkPuP.ExecuteScalar()) == 0)

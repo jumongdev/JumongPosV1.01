@@ -234,12 +234,23 @@ public partial class StockReceivingForm : Form
         dgvPending.Rows.Clear();
         foreach (var (productId, productName, barcode, stockBefore, qty) in _pending)
         {
+            var ratio = 1;
+            var parentName = "";
+            var dispBefore = stockBefore;
+            var prod = ProductService.GetById(productId);
+            if (prod != null && prod.StockParentId > 0)
+            {
+                ratio = prod.StockLinkRatio > 0 ? prod.StockLinkRatio : 1;
+                var parent = ProductService.GetById(prod.StockParentId);
+                if (parent != null) { parentName = parent.Name; dispBefore = parent.StockQty; }
+            }
+            var addQty = ratio > 1 ? qty * ratio : qty;
             var idx = dgvPending.Rows.Add();
-            dgvPending.Rows[idx].Cells[0].Value = productName;
+            dgvPending.Rows[idx].Cells[0].Value = ratio > 1 ? $"{productName}  (→ {parentName} ×{ratio})" : productName;
             dgvPending.Rows[idx].Cells[1].Value = barcode;
-            dgvPending.Rows[idx].Cells[2].Value = stockBefore;
-            dgvPending.Rows[idx].Cells[3].Value = qty;
-            dgvPending.Rows[idx].Cells[4].Value = stockBefore + qty;
+            dgvPending.Rows[idx].Cells[2].Value = dispBefore;
+            dgvPending.Rows[idx].Cells[3].Value = ratio > 1 ? $"{qty} (= {addQty})" : qty;
+            dgvPending.Rows[idx].Cells[4].Value = dispBefore + addQty;
             dgvPending.Rows[idx].Cells[5].Value = "✕";
             dgvPending.Rows[idx].Tag = productId;
         }

@@ -1077,12 +1077,13 @@ public static class SyncService
                 var ptsExempt = p.TryGetProperty("pointsExempt", out var pe) && pe.ValueKind == JsonValueKind.True;
                 var ptsPerUnit = p.TryGetProperty("pointsPerUnit", out var ppu) ? ppu.GetInt32() : 0;
                 var isActive = !p.TryGetProperty("isActive", out var ia) || ia.ValueKind != JsonValueKind.False;
+                var linkRatio = p.TryGetProperty("linkRatio", out var lr) && lr.ValueKind == JsonValueKind.Number ? Math.Max(1, lr.GetInt32()) : 1;
 
                 if (existingId > 0)
                 {
                     var imageData = p.TryGetProperty("imageData", out var img) ? img.GetString() : null;
                     // Update existing product
-                    using var upd = new SQLiteCommand("UPDATE Products SET Name=@n, Barcode=@b, Category=@c, Price=@p, Cost=@co, image_data=@img, PointsExempt=@pe, PointsPerUnit=@ppu, IsActive=@ia, ModifiedBy='cloud' WHERE Id=@id", conn);
+                    using var upd = new SQLiteCommand("UPDATE Products SET Name=@n, Barcode=@b, Category=@c, Price=@p, Cost=@co, image_data=@img, PointsExempt=@pe, PointsPerUnit=@ppu, IsActive=@ia, StockParentId=@spid, StockLinkRatio=@sratio, ModifiedBy='cloud' WHERE Id=@id", conn);
                     upd.Parameters.AddWithValue("@n", name);
                     upd.Parameters.AddWithValue("@b", (object?)barcode ?? DBNull.Value);
                     upd.Parameters.AddWithValue("@c", category ?? "");
@@ -1092,6 +1093,8 @@ public static class SyncService
                     upd.Parameters.AddWithValue("@pe", ptsExempt ? 1 : 0);
                     upd.Parameters.AddWithValue("@ppu", ptsPerUnit);
                     upd.Parameters.AddWithValue("@ia", isActive ? 1 : 0);
+                    upd.Parameters.AddWithValue("@spid", 0);
+                    upd.Parameters.AddWithValue("@sratio", linkRatio);
                     upd.Parameters.AddWithValue("@id", existingId);
                     upd.ExecuteNonQuery();
 
@@ -1111,8 +1114,8 @@ public static class SyncService
                     var imageData = p.TryGetProperty("imageData", out var img) ? img.GetString() : null;
                     // Insert new product
                     using var ins = new SQLiteCommand(@"
-                        INSERT INTO Products (Name, Barcode, Category, Price, Cost, StockQty, IsActive, CreatedAt, ModifiedBy, SourceId, image_data, PointsExempt, PointsPerUnit)
-                        VALUES (@n, @b, @c, @p, @co, 0, @ia, datetime('now','localtime'), 'cloud', 'master', @img, @pe, @ppu)", conn);
+                        INSERT INTO Products (Name, Barcode, Category, Price, Cost, StockQty, IsActive, CreatedAt, ModifiedBy, SourceId, image_data, PointsExempt, PointsPerUnit, StockParentId, StockLinkRatio)
+                        VALUES (@n, @b, @c, @p, @co, 0, @ia, datetime('now','localtime'), 'cloud', 'master', @img, @pe, @ppu, 0, @sratio)", conn);
                     ins.Parameters.AddWithValue("@ia", isActive ? 1 : 0);
                     ins.Parameters.AddWithValue("@n", name);
                     ins.Parameters.AddWithValue("@b", (object?)barcode ?? DBNull.Value);
@@ -1122,6 +1125,7 @@ public static class SyncService
                     ins.Parameters.AddWithValue("@img", (object?)imageData ?? DBNull.Value);
                     ins.Parameters.AddWithValue("@pe", ptsExempt ? 1 : 0);
                     ins.Parameters.AddWithValue("@ppu", ptsPerUnit);
+                    ins.Parameters.AddWithValue("@sratio", linkRatio);
                     ins.ExecuteNonQuery();
 
                     using var getId = new SQLiteCommand("SELECT last_insert_rowid()", conn);
@@ -1136,6 +1140,9 @@ public static class SyncService
 
                 if ((added + updated) % 50 == 0) progress?.Report($"Processed {added + updated} products...");
             }
+
+            // STOCK LINK: resolve local parent ids (parents are all upserted by now)
+            ResolveStockLinks(conn, products);
 
             // Deactivate local master-sourced products that are no longer in the cloud master catalog
             if (processedIds.Count > 0)
@@ -1181,6 +1188,7 @@ public static class SyncService
             using var dbConn = DatabaseHelper.GetConnection();
             dbConn.Open();
             var (added, updated) = ProcessProducts(dbConn, products, progress);
+            ResolveStockLinks(dbConn, products);
 
             using var ts = new SQLiteCommand("INSERT OR REPLACE INTO Settings (Key, Value) VALUES ('LastMasterSync', @v)", dbConn);
             ts.Parameters.AddWithValue("@v", TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -1277,11 +1285,12 @@ public static class SyncService
 
             var ptsExempt = p.TryGetProperty("pointsExempt", out var pe) && pe.ValueKind == JsonValueKind.True;
             var ptsPerUnit = p.TryGetProperty("pointsPerUnit", out var ppu) ? ppu.GetInt32() : 0;
+            var linkRatio = p.TryGetProperty("linkRatio", out var lr) && lr.ValueKind == JsonValueKind.Number ? Math.Max(1, lr.GetInt32()) : 1;
 
             if (existingId > 0)
             {
                 var imageData = p.TryGetProperty("imageData", out var img) ? img.GetString() : null;
-                using var upd = new SQLiteCommand("UPDATE Products SET Name=@n, Barcode=@b, Category=@c, Price=@p, Cost=@co, image_data=@img, PointsExempt=@pe, PointsPerUnit=@ppu, ModifiedBy='cloud' WHERE Id=@id", conn);
+                using var upd = new SQLiteCommand("UPDATE Products SET Name=@n, Barcode=@b, Category=@c, Price=@p, Cost=@co, image_data=@img, PointsExempt=@pe, PointsPerUnit=@ppu, StockParentId=@spid, StockLinkRatio=@sratio, ModifiedBy='cloud' WHERE Id=@id", conn);
                 upd.Parameters.AddWithValue("@n", name);
                 upd.Parameters.AddWithValue("@b", (object?)barcode ?? DBNull.Value);
                 upd.Parameters.AddWithValue("@c", category ?? "");
@@ -1290,6 +1299,8 @@ public static class SyncService
                 upd.Parameters.AddWithValue("@img", (object?)imageData ?? DBNull.Value);
                 upd.Parameters.AddWithValue("@pe", ptsExempt ? 1 : 0);
                 upd.Parameters.AddWithValue("@ppu", ptsPerUnit);
+                upd.Parameters.AddWithValue("@spid", 0);
+                upd.Parameters.AddWithValue("@sratio", linkRatio);
                 upd.Parameters.AddWithValue("@id", existingId);
                 upd.ExecuteNonQuery();
 
@@ -1306,8 +1317,8 @@ public static class SyncService
             {
                 var imageData = p.TryGetProperty("imageData", out var img) ? img.GetString() : null;
                 using var ins = new SQLiteCommand(@"
-                    INSERT INTO Products (Name, Barcode, Category, Price, Cost, StockQty, IsActive, CreatedAt, ModifiedBy, SourceId, image_data, PointsExempt, PointsPerUnit)
-                    VALUES (@n, @b, @c, @p, @co, 0, 1, datetime('now','localtime'), 'cloud', 'master', @img, @pe, @ppu)", conn);
+                    INSERT INTO Products (Name, Barcode, Category, Price, Cost, StockQty, IsActive, CreatedAt, ModifiedBy, SourceId, image_data, PointsExempt, PointsPerUnit, StockParentId, StockLinkRatio)
+                    VALUES (@n, @b, @c, @p, @co, 0, 1, datetime('now','localtime'), 'cloud', 'master', @img, @pe, @ppu, 0, @sratio)", conn);
                 ins.Parameters.AddWithValue("@n", name);
                 ins.Parameters.AddWithValue("@b", (object?)barcode ?? DBNull.Value);
                 ins.Parameters.AddWithValue("@c", category ?? "");
@@ -1316,6 +1327,7 @@ public static class SyncService
                 ins.Parameters.AddWithValue("@img", (object?)imageData ?? DBNull.Value);
                 ins.Parameters.AddWithValue("@pe", ptsExempt ? 1 : 0);
                 ins.Parameters.AddWithValue("@ppu", ptsPerUnit);
+                ins.Parameters.AddWithValue("@sratio", linkRatio);
                 ins.ExecuteNonQuery();
 
                 using var getId = new SQLiteCommand("SELECT last_insert_rowid()", conn);
@@ -1332,7 +1344,40 @@ public static class SyncService
         return (added, updated);
     }
 
-    private static void InsertUnits(SQLiteConnection conn, int productId, JsonElement unitsEl)
+        // STOCK LINK (2026-09-02): pagkatapos i-upsert ang lahat ng products, i-resolve ang local
+        // parent id (ang payload ay nagdadala ng parent barcode; ang local parent row ay hinahanap by barcode).
+        private static void ResolveStockLinks(SQLiteConnection conn, List<JsonElement> products)
+        {
+            try
+            {
+                foreach (var p in products)
+                {
+                    if (!p.TryGetProperty("stockParentId", out var spi) || spi.ValueKind != JsonValueKind.Number || spi.GetInt32() <= 0) continue;
+                    if (!p.TryGetProperty("stockParentBarcode", out var spb) || spb.ValueKind != JsonValueKind.String) continue;
+                    var pb = spb.GetString();
+                    if (string.IsNullOrEmpty(pb)) continue;
+                    if (!p.TryGetProperty("barcode", out var bc) || bc.ValueKind != JsonValueKind.String) continue;
+                    var childBarcode = bc.GetString();
+                    if (string.IsNullOrEmpty(childBarcode)) continue;
+                    var ratio = p.TryGetProperty("linkRatio", out var lr) && lr.ValueKind == JsonValueKind.Number ? Math.Max(1, lr.GetInt32()) : 1;
+
+                    int childLocalId = 0, parentLocalId = 0;
+                    using (var ch = new SQLiteCommand("SELECT Id FROM Products WHERE Barcode = @b AND IsActive = 1 LIMIT 1", conn))
+                    { ch.Parameters.AddWithValue("@b", childBarcode); var v = ch.ExecuteScalar(); if (v != null) childLocalId = Convert.ToInt32(v); }
+                    if (childLocalId == 0) continue;
+                    using (var ph = new SQLiteCommand("SELECT Id FROM Products WHERE Barcode = @b AND IsActive = 1 LIMIT 1", conn))
+                    { ph.Parameters.AddWithValue("@b", pb); var v = ph.ExecuteScalar(); if (v != null) parentLocalId = Convert.ToInt32(v); }
+                    using var up = new SQLiteCommand("UPDATE Products SET StockParentId = @pid, StockLinkRatio = @ratio WHERE Id = @id", conn);
+                    up.Parameters.AddWithValue("@pid", parentLocalId);
+                    up.Parameters.AddWithValue("@ratio", ratio);
+                    up.Parameters.AddWithValue("@id", childLocalId);
+                    up.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex) { ErrorLogger.Log("SyncService.ResolveStockLinks", ex); }
+        }
+
+        private static void InsertUnits(SQLiteConnection conn, int productId, JsonElement unitsEl)
     {
         foreach (var u in unitsEl.EnumerateArray())
         {

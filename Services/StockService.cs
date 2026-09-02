@@ -43,22 +43,55 @@ public class StockService
         {
             foreach (var (productId, productName, barcode, stockBefore, qty) in items)
             {
-                var stockAfter = stockBefore + qty;
+                var effBefore = stockBefore;
+                var stockAfter = effBefore + qty;
                 var now = TimeHelper.Now.ToString("yyyy-MM-dd HH:mm:ss");
+
+                // STOCK LINK (2026-09-02): kung ang natanggap na product ay linked child, ang stock
+                // ay pumapasok sa PARENT (qty × ratio) — ang trail ay nasa parent product.
+                int stockTargetId = productId;
+                var trailName = productName;
+                var trailBarcode = barcode;
+                var addQty = qty;
+                using (var lk = new SQLiteCommand("SELECT StockParentId, StockLinkRatio FROM Products WHERE Id = @pid", conn))
+                {
+                    lk.Parameters.AddWithValue("@pid", productId);
+                    using var lkr = lk.ExecuteReader();
+                    if (lkr.Read())
+                    {
+                        var sp = Convert.ToInt32(lkr["StockParentId"]);
+                        if (sp > 0)
+                        {
+                            stockTargetId = sp;
+                            var r = Convert.ToInt32(lkr["StockLinkRatio"]);
+                            addQty = qty * (r > 0 ? r : 1);
+                        }
+                    }
+                }
+                using (var gsr = new SQLiteCommand("SELECT StockQty, Name, COALESCE(Barcode,'') FROM Products WHERE Id = @pid", conn))
+                {
+                    gsr.Parameters.AddWithValue("@pid", stockTargetId);
+                    using var gr = gsr.ExecuteReader();
+                    gr.Read();
+                    effBefore = Convert.ToInt32(gr["StockQty"]);
+                    trailName = gr.GetString(1);
+                    trailBarcode = gr.GetString(2);
+                }
+                stockAfter = effBefore + addQty;
 
                 using var upd = new SQLiteCommand("UPDATE Products SET StockQty = @new WHERE Id = @id", conn);
                 upd.Parameters.AddWithValue("@new", stockAfter);
-                upd.Parameters.AddWithValue("@id", productId);
+                upd.Parameters.AddWithValue("@id", stockTargetId);
                 upd.ExecuteNonQuery();
 
                 using var ins = new SQLiteCommand(@"
                     INSERT INTO StockTrail (ProductId, ProductName, Barcode, QuantityAdded, StockBefore, StockAfter, Reference, UserId, UserName, InvoiceNo, CustomerName, CreatedAt)
                     VALUES (@pid, @pn, @bc, @qa, @sb, @sa, @ref, @uid, @un, '', '', @ca)", conn);
-                ins.Parameters.AddWithValue("@pid", productId);
-                ins.Parameters.AddWithValue("@pn", productName);
-                ins.Parameters.AddWithValue("@bc", barcode);
-                ins.Parameters.AddWithValue("@qa", qty);
-                ins.Parameters.AddWithValue("@sb", stockBefore);
+                ins.Parameters.AddWithValue("@pid", stockTargetId);
+                ins.Parameters.AddWithValue("@pn", trailName);
+                ins.Parameters.AddWithValue("@bc", trailBarcode);
+                ins.Parameters.AddWithValue("@qa", addQty);
+                ins.Parameters.AddWithValue("@sb", effBefore);
                 ins.Parameters.AddWithValue("@sa", stockAfter);
                 ins.Parameters.AddWithValue("@ref", reference);
                 ins.Parameters.AddWithValue("@uid", userId);
@@ -67,7 +100,7 @@ public class StockService
                 ins.ExecuteNonQuery();
                 using var idCmd = new SQLiteCommand("SELECT last_insert_rowid()", conn);
                 var trailId = Convert.ToInt32(idCmd.ExecuteScalar());
-                var trail = new StockTrail { Id = trailId, ProductId = productId, ProductName = productName, Barcode = barcode, QuantityAdded = qty, StockBefore = stockBefore, StockAfter = stockAfter, Reference = reference, UserId = userId, UserName = userName, CreatedAt = now };
+                var trail = new StockTrail { Id = trailId, ProductId = stockTargetId, ProductName = trailName, Barcode = trailBarcode, QuantityAdded = addQty, StockBefore = effBefore, StockAfter = stockAfter, Reference = reference, UserId = userId, UserName = userName, CreatedAt = now };
                 var capturedTrailId = trailId;
                 Task.Run(async () =>
                 {
@@ -181,7 +214,9 @@ public class StockService
             Cost = Convert.ToDecimal(rdr["Cost"]),
             StockQty = Convert.ToInt32(rdr["StockQty"]),
             IsActive = Convert.ToBoolean(rdr["IsActive"]),
-            CreatedAt = DateTime.SpecifyKind(DateTime.Parse(rdr["CreatedAt"].ToString()!), DateTimeKind.Local)
+            CreatedAt = DateTime.SpecifyKind(DateTime.Parse(rdr["CreatedAt"].ToString()!), DateTimeKind.Local),
+            StockParentId = rdr["StockParentId"] != DBNull.Value ? Convert.ToInt32(rdr["StockParentId"]) : 0,
+            StockLinkRatio = rdr["StockLinkRatio"] != DBNull.Value ? Convert.ToInt32(rdr["StockLinkRatio"]) : 1
         };
     }
 }

@@ -17,6 +17,9 @@ public class Product
     public string ImageData { get; set; } = "";
     public bool PointsExempt { get; set; }
     public int PointsPerUnit { get; set; }
+    // STOCK LINK (2026-09-02): StockParentId = local Id ng parent (0 = hindi linked); StockLinkRatio = 1 child = N parent
+    public int StockParentId { get; set; }
+    public int StockLinkRatio { get; set; } = 1;
 
     public string DisplayWithStock => $"{Name}  —  Stock: {StockQty} pcs";
     public string DisplayWithPrice => $"{Name}  [{Barcode}]  \u20b1{Price:N2}  |  Stock: {StockQty}";

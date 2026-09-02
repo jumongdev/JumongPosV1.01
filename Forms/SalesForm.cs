@@ -435,13 +435,17 @@ public partial class SalesForm : Form
         var totalPieces = otherPieces + newQty * item.QtyPerUnit;
 
         var prod = ProductService.GetById(item.ProductId);
-        var available = prod != null ? AvailablePieces(prod.Id, prod.StockQty) : 0;
-        if (prod != null && totalPieces > available)
+        if (prod != null)
         {
-            MessageBox.Show(
-                $"Insufficient stock for '{prod.Name}'.\nRequested: {totalPieces} pcs\nAvailable: {available} pcs{HeldNote(item.ProductId)}",
-                "Out of Stock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
+            var eff = EffectiveAvailability(prod);
+            if (totalPieces > eff.available)
+            {
+                var msg = eff.ratio > 1
+                    ? $"Insufficient stock for '{prod.Name}'.\nRequested: {totalPieces} ({totalPieces * eff.ratio} pcs mula sa {eff.parentName})\nAvailable: {eff.available} ({eff.available * eff.ratio} pcs sa {eff.parentName}){HeldNoteFor(prod)}"
+                    : $"Insufficient stock for '{prod.Name}'.\nRequested: {totalPieces} pcs\nAvailable: {eff.available} pcs{HeldNote(item.ProductId)}";
+                MessageBox.Show(msg, "Out of Stock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
         }
 
         item.Quantity = newQty;
@@ -536,12 +540,13 @@ public partial class SalesForm : Form
             .Sum(x => x.Quantity * x.QtyPerUnit);
         var newPieces = cartPieces + quantity * qtyPerUnit;
 
-        var available = AvailablePieces(product.Id, product.StockQty);
-        if (newPieces > available)
+        var eff = EffectiveAvailability(product);
+        if (newPieces > eff.available)
         {
-            MessageBox.Show(
-                $"Insufficient stock for '{product.Name}'.\nRequested: {newPieces} pcs\nAvailable: {available} pcs{HeldNote(product.Id)}",
-                "Out of Stock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            var msg = eff.ratio > 1
+                ? $"Insufficient stock for '{product.Name}'.\nRequested: {newPieces} ({newPieces * eff.ratio} pcs mula sa {eff.parentName})\nAvailable: {eff.available} ({eff.available * eff.ratio} pcs sa {eff.parentName}){HeldNoteFor(product)}"
+                : $"Insufficient stock for '{product.Name}'.\nRequested: {newPieces} pcs\nAvailable: {eff.available} pcs{HeldNote(product.Id)}";
+            MessageBox.Show(msg, "Out of Stock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -583,6 +588,33 @@ public partial class SalesForm : Form
         if (SyncService.StoreId != "STORE-20260602-7159") return localStock;
         var live = SyncService.GetLiveStockAsync(new[] { productId }).GetAwaiter().GetResult();
         return live.TryGetValue(productId, out var serverQty) ? Math.Min(localStock, serverQty) : localStock;
+    }
+
+    /// <summary>
+    /// STOCK LINK (2026-09-02): effective availability ng isang product sa SOLD unit.
+    /// Para sa linked child: availability = floor(parent available ÷ ratio) — ang stock ay nasa parent.
+    /// </summary>
+    private (int available, int ratio, string parentName) EffectiveAvailability(Product product)
+    {
+        if (product.StockParentId > 0)
+        {
+            var ratio = product.StockLinkRatio > 0 ? product.StockLinkRatio : 1;
+            var parent = ProductService.GetById(product.StockParentId);
+            if (parent != null)
+            {
+                var parentAvail = AvailablePieces(parent.Id, parent.StockQty);
+                return ((int)Math.Floor(parentAvail / (double)ratio), ratio, parent.Name);
+            }
+        }
+        return (AvailablePieces(product.Id, product.StockQty), 1, product.Name);
+    }
+
+    /// <summary>
+    /// STOCK LINK: ang held-stock note ay dapat i-check sa PARENT (doon naka-record ang hold).
+    /// </summary>
+    private string HeldNoteFor(Product product)
+    {
+        return HeldNote(product.StockParentId > 0 ? product.StockParentId : product.Id);
     }
 
     /// <summary>
@@ -715,9 +747,12 @@ public partial class SalesForm : Form
             var prod = ProductService.GetById(item.ProductId);
             if (prod == null) { stockIssues.Add($"'{item.ProductName}' — product no longer exists"); continue; }
             var totalPieces = items.Where(x => x.ProductId == item.ProductId).Sum(x => x.Quantity * x.QtyPerUnit);
-            if (totalPieces > prod.StockQty)
+            var eff = EffectiveAvailability(prod);
+            if (totalPieces > eff.available)
             {
-                var msg = $"'{prod.Name}' — needs {totalPieces} pcs, only {prod.StockQty} available{HeldNote(item.ProductId)}";
+                var msg = eff.ratio > 1
+                    ? $"'{prod.Name}' — needs {totalPieces} ({totalPieces * eff.ratio} pcs mula sa {eff.parentName}), only {eff.available} ({eff.available * eff.ratio} pcs sa {eff.parentName}) available{HeldNoteFor(prod)}"
+                    : $"'{prod.Name}' — needs {totalPieces} pcs, only {eff.available} available{HeldNote(item.ProductId)}";
                 if (!stockIssues.Contains(msg)) stockIssues.Add(msg);
             }
         }
@@ -763,15 +798,16 @@ public partial class SalesForm : Form
 
         // HQ live stock guard: verify the whole cart against min(local, server) before payment
         var liveIssues = new List<string>();
-        var liveStock = SyncService.GetLiveStockAsync(_cart.Select(x => x.ProductId)).GetAwaiter().GetResult();
         foreach (var g in _cart.GroupBy(x => x.ProductId))
         {
             var prod = ProductService.GetById(g.Key);
             if (prod == null) continue;
+            var eff = EffectiveAvailability(prod);
             var pieces = g.Sum(x => x.Quantity * x.QtyPerUnit);
-            var available = Math.Min(prod.StockQty, liveStock.TryGetValue(g.Key, out var sv) ? sv : prod.StockQty);
-            if (pieces > available)
-                liveIssues.Add($"'{prod.Name}' — needs {pieces} pcs, only {available} available (live check){HeldNote(g.Key)}");
+            if (pieces > eff.available)
+                liveIssues.Add(eff.ratio > 1
+                    ? $"'{prod.Name}' — needs {pieces} ({pieces * eff.ratio} pcs mula sa {eff.parentName}), only {eff.available} ({eff.available * eff.ratio} pcs sa {eff.parentName}) available (live check){HeldNoteFor(prod)}"
+                    : $"'{prod.Name}' — needs {pieces} pcs, only {eff.available} available (live check){HeldNote(g.Key)}");
         }
         if (liveIssues.Count > 0)
         {
