@@ -9,6 +9,50 @@ window.fmtInt = n => Number(n || 0).toLocaleString('en-PH');
 window.esc = s => (s + '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 window.shortStore = (sid, name) => (name && name.trim()) ? name.trim() : (sid ? sid.replace('STORE-', '').slice(0, 12) : 'Unknown');
 
+// Product-image thumbnails: IO-gated direct URL loading (no base64, browser-cached 1h)
+let _pimgObs = null;
+function _pimgSet(img) {
+  const pid = img.dataset.pid;
+  if (!pid) return;
+  const url = '/api/dashboard/product-image/' + pid;
+  if (img.dataset.src === url) return;
+  img.dataset.src = url;
+  img.style.display = '';
+  img.src = url;
+}
+function watchProductImages() {
+  const imgs = document.querySelectorAll('#masterTable img[data-pimg]');
+  const vh = window.innerHeight;
+  imgs.forEach(img => {
+    const pid = img.dataset.pid;
+    if (!pid) return;
+    const url = '/api/dashboard/product-image/' + pid;
+    if (img.dataset.src !== url) {
+      const r = img.getBoundingClientRect();
+      if (r.top < vh + 400 && r.bottom > -400) _pimgSet(img);
+    }
+  });
+  if (typeof IntersectionObserver === 'undefined') return;
+  if (!_pimgObs) {
+    _pimgObs = new IntersectionObserver(entries => {
+      entries.forEach(en => { if (en.isIntersecting) _pimgSet(en.target); });
+    }, { rootMargin: '400px' });
+  }
+  imgs.forEach(img => {
+    const url = '/api/dashboard/product-image/' + (img.dataset.pid || '');
+    if (img.dataset.src !== url) _pimgObs.observe(img);
+  });
+}
+window.addEventListener('scroll', () => setTimeout(watchProductImages, 120), { passive: true });
+document.addEventListener('alpine:init', () => {
+  setTimeout(watchProductImages, 1500);
+  if (typeof MutationObserver !== 'undefined') {
+    new MutationObserver(() => {
+      if (document.querySelector('#masterTable')) setTimeout(watchProductImages, 80);
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+});
+
 document.addEventListener('alpine:init', () => {
 
 Alpine.store('app', {
@@ -34,7 +78,6 @@ Alpine.store('app', {
     _stBadge: 0,
     _shopBadge: 0,
     _kbBadge: 0,
-    _ssBadge: 0,
     _restockBadge: 0,
     _suggBadge: 0,
     _promoQBadge: 0,
@@ -44,7 +87,7 @@ Alpine.store('app', {
       'health': 'grp-system', 'suspect1pc': 'grp-system',
       'rpt-sales': 'grp-reports', 'rpt-invcost': 'grp-reports', 'rpt-shifts': 'grp-reports', 'analytics': 'grp-reports', 'rpt-invval': 'grp-reports',
       'grp-reports': 'grp-pos', 'products': 'grp-pos', 'grp-inv': 'grp-pos',
-      'online-orders': 'grp-ecom', 'shop-content': 'grp-ecom', 'msgr-bot': 'grp-ecom', 'sari-sari': 'grp-ecom', 'promo-banners': 'grp-ecom', 'restock-requests': 'grp-ecom', 'product-suggestions': 'grp-ecom', 'promo-groups': 'grp-ecom', 'promo-free-queue': 'grp-ecom',
+      'online-orders': 'grp-ecom', 'shop-content': 'grp-ecom', 'msgr-bot': 'grp-ecom', 'promo-banners': 'grp-ecom', 'restock-requests': 'grp-ecom', 'product-suggestions': 'grp-ecom', 'promo-groups': 'grp-ecom', 'promo-free-queue': 'grp-ecom',
       'st-receiving': 'grp-inv', 'st-trail': 'grp-inv', 'st-transfer': 'grp-inv',
       'settings': 'grp-settings', 'pospromo': 'grp-settings', 'posqr': 'grp-settings', 'branding': 'grp-settings', 'google-auth': 'grp-settings'
     },
@@ -478,49 +521,16 @@ Alpine.store('app', {
   /* ΓöÇΓöÇ Master Products ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('masterProducts', () => ({
     d: [], loading: true, search: '', catFilter: '', status: 'active', stockTotals: {}, stockTotalsByName: {},
-    thumbs: {}, _thumbObs: null, batchBusy: false, batchDone: 0, batchTotal: 0,
+    hqStockByBc: {}, hqStockByName: {},
+    batchBusy: false, batchDone: 0, batchTotal: 0,
     async init() {
       window.addEventListener('load-products', () => this.load());
       if (Alpine.store('app').section === 'products') await this.load();
-      const tb = document.querySelector('#masterTable tbody');
-      if (tb && typeof MutationObserver !== 'undefined') {
-        new MutationObserver(() => setTimeout(() => this.watchThumbs(), 60)).observe(tb, { childList: true, subtree: true });
-      }
-      if (!this._thumbScrollBound) {
-        this._thumbScrollBound = () => setTimeout(() => this.watchThumbs(), 80);
-        window.addEventListener('scroll', this._thumbScrollBound, { passive: true });
-        setTimeout(() => this.watchThumbs(), 200);
-      }
-    },
-    // Lazy image thumbnails - list endpoint is noImages=true (perf), so fetch per-row on demand (IO-gated, cached)
-    watchThumbs() {
-      const els = document.querySelectorAll('#masterTable td[data-tid]');
-      // Direct near-viewport load first (scroll fallback - IO alone proved unreliable in the shop too)
-      const vh = window.innerHeight;
-      els.forEach(el => {
-        const r = el.getBoundingClientRect();
-        if (r.top < vh + 600 && r.bottom > -600) this.loadThumb(Number(el.dataset.tid));
-      });
-      if (typeof IntersectionObserver === 'undefined') return;
-      if (!this._thumbObs) {
-        this._thumbObs = new IntersectionObserver(entries => {
-          entries.forEach(en => { if (en.isIntersecting) this.loadThumb(Number(en.target.dataset.tid)); });
-        }, { rootMargin: '400px' });
-      }
-      els.forEach(el => this._thumbObs.observe(el));
-    },
-    async loadThumb(id) {
-      if (this.thumbs[id] !== undefined) return;
-      this.thumbs[id] = 'loading';
-      try {
-        const r = await fetchJSON(API + '/products/master/' + id);
-        this.thumbs[id] = (r.product && r.product.imageData) || '';
-      } catch (e) { this.thumbs[id] = ''; }
     },
     async load(force) {
       if (!force) {
         const c = Alpine.store('app').cache.master;
-        if (c && Date.now() - c.t < 15000) { this.d = c.data; this.loading = false; this.loadTotals(); return }
+        if (c && Date.now() - c.t < 15000) { this.d = c.data; this.loading = false; this.loadTotals(); setTimeout(watchProductImages, 120); return }
       }
       this.loading = true;
       try {
@@ -529,7 +539,7 @@ Alpine.store('app', {
       } catch (e) { this.d = [] }
       this.loading = false;
       this.loadTotals();
-      setTimeout(() => this.watchThumbs(), 100);
+      setTimeout(watchProductImages, 150);
     },
     async loadTotals() {
       const c = Alpine.store('app').cache.stockTotals;
@@ -575,11 +585,14 @@ Alpine.store('app', {
       Alpine.store('app').editingId = id || null;
       if (id) {
         const local = this.d.find(x => x.id === id);
-        Alpine.store('app').editingProductData = local ? { ...local, units: [] } : null;
         try {
+          // Hintayin ang fetch bago buksan ang editor. Dati, ang local data (units: []) ay
+          // inilalagay MUNA -> kung nagbukas ang form bago matapos ang fetch, walang units ang
+          // form -> ang SAVE ay magse-save ng walang units -> UNIT PROTECTION ay nag-iingat ng
+          // lumang units -> mukhang "auto-balik" ang mga deleted units (Mismo incident 2026-09-02).
           const r = await fetchJSON(API + '/products/master/' + id);
           Alpine.store('app').editingProductData = { ...r.product, units: r.units || [] };
-        } catch (e) { /* keep local data */ }
+        } catch (e) { Alpine.store('app').editingProductData = local ? { ...local, units: [] } : null; }
       } else {
         Alpine.store('app').editingProductData = null;
       }
@@ -636,15 +649,6 @@ Alpine.store('app', {
       } catch (e) { toast('Delete failed: ' + e.message, 'error') }
     },
     get editingProduct() { const id = Alpine.store('app').editingId; return id ? this.d.find(x => x.id === id) : null },
-    async saveOnlinePrice(x, val) {
-      const num = parseFloat(val);
-      const saved = (num > 0) ? num : 0;
-      x.onlinePrice = saved;
-      try {
-        await fetch(API + '/products/master/' + x.id + '/flags', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ onlinePrice: saved }) });
-        toast('Online price saved: ' + (saved > 0 ? '₱' + saved.toFixed(2) : 'default') + ' — ' + (x.name || ''));
-      } catch (e) { toast('Save failed: ' + e.message, 'error'); }
-    },
     async toggleFlag(x, field, val) {      const prev = x[field];
       x[field] = val;
       try {
@@ -718,6 +722,7 @@ Alpine.store('app', {
     removeImage: false,
     pointsExempt: false, pointsPerUnit: 0, isActive: true, sellOnline: true,
     units: [], productId: null, categories: [],
+    linkParentId: 0, linkRatio: 1, linkParentName: '', linkQ: '', linkOpen: false, linkProducts: [],
     async init() {
       this.$watch('$store.app.section', () => { if (this.$store.app.section !== 'products') this.reset() });
       this.$watch('$store.app.editorOpen', (v) => { if (v) this.open(Alpine.store('app').editingId) });
@@ -727,10 +732,40 @@ Alpine.store('app', {
       this.productId = id || null;
       this.removeImage = false;
       const p = Alpine.store('app').editingProductData;
-      if (id && p) { this.name = p.name; this.barcode = p.barcode || ''; this.category = p.category || ''; this.price = p.price; this.cost = p.cost; this.imageData = p.imageData || ''; this.pointsExempt = p.pointsExempt || false; this.pointsPerUnit = p.pointsPerUnit || 0; this.isActive = p.isActive !== false; this.sellOnline = p.sellOnline !== false; this.units = (p.units || []).map(u => ({ ...u })) }
-      else { this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.sellOnline = true; this.units = [] }
+      if (id && p) {
+        this.name = p.name; this.barcode = p.barcode || ''; this.category = p.category || ''; this.price = p.price; this.cost = p.cost; this.imageData = p.imageData || ''; this.pointsExempt = p.pointsExempt || false; this.pointsPerUnit = p.pointsPerUnit || 0; this.isActive = p.isActive !== false; this.sellOnline = p.sellOnline !== false; this.units = (p.units || []).map(u => ({ ...u }));
+        this.linkParentId = p.stockParentId || 0; this.linkRatio = p.linkRatio || 1; this.linkParentName = p.stockParentName || ''; this.linkQ = p.stockParentName || '';
+      }
+      else { this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.sellOnline = true; this.units = []; this.linkParentId = 0; this.linkRatio = 1; this.linkParentName = ''; this.linkQ = ''; }
     },
-    reset() { this.productId = null; this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.removeImage = false; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.sellOnline = true; this.units = []; Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null; Alpine.store('app').editingProductData = null },
+    reset() { this.productId = null; this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.removeImage = false; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.sellOnline = true; this.units = []; this.linkParentId = 0; this.linkRatio = 1; this.linkParentName = ''; this.linkQ = ''; this.linkOpen = false; Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null; Alpine.store('app').editingProductData = null },
+    async loadLinkProducts() {
+      if (this.linkProducts.length) return;
+      try {
+        const cached = Alpine.store('app').cache.master;
+        if (cached && cached.data && cached.data.length) { this.linkProducts = cached.data; return; }
+        this.linkProducts = await fetchJSON(API + '/products/master?noImages=true');
+      } catch (e) { this.linkProducts = []; }
+    },
+    get linkResults() {
+      const q = (this.linkQ || '').toLowerCase().trim();
+      let list = this.linkProducts.filter(p => p.id !== this.productId);
+      if (q) list = list.filter(p => (p.name || '').toLowerCase().includes(q) || (p.barcode || '').includes(q));
+      return list.slice(0, 20);
+    },
+    linkPickFirst() { const r = this.linkResults; if (r.length) this.linkSelect(r[0]); else this.linkOpen = false; },
+    linkSelect(p) { this.linkParentId = p.id; this.linkParentName = p.name; this.linkQ = p.name; this.linkOpen = false; },
+    linkApply() {
+      if (!this.linkParentId) { toast('Pumili muna ng parent product sa search', 'error'); return; }
+      const r = Math.floor(Number(this.linkRatio) || 1);
+      if (r < 1) { toast('Link ratio ay dapat 1 o mas mataas', 'error'); return; }
+      this.linkRatio = r;
+      toast('🔗 Link: 1 = ' + r + ' ' + this.linkParentName + ' — i-SAVE para i-save', 'success');
+    },
+    linkUnlink() {
+      this.linkParentId = 0; this.linkParentName = ''; this.linkQ = '';
+      toast('Link inalis — i-SAVE para i-save', 'success');
+    },
     addCategory() {
       var name = prompt('Enter new category name:');
       if (!name || !name.trim()) return;
@@ -757,7 +792,9 @@ Alpine.store('app', {
         imageData: this.imageData, removeImage: this.removeImage, isActive: this.isActive,
         sellOnline: this.sellOnline,
         pointsExempt: this.pointsExempt, pointsPerUnit: parseInt(this.pointsPerUnit) || 0,
-        units: this.units.filter(u => u.unitName).map(u => ({ ...u, cost: (u.qtyPerUnit || 1) * (parseFloat(this.cost) || 0), pointsPerUnit: parseInt(u.pointsPerUnit) || 0 }))
+        stockParentId: this.linkParentId || 0, linkRatio: Math.floor(Number(this.linkRatio) || 1),
+        units: this.units.filter(u => u.unitName).map(u => ({ ...u, cost: (u.qtyPerUnit || 1) * (parseFloat(this.cost) || 0), pointsPerUnit: parseInt(u.pointsPerUnit) || 0 })),
+        clearUnits: this.productId && !this.units.filter(u => u.unitName).length ? true : undefined
       };
       try {
         const api = API + '/products/master';
@@ -1904,30 +1941,6 @@ Alpine.store('app', {
   }));
 
   /* ── Shop Content (landing page content editor) ─────────────────────── */
-  Alpine.data('sariSariPanel', () => ({
-    apps: [], filter: 'pending', _pending: 0,
-    async init() { await this.load(); await this.refreshBadge(); },
-    setFilter(f) { this.filter = f; this.load(); },
-    async load() {
-      try {
-        const url = API + '/sari-sari/applications' + (this.filter ? '?status=' + this.filter : '');
-        this.apps = await fetchJSON(url);
-        if (this.filter !== 'pending') await this.refreshBadge();
-      } catch (e) { this.apps = []; }
-    },
-    async refreshBadge() {
-      try { const r = await fetchJSON(API + '/sari-sari/pending-count'); this._pending = r.count || 0; Alpine.store('app')._ssBadge = this._pending; } catch (e) {}
-    },
-    async review(a, approve) {
-      if (!confirm((approve ? 'APPROVE' : 'REJECT') + ' application ng ' + (a.customerName || 'customer') + (a.storeName ? ' (' + a.storeName + ')' : '') + '?')) return;
-      try {
-        await fetchJSON(API + '/sari-sari/applications/' + a.id + '/review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ approve }) });
-        toast(approve ? 'Approved - wholesale access granted' : 'Rejected');
-        await this.load();
-      } catch (e) { toast(e.message || 'Review failed', 'error'); }
-    }
-  }));
-
   Alpine.data('restockPanel', () => ({
     data: [], filter: 'pending', loading: false,
     async init() { await this.load(); },

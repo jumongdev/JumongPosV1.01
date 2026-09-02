@@ -106,7 +106,6 @@ tailwind.config = {
             { id:'shop-content', icon:'🛍️', label:'Shop Content' },
             { id:'promo-banners', icon:'🎯', label:'Promo Banners' },
             { id:'msgr-bot', icon:'🤖', label:'Messenger Bot' },
-            { id:'sari-sari', icon:'🏪', label:'Sari-Sari Apps' },
             { id:'restock-requests', icon:'🚨', label:'Restock Requests' },
             { id:'product-suggestions', icon:'💡', label:'Product Suggestions' },
             { id:'promo-groups', icon:'🎁', label:'Promo Groups' },
@@ -195,8 +194,8 @@ tailwind.config = {
             <span class="text-lg shrink-0" x-text="item.icon"></span>
             <span class="nav-label text-xs" x-show="$store.app._sidebarOpen" x-text="item.label"></span>
             <span class="ml-auto bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full min-w-[18px] text-center"
-              x-show="(item.id==='online-orders' && $store.app._shopBadge > 0) || (item.id==='ai-kb' && $store.app._kbBadge > 0) || (item.id==='sari-sari' && $store.app._ssBadge > 0) || (item.id==='restock-requests' && $store.app._restockBadge > 0) || (item.id==='product-suggestions' && $store.app._suggBadge > 0) || (item.id==='promo-free-queue' && $store.app._promoQBadge > 0)"
-              x-text="item.id==='online-orders' ? $store.app._shopBadge : item.id==='ai-kb' ? $store.app._kbBadge : item.id==='sari-sari' ? $store.app._ssBadge : item.id==='restock-requests' ? $store.app._restockBadge : item.id==='product-suggestions' ? $store.app._suggBadge : $store.app._promoQBadge"></span>
+              x-show="(item.id==='online-orders' && $store.app._shopBadge > 0) || (item.id==='ai-kb' && $store.app._kbBadge > 0) || (item.id==='restock-requests' && $store.app._restockBadge > 0) || (item.id==='product-suggestions' && $store.app._suggBadge > 0) || (item.id==='promo-free-queue' && $store.app._promoQBadge > 0)"
+              x-text="item.id==='online-orders' ? $store.app._shopBadge : item.id==='ai-kb' ? $store.app._kbBadge : item.id==='restock-requests' ? $store.app._restockBadge : item.id==='product-suggestions' ? $store.app._suggBadge : $store.app._promoQBadge"></span>
           </a>
         </div>
       </template>
@@ -1107,7 +1106,6 @@ tailwind.config = {
                   <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Barcode</th>
                   <th class="text-left px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Category</th>
                   <th class="text-center px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]" title="Points Per Unit">Pts/U</th>
-                  <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]" title="Price for regular online members (0 = use default price)">Online Price</th>
                   <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Price</th>
                   <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Cost</th>
                   <th class="text-right px-3 py-2.5 border-b border-gray-100 dark:border-[#222255]">Margin</th>
@@ -1120,23 +1118,17 @@ tailwind.config = {
                   <template x-for="(x,i) in filtered" :key="i">
                     <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                       <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.id"></td>
-                      <td class="px-3 py-2 text-center" :data-tid="x.id">
-                        <img x-show="thumbs[x.id] && thumbs[x.id].startsWith('data:')" :src="thumbs[x.id]" class="w-8 h-8 object-cover rounded mx-auto" :alt="x.name">
-                        <span x-show="!thumbs[x.id] || !thumbs[x.id].startsWith('data:')" class="inline-block w-8 h-8 rounded bg-gray-100 dark:bg-[#181848] text-[8px] text-gray-400 flex items-center justify-center mx-auto">IMG</span>
+<td class="px-3 py-2 text-center relative">
+                        <span class="inline-block w-8 h-8 rounded bg-gray-100 dark:bg-[#181848] text-[8px] text-gray-400 flex items-center justify-center mx-auto">IMG</span>
+                        <img data-pimg="1" :data-pid="x.id" onerror="this.style.display='none'" :alt="x.name" class="absolute inset-0 m-auto w-8 h-8 object-cover rounded">
                       </td>
-                      <td class="px-3 py-2 font-medium" :class="x.isActive === false ? 'line-through text-gray-400' : ''" x-text="x.name"></td>
-                      <td class="px-3 py-2 text-center"><span x-show="x.isActive === false" class="text-[10px] font-bold px-2 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">INACTIVE</span><span x-show="x.isActive !== false" class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">ACTIVE</span></td>
+                      <td class="px-3 py-2 font-medium" :class="x.isActive === false ? 'line-through text-gray-400' : ''"><span x-text="x.name"></span><span x-show="x.stockParentId" class="block text-[10px] font-bold text-violet-600 dark:text-violet-400 mt-0.5 normal-case">🔗 LINKED → <span x-text="x.stockParentName || ('#' + x.stockParentId)"></span></span></td></td>                      <td class="px-3 py-2 text-center"><span x-show="x.isActive === false" class="text-[10px] font-bold px-2 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">INACTIVE</span><span x-show="x.isActive !== false" class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">ACTIVE</span></td>
                       <td class="px-3 py-2 text-center"><input type="checkbox" :checked="x.sellOnline !== false" @change="toggleFlag(x, 'sellOnline', $event.target.checked)" class="w-3.5 h-3.5 accent-cyan-600" title="Displayed in online shop"></td>
                       <td class="px-3 py-2 text-center"><input type="checkbox" :checked="x.isActive !== false" @change="toggleFlag(x, 'isActive', $event.target.checked)" class="w-3.5 h-3.5 accent-emerald-600" title="Active"></td>
                       <td class="px-3 py-2 text-center"><input type="checkbox" :checked="x.pointsExempt" @change="toggleFlag(x, 'pointsExempt', $event.target.checked)" class="w-3.5 h-3.5 accent-amber-500" title="Points Exempt"></td>
                       <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.barcode || ''"></td>
                       <td class="px-3 py-2" x-text="x.category || ''"></td>
                       <td class="px-3 py-2 text-center text-gray-500 dark:text-[#7878aa]" x-text="x.pointsPerUnit || 0"></td>
-                      <td class="px-3 py-2 text-right">
-                        <input :value="x.onlinePrice || ''" @change="saveOnlinePrice(x, $event.target.value)"
-                          class="w-20 text-right text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded px-1.5 py-1 text-gray-700 dark:text-slate-200"
-                          placeholder="0 = default" title="Online price (0 = default price)">
-                      </td>
                       <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.price)"></span></td>
                       <td class="px-3 py-2 text-right text-red-500">&#8369;<span x-text="fmt(x.cost)"></span></td>
                       <td class="px-3 py-2 text-right font-medium" :class="marginClass(margin(x))"><span x-text="margin(x)"></span>%</td>
@@ -1572,7 +1564,6 @@ tailwind.config = {
                 <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Name</th>
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Phone</th>
-                  <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Status</th>
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Address</th>
                   <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Email</th>
                   <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">⭐ Points</th>
@@ -1590,10 +1581,6 @@ tailwind.config = {
                           <button @click="openPhone(x)" class="text-[10px] font-bold px-2 py-1 rounded-lg bg-amber-500 text-white hover:bg-amber-600" title="May Gmail ang customer pero walang phone number — i-save dito">📱 I-SAVE PHONE</button>
                         </template>
                         <template x-if="!x.phone && !x.googleSub"><span class="text-gray-400">—</span></template>
-                      </td>
-                      <td class="px-3 py-2">
-                        <template x-if="x.isSariSari"><span class="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300" title="Verified sari-sari store">🏪 STORE</span></template>
-                        <template x-if="!x.isSariSari"><span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-[#181848] text-gray-500 dark:text-slate-400">REGULAR</span></template>
                       </td>
                       <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] max-w-[220px]" x-text="addrText(x) || '—'"></td>
                       <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.email || ''"></td>
@@ -2069,6 +2056,40 @@ tailwind.config = {
                 </div>
               </template>
             </div>
+          </section>
+
+          <section>
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="text-[11px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">🔗 Stock Link</h4>
+              <span class="text-[10px] text-gray-400 dark:text-[#7878aa]">(opsyonal — stock ay manggagaling sa PARENT × ratio)</span>
+            </div>
+            <template x-if="!productId"><div class="text-xs text-gray-400 dark:text-[#7878aa] py-3 text-center border border-dashed border-gray-300 dark:border-[#222255] rounded-lg">I-save muna ang product bago mag-link.</div></template>
+            <template x-if="productId">
+              <div class="space-y-2">
+                <div x-show="linkParentId" class="rounded-lg border border-violet-300 dark:border-violet-700 bg-violet-50 dark:bg-violet-900/20 px-3 py-2 text-xs">
+                  <span class="font-bold text-violet-700 dark:text-violet-300">Linked → </span><span x-text="linkParentName"></span>
+                  <span class="text-gray-500 dark:text-[#7878aa]" x-text="'  (1 = ' + linkRatio + ' parent)'"></span>
+                </div>
+                <div class="relative">
+                  <input x-model="linkQ" @focus="linkOpen = true; loadLinkProducts()" @input="linkOpen = true; loadLinkProducts()" @keydown.enter.prevent="linkPickFirst()" @click.outside="linkOpen = false" type="text" placeholder="Search parent product (stock source)..." class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                  <div x-show="linkOpen" class="absolute z-20 left-0 right-0 top-full mt-1 bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-lg shadow-xl max-h-52 overflow-y-auto">
+                    <template x-for="p in linkResults" :key="p.id">
+                      <button @click="linkSelect(p)" class="block w-full text-left px-3 py-1.5 text-[11px] hover:bg-violet-50 dark:hover:bg-[#181848] truncate" x-text="(p.name + (p.stockParentId ? '  (linked na)' : ''))"></button>
+                    </template>
+                    <p x-show="!linkResults.length" class="px-3 py-2 text-[11px] text-gray-400">Walang match — i-type pa</p>
+                  </div>
+                </div>
+                <div class="flex items-end gap-2">
+                  <div class="flex-1">
+                    <label class="text-[10px] text-gray-400 dark:text-[#7878aa] block mb-0.5">1 [this] = N [parent]</label>
+                    <input type="number" min="1" step="1" x-model.number="linkRatio" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                  </div>
+                  <button @click="linkApply()" class="text-xs px-4 py-2 rounded-lg bg-violet-600 text-white font-medium hover:bg-violet-700">🔗 LINK</button>
+                  <button @click="linkUnlink()" x-show="linkParentId" class="text-xs px-4 py-2 rounded-lg border border-red-500 text-red-500 hover:bg-red-500/10">UNLINK</button>
+                </div>
+                <p class="text-[10px] text-gray-400 dark:text-[#7878aa]">Ang linked product ay HINDI maaaring magkaroon ng units. Ang stock nito ay nanggagaling sa parent × ratio (hal. 1 = 10 → bawas 10 sa parent kada benta; restock 10 = +100 sa parent).</p>
+              </div>
+            </template>
           </section>
 
         </div>
@@ -2620,68 +2641,6 @@ tailwind.config = {
             </div>
           </template>
           <p x-show="!rows.length" class="text-xs text-center text-gray-400 dark:text-[#7878aa] py-8">Walang laman ang queue.</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- SARI-SARI STORE APPLICATIONS SECTION                        -->
-    <div x-show="$store.app.section === 'sari-sari'" x-transition.opacity>
-      <div x-data="sariSariPanel" class="space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">🏪 Sari-Sari Store Applications <span class="text-[10px] text-gray-400 dark:text-[#7878aa] font-normal">(DTI o store front photo submissions - i-approve para sa wholesale)</span></h3>
-          <div class="flex items-center gap-2">
-            <span class="text-xs px-3 py-2 rounded-lg border border-amber-500 text-amber-600 dark:text-amber-400 font-medium">⏳ PENDING: <b x-text="_pending"></b></span>
-            <button @click="load()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">REFRESH</button>
-          </div>
-        </div>
-        <div class="flex gap-2 flex-wrap">
-          <button @click="setFilter('pending')" class="text-xs px-3 py-2 rounded-lg font-medium" :class="filter === 'pending' ? 'bg-amber-500 text-white' : 'border border-amber-500 text-amber-600 dark:text-amber-400'">PENDING</button>
-          <button @click="setFilter('approved')" class="text-xs px-3 py-2 rounded-lg font-medium" :class="filter === 'approved' ? 'bg-emerald-600 text-white' : 'border border-emerald-600 text-emerald-600 dark:text-emerald-400'">APPROVED</button>
-          <button @click="setFilter('rejected')" class="text-xs px-3 py-2 rounded-lg font-medium" :class="filter === 'rejected' ? 'bg-red-500 text-white' : 'border border-red-500 text-red-500'">REJECTED</button>
-          <button @click="setFilter('')" class="text-xs px-3 py-2 rounded-lg border border-gray-300 dark:border-[#222255] text-gray-600 dark:text-slate-300">ALL</button>
-        </div>
-        <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
-          <div class="overflow-x-auto">
-            <table class="w-full text-xs">
-              <thead class="bg-gray-50 dark:bg-[#0d0d25]/50">
-                <tr class="border-b border-gray-200 dark:border-[#222255] text-left text-[10px] text-gray-500 dark:text-[#7878aa] uppercase tracking-wider">
-                  <th class="px-3 py-2">Store</th>
-                  <th class="px-3 py-2">Customer</th>
-                  <th class="px-3 py-2">Contact</th>
-                  <th class="px-3 py-2">DTI / PHOTO</th>
-                  <th class="px-3 py-2">Date</th>
-                  <th class="px-3 py-2">Status</th>
-                  <th class="px-3 py-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <template x-for="a in apps" :key="a.id">
-                  <tr class="border-b border-gray-100 dark:border-[#1a1a44] hover:bg-gray-50 dark:hover:bg-[#181848]/50">
-                    <td class="px-3 py-2 font-medium text-gray-700 dark:text-slate-200" x-text="a.storeName || '—'"></td>
-                    <td class="px-3 py-2" x-text="a.customerName"></td>
-                    <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]"><span x-text="a.phone || '—'"></span><br><span class="text-[10px]" x-text="a.email"></span></td>
-                    <td class="px-3 py-2"><a :href="a.dtiFile" target="_blank" class="text-cyan-600 dark:text-cyan-400 font-bold">VIEW ↗</a></td>
-                    <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="a.createdAt"></td>
-                    <td class="px-3 py-2">
-                      <span class="px-2 py-0.5 rounded-full text-[9px] font-bold"
-                        :class="a.status === 'pending' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' : a.status === 'approved' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'"
-                        x-text="a.status.toUpperCase()"></span>
-                    </td>
-                    <td class="px-3 py-2 whitespace-nowrap">
-                      <template x-if="a.status === 'pending'">
-                        <span>
-                          <button @click="review(a, true)" class="text-[10px] px-2.5 py-1.5 rounded bg-emerald-600 text-white font-bold hover:bg-emerald-700">✔ APPROVE</button>
-                          <button @click="review(a, false)" class="text-[10px] px-2.5 py-1.5 rounded border border-red-500 text-red-500 hover:bg-red-500/10 ml-1">✕ REJECT</button>
-                        </span>
-                      </template>
-                      <template x-if="a.status !== 'pending'"><span class="text-gray-400 dark:text-[#4a4a7a] text-[10px]">—</span></template>
-                    </td>
-                  </tr>
-                </template>
-                <tr x-show="apps.length === 0"><td colspan="7" class="px-3 py-8 text-center text-gray-400 text-xs">Walang applications</td></tr>
-              </tbody>
-            </table>
-          </div>
         </div>
       </div>
     </div>
@@ -3533,8 +3492,8 @@ tailwind.config = {
 
   </div><!-- /main content -->
 
-  <script src="components.js?v=20260827"></script>
-  <script src="app.js?v=20260827"></script>
+  <script src="components.js?v=20260906"></script>
+  <script src="app.js?v=20260906"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script>
   /* ── Web login gating (username + PIN, WEB ACCESS only) ── */

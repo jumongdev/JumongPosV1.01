@@ -1,6 +1,109 @@
 # JumongPOS — Full Project Guide for AI Agents
 
-## Latest Change (2026-09-01) — v1.1.69 (POS client + API): END-SHIFT RECONCILIATION SIGN FIX (wala nang phantom SHORT) + E-COMMERCE SA END SHIFT + lahat ng 4 stores na-update
+## Latest Change (2026-09-02) — STOCK LINK FEATURE (v1.1.70 client + v1.1.65 API): linked child products na ang stock ay nanggagaling sa parent (1 child = N parent)
+
+**Request:** "para wala ng unit unit we make separate item as long as he got different barcode just link the item to main source of stock para isang bilang lang" — ang units model ay hindi kayang magkaroon ng sariling image/barcode/listing ang bawat packaging sa e-commerce. Desisyon: **isahan na model** — bawat packaging = sariling master product (barcode/image/presyo), naka-**LINK** sa isang stock base (parent) na may ratio. Ang existing units items ay HINDI ginagalaw; ang user ang magko-convert nang unti-unti. Walang ginawang test items/links — ikaw ang gagawa sa dashboard.
+
+### Ang model (locked)
+```
+MAIN/BASE:  FUDGEE BARR CHOCOLATE 10/42G (₱81, barcode 4800092550911) ← dito nakatira ang stock
+CHILD:      FUDGEE BARR CHOCOLATE BOX (sariling barcode, sariling image/presyo) link→parent, ratio 10
+```
+- Benta 1 child = bawas sa PARENT `qty × ratio` (1 box = −10 packs); availability = `floor(parent ÷ ratio)`
+- Restock child = pasok sa parent `qty × ratio` (10 box = +100 packs, may preview sa receiving)
+- Void = reversal sa parent; e-commerce hold/reserve = sa parent; child stock laging 0
+
+### Ang mga ayos (v1.1.70 client / v1.1.65 API)
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs` | Migration: `master_products.stock_parent_id INT NOT NULL DEFAULT 0` + `link_ratio NUMERIC NOT NULL DEFAULT 1` + index. |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **GetMasterProducts/GetMasterProduct/DownloadMasterCatalog** → may `stockParentId/linkRatio/stockParentName/stockParentBarcode` (parent name/barcode via id map). **UpdateMasterProduct**: tinatanggap ang `StockParentId/LinkRatio`; validations — hindi sa sarili, 1 level lang (parent hindi pwedeng linked), ratio ≥ 1, linked child = BAWAL units (o ClearUnits muna); audit (master_product_audit). **Ecom**: ShopCatalog/ShopProduct hqStock ng child = `floor(parent ÷ ratio)` (parent stock via barcode lookup); `AdjustOrderStockHeld` → kung linked, i-deduct/ibalik ang PARENT (pcs × ratio, trail sa parent row). Version → "1.1.65" (2 places); latestVer → "1.1.70". |
+| `JumongCloudAPI/wwwroot/index.html` | Editor: **🔗 STOCK LINK** section (parent search + ratio "1 [this] = N [parent]" + LINK/UNLINK + note na bawal units sa linked). Master list: 🔗 LINKED → parent badge sa name cell (span sa loob ng td — huwag x-text sa td mismo). Cache-buster `?v=20260904` → `?v=20260905`. |
+| `JumongCloudAPI/wwwroot/components.js` | `productEditor`: state `linkParentId/linkRatio/linkParentName/linkQ/linkOpen/linkProducts`; `loadLinkProducts()` (reuse cache.master); `linkResults/linkPickFirst/linkSelect/linkApply/linkUnlink`; open()/reset() nag-lo-load ng link fields; save() nagpapadala ng `stockParentId/linkRatio`. |
+| `Data/DatabaseHelper.cs` (client) | Migration: `Products.StockParentId INT NOT NULL DEFAULT 0` + `StockLinkRatio INT NOT NULL DEFAULT 1`. |
+| `Models/Product.cs` + `ProductService.cs` + `StockService.cs` (Map) | Properties + reader mapping. |
+| `Services/SyncService.cs` (client) | `ProcessProducts` (full + incremental loops): UPDATE/INSERT kasama ang `StockParentId=0/StockLinkRatio`; bagong **`ResolveStockLinks(conn, products)`** — pagkatapos i-upsert lahat, i-resolve ang LOCAL parent id by parent barcode (tinatawag sa parehong DownloadMasterCatalog at DownloadUpdatedMasterCatalog). |
+| `Services/SaleService.cs` (client) | **SaveSale**: kung linked ang item → deduct ang PARENT (`qty×qpu×ratio`), stockBefore/After at trail sa parent (name/barcode ng parent); **VoidSale** at **VoidItem**: reversal sa parent (parehong link resolution). |
+| `Forms/SalesForm.cs` (client) | Bagong `EffectiveAvailability(product)` → `(available, ratio, parentName)` (child = floor(parentAvailable ÷ ratio; AvailablePieces HQ-live sa parent id) + `HeldNoteFor(product)` (held check sa parent). Ginamit sa 4 guards: AddToCart, qty-change dialog, held-cart retrieve, pre-pay live check — messages "Available: N (N×ratio pcs mula sa parent)". |
+| `Forms/StockReceivingForm.cs` (client) | `RefreshPendingGrid`: linked child → preview "name (→ parent ×N)" + QTY "qty (= addQty)" + BEFORE/AFTER sa parent units (re-read parent stock). |
+| `Services/StockService.cs` (client) | `ConfirmReceiving`: linked child → credit ang PARENT (`qty×ratio`), trail sa parent. |
+| Versions | Client **1.1.70** (exe 211,539,388 B, sha256 C5CF4B79…); API **1.1.65**; latestVer 1.1.70. |
+
+### Deploy
+API publish → WinRM (stop→copy→start); web (index.html/components.js) → live wwwroot; client publish → `C:\dev\out\client` → drop `C:\JumongAPI\client\` + **GitHub release v1.1.70** (id 381210189, asset 211,539,388 B state=uploaded — GOTCHA: ang upload URL ay dapat **uploads.github.com**, hindi api.github.com — 404 kung mali). Stores update via UPDATE APP. **Verified live:** version 1.1.65; columns exist; master_product_units count 394 (hindi nagalaw ang existing units); Mismo/Fudgee stock_parent_id=0; payloads (list/single/download) may link fields; web live (Stock Link section + v=20260905 + linkSelect). GOTCHA re-learned: huwag i-`x-text` sa td na may ibang child elements (binubura ang badge) — i-`x-text` sa span sa loob.
+
+### Follow-up ops (same day): MILO CHOCO DRINK 24G → by-12 pack conversion (₱115/cost ₱105, zero units, Fudgee-style)
+
+User: "gagawin ko sana sila lahat ng tirang stock na by 12 tapos alisin ang unit bali ang maigiging new cost is 105 tapos and sell is 115". **Flow (reusable template para sa future conversions):** (1) master update via API PUT (audited — may row sa master_product_audit): price 115, cost 105, `units:[]` + `clearUnits:true` → burahin ang `dozen`/`box` rows, sell_online stays; (2) hintayin ang POS pull (~5-7 min) at i-verify sa HQ local na unitless na (para hindi mag-negative ang stock kung may benta habang qpu12 pa); (3) per store via agent `sql`: `UPDATE Products SET StockQty = StockQty/12` (lahat divisible — 372/348/1200/60) + conversion `StockTrail` (StockBefore, QuantityAdded=-(before-after), StockAfter, ref `MILO unit conversion pc→by-12 pack 2026-09-02`, User 'System', Synced 0 → auto-push). Result per store: HQ 31, HVR 29, Naic 100, ACGS 5. **Verified:** HQ/A80C pushed sa server (31/5 + cloud trails 435350/435351); AA36 (last sync 19:25) at E174 (18:47) ay may **saradong POS apps** (agents alive lang) — local converted na, server mirror + trails mag-a-update sa susunod na pagbukas ng POS. Punches now: 1 MILO = ₱115, −1 (pack); e-com ₱115/pack reserve 1.
+
+## Latest Change (2026-09-02) — MISMO UNITS FIX: bawas 1 per sale (qpu 1) + lahat ng POS trails na-reconcile + audit + editor race fixed (v1.1.64)
+
+**Request:** "WHY COKE ROYAL SPRITE MISMO BECOME HAVING UNIT FOR 1 PC NOW THE INVENTORY IN ALL SHOP HAVING DEDUCTION OF 12 INSTEAD OF ONLY 1" + "KATULAD KANINA DELETE KO NA MGA 1 PC NGAYON BUMALIK NAMAN — ANO YAN AUTO BALIK?" + "dapat maayos lahat ng pos trail". **Nawala ang unit sa dashboard** (units column empty — fixed in v1.1.63) at **−12 deductions** sa lahat ng stores mula 12:42 ngayon.
+
+### Root cause (buong kwento)
+
+1. Ang `GetMasterProducts` (dashboard list) ay **hindi nagbabalik ng `units`** simula sa v1.1.50 perf fix (40x faster via `?noImages=true`) — kaya ang Units column ay laging `—` (units "nawala sa dashboard"). **Fixed v1.1.63**: compact `units` array (unitName/price/qtyPerUnit/isDefault) via grouped query.
+2. Ang 3 Mismo products (114 Coke Mismo, 466 Royal Mismo, 514 Sprite Mismo — barcode `002`/`4801981118519`/`4801981118601`) ay na-restore ng units na `by 12` ₱196 qpu **12 DEFAULT** + `pc` ₱16.33 (=196÷12) noong ~Sept 1 gabi–Sept 2 07:13 (ecom order SHOP-20260902-0104 07:13 ay gumamit na ng `by 12` @196). Nang ma-pull ito ng POS (~12:41 HQ/ACGS), ang bawat punch 1 = **−12** (dati 4 na buwang `''`/qpu1 = −1). Ang **pc unit ay hindi auto-process** (walang code gumagawa nito; verified) at walang session ang nag-edit ng files (file mtimes) — galing sa isang save/helper na sumunod sa 39-item catalog convention (Kopiko pc ₱13 = 130÷10). Ang `master_products.updated_at` 13:24 = isang LATER overwrite save. **Ang "auto balik" = editor race + UNIT PROTECTION**: `openEditor` ay naglalagay munang `units: []` bago matapos ang fetch (components.js:589) → kung magbukas ang form nang walang units → empty save → protection keeps luma → mukhang bumabalik ang pc.
+3. **User decision (locked):** Mismo = single default unit `by 12` ₱196 **qpu 1** (bawas 1 per sale, gaya ng 4 na buwang takbo), **walang pc**. NOTE (ecom consequence): ang e-com Mismo order (₱196) ay magre-reserve ng **1 pc** lang (hindi 12) — in-accept ng user.
+
+### Ang mga ayos (v1.1.64)
+
+| File | Change |
+|---|---|
+| PostgreSQL (live, direct) | `master_product_units` para sa 114/466/514 → DELETE pc + single `by 12` ₱196 cost 193 **qpu 1 is_default=true** + bump `master_products.updated_at=NOW()` (17:20) → lahat ng POS auto-pull sa susunod na 5-min cycle. |
+| `JumongCloudAPI/Data/PgDatabaseHelper.cs` | Migration: **`master_product_audit`** table (id, product_id, name, action, units_json, ip, created_at) — kung sino/kelan/IP kada master save (create/update). |
+| `JumongCloudAPI/Controllers/DashboardController.cs` | **`SeedProductDto.ClearUnits`** (bool?) + `UpdateMasterProduct`: kung `ClearUnits=true` → DELETE lahat ng units; else kung may laman ang payload → **normalize SINGLE default** (wala → una; marami → una lang) + delete/insert; `InsertMasterAudit` helper (audit create + update, hindi nag-break sa save). Version → **"1.1.64"** (2 places; latestVer stays 1.1.69). |
+| `JumongCloudAPI/wwwroot/components.js` | **Editor race fixed** (`masterProducts.openEditor`): hintayin ang fetch bago buksan ang editor (walang premature `units: []`). **`clearUnits`** sa `productEditor.save()`: kung naalis lahat ng unit rows → `clearUnits:true` (para totoong mawala, hindi na i-keep ng protection). |
+| `JumongCloudAPI/wwwroot/index.html` | Cache-buster `?v=20260903` → `?v=20260904`. |
+
+### POS trail reconciliation (lahat ng stores — via agents, Synced=0 na-trail + auto-push)
+
+| Store | Local Id (002) | Bawas noon | Dapat | Na-restore | Trail |
+|---|---|---|---|---|---|
+| HQ (7159) | 5525 | 168 (14×12) | 14 | **+154** (198→352) | trail 101907 `Adjustment: Mismo qpu correction 2026-09-02` Synced=1 |
+| Naic (E174) | 114 | 96 (8×12) | 8 | **+88** (89→177) | cloud trail 434592 |
+| ACGS (A80C) | 116 | 12 (1×12) | 1 | **+11** (167→178) | cloud trail 434626 |
+| HVR (AA36) | 129 | 0 (hindi naapektuhan) | — | wala (10) | — |
+
+Per store: agent `sql` → `UPDATE Products SET StockQty=... WHERE Id=...` + `INSERT StockTrail` (+N, before/after, UserName 'System', Synced 0 → auto-push). Server `products` mirror verified (352/177/178/10) + cloud `stock_trails` 3 correction rows. GOTCHA (A80C): ang master id 116 = COLGATE, pero ang A80C LOCAL pos 116 = Coke Mismo (pos_id ≠ master id) — ang trail fix ay dapat i-target ang LOCAL product ng bawat store.
+
+**Verified live:** master units = by12@196 qpu1 (no pc) ×3; HQ/E174/A80C local `ProductUnits` = `by 12 196 1 1` (no pc); server products 352/177/178/10; cloud trails 154/88/11; **0 new qpu12 sales after 17:20**; API v1.1.64; audit table exists. **GOTCHA re-learned:** ang `master_product_units` ay walang created_at — dating units by product `updated_at`; ang POS incremental pull (`?since=`) ay nakadepende sa `master_products.updated_at` — kaya ang direct-SQL unit inserts (walang bump) ay hindi umaabot sa POS hangga't may isa pang save.
+
+## Latest Change (2026-09-01) — Dashboard Master Products IMAGE THUMBNAILS FIXED (direct URL loading, walang mismatched images) + ComfyUI Ecom workflow fixed + index.html mojibake restored
+
+**Requests:** (1) verify ComfyUI workflows for e-commerce images → user reported the `Ecommerce_Product_Photo` result made the product look "unano" (tiny); (2) upload image sa Master Catalog edit → save → "nothing save in master catalog" (list view); (3) "why in ecommerce the picture load in dashboard does not?" — **Lahat ng bug na ito ay na-fix at na-verify via headless Chrome (CDP)**.
+
+### ComfyUI (dev PC) — `Ecommerce_Product_Photo` workflow FIXED
+
+**Bug 1 (unano):** ang pipeline ay nagsi-scale ng BUONG frame (may transparent margins pa) sa 1024×1024 → maliit ang product sa gitna. **Bug 2:** `CropByMask` `.convert('RGB')` ay nag-drop ng ALPHA channel → bumalik ang background. **Bug 3:** `ImageCompositeHandleMask` ay nag-crash ng `UnboundLocalError: multiple` kapag `round_to_multiple=None` at nag-overflow ang handle box (line 305-307). **Bug 4:** ang node module ay naka-cache sa memory — kailangan i-purge ang `py/__pycache__` at i-restart bago mag-reflect ang edits.
+
+| File | Change |
+|---|---|
+| `ComfyUI_windows_portable/ComfyUI/user/default/workflows/Ecommerce_Product_Photo.json` | Rewritten pipeline: LoadImage → `RmBgUltra V2` (VITMatte — auto-downloads sa unang run) → `LayerUtility: CropByMask` (min_bounding_rect, reserve 20 — tanggalin ang espasyo) → `LayerUtility: ImageMaskScaleAs` (letterbox/lanczos, scale_as=white 1024 canvas — image+mask sabay, walang distortion) → `LayerUtility: ImageCompositeHandleMask` (layer_mask = scaled mask, x=50/y=50/scale=1.0) → SaveImage. Output: `output/ecom_product_*.png` (white bg, product ~94%×78% ng frame, dati 58%×51%). Backup: `Ecommerce_Product_Photo_v1_old.json`. |
+| `custom_nodes/ComfyUI_LayerStyle/py/image_composit_handle_mask.py` | `if round_to_multiple != 'None': ... else: multiple = 1` — fixes `UnboundLocalError` kapag ang handle box ay umo-overflow sa edge. |
+| `custom_nodes/ComfyUI_LayerStyle/py/crop_by_mask.py` | `_canvas = tensor2pil(l_images[i]).convert('RGB')` → keep RGBA kung may alpha (`if _canvas.mode != 'RGBA': _canvas = _canvas.convert('RGB')`) — hindi na nawawala ang transparency. |
+| — | GOTCHA: ang `Ecommerce_Product_Photo.json` ay gumagamit ng `detail_method="VITMatte"` — ang model ay wala sa disk nung una (auto-download ~1GB sa unang run, naka-cache sa `models/vitmatte/`); `RMBG-1.4/model.pth` ang fallback base mask. Ang ComfyUI ay dapat i-launch na may `PYTHONIOENCODING=utf-8` + `PYTHONUTF8=1` kapag nagre-redirect ng output sa log file (kung hindi, mag-crash sa emoji print: `UnicodeEncodeError: 'charmap' codec can't encode '\U0001f63a'`). |
+
+### Dashboard Master Products thumbnails — direct URL + IO loader (web + API)
+
+**Root cause ng "sira lahat / iba iba ang image":** ang lumang `loadThumb`/`watchThumbs` ay nag-fetch ng buong product JSON (base64 600KB each) per row na may **sticky cache bug** — at pagkatapos i-render ng Alpine (search/filter/pagination), ang `<img>` elements ay nire-reuse ng `x-for :key="i"` → **stale src = maling image sa maling item** (verified via CDP: search "Marlboro" → 294 showed image ng product 431!). Ang e-commerce (shop.html) ay gumagamit ng direct image URL → kaya doon gumagana.
+
+| File | Change |
+|---|---|
+| `JumongCloudAPI/Controllers/DashboardController.cs` (`ProductImage`) | **MIME fix**: hindi na laging `image/jpeg` — detect mula sa `data:` prefix (png/webp/gif). **No-image fix**: imbes na 404, mag-return ng **1x1 transparent PNG** (70 bytes, `Cache-Control: max-age=86400`) → walang console noise, IMG placeholder pa rin ang lalabas (ang transparent img ay nasa likod ng span). |
+| `JumongCloudAPI/wwwroot/index.html` (masterTable image cell) | `<td class="px-3 py-2 text-center relative">` na may `<span>IMG</span>` placeholder + `<img data-pimg="1" :data-pid="x.id" onerror="this.style.display='none'" class="absolute inset-0 m-auto w-8 h-8 object-cover rounded">` — **direct URL** sa `/api/dashboard/product-image/{id}`, hindi na base64 JSON. |
+| `JumongCloudAPI/wwwroot/components.js` | **Bagong global loader** `watchProductImages()`: IO-gated (IntersectionObserver rootMargin 400px) + near-viewport direct scan; `_pimgSet(img)` ay **pid-aware** (`dataset.src !== '/api/dashboard/product-image/' + pid` → reset `style.display=''` + set src) — **fix sa mismatched images** pagkatapos ng re-render; **global MutationObserver** sa `document.body` (hindi lang sa init-time table — kung section='dashboard' sa start, walang `#masterTable` → hindi mag-attach ang lumang per-component observer!) → i-re-scan ang lahat ng imgs sa bawat DOM change; scroll listener + alpine:init trigger. Tinanggal: `watchThumbs`/`loadThumb`/`thumbs` state/`_thumbObs`/`_thumbScrollBound`. |
+| `JumongCloudAPI/wwwroot/components.js` (masterProducts) | Data init: dagdag `hqStockByBc: {}, hqStockByName: {}` — **fix sa `TypeError: Cannot read properties of undefined (reading '<barcode>')`** sa TOTAL STOCK/SERVER STOCK columns (ang `hqStock(x)` ay nagbabasa ng `this.hqStockByBc[barcode]` bago pa matapos ang async `loadTotals()`). |
+| `JumongCloudAPI/wwwroot/index.html` | Cache-buster `?v=20260827` → `?v=20260903` (components.js + app.js). |
+
+**Verified via headless Chrome (CDP, test token `headless-test-20260901/2` sa `whapp_tokens` user_pos_id=15):** (1) after load → 135 imgs agad; scroll → 327 loaded; Marlboro 294 `complete:true naturalWidth:1024` ✓; (2) **search "Marlboro" → 4 rows, bawat isa tama ang src (294/295/296/297), `mismatched=0`** ✓ (pre-fix: 294 nagpakita ng product 431's image!); (3) walang-image products → 200 1x1 PNG (70B) hindi na 404 ✓. Test token deleted + test products cleaned.
+
+**CRISIS + LESSON (mojibake):** habang binubump ang cache-buster, ginamit ko ang PowerShell `Set-Content -NoNewline -Encoding UTF8` sa index.html → **na-corrupt ang LAHAT ng emoji** (Get-Content -Raw default ANSI read → mojibake → naka-save). User: "hindi ok dat symbol ngayon character". **Fix:** `git checkout -- JumongCloudAPI/wwwroot/index.html` (restore from fcd7f1f) + re-apply ang image cell + cache-buster edits via **Edit tool lang** (safe sa UTF-8). **LESSON re-confirmed: HUWAG kailanman gumamit ng PowerShell Get-Content/Set-Content sa mga UTF-8 file na may emoji — Edit tool lang.** Note: ang `Invoke-WebRequest .Content` ay nag-decode ng UTF-8 bilang latin-1 → false-positive mojibake sa verify; gamitin `RawContentStream` + `Encoding.UTF8.GetString(bytes)`.
+
+**HQ agent ERROR badge** (naka-paste ng user): `[2026-09-01 18:36:48] FetchPromoMessage` ×3 — galing sa API service restart (stop→copy→start) sa oras na iyon; transient, auto-clears pagkatapos ng 1 hour window. Not a bug.
+
+## Previous Change (2026-09-01) — v1.1.69 (POS client + API): END-SHIFT RECONCILIATION SIGN FIX (wala nang phantom SHORT) + E-COMMERCE SA END SHIFT + lahat ng 4 stores na-update
 
 **Request:** "fix rteconcilation and the ecomerce should be part in hq endshift" + "update all pos version and shutdown the pc after" — ang INVENTORY RECONCILIATION ay nagpakita ng phantom SHORT ₱1,059,739.94 sa HQ kahit updated na (1.1.68) — **root cause: sign bug** — ang reworked `DailyCloseService.GetShiftTotals()` ay nagbabalik ng NEGATIVE `adjustDown` (`SUM(Cost × QuantityAdded)` sa `QuantityAdded < 0`), pero ang formula ay `expected = ... - adjustDown` → MINUS ng negative = **nag-ADD** ng adjustments pabalik → Expected inflated ng 2×|adjustDown| → SHORT. Verified live: Transfer −520,332.70 + Ecom −3,268.96 + local ≈ −529,870 × 2 = 1,059,739.94 (exact match). Pangalawang bug: `SyncService.GetEndShiftSnapshot()` ay tumatawag ng `/dashboard/dashboard/end-shift-snapshot` (DOUBLE prefix) → 404 → CHANNEL BREAKDOWN (SERVER) section NEVER nag-render → e-commerce hindi lumalabas sa end-shift (bug mula pa sa v1.1.41/v1.1.50 — API endpoint verified via curl sa tamang path, pero client URL double-prefixed mula day one, silent null).
 

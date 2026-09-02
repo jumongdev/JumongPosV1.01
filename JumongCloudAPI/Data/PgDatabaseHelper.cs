@@ -423,6 +423,16 @@ public static class PgDatabaseHelper
                 is_default BOOLEAN NOT NULL DEFAULT FALSE
             );
             CREATE INDEX IF NOT EXISTS idx_master_product_units_product_id ON master_product_units(product_id);
+            CREATE TABLE IF NOT EXISTS master_product_audit (
+                id BIGSERIAL PRIMARY KEY,
+                product_id INTEGER NOT NULL DEFAULT 0,
+                name TEXT NOT NULL DEFAULT '',
+                action TEXT NOT NULL DEFAULT '',
+                units_json TEXT NOT NULL DEFAULT '',
+                ip TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS idx_master_product_audit_product ON master_product_audit (product_id);
         ";
         masterCmd.ExecuteNonQuery();
 
@@ -1105,6 +1115,9 @@ public static class PgDatabaseHelper
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
             ALTER TABLE master_products ADD COLUMN IF NOT EXISTS online_price NUMERIC NOT NULL DEFAULT 0;
+            ALTER TABLE master_products ADD COLUMN IF NOT EXISTS stock_parent_id INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE master_products ADD COLUMN IF NOT EXISTS link_ratio NUMERIC NOT NULL DEFAULT 1;
+            CREATE INDEX IF NOT EXISTS idx_master_products_stock_parent ON master_products (stock_parent_id);
             CREATE TABLE IF NOT EXISTS payment_qrs (
                 id SERIAL PRIMARY KEY,
                 header TEXT NOT NULL DEFAULT '',

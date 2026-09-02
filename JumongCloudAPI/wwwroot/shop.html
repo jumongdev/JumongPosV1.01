@@ -336,12 +336,11 @@ let activeCat = 'all';
 let activeGroup = 'all';
 let searchQ = '';
 let member = false;
-let me = { name: '', phone: '', email: '', isSariSari: false, applicationStatus: 'none' };
+let me = { name: '', phone: '', email: '' };
 let myAddresses = [];
 let myFavs = new Set();
 let favOnly = false;
 let subdivisions = [];
-let isSariSari = false;
 let promoBanners = [];
 let promoPointsRate = 200;
 let detailUnit = null;
@@ -517,21 +516,11 @@ function defUnit(p) {
   return u.find(x => x.isDefault) || u[0] || null;
 }
 
-// Resolved price for the customer (online_price applies to regular members on the default unit)
+// Resolved price para sa member (wala nang tier — lahat ay presyo ng unit/product)
 function unitPrice(p, u) {
-  const base = u ? Number(u.price) : Number(p.price || 0);
-  if (!member || isSariSari || !p.onlinePrice) return base;
-  const op = Number(p.onlinePrice);
-  const isDef = !u || u.isDefault;
-  return (isDef && op > 0) ? op : base;
+  return u ? Number(u.price) : Number(p.price || 0);
 }
-function onlineSavings(p, u) {
-  const base = u ? Number(u.price) : Number(p.price || 0);
-  if (!member || isSariSari || !p.onlinePrice) return 0;
-  const op = Number(p.onlinePrice);
-  const isDef = !u || u.isDefault;
-  return (isDef && op > 0 && op < base) ? Math.round((base - op) * 100) / 100 : 0;
-}
+function onlineSavings(p, u) { return 0; }
 
 function stockOf(p) { return Number(p.hqStock || 0); }
 function inCartQty(id) { return cart.filter(c => c.id === id).reduce((s, c) => s + c.qty, 0); }
@@ -591,7 +580,6 @@ async function loadCatalog() {
   if (cached) {
     catalog = cached.items || cached;
     member = member || !!(cached.member);
-    isSariSari = !!(cached.isSariSari);
     categories = [...new Set(catalog.map(p => p.category).filter(Boolean))].sort((a, b) => String(a).toLowerCase().localeCompare(String(b).toLowerCase()));
     renderChips();
     renderGrid();
@@ -603,8 +591,7 @@ async function loadCatalog() {
     const j = await r.json();
     catalog = j.items || [];
     member = !!j.member;
-    isSariSari = !!j.isSariSari;
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), items: catalog, member, isSariSari })); } catch (e) { /* storage full - ignore */ }
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), items: catalog, member })); } catch (e) { /* storage full - ignore */ }
     categories = [...new Set(catalog.map(p => p.category).filter(Boolean))].sort((a, b) => String(a).toLowerCase().localeCompare(String(b).toLowerCase()));
     renderChips();
     renderGrid();
@@ -958,26 +945,25 @@ function renderGrid() {
   if (!list.length) { g.innerHTML = ''; return; }
   g.innerHTML = list.map(p => {
     let u = defUnit(p);
-    if (isSariSari && gridUnitSel[p.id]) {
+    if (member && gridUnitSel[p.id]) {
       const gs = (p.units || []).find(x => x.unitName === gridUnitSel[p.id]);
       if (gs) u = gs;
     }
     const price = member ? unitPrice(p, u) : null;
-    const origPrice = member && !isSariSari && p.onlinePrice ? Number(u ? u.price : p.price) : null;
     const save = onlineSavings(p, u);
-    const unit = u ? u.unitName : 'PC';
+    const unit = u ? u.unitName : '';
     const avail = stockOf(p);
     const need = (u && u.qtyPerUnit > 1 ? u.qtyPerUnit : 1);
     const soldOut = avail < need;
     const mono = (p.name || '?').trim().charAt(0).toUpperCase();
-    const unitChipsRow = isSariSari && (p.units || []).length > 1
+    const unitChipsRow = member && (p.units || []).length > 1
       ? '<div class="mt-1.5 flex gap-1 flex-wrap">' + (p.units || []).map(x =>
           '<button onclick="event.stopPropagation();pickGridUnit(' + p.id + ',\'' + escH(x.unitName) + '\')" class="shrink-0 text-[9px] font-bold px-2 py-0.5 rounded-md border transition active:scale-95 ' + (u && u.unitName === x.unitName ? 'bg-violet-700 text-white border-violet-700' : 'bg-white text-stone-500 border-gray-200 hover:border-violet-400') + '">' + escH(x.unitName) + ' ' + fmt(Number(x.price)) + '</button>').join('') + '</div>'
       : '';
     const priceBlock = member
       ? '<div class="min-w-0">' +
           '<p class="font-black text-violet-700 text-[15px] leading-tight">' + fmt(price) + '</p>' +
-          (save > 0 ? '<p class="text-[10px] text-stone-400"><span class="line-through-x">' + fmt(origPrice) + '</span> <span class="text-emerald-600 font-black">SAVE ' + fmt(save) + '</span></p>' : '<p class="text-[10px] text-stone-400">per ' + unit + '</p>') +
+          (unit ? '<p class="text-[10px] text-stone-400">per ' + unit + '</p>' : '') +
         '</div>'
       : '<div><p class="font-extrabold text-stone-900 text-sm leading-tight">—</p><p class="text-[10px] text-stone-400">🔒 <span class="text-violet-700 font-bold">Sign in</span> to see price</p></div>';
     return '<div class="rounded-2xl bg-white overflow-hidden card-shadow flex flex-col hover:shadow-lg transition cursor-pointer active:scale-[.98]" onclick="openDetail(' + p.id + ')">' +
@@ -986,7 +972,7 @@ function renderGrid() {
         '<img data-lazy="' + p.id + '" class="opacity-0 absolute inset-0 w-full h-full object-cover" loading="lazy" alt="">' +
         '<div class="absolute top-1.5 right-1.5 z-10">' + favBtnHtml(p.id) + '</div>' +
         '<div class="absolute top-2 left-2 flex flex-col gap-1 z-10">' +
-          (save > 0 ? '<span class="bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded-md shadow">SAVE ' + fmt(save) + '</span>' : '') +
+          '' +
         '</div>' +
         (soldOut ? '<div class="absolute inset-0 bg-black/55 flex items-center justify-center"><span class="bg-white text-stone-900 text-[10px] font-black tracking-wider px-3 py-1.5 rounded-lg">OUT OF STOCK</span></div>' : '') +
         (member && !soldOut ? '<button onclick="event.stopPropagation();addToCart(' + p.id + ')" class="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-violet-700 hover:bg-violet-800 text-white shadow-lg flex items-center justify-center active:scale-90 transition z-10" aria-label="Add to cart"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg></button>' : '') +
@@ -1066,18 +1052,17 @@ async function openDetail(id) {
       data = (full && full.imageData) || '';
       imgCache[id] = data;
       applyImg(id, data);
-      if (member && full && typeof full.isSariSari === 'boolean') isSariSari = full.isSariSari;
     } catch (e) { data = ''; }
   }
   const units = (p.units || []);
   const defaultU = defUnit(p);
-  const usable = isSariSari ? units : (defaultU ? [defaultU] : []);
+  const usable = units.length ? units : (defaultU ? [defaultU] : []);
   const keepU = detailUnit && usable.some(x => x.unitName === detailUnit.unitName) ? detailUnit : null;
   detailUnit = keepU || (usable.find(x => x.isDefault) || usable[0] || null);
   const u = detailUnit;
   const price = member ? unitPrice(p, u) : null;
   const save = onlineSavings(p, u);
-  const unit = u ? u.unitName : 'PC';
+  const unit = u ? u.unitName : '';
   const need = (u && u.qtyPerUnit > 1 ? u.qtyPerUnit : 1);
   const avail = Math.floor(stockOf(p) / need);
   const soldOut = avail < 1;
@@ -1096,10 +1081,34 @@ async function openDetail(id) {
         (member ? '<p class="text-[10px] font-extrabold text-stone-900 mt-0.5">' + fmt(sprice) + '</p>' : '') +
       '</button>';
     }).join('') + '</div></div>' : '';
+  // STOCK LINK family: parent + siblings + children (iwas duplicate, hindi kasama ang sarili)
+  const fam = [];
+  if (p.stockParentId) { const par = catalog.find(x => x.id === p.stockParentId); if (par) fam.push(par); }
+  catalog.forEach(x => {
+    if (x.id === id) return;
+    const rel = (p.stockParentId && x.stockParentId === p.stockParentId) || x.stockParentId === p.id;
+    if (rel && !fam.some(f => f.id === x.id)) fam.push(x);
+  });
+  const linkHtml = fam.length ? '<div class="mt-5">' +
+    '<p class="text-xs font-black text-stone-500 uppercase tracking-wide mb-2">📦 Ibang laki / packaging</p>' +
+    '<div class="grid grid-cols-3 gap-2">' + fam.map(s => {
+      const su = defUnit(s);
+      const sprice = member ? unitPrice(s, su) : null;
+      const sSoldOut = stockOf(s) < 1;
+      return '<button onclick="closeDetail();openDetail(' + s.id + ')" class="rounded-xl bg-gray-50 p-2 text-left transition active:scale-95">' +
+        '<div class="aspect-square rounded-lg bg-gray-50 relative overflow-hidden">' +
+          '<div class="w-full h-full mono-tile flex items-center justify-center text-white font-black text-xl" data-mono="' + s.id + '">' + (s.name || '?').trim().charAt(0).toUpperCase() + '</div>' +
+          '<img data-lazy="' + s.id + '" class="opacity-0 absolute inset-0 w-full h-full object-cover" loading="lazy" alt="">' +
+          (sSoldOut ? '<div class="absolute inset-0 bg-black/55 flex items-center justify-center"><span class="bg-white text-stone-900 text-[10px] font-black tracking-wider px-3 py-1.5 rounded-lg">OUT OF STOCK</span></div>' : '') +
+        '</div>' +
+        '<p class="text-[10px] font-semibold text-stone-700 clamp2 mt-1">' + s.name + '</p>' +
+        (member ? '<p class="text-[10px] font-extrabold text-stone-900 mt-0.5">' + fmt(sprice) + '</p>' : '') +
+      '</button>';
+    }).join('') + '</div></div>' : '';
   const unitChips = (usable.length > 1)
     ? '<div class="flex gap-1.5 flex-wrap mt-3">' + usable.map(x =>
         '<button onclick="selectUnit(\'' + escH(x.unitName) + '\')" class="text-[11px] font-bold px-3 py-1.5 rounded-full border transition ' + (detailUnit && detailUnit.unitName === x.unitName ? 'bg-violet-700 text-white border-violet-700' : 'bg-white text-stone-600 border-gray-200') + '">' + escH(x.unitName) + ' · ' + fmt(Number(x.price)) + '</button>').join('') + '</div>'
-    : (isSariSari ? '<p class="text-[10px] text-stone-400 mt-2">Wholesale price: ' + fmt(Number(p.price)) + '</p>' : '');
+    : '';
   const body = document.getElementById('detailBody');
   body.innerHTML =
     '<div class="relative aspect-square bg-gray-100 rounded-t-3xl overflow-hidden">' +
@@ -1114,7 +1123,7 @@ async function openDetail(id) {
         '<button onclick="event.stopPropagation();toggleFav(' + p.id + ', event)" class="w-9 h-9 shrink-0 rounded-full flex items-center justify-center shadow transition active:scale-90 ' + (myFavs.has(p.id) ? 'bg-red-500 text-white' : 'bg-white text-stone-400 hover:text-red-500') + '" aria-label="Favorite">' + (myFavs.has(p.id) ? '❤️' : '🤍') + '</button>' +
       '</div>' +
       (member
-        ? '<p class="text-sm text-stone-500 mt-2"><span class="font-black text-violet-700 text-lg">' + fmt(price) + '</span> <span class="text-stone-400">per ' + unit + '</span>' + (save > 0 ? ' <span class="text-[10px] text-stone-400"><span class="line-through-x">' + fmt(Number(u ? u.price : p.price)) + '</span> <span class="text-emerald-600 font-black">SAVE ' + fmt(save) + '</span></span>' : '') + '</p>'
+        ? '<p class="text-sm text-stone-500 mt-2"><span class="font-black text-violet-700 text-lg">' + fmt(price) + '</span>' + (unit ? ' <span class="text-stone-400">per ' + unit + '</span>' : '') + '</p>'
         : '<button onclick="event.stopPropagation();signIn()" class="mt-3 w-full border-2 border-violet-700 text-violet-700 font-bold rounded-2xl py-3 text-sm transition active:scale-[.98]">🔒 SIGN IN WITH GOOGLE TO SEE PRICES</button>') +
       unitChips +
       (p.barcode ? '<p class="text-[11px] text-stone-400 mt-1">Barcode: ' + p.barcode + '</p>' : '') +
@@ -1124,6 +1133,7 @@ async function openDetail(id) {
             ? '<button onclick="event.stopPropagation();requestRestock(' + p.id + ')" class="mt-4 w-full bg-stone-800 hover:bg-stone-900 text-white font-bold rounded-2xl py-3.5 text-sm transition active:scale-[.98]">🔔 NOTIFY ME WHEN BACK IN STOCK</button>'
             : '<button onclick="event.stopPropagation();addToCart(' + p.id + ')" class="mt-4 w-full bg-violet-700 hover:bg-violet-800 text-white font-bold rounded-2xl py-3.5 text-sm transition active:scale-[.98]">ADD TO CART</button>')
         : '') +
+      linkHtml +
       suggHtml +
     '</div>';
   document.getElementById('detailModal').classList.remove('hidden');
@@ -1194,7 +1204,7 @@ function addToCart(id) {
   if (!p) return;
   let u = defUnit(p);
   if (detailUnit && openDetailId === id) { u = detailUnit; }
-  else if (isSariSari && gridUnitSel[id]) { const gs = (p.units || []).find(x => x.unitName === gridUnitSel[id]); if (gs) u = gs; }
+  else if (member && gridUnitSel[id]) { const gs = (p.units || []).find(x => x.unitName === gridUnitSel[id]); if (gs) u = gs; }
   const need = (u && u.qtyPerUnit > 1 ? u.qtyPerUnit : 1);
   const avail = Math.floor(stockOf(p) / need);
   const inCart = inCartQty(id);
@@ -1411,12 +1421,12 @@ function renderCart() {
     if (!p) return '';
     const u = c.price ? { unitName: c.unitName || 'PC', price: c.price } : defUnit(p);
     const price = Number(u.price);
-    const unit = u.unitName || 'PC';
+    const unit = u.unitName || '';
     return '<div class="flex gap-3 py-3 border-b border-gray-100 last:border-0">' +
       '<div class="w-14 h-14 rounded-xl bg-gray-100 mono-tile flex items-center justify-center text-white font-black text-lg shrink-0" data-mono2="' + p.id + '">' + (p.name || '?').trim().charAt(0).toUpperCase() + '</div>' +
       '<div class="flex-1 min-w-0">' +
         '<p class="text-[13px] font-semibold text-stone-800 clamp2 leading-snug">' + p.name + '</p>' +
-        '<p class="text-xs text-stone-400 mt-0.5">' + fmt(price) + ' × ' + c.qty + ' ' + unit + '</p>' +
+        '<p class="text-xs text-stone-400 mt-0.5">' + fmt(price) + ' × ' + c.qty + (unit ? ' ' + unit : '') + '</p>' +
       '</div>' +
       '<div class="flex flex-col items-end justify-between">' +
         '<button onclick="setQty(' + p.id + ', 0)" class="text-stone-300 hover:text-red-500 text-xs font-bold">✕</button>' +
@@ -1822,33 +1832,15 @@ switchView(sessionStorage.getItem('shop_view') === 'catalog' ? 'catalog' : 'home
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
 }
-// sari-sari status heartbeat - a just-approved store gets ALL units on the next open
-// without needing a page refresh (updates in-memory flag + re-renders only on change)
-setInterval(async () => {
-  if (!member) return;
-  try {
-    const r = await fetchT(API + '/dashboard/customer/me', {}, 8000);
-    if (!r.ok) return;
-    const j = await r.json();
-    const fresh = !!(j.me && j.me.isSariSari);
-    if (fresh !== isSariSari) {
-      isSariSari = fresh;
-      renderChips();
-      renderGrid();
-      if (openDetailId != null) openDetail(openDetailId);
-    }
-  } catch (e) {}
-}, 45000);
 
 // ─── MEMBER / PROFILE (Google Sign-In) ───────────────
 async function loadMe() {
   try {
     const r = await fetchT(API + '/dashboard/customer/me', {}, 10000);
-    if (r.status === 401) { member = false; isSariSari = false; applyMemberUI(); return; }
+    if (r.status === 401) { member = false; applyMemberUI(); return; }
     const j = await r.json();
     member = true;
     me = j.me || me;
-    isSariSari = !!(me.isSariSari);
     myAddresses = j.addresses || [];
     const b = document.getElementById('userBadge');
     if (b) b.classList.remove('hidden');
@@ -2003,11 +1995,10 @@ async function renderProfile() {
     qrBox.innerHTML = '<p class="text-[10px] text-stone-400 text-center">Mag-register online para makakuha ng QR at mag-earn ng points</p>';
   }
   const st = document.getElementById('pfSariStatus');
-  const stMap = { none: ['Retail customer', 'bg-gray-100 text-gray-600'], pending: ['Sari-Sari Store application pending', 'bg-amber-100 text-amber-700'], approved: ['Sari-Sari Store member', 'bg-emerald-100 text-emerald-700'], rejected: ['Application rejected - apply again', 'bg-red-100 text-red-700'] };
-  const [label, cls] = stMap[me.applicationStatus] || stMap.none;
+  const [label, cls] = ['Retail customer', 'bg-gray-100 text-gray-600'];
   st.textContent = label;
   st.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full ' + cls;
-  document.getElementById('sariApplyBox').classList.toggle('hidden', me.applicationStatus === 'approved' || me.applicationStatus === 'pending');
+  document.getElementById('sariApplyBox').classList.add('hidden');
   const wrap = document.getElementById('addrList');
   const addrLine = a => {
     const parts = [];
@@ -2104,27 +2095,10 @@ async function delAddr(id) {
     await loadMe();
   } catch (e) { toast(e.message, 'error'); }
 }
-async function applySariSari() {
-  const store = document.getElementById('ssStore').value.trim();
-  const file = document.getElementById('ssDti').files[0];
-  if (!store) return toast('Enter your store name', 'error');
-  if (!file) return toast('I-upload ang DTI o larawan ng harap ng tindahan', 'error');
-  const fd = new FormData();
-  fd.append('storeName', store);
-  fd.append('dtiFile', file);
-  try {
-    const r = await fetchT(API + '/dashboard/customer/sari-sari/apply', { method: 'POST', body: fd }, 30000);
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.error || 'Apply failed');
-    toast('Application submitted! Hinihintay na ang approval.');
-    me.applicationStatus = 'pending';
-    renderProfile();
-  } catch (e) { toast('Apply failed: ' + e.message, 'error'); }
-}
 async function doLogout() {
   try { await fetchT(API + '/dashboard/customer/logout', { method: 'POST' }, 10000); } catch (e) {}
   member = false;
-  me = { name: '', phone: '', email: '', isSariSari: false, applicationStatus: 'none' };
+  me = { name: '', phone: '', email: '' };
   myAddresses = [];
   const b = document.getElementById('userBadge'); if (b) b.classList.add('hidden');
   closeProfile();
@@ -2187,18 +2161,6 @@ if (window.visualViewport) {
           <button onclick="loadOrders()" class="text-xs font-bold text-violet-700">REFRESH</button>
         </div>
         <div id="orderList" class="space-y-2"></div>
-      </div>
-      <div>
-        <div class="flex items-center justify-between mb-2">
-          <p class="text-xs font-bold text-stone-500">SARI-SARI STORE</p>
-          <span id="pfSariStatus" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600"></span>
-        </div>
-        <div id="sariApplyBox" class="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 space-y-2.5">
-          <p class="text-[11px] text-amber-800 leading-relaxed">Mag-apply bilang Sari-Sari Store para sa wholesale/bulk rates. I-upload ang <b>DTI</b> kung meron, o <b>larawan ng harap ng iyong tindahan</b> (kung walang DTI).</p>
-          <input id="ssStore" type="text" placeholder="Store name" class="w-full border border-amber-300 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-500/40">
-          <input id="ssDti" type="file" accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full text-xs text-stone-500">
-          <button onclick="applySariSari()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl py-3 text-sm transition">SUBMIT APPLICATION</button>
-        </div>
       </div>
       <button onclick="doLogout()" class="w-full border-2 border-red-200 text-red-500 font-bold rounded-xl py-3 text-sm hover:bg-red-50 transition">SIGN OUT</button>
     </div>
