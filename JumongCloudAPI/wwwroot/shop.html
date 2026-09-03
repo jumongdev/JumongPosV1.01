@@ -100,7 +100,7 @@
   .feed-snap::-webkit-scrollbar { display: none; }
   .feed-post { position: relative; height: calc(100vh - 104px); scroll-snap-align: start; overflow: hidden; background: #1c1330; }
   @supports (height: 100dvh) { .feed-post { height: calc(100dvh - 104px); } }
-  .feed-post img.feed-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .feed-post img.feed-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
   .feed-post::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 45%; background: linear-gradient(to top, rgba(12,8,28,.82), transparent); pointer-events: none; }
   .feed-grad { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
   .feed-grad span { font-size: 60px; }
@@ -112,6 +112,8 @@
   .feed-name { font-size: 13px; font-weight: 900; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
   .feed-badge { font-size: 9px; font-weight: 800; color: #e9d5ff; margin-top: 2px; text-transform: uppercase; letter-spacing: .08em; }
   .feed-text { font-size: 12.5px; color: #fff; margin-top: 6px; line-height: 1.45; max-height: 3.6em; overflow: hidden; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+  .feed-text.feed-open { max-height: none; overflow: visible; }
+  .feed-more { margin-top: 3px; font-size: 10px; font-weight: 800; color: #e9d5ff; background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline; }
   .feed-link { margin-top: 8px; background: rgba(255,255,255,.95); border-radius: 12px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; }
   .feed-link span { font-size: 11px; font-weight: 700; color: #1c1330; }
   .feed-link .feed-link-go { font-size: 10px; font-weight: 900; color: #6d28d9; white-space: nowrap; }
@@ -1033,6 +1035,7 @@ async function openDetail(id) {
           '<div class="w-full h-full mono-tile flex items-center justify-center text-white font-black text-xl" data-mono="' + s.id + '">' + (s.name || '?').trim().charAt(0).toUpperCase() + '</div>' +
           '<img data-lazy="' + s.id + '" class="opacity-0 absolute inset-0 w-full h-full object-cover" loading="lazy" alt="">' +
           (sSoldOut ? '<div class="absolute inset-0 bg-black/55 flex items-center justify-center"><span class="bg-white text-stone-900 text-[10px] font-black tracking-wider px-3 py-1.5 rounded-lg">OUT OF STOCK</span></div>' : '') +
+          (member && !sSoldOut ? '<button onclick="event.stopPropagation();addToCart(' + s.id + ')" class="absolute bottom-1 right-1 w-7 h-7 rounded-full bg-violet-700 hover:bg-violet-800 text-white shadow flex items-center justify-center active:scale-90" aria-label="Add to cart"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14"/></svg></button>' : '') +
         '</div>' +
         '<p class="text-[10px] font-semibold text-stone-700 clamp2 mt-1">' + s.name + '</p>' +
         (member ? '<p class="text-[10px] font-extrabold text-stone-900 mt-0.5">' + fmt(sprice) + '</p>' : '') +
@@ -1863,6 +1866,8 @@ function feedCard(p, i) {
   const noImg = p.imageUrl
     ? '<img class="feed-img" src="' + p.imageUrl + '" alt="post">'
     : '<div class="feed-grad" style="background:' + grad + '"><span>📷</span></div>';
+  const txt = (p.text || '').trim();
+  const longTxt = txt.length > 140;
   return '<div class="feed-post" data-fp="' + p.id + '">' +
     noImg +
     '<div class="feed-rail">' +
@@ -1872,10 +1877,17 @@ function feedCard(p, i) {
     '<div class="feed-caption">' +
       '<p class="feed-name">🏪 ' + escH(p.posterName || 'Andengs Superstore') + '</p>' +
       '<p class="feed-badge">' + (p.kind === 'promo' ? '🎁 PROMO' : '📢 UPDATE') + ' · ' + timeAgo(p.createdAt) + '</p>' +
-      (p.text ? '<p class="feed-text">' + escH(p.text) + '</p>' : '') +
+      (txt ? '<p class="feed-text' + (longTxt ? '' : '') + '" id="ftext' + p.id + '">' + escH(txt) + '</p>' + (longTxt ? '<button class="feed-more" id="fmore' + p.id + '" onclick="feedToggleText(' + p.id + ')">Tingnan pa ▾</button>' : '') : '') +
       (p.linkType ? '<div class="feed-link" onclick="feedOpenLink(' + i + ')"><span id="flink' + p.id + '">🔗 ' + p.linkType + '</span><span class="feed-link-go">TINGNAN →</span></div>' : '') +
     '</div>' +
   '</div>';
+}
+function feedToggleText(id) {
+  const el = document.getElementById('ftext' + id);
+  const btn = document.getElementById('fmore' + id);
+  if (!el) return;
+  const open = el.classList.toggle('feed-open');
+  if (btn) btn.textContent = open ? 'Itago ▴' : 'Tingnan pa ▾';
 }
 function timeAgo(iso) {
   try {
@@ -1895,7 +1907,12 @@ async function fillFeedProduct(i, p) {
     await ensureCatalogLoaded();
     const it = catalog.find(x => x.id === Number(p.linkValue));
     const el = document.getElementById('flink' + p.id);
-    if (el && it) el.textContent = '📦 ' + it.name + ' · ₱' + (Number(it.price) || 0).toFixed(2);
+    if (el && it) {
+      const pr = member ? (Number(it.price) || 0) : null;
+      el.textContent = member
+        ? '📦 ' + it.name + ' · ₱' + pr.toFixed(2)
+        : '📦 ' + it.name + ' · 🔒 Sign in';
+    }
     else if (el) el.textContent = '🔗 item #' + p.linkValue;
   } catch (e) { }
 }
