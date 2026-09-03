@@ -93,11 +93,6 @@
     <div id="feedSentinel"></div>
   </div>
 
-  <!-- PROMO CHIPS (orderable promos — above bottom nav) -->
-  <div id="feedPromoBar" class="hidden fixed left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-stone-100 px-3 py-2" style="bottom:56px">
-    <div id="feedPromoChips" class="flex gap-2 overflow-x-auto scrollbar-hide"></div>
-  </div>
-
   <!-- LEGACY HOME BLOCKS (nakatago — iniingatan para sa JS refs: banners/promo-groups/FB posts) -->
   <div id="legacyHome" class="hidden">
     <!-- ===== BANNER CAROUSEL ===== -->
@@ -242,46 +237,6 @@
 </div>
 </div><!-- /memberShop -->
 </div><!-- /catalogView -->
-
-<!-- ===== ABOUT / WHY US ===== -->
-<section id="aboutSec" class="max-w-6xl mx-auto px-4 mt-10">
-  <div class="rounded-2xl bg-white card-shadow p-6">
-    <p class="font-black text-stone-900 mb-1.5">Why Shop With Andengs?</p>
-    <p class="text-sm text-stone-600 leading-relaxed" id="aboutText">Andengs Superstore is a trusted local supermarket serving households and sari-sari stores with authentic products, fast delivery and easy pickup.</p>
-    <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-stone-600">
-      <p class="flex gap-2"><span>🚚</span><span id="coverageText">We deliver around the Naic area - message us to confirm your barangay.</span></p>
-      <p class="flex gap-2"><span>🏪</span><span id="addressText">Andengs Superstore, Naic, Cavite</span></p>
-      <p class="flex gap-2"><span>📞</span><span id="phoneText">09943398072</span></p>
-    </div>
-  </div>
-</section>
-
-<!-- ===== FOOTER ===== -->
-<footer id="siteFooter" class="bg-stone-900 text-stone-300 mt-10">
-  <div class="max-w-6xl mx-auto px-4 py-10 grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
-    <div>
-      <p class="font-black text-white mb-2">Andengs Superstore</p>
-      <p class="text-xs text-stone-400">Kumpletong groceries para sa bahay at negosyo.</p>
-    </div>
-    <div>
-      <p class="font-bold text-white mb-2">SHOP</p>
-      <a href="#" onclick="scrollToShop()" class="block text-xs py-1 hover:text-white">All Products</a>
-      <a href="#" onclick="scrollToShop()" class="block text-xs py-1 hover:text-white">Categories</a>
-      <a href="#" onclick="scrollToShop()" class="block text-xs py-1 hover:text-white">Wholesale Bundles</a>
-    </div>
-    <div>
-      <p class="font-bold text-white mb-2">HELP</p>
-      <a href="#" onclick="openProfile()" class="block text-xs py-1 hover:text-white">Track Order</a>
-      <a href="#" onclick="openCart()" class="block text-xs py-1 hover:text-white">My Cart</a>
-      <a href="#" onclick="scrollToShop()" class="block text-xs py-1 hover:text-white">How to Order</a>
-    </div>
-    <div>
-      <p class="font-bold text-white mb-2">CONTACT</p>
-      <p class="text-xs py-1 text-stone-400" id="phoneText2"></p>
-    </div>
-  </div>
-  <div class="border-t border-stone-800 py-4 text-center text-xs text-stone-500">Andengs Superstore • Online Shop • Naic, Cavite</div>
-</footer>
 
 <!-- ===== CART DRAWER ===== -->
 <div id="cartOverlay" class="hidden fixed inset-0 z-50 bg-black/50 anim-in" onclick="closeCart()"></div>
@@ -820,30 +775,19 @@ function renderPromoGroups() {
   const row = document.getElementById('promoGroupsRow');
   const sec = document.getElementById('promoSection');
   if (!row || !sec) return;
-  if (!promoGroups.length) { sec.classList.add('hidden'); }
-  else {
-    sec.classList.remove('hidden');
-    row.innerHTML = promoGroups.map(g => {
-      const free = catalog.find(x => x.id === g.freeProductId);
-      const items = (g.items || []).map(x => x.name).filter(Boolean).slice(0, 3);
-      return '<button onclick="promoClick(' + g.id + ')" class="w-full text-left rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white p-4 card-shadow active:scale-[.98] transition">' +
-        '<p class="text-[10px] font-black uppercase tracking-widest text-white/70">🎁 Promo</p>' +
-        '<p class="font-black text-base mt-1">' + escH(g.name) + '</p>' +
-        '<p class="text-[11px] text-white/85 mt-1">Bumili ng ' + g.buyQty + ' pcs (kahit anong combo ng: ' + escH(items.join(' + ')) + ')</p>' +
-        '<div class="mt-2 rounded-xl bg-white/15 px-3 py-2"><p class="text-[11px] font-bold">🎉 GET ' + g.freeQty + ' FREE: ' + escH(free ? free.name : '') + '</p></div>' +
-        '<span class="inline-block mt-3 text-[11px] font-black bg-white text-violet-700 rounded-full px-4 py-1.5">PUMILI NG PRODUCT →</span>' +
-      '</button>';
-    }).join('');
-  }
-  // chips bar (orderable promos above bottom nav)
-  const bar = document.getElementById('feedPromoBar');
-  const chips = document.getElementById('feedPromoChips');
-  if (bar && chips) {
-    if (!promoGroups.length) { bar.classList.add('hidden'); return; }
-    bar.classList.remove('hidden');
-    chips.innerHTML = promoGroups.map(g =>
-      '<button onclick="promoClick(' + g.id + ')" class="shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-[10px] font-black shadow">🎁 ' + escH(g.name) + '</button>').join('');
-  }
+  if (!promoGroups.length) { sec.classList.add('hidden'); return; }
+  sec.classList.remove('hidden');
+  row.innerHTML = promoGroups.map(g => {
+    const free = catalog.find(x => x.id === g.freeProductId);
+    const items = (g.items || []).map(x => x.name).filter(Boolean).slice(0, 3);
+    return '<button onclick="promoClick(' + g.id + ')" class="w-full text-left rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white p-4 card-shadow active:scale-[.98] transition">' +
+      '<p class="text-[10px] font-black uppercase tracking-widest text-white/70">🎁 Promo</p>' +
+      '<p class="font-black text-base mt-1">' + escH(g.name) + '</p>' +
+      '<p class="text-[11px] text-white/85 mt-1">Bumili ng ' + g.buyQty + ' pcs (kahit anong combo ng: ' + escH(items.join(' + ')) + ')</p>' +
+      '<div class="mt-2 rounded-xl bg-white/15 px-3 py-2"><p class="text-[11px] font-bold">🎉 GET ' + g.freeQty + ' FREE: ' + escH(free ? free.name : '') + '</p></div>' +
+      '<span class="inline-block mt-3 text-[11px] font-black bg-white text-violet-700 rounded-full px-4 py-1.5">PUMILI NG PRODUCT →</span>' +
+    '</button>';
+  }).join('');
 }
 let promoOrderGroup = null;
 let promoOrderItems = [];
@@ -1428,11 +1372,6 @@ function switchView(v) {
   home.classList.toggle('hidden', v !== 'home');
   cat.classList.toggle('hidden', v !== 'catalog');
   if (sr) sr.classList.toggle('hidden', v !== 'catalog');
-  // About + footer: Home view lang (sagabal sa catalog scroll)
-  const ab = document.getElementById('aboutSec');
-  const ft = document.getElementById('siteFooter');
-  if (ab) ab.classList.toggle('hidden', v !== 'home');
-  if (ft) ft.classList.toggle('hidden', v !== 'home');
   if (v === 'catalog') watchImages();
   window.scrollTo({ top: 0 });
 }

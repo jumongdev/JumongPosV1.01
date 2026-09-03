@@ -2184,8 +2184,7 @@ Alpine.store('app', {
       const byId = this.prods.find(x => String(x.id) === q);
       if (byId) { this.pbSyncTarget(); return; }
       const byName = this.prods.find(x => String(x.name).toLowerCase() === q.toLowerCase());
-      if (byName) { this.form.prodQ = String(byName.id); this.pbSyncTarget(); return; }
-      this.form.prodQ = '';
+      this.form.prodQ = byName ? String(byName.id) : this.form.prodQ;
       this.pbSyncTarget();
     },
     pbSample() {
@@ -2210,6 +2209,13 @@ Alpine.store('app', {
     async save() {
       if (!this.form.id && !this.form.file) { toast('Mag-upload ng image para sa bagong banner (o gamitin ang edit)', 'error'); return; }
       if (this.form.targetType === 'category' && !this.form.targetValue) { toast('Pumili ng kategorya (at opsiyonal na salain)', 'error'); return; }
+      if (this.form.targetType === 'product') {
+        const q = String(this.form.prodQ || '').trim();
+        const m = this.prods.find(x => String(x.name).toLowerCase() === q.toLowerCase());
+        if (m) this.form.prodQ = String(m.id);
+        this.pbSyncTarget();
+        if (!this.form.targetValue) { toast('Piliin ang produkto sa listahan (i-type at i-click ang lalabas)', 'error'); return; }
+      }
       this.saving = true; this.msg = '';
       try {
         const fd = new FormData();
@@ -2315,11 +2321,9 @@ Alpine.data('shopContentPanel', () => ({
     fbProdPicked(p) {
       const q = String(p.prodQ || '').trim();
       const byId = this.fbProds.find(x => String(x.id) === q);
-      if (byId) { this.fbPostCompose(p); return; }
+      if (byId) { p.ctaTargetValue = String(byId.id); return; }
       const byName = this.fbProds.find(x => String(x.name).toLowerCase() === q.toLowerCase());
-      if (byName) { p.prodQ = String(byName.id); this.fbPostCompose(p); return; }
-      p.prodQ = '';
-      this.fbPostCompose(p);
+      p.ctaTargetValue = byName ? String(byName.id) : '';
     },
     fbProdName(p) {
       const x = this.fbProds.find(a => String(a.id) === String(p.ctaTargetValue || '').trim());
@@ -2461,13 +2465,12 @@ Alpine.data('shopContentPanel', () => ({
       return list.slice(0, 12);
     },
     prodPicked() {
+      // huwag i-clear ang input habang nagta-type — i-save lang ang value kapag may buong match (id o exact name)
       const q = String(this.f.linkProdQ || '').trim();
       const byId = this.prods.find(x => String(x.id) === q);
-      if (byId) { this.linkChanged(); return; }
+      if (byId) { this.f.linkValue = String(byId.id); return; }
       const byName = this.prods.find(x => String(x.name).toLowerCase() === q.toLowerCase());
-      if (byName) { this.f.linkProdQ = String(byName.id); this.linkChanged(); return; }
-      this.f.linkProdQ = '';
-      this.linkChanged();
+      this.f.linkValue = byName ? String(byName.id) : '';
     },
     async save() {
       if (!this.f.text.trim() && !this.f.image) { toast('Maglagay ng text o larawan', 'error'); return; }
@@ -2477,6 +2480,15 @@ Alpine.data('shopContentPanel', () => ({
         fd.append('kind', this.f.kind);
         fd.append('text', this.f.text);
         this.linkChanged();
+        if (this.f.linkType === 'product') {
+          const q = String(this.f.linkProdQ || '').trim();
+          if (!this.f.linkValue) {
+            const m = this.prods.find(x => String(x.name).toLowerCase() === q.toLowerCase());
+            if (m) this.f.linkValue = String(m.id);
+          }
+          if (!this.f.linkValue) { toast('Piliin ang produkto sa listahan (i-type at i-click ang lalabas)', 'error'); this.saving = false; return; }
+          this.f.linkProdQ = this.f.linkValue;
+        }
         fd.append('linkType', this.f.linkType || '');
         fd.append('linkValue', this.f.linkValue || '');
         if (this.f.image) {
