@@ -2171,9 +2171,12 @@ Alpine.store('app', {
     }
   }));
 
-  Alpine.data('shopContentPanel', () => ({
+Alpine.data('shopContentPanel', () => ({
     c: {}, loaded: false, saving: false, suggestions: [],
-    async init() { await this.load(); await this.loadSuggestions(); },
+    fbTarget: 'Wala', fbCat: '', fbSearch: '', fbProd: '', fbProdQ: '', fbUrl: '',
+    fbCats: [], fbProds: [], fbProdLoading: false,
+    subRows: [], subAdd: '',
+    async init() { await this.load(); await this.loadSuggestions(); await this.loadFbLists(); },
     fields: [
       { k: 'hero_title', label: 'Hero Title', g: 'HERO', t: 'text' },
       { k: 'hero_subtitle', label: 'Hero Subtitle', g: 'HERO', t: 'textarea' },
@@ -2192,16 +2195,18 @@ Alpine.store('app', {
       { k: 'phone', label: 'Phone Number', g: 'CONTACT / ABOUT', t: 'text' },
       { k: 'messenger_link', label: 'Messenger Link (m.me/...)', g: 'CONTACT / ABOUT', t: 'text' },
       { k: 'facebook_link', label: 'Facebook Link', g: 'CONTACT / ABOUT', t: 'text' },
-      { k: 'about_text', label: 'About Us Text', g: 'CONTACT / ABOUT', t: 'textarea' },
-      { k: 'subdivisions', label: 'Subdivisions (isang subdivision bawat linya — para sa locked picker)', g: 'DELIVERY', t: 'textarea' },
-      { k: 'fb_embed_home', label: 'Facebook Post Embed (Home) — i-paste ang buong <iframe> code (FB post → ⋯ → Embed → Get Code)', g: 'FACEBOOK', t: 'textarea', rows: 6 },
-      { k: 'fb_cta_label', label: 'Button Text (sa ilalim ng post; blangko = walang button)', g: 'FACEBOOK', t: 'text' },
-      { k: 'fb_cta_target_type', label: 'Target ng Button', g: 'FACEBOOK', t: 'select', options: ['Wala', 'Product', 'Category', 'URL'] },
-      { k: 'fb_cta_target_value', label: 'Target Value — Product: Product ID (hal. 310) · Category: category|search (hal. powdered drink|milo choco) · URL: buong link', g: 'FACEBOOK', t: 'text' }
+      { k: 'about_text', label: 'About Us Text', g: 'CONTACT / ABOUT', t: 'textarea' }
     ],
-    get groups() { return ['HERO', 'WHOLESALE', 'TRUST BADGES', 'CONTACT / ABOUT', 'DELIVERY', 'FACEBOOK'] },
+    get groups() { return ['HERO', 'WHOLESALE', 'TRUST BADGES', 'CONTACT / ABOUT'] },
     async load() {
       try { this.c = await fetchJSON(API + '/shop/content'); this.loaded = true; } catch (e) { this.loaded = false; }
+      this.fbTarget = this.c.fb_cta_target_type || 'Wala';
+      const v = String(this.c.fb_cta_target_value || '');
+      const tl = String(this.fbTarget).toLowerCase();
+      if (tl === 'category') { const p = v.split('|'); this.fbCat = (p[0] || '').trim(); this.fbSearch = (p[1] || '').trim(); }
+      else if (tl === 'product') { this.fbProd = v.trim(); this.fbProdQ = v.trim(); }
+      else if (tl === 'url') this.fbUrl = v.trim();
+      this.subRows = String(this.c.subdivisions || '').split('\n').map(s => s.trim()).filter(Boolean);
     },
     async loadSuggestions() {
       try { this.suggestions = await fetchJSON(API + '/subdivision-suggestions?status=pending'); } catch (e) { this.suggestions = []; }
@@ -2220,9 +2225,68 @@ Alpine.store('app', {
         await this.loadSuggestions();
       } catch (e) { toast(e.message || 'Failed', 'error'); }
     },
+    async loadFbLists() {
+      try { const r = await fetchJSON(API + '/shop/categories'); this.fbCats = r.categories || []; } catch (e) { this.fbCats = []; }
+    },
+    async ensureFbProds() {
+      if (this.fbProds.length || this.fbProdLoading) return;
+      this.fbProdLoading = true;
+      try {
+        const r = await fetchJSON(API + '/shop/catalog?withImages=false');
+        this.fbProds = (r.items || []).map(p => ({ id: p.id, name: p.name, price: p.price }));
+      } catch (e) { this.fbProds = []; }
+      this.fbProdLoading = false;
+    },
+    get fbProdFiltered() {
+      if (!this.fbProds.length) return [];
+      const q = String(this.fbProdQ || '').trim().toLowerCase();
+      const list = q ? this.fbProds.filter(p => String(p.name).toLowerCase().includes(q)) : this.fbProds;
+      return list.slice(0, 12);
+    },
+    fbProdName() {
+      const p = this.fbProds.find(x => String(x.id) === String(this.fbProd));
+      return p ? p.name + ' — ₱' + (Number(p.price) || 0).toFixed(2) : (this.fbProd ? 'Product #' + this.fbProd : '');
+    },
+    fbProdQChanged() {
+      const q = String(this.fbProdQ || '').trim();
+      const byId = this.fbProds.find(p => String(p.id) === q);
+      if (byId) { this.fbProd = String(byId.id); this.composeFb(); return; }
+      const byName = this.fbProds.find(p => String(p.name).toLowerCase() === q.toLowerCase());
+      if (byName) { this.fbProd = String(byName.id); this.fbProdQ = String(byName.id); this.composeFb(); return; }
+      this.fbProd = '';
+    },
+    fbTargetChanged() { this.composeFb(); },
+    fbCatChanged() { this.composeFb(); },
+    fbSearchChanged() { this.composeFb(); },
+    fbUrlChanged() { this.composeFb(); },
+    composeFb() {
+      this.c.fb_cta_target_type = this.fbTarget;
+      const tl = String(this.fbTarget).toLowerCase();
+      if (tl === 'wala' || !tl) this.c.fb_cta_target_value = '';
+      else if (tl === 'category') this.c.fb_cta_target_value = [this.fbCat, this.fbSearch].filter(Boolean).join('|');
+      else if (tl === 'product') this.c.fb_cta_target_value = String(this.fbProd || '').trim();
+      else if (tl === 'url') this.c.fb_cta_target_value = String(this.fbUrl || '').trim();
+    },
+    subAddRow() {
+      const n = String(this.subAdd || '').trim();
+      if (!n) return;
+      if (this.subRows.some(x => x.toLowerCase() === n.toLowerCase())) { toast('Duplicate na — nasa listahan na ang "' + n + '"', 'error'); return; }
+      this.subRows.push(n);
+      this.subAdd = '';
+    },
+    subDelRow(i) { this.subRows.splice(i, 1); },
+    subDedupe() {
+      const seen = new Set(); const out = [];
+      this.subRows.forEach(x => { const k = x.toLowerCase(); if (!seen.has(k)) { seen.add(k); out.push(x); } });
+      this.subRows = out;
+      toast('Naalis ang mga duplicate — ' + this.subRows.length + ' natira');
+    },
+    subSort() { this.subRows.sort((a, b) => String(a).toLowerCase().localeCompare(String(b).toLowerCase())); },
     async save() {
       this.saving = true;
       try {
+        this.c.subdivisions = this.subRows.join('\n');
+        this.composeFb();
         const r = await fetchJSON(API + '/shop-content', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.c)
         });
