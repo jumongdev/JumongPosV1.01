@@ -95,13 +95,10 @@
   </div>
 </section>
 
-<!-- ===== FACEBOOK POST EMBED (dashboard-controlled) ===== -->
+<!-- ===== FACEBOOK POSTS (dashboard-controlled, multi) ===== -->
 <section id="fbHomeSection" class="hidden max-w-6xl mx-auto px-4 mt-4">
   <div class="rounded-3xl overflow-hidden card-shadow bg-white">
-    <div id="fbHomeWrap" class="flex justify-center overflow-x-auto p-1 sm:p-2"></div>
-    <div class="px-4 pb-4 flex justify-center">
-      <button id="fbCtaBtn" onclick="fbCtaClick()" class="hidden mt-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white text-sm font-black shadow-lg active:scale-95 transition"></button>
-    </div>
+    <div id="fbHomeWrap" class="flex flex-col"></div>
   </div>
 </section>
 <style>#fbHomeWrap iframe { max-width: 100%; }</style>
@@ -373,7 +370,7 @@ const CONTENT_DEFAULTS = {
   messenger_link: 'https://m.me/jumongdev',
   facebook_link: 'https://facebook.com/jumongdev',
   about_text: 'Andengs Superstore is a trusted local supermarket serving households and sari-sari stores with authentic products, fast delivery and easy pickup.',
-  fb_embed_home: '', fb_cta_label: '', fb_cta_target_type: 'Wala', fb_cta_target_value: ''
+  fb_embed_home: '', fb_cta_label: '', fb_cta_target_type: 'Wala', fb_cta_target_value: '', fb_posts: ''
 };
 let shopContent = Object.assign({}, CONTENT_DEFAULTS);
 
@@ -411,21 +408,45 @@ function applyContent() {
   fillSubdivisionSelects();
   document.querySelectorAll('[data-msg]').forEach(a => a.href = shopContent.messenger_link || '#');
   const fb = document.getElementById('fbLink'); if (fb) fb.href = shopContent.facebook_link || '#';
-  // Facebook post embed (home) + CTA button
-  const fbCode = String(shopContent.fb_embed_home || '').trim();
+  // Facebook posts (home) — multi-post list + CTA buttons
+  const posts = parseFbPosts();
   const fbSec = document.getElementById('fbHomeSection');
   const fbWrap = document.getElementById('fbHomeWrap');
   if (fbSec && fbWrap) {
-    if (fbCode) { fbWrap.innerHTML = fbCode; fbSec.classList.remove('hidden'); }
-    else { fbWrap.innerHTML = ''; fbSec.classList.add('hidden'); }
+    if (posts.length) {
+      fbWrap.innerHTML = posts.map((p, i) =>
+        '<div class="flex flex-col items-center">' +
+          '<div class="w-full max-w-[500px] flex justify-center overflow-x-auto p-1 sm:p-2">' + fbEmbedHtml(p.code) + '</div>' +
+          (String(p.ctaLabel || '').trim() && String(p.ctaTargetType || '').toLowerCase() !== 'wala'
+            ? '<button onclick="fbCtaClick(' + i + ')" class="mt-1 mb-4 px-6 py-3 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white text-sm font-black shadow-lg active:scale-95 transition">' + escH(p.ctaLabel) + '</button>'
+            : '') +
+        '</div>').join('');
+      fbSec.classList.remove('hidden');
+    } else {
+      fbWrap.innerHTML = '';
+      fbSec.classList.add('hidden');
+    }
   }
-  const fbBtn = document.getElementById('fbCtaBtn');
-  if (fbBtn) {
-    const lbl = String(shopContent.fb_cta_label || '').trim();
-    const t = String(shopContent.fb_cta_target_type || '').toLowerCase();
-    if (lbl && t !== 'wala' && t !== '') { fbBtn.textContent = lbl; fbBtn.classList.remove('hidden'); }
-    else fbBtn.classList.add('hidden');
+}
+function parseFbPosts() {
+  const raw = String(shopContent.fb_posts || '').trim();
+  if (raw) {
+    try {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return arr.filter(p => p && String(p.code || '').trim());
+    } catch (e) { /* fallback below */ }
   }
+  const legacy = String(shopContent.fb_embed_home || '').trim();
+  if (legacy) return [{ code: legacy, ctaLabel: shopContent.fb_cta_label || '', ctaTargetType: shopContent.fb_cta_target_type || 'Wala', ctaTargetValue: shopContent.fb_cta_target_value || '' }];
+  return [];
+}
+function fbEmbedHtml(code) {
+  const c = String(code || '');
+  const ifr = (c.match(/<iframe[^>]*src="[^"]*plugins\/post\.php[^"]*"[^>]*>/i) || [])[0];
+  if (ifr) return ifr;
+  const href = (c.match(/data-href="([^"]+)"/i) || [])[1];
+  if (href) return '<iframe src="https://www.facebook.com/plugins/post.php?href=' + encodeURIComponent(href) + '&show_text=true&width=500" width="500" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowfullscreen="true" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>';
+  return '<p class="text-xs text-stone-400 text-center py-4">FB embed code — hindi mabasa. I-paste ang buong &lt;iframe&gt; code.</p>';
 }
 
 function fillSubdivisionSelects() {
@@ -1996,9 +2017,12 @@ function bannerClick(id) {
     document.getElementById('shop').scrollIntoView({ behavior: 'smooth' });
   }
 }
-function fbCtaClick() {
-  const t = String(shopContent.fb_cta_target_type || '').toLowerCase();
-  const v = String(shopContent.fb_cta_target_value || '').trim();
+function fbCtaClick(i) {
+  const posts = parseFbPosts();
+  const p = posts[i];
+  if (!p) return;
+  const t = String(p.ctaTargetType || '').toLowerCase();
+  const v = String(p.ctaTargetValue || '').trim();
   if (t === 'wala' || t === '' || !v) return;
   if (t === 'url') { window.location = v; return; }
   if (t === 'product') {

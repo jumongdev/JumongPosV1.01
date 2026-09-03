@@ -2306,61 +2306,83 @@ tailwind.config = {
           </div>
         </div>
 
-        <!-- FB POST SA HOME (dashboard-controlled Facebook embed + CTA) -->
+        <!-- FB POSTS SA HOME (multi-post: add / preview / delete) -->
         <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
-          <div class="px-4 py-2.5 border-b border-gray-100 dark:border-[#222255] bg-gray-50 dark:bg-[#0d0d25]/50">
-            <h4 class="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">📘 FB POST SA HOME</h4>
+          <div class="px-4 py-2.5 border-b border-gray-100 dark:border-[#222255] bg-gray-50 dark:bg-[#0d0d25]/50 flex items-center justify-between">
+            <h4 class="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">📘 FB POSTS SA HOME <span x-show="fbPosts.length" class="ml-1 px-1.5 py-0.5 rounded-full bg-blue-600 text-white text-[9px]" x-text="fbPosts.length"></span></h4>
+            <button @click="fbAddPost()" class="text-[10px] px-2.5 py-1.5 rounded bg-blue-600 text-white font-bold hover:bg-blue-700">➕ ADD ANOTHER POST</button>
           </div>
-          <div class="p-4 space-y-3">
-            <div>
-              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Embed code — i-paste ang buong &lt;iframe&gt; (FB post → ⋯ → Embed → Get Code)</label>
-              <textarea x-model="c.fb_embed_home" rows="6" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200 font-mono"></textarea>
-            </div>
-            <div>
-              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Button text (sa ilalim ng post; blangko = walang button)</label>
-              <input x-model="c.fb_cta_label" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-            </div>
-            <div>
-              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Saan ituturo ang button</label>
-              <select x-model="fbTarget" @change="fbTargetChanged()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                <option>Wala</option>
-                <option>Product</option>
-                <option>Category</option>
-                <option>URL</option>
-              </select>
-            </div>
-            <template x-if="fbTarget === 'Category'">
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Kategorya</label>
-                  <select x-model="fbCat" @change="fbCatChanged()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                    <option value="">-- Piliin ang kategorya --</option>
-                    <template x-for="cat in fbCats" :key="cat"><option :value="cat" x-text="cat"></option></template>
-                  </select>
+          <div class="p-4 space-y-4">
+            <template x-for="(p, i) in fbPosts" :key="i">
+              <div class="border border-gray-200 dark:border-[#222255] rounded-xl p-3 space-y-2">
+                <div class="flex items-center justify-between">
+                  <p class="text-[11px] font-bold text-gray-500 dark:text-[#7878aa]" x-text="'POST ' + (i + 1)"></p>
+                  <button @click="fbDelPost(i)" class="text-[10px] px-2 py-1 rounded bg-red-500/10 text-red-500 hover:bg-red-500/20">✕ DELETE</button>
                 </div>
                 <div>
-                  <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Salain (opsyonal — hal. milo)</label>
-                  <input x-model="fbSearch" @input="fbSearchChanged()" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                  <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Embed code (i-paste ang buong &lt;iframe&gt; — FB post → ⋯ → Embed → Get Code)</label>
+                  <textarea x-model="p.code" rows="4" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200 font-mono" placeholder="&lt;iframe src=&quot;https://www.facebook.com/plugins/post.php?...&quot;&gt;"></textarea>
                 </div>
+                <template x-if="String(p.code || '').trim()">
+                  <div>
+                    <p class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">🖼️ Preview (ganito sa home — auto-fit sa phone):</p>
+                    <div class="border border-gray-200 dark:border-[#222255] rounded-lg p-1 bg-gray-50 dark:bg-[#0d0d25]/50 overflow-x-auto">
+                      <div class="w-[500px] max-w-full mx-auto" x-html="fbPreviewHtml(p.code)"></div>
+                    </div>
+                  </div>
+                </template>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Button text (sa ilalim ng post; blangko = walang button)</label>
+                    <input x-model="p.ctaLabel" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                  </div>
+                  <div>
+                    <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Saan ituturo ang button</label>
+                    <select x-model="p.ctaTargetType" @change="fbPostTargetChanged(p)" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                      <option>Wala</option>
+                      <option>Product</option>
+                      <option>Category</option>
+                      <option>URL</option>
+                    </select>
+                  </div>
+                </div>
+                <template x-if="p.ctaTargetType === 'Category'">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Kategorya</label>
+                      <select x-model="p.cat" @change="fbPostTargetChanged(p)" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                        <option value="">-- Piliin ang kategorya --</option>
+                        <template x-for="cat in fbCats" :key="cat"><option :value="cat" x-text="cat"></option></template>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Salain (opsyonal — hal. milo)</label>
+                      <input x-model="p.search" @input="fbPostTargetChanged(p)" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                    </div>
+                  </div>
+                </template>
+                <template x-if="p.ctaTargetType === 'Product'">
+                  <div>
+                    <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Produkto (type-to-search — piliin sa listahan)</label>
+                    <input x-model="p.prodQ" @focus="ensureFbProds()" @input="fbProdPicked(p)" list="fbProdsList" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                    <datalist id="fbProdsList">
+                      <template x-for="x in fbProdsFor(p)" :key="x.id"><option :value="String(x.id)" x-text="x.name"></option></template>
+                    </datalist>
+                    <p class="text-[10px] text-gray-400 dark:text-[#7878aa] mt-1" x-text="fbProdName(p)"></p>
+                  </div>
+                </template>
+                <template x-if="p.ctaTargetType === 'URL'">
+                  <div>
+                    <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Link</label>
+                    <input x-model="p.url" @input="fbPostTargetChanged(p)" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                  </div>
+                </template>
               </div>
             </template>
-            <template x-if="fbTarget === 'Product'">
-              <div>
-                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Produkto (type-to-search — piliin sa listahan)</label>
-                <input x-model="fbProdQ" @focus="ensureFbProds()" @input="fbProdQChanged()" list="fbProdsList" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                <datalist id="fbProdsList">
-                  <template x-for="p in fbProdFiltered" :key="p.id"><option :value="String(p.id)" x-text="p.name"></option></template>
-                </datalist>
-                <p class="text-[10px] text-gray-400 dark:text-[#7878aa] mt-1" x-text="fbProdName()"></p>
-              </div>
+            <template x-if="fbPosts.length === 0">
+              <p class="text-xs text-gray-400 dark:text-[#7878aa] text-center py-4">Wala pang FB post — i-click ang ➕ ADD ANOTHER POST</p>
             </template>
-            <template x-if="fbTarget === 'URL'">
-              <div>
-                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Link</label>
-                <input x-model="fbUrl" @input="fbUrlChanged()" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-              </div>
-            </template>
-            <p class="text-[10px] text-gray-400 dark:text-[#7878aa]">Resulta: ang post + button ay lalabas sa home ng shop (ibaba ng banner carousel). Guest → sign-in muna bago ma-click ang target.</p>
+            <p class="text-[10px] text-gray-400 dark:text-[#7878aa]">Pagkatapos magdagdag/mag-edit: 💾 SAVE ALL → lalabas sa home ng shop (ibaba ng banner carousel, isa-isa). Guest → sign-in muna bago ma-click ang target.</p>
           </div>
         </div>
 
@@ -2501,17 +2523,60 @@ tailwind.config = {
             </div>
             <div>
               <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Target Type</label>
-              <select x-model="form.targetType" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+              <select x-model="form.targetType" @change="pbTargetChanged()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
                 <option value="category">Category (may optional search)</option>
-                <option value="product">Product (ID)</option>
+                <option value="product">Product</option>
                 <option value="url">URL</option>
                 <option value="register">Register (Sign-in)</option>
               </select>
             </div>
-            <div>
-              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1" x-text="form.targetType === 'category' ? 'Category | search (hal. alcohol|CLVB)' : form.targetType === 'product' ? 'Product ID' : form.targetType === 'url' ? 'URL' : '(walang value)'"></label>
-              <input x-model="form.targetValue" type="text" placeholder="hal. alcohol|CLVB" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-            </div>
+            <template x-if="form.targetType === 'category'">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Kategorya</label>
+                  <select x-model="form.cat" @change="pbTargetChanged()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                    <option value="">-- Piliin ang kategorya --</option>
+                    <template x-for="cat in cats" :key="cat"><option :value="cat" x-text="cat"></option></template>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Salain (opsyonal — hal. CLVB)</label>
+                  <input x-model="form.search" @input="pbTargetChanged()" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                </div>
+              </div>
+            </template>
+            <template x-if="form.targetType === 'product'">
+              <div>
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Produkto (type-to-search — piliin sa listahan)</label>
+                <input x-model="form.prodQ" @focus="pbEnsureProds()" @input="pbProdPicked()" list="pbProdsList" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                <datalist id="pbProdsList">
+                  <template x-for="x in pbProdFiltered" :key="x.id"><option :value="String(x.id)" x-text="x.name"></option></template>
+                </datalist>
+              </div>
+            </template>
+            <template x-if="form.targetType === 'url'">
+              <div>
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">URL</label>
+                <input x-model="form.url" @input="pbTargetChanged()" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+              </div>
+            </template>
+            <template x-if="form.targetType === 'register'">
+              <div class="sm:col-span-2">
+                <p class="text-[11px] text-gray-500 dark:text-[#7878aa]">Ang banner ay magbubukas ng Google Sign-in (para sa mga guest).</p>
+              </div>
+            </template>
+            <template x-if="form.targetType !== 'register'">
+              <div class="sm:col-span-2">
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">🎯 SAMPLE — kung saan landing ang banner:</label>
+                <div class="rounded-lg bg-gray-50 dark:bg-[#0d0d25]/50 border border-gray-200 dark:border-[#222255] p-2 max-h-32 overflow-y-auto">
+                  <template x-if="pbSample() === null"><p class="text-[10px] text-gray-400">(i-load ang listahan — i-click ang target field)</p></template>
+                  <template x-if="pbSample() && pbSample().length === 0"><p class="text-[10px] text-gray-400">Walang tutugma sa target na ito</p></template>
+                  <template x-for="(s, si) in (pbSample() || [])" :key="si">
+                    <p class="text-[11px] text-gray-600 dark:text-slate-300 truncate"><span x-text="(si + 1) + '. ' + s.name"></span><span x-text="s.price != null ? ' — ₱' + Number(s.price).toFixed(2) : ''"></span></p>
+                  </template>
+                </div>
+              </div>
+            </template>
             <div>
               <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Sort Order</label>
               <input x-model.number="form.sortOrder" type="number" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
@@ -3580,8 +3645,8 @@ tailwind.config = {
 
   </div><!-- /main content -->
 
-  <script src="components.js?v=20260908"></script>
-  <script src="app.js?v=20260908"></script>
+  <script src="components.js?v=20260909"></script>
+  <script src="app.js?v=20260909"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script>
   /* ── Web login gating (username + PIN, WEB ACCESS only) ── */
