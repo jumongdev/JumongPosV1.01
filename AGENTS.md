@@ -18,6 +18,8 @@ Child "GINEBRA SAN MIGUEL GIN ROUND 350ML by 24" (barcode placeholder, linked→
 
 **Verified live:** v1.1.69 · inventory-value 4 stores OK (HQ 715 items — child excluded) · WhGetProducts hq → 5953 `stockParentId 211, stockParentStock 8146` · HQ local 8146/0 · master 722 active, cost 1608, linked 211. **Panuntunan (locked):** linked child = stock laging 0 + cost = parent×ratio (naka-lock) + price = user input; unlinked = sariling cost/count (walang pagbabago).
 
+**Follow-up same day (Ginebra duplicate discovered):** ang +4,800 na na-corrector ko ay **DUPLICATE** — may +4,800 na pala noong Sep 2 19:30 (`RECV-20260902-193057 | rto`) na direktang receive sa GINEBRA ROUND (parehong 200 boxes). User: "nag add na kagabi add ulit?" → **REVERTED**: parent 8145 → **3,345** (−4,800, reversal trail pos_id<0 `Ginebra correction revert - duplicate ng RECV-20260902-193057 2026-09-03`), child 0 nanatili. HQ local auto-apply (trail 102553, Synced=1, stock 3345 ✓). Cloud trail 436726 (−4,800). **Lesson: bago mag-correction, i-check muna kung may nakaraang receive ng parehong dami (RECV history ng parent) — ang 200-box receive ay 2× na-enter (diretso kagabi + sa box kanina).**
+
 ## Latest Change (2026-09-02) — STOCK LINK Phase 2: MOBILE (whapp) link-aware + profile popup hotfix + sari-sari tier removal (v1.1.68 API)
 
 **Requests:** (1) mobile receiving ng linked child (MILO BOX) ay dapat pumasok sa PARENT (20 box = +840 sa MILO by-12), hindi sa sariling row; (2) profile popup nawala para sa mga walang address/mobile (renderProfile crash); (3) sari-sari tier removal (pang-kalahatan na e-commerce). **Phase 1 (POS client + ecom reserve)** = nasa nakaraang entry; ito ang Phase 2.
