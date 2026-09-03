@@ -1460,7 +1460,13 @@
       return ' = ' + whole + ' ' + lb + (whole === 1 ? '' : 's') + (s % q ? ' + ' + s % q + ' pcs' : '');
     }
     function stockText(p) {
-      const s = Number(p && p.stockQty) || 0;
+      const s = Number(effectiveStock(p)) || 0;
+      if (Number(p && p.stockParentId) > 0) {
+        const ratio = Math.max(1, Number(p.linkRatio) || 1);
+        return s <= 0
+          ? '<span class="text-red-400 font-bold">OUT OF STOCK (parent ' + (Number(p.stockParentStock) || 0) + ' ÷ ' + ratio + ' = 0)</span>'
+          : 'Available: ' + s + ' <span class="text-cyan-400">(parent ' + (Number(p.stockParentStock) || 0) + ' ÷ ' + ratio + ')</span>';
+      }
       if (s <= 0) return '<span class="text-red-400 font-bold">OUT OF STOCK (0 pcs)</span>';
       return 'Stock: ' + s + ' pcs' + boxesText(s, unitBoxQty(p), unitBoxLabel(p));
     }
@@ -1475,7 +1481,7 @@
         const data = await r.json();
         box.innerHTML = '';
         (data || []).filter(p => p.isActive !== false).slice(0, 20).forEach(p => {
-          const out = Number(p.stockQty) <= 0;
+          const out = effectiveStock(p) <= 0;
           const div = document.createElement('div');
           div.className = 'card';
           div.innerHTML = '<div class="flex items-center justify-between"><div><p class="text-white text-sm font-bold">' + p.name + '</p>' +
@@ -1507,7 +1513,7 @@
         await ensureSellProdCache();
         const p = sellProdCache.find(x => x.id === productId);
         if (!p) { toast('Product not found', 'error'); return; }
-        if (Number(p.stockQty) <= 0) { toast('OUT OF STOCK: ' + p.name, 'error'); return; }
+        if (effectiveStock(p) <= 0) { toast('OUT OF STOCK: ' + p.name, 'error'); return; }
         currentProduct = p;
         document.getElementById('pickProductName').textContent = p.name;
         document.getElementById('pickProductStock').innerHTML = stockText(p);
@@ -2120,9 +2126,9 @@
 
     function updateInvModeCounts(data) {
       const list = (data || []).filter(p => p.isActive !== false);
-      const nStock = list.filter(p => Number(p.stockQty) > 0).length;
-      const nLow = list.filter(p => Number(p.stockQty) > 0 && Number(p.stockQty) <= 10).length;
-      const nOut = list.filter(p => Number(p.stockQty) === 0).length;
+      const nStock = list.filter(p => effectiveStock(p) > 0).length;
+      const nLow = list.filter(p => effectiveStock(p) > 0 && effectiveStock(p) <= 10).length;
+      const nOut = list.filter(p => effectiveStock(p) === 0).length;
       const a = document.getElementById('invBtnAll'); if (a) a.textContent = 'STOCK · ' + nStock;
       const l = document.getElementById('invBtnLow'); if (l) l.textContent = 'LOW · ' + nLow;
       const o = document.getElementById('invBtnOut'); if (o) o.textContent = 'NONE · ' + nOut;
@@ -2148,10 +2154,10 @@
       let rows = (data || []).filter(p => p.isActive !== false);
       const cat = getInvCatFilter();
       if (cat) rows = rows.filter(p => (p.category || '') === cat);
-      if (invMode === 'all') rows = rows.filter(p => Number(p.stockQty) > 0);
-      else if (invMode === 'out') rows = rows.filter(p => Number(p.stockQty) === 0);
-      else if (invMode === 'low') rows = rows.filter(p => Number(p.stockQty) > 0 && Number(p.stockQty) <= 10);
-      rows.sort((a, b) => (Number(a.stockQty) - Number(b.stockQty)) || String(a.name).localeCompare(String(b.name)));
+      if (invMode === 'all') rows = rows.filter(p => effectiveStock(p) > 0);
+      else if (invMode === 'out') rows = rows.filter(p => effectiveStock(p) === 0);
+      else if (invMode === 'low') rows = rows.filter(p => effectiveStock(p) > 0 && effectiveStock(p) <= 10);
+      rows.sort((a, b) => (effectiveStock(a) - effectiveStock(b)) || String(a.name).localeCompare(String(b.name)));
       return rows;
     }
 
@@ -2179,12 +2185,13 @@
       const start = (invPage - 1) * INV_PAGE_SIZE;
       const pageRows = invRows.slice(start, start + INV_PAGE_SIZE);
       pageRows.forEach(p => {
-        const low = p.stockQty <= 10;
+        const eff = effectiveStock(p);
+        const low = eff <= 10;
         const div = document.createElement('div');
         div.className = 'card';
         div.innerHTML = '<div class="flex items-center justify-between" onclick="showProductDetail(' + p.id + ')"><div><p class="text-white text-sm font-bold">' + p.name + '</p>' +
-          '<p class="text-gray-500 text-[11px]">' + (p.barcode || 'no barcode') + (unitBoxQty(p) > 1 ? ' • ' + boxesText(p.stockQty, unitBoxQty(p), unitBoxLabel(p)) : '') + '</p></div>' +
-          '<p class="text-lg font-bold ' + (p.stockQty === 0 ? 'text-red-400' : low ? 'text-orange-400' : 'text-emerald-400') + '">' + p.stockQty + '</p></div>';
+          '<p class="text-gray-500 text-[11px]">' + (p.barcode || 'no barcode') + (unitBoxQty(p) > 1 ? ' • ' + boxesText(eff, unitBoxQty(p), unitBoxLabel(p)) : '') + '</p></div>' +
+          '<p class="text-lg font-bold ' + (eff === 0 ? 'text-red-400' : low ? 'text-orange-400' : 'text-emerald-400') + '">' + eff + '</p></div>';
         box.appendChild(div);
       });
       if (!invRows.length) box.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">No products found</p>';

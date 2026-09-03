@@ -566,8 +566,8 @@ Alpine.store('app', {
         Alpine.store('app').cache.stockTotals = { data: byBc, byName: byName, hq: hqByBc, hqByName: hqByName, t: Date.now() };
       } catch (e) { /* keep previous totals */ }
     },
-    totalStock(p) { if (!p) return 0; if (p.barcode) return this.stockTotals[p.barcode] || 0; return this.stockTotalsByName[p.name] || 0 },
-    hqStock(p) { if (!p) return 0; if (p.barcode) return this.hqStockByBc[p.barcode] || 0; return this.hqStockByName[p.name] || 0 },
+    totalStock(p) { if (!p) return 0; if (p.stockParentId) { const ps = p.stockParentBarcode ? (this.stockTotals[p.stockParentBarcode] || 0) : 0; return Math.floor(ps / (p.linkRatio || 1)); } if (p.barcode) return this.stockTotals[p.barcode] || 0; return this.stockTotalsByName[p.name] || 0 },
+    hqStock(p) { if (!p) return 0; if (p.stockParentId) { const ps = p.stockParentBarcode ? (this.hqStockByBc[p.stockParentBarcode] || 0) : 0; return Math.floor(ps / (p.linkRatio || 1)); } if (p.barcode) return this.hqStockByBc[p.barcode] || 0; return this.hqStockByName[p.name] || 0 },
     stockCls(q) { return q === 0 ? 'text-red-500' : q < 10 ? 'text-amber-500' : 'text-emerald-500' },
     get categories() { const c = []; this.d.forEach(x => { if (x.category && !c.includes(x.category)) c.push(x.category) }); return c.sort() },
     get inactiveCount() { return this.d.filter(x => x.isActive === false).length },
@@ -749,7 +749,7 @@ Alpine.store('app', {
     },
     get linkResults() {
       const q = (this.linkQ || '').toLowerCase().trim();
-      let list = this.linkProducts.filter(p => p.id !== this.productId);
+      let list = this.linkProducts.filter(p => p.isActive !== false && p.id !== this.productId);
       if (q) list = list.filter(p => (p.name || '').toLowerCase().includes(q) || (p.barcode || '').includes(q));
       return list.slice(0, 20);
     },
@@ -2007,7 +2007,7 @@ Alpine.store('app', {
     searchResults(q) {
       const s = (q || '').toLowerCase().trim();
       if (!s) return [];
-      return this.products.filter(p => (p.name || '').toLowerCase().includes(s) || (p.barcode || '').includes(s)).slice(0, 20);
+      return this.products.filter(p => p.isActive !== false && ((p.name || '').toLowerCase().includes(s) || (p.barcode || '').includes(s))).slice(0, 20);
     },
     // Resolve typed text -> product id (exact name, o kaya unique na match)
     resolveProduct(q) {

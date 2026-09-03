@@ -1,5 +1,23 @@
 # JumongPOS — Full Project Guide for AI Agents
 
+## Latest Change (2026-09-03) — LINKED-CHILD INVARIANT: child = 0 stock + cost naka-lock sa parent (v1.1.69) + Ginebra correction
+
+**Request:** "i created ginebra box right then i receive item thru that box it should count in link account?" + "dapat pag ang item created is link the cost and count does not function he uses the link cost and count" + "200 sa boxes na count pa yan sa inventory count" — ang linked child ay HINDI dapat magkaroon ng sariling count/cost: lahat ng receiving/selling sa pamamagitan ng child → PARENT (×ratio); ang cost = parent cost × ratio (naka-lock); ang PRICE = input ng user (malaya).
+
+### Ang nangyari (Ginebra 722)
+Child "GINEBRA SAN MIGUEL GIN ROUND 350ML by 24" (barcode placeholder, linked→211 GINEBRA ROUND, ratio 24). Mobile receiving 09:48 (+200) ay **na-mis-credit sa CHILD row (5953)** dahil: noong 09:46 ang child ay naging **is_active=false** (na-save nang naka-off ang Active checkbox sa editor) at ang `ResolveHqStockLink` ay may `AND sp.is_active = true` filter → hindi nahanap ang link → +200 sa child imbes na +4,800 sa parent. Na-reactivate (11:30) at na-corrector ang data.
+
+### Ang mga ayos (v1.1.69 API + web)
+
+| File | Change |
+|---|---|
+| `DashboardController.cs` | **`ResolveHqStockLink`** — tinanggal ang `AND sp.is_active = true` (routing sa parent kahit inactive ang child). **`UpdateMasterProduct`** — kapag nag-link: **cost LOCKED = parent cost × ratio** (i-override ang typed cost; price = input pa rin); kapag nag-save ng PARENT: **i-propagate ang cost sa linked children** (`cost = @co × link_ratio`). **`inventory-value`** at **`WhInventorySummary` (source=hq)** — **i-EXCLUDE ang linked-child rows** (LEFT JOIN master_products by barcode; `COALESCE(mp.stock_parent_id,0)=0`) — hindi na magko-count ang child sa inventory kahit paano. GOTCHA: lahat ng columns sa aggregates ay dapat i-qualify `p.` (ambiguity sa join). Version → "1.1.69" (2 places). |
+| `wwwroot/components.js` | `masterProducts.totalStock/hqStock` — kung linked (`p.stockParentId`): **derived** = `floor(parentBarcode sum ÷ linkRatio)` (TOTAL STOCK/SERVER STOCK columns). |
+| `wwwroot/whmobile.html` | `effectiveStock(p)` (derived = floor(stockParentStock ÷ ratio)) gamit sa LAHAT: `stockText` (SELL card — "Available: N (parent X ÷ ratio)"), `searchProducts` out calc, `openUnitPicker` guard, `updateInvModeCounts`, `invFilterRows` (buckets/sort), `renderInvPage` (stock label). |
+| **Data correction (Ginebra)** | Server: child 5953 200→**0**, parent 5500 3346→**8,146** (+4,800 = 200×24), correction `stock_trails` pos_id<0 ×2 ("Ginebra linked-child receive correction 2026-09-03", channel correction) → **HQ local auto-apply via stock-pull** (verified: local 5500=8146, 5953=0, StockParentId 5500 ✓). Master 722: cost → **1,608** (67×24), price 1,620 mananatili. Cloud trails 436723 (−200) + 436725 (+4,800). |
+
+**Verified live:** v1.1.69 · inventory-value 4 stores OK (HQ 715 items — child excluded) · WhGetProducts hq → 5953 `stockParentId 211, stockParentStock 8146` · HQ local 8146/0 · master 722 active, cost 1608, linked 211. **Panuntunan (locked):** linked child = stock laging 0 + cost = parent×ratio (naka-lock) + price = user input; unlinked = sariling cost/count (walang pagbabago).
+
 ## Latest Change (2026-09-02) — STOCK LINK Phase 2: MOBILE (whapp) link-aware + profile popup hotfix + sari-sari tier removal (v1.1.68 API)
 
 **Requests:** (1) mobile receiving ng linked child (MILO BOX) ay dapat pumasok sa PARENT (20 box = +840 sa MILO by-12), hindi sa sariling row; (2) profile popup nawala para sa mga walang address/mobile (renderProfile crash); (3) sari-sari tier removal (pang-kalahatan na e-commerce). **Phase 1 (POS client + ecom reserve)** = nasa nakaraang entry; ito ang Phase 2.
