@@ -2125,16 +2125,24 @@ Alpine.store('app', {
   let _shopCats = null, _shopCatsLoading = null;
   async function _loadShopCats() {
     if (_shopCats) return _shopCats;
-    if (!_shopCatsLoading) _shopCatsLoading = fetchJSON(API + '/shop/categories')
-      .then(r => (_shopCats = r.categories || [])).catch(() => (_shopCats = []));
+    if (_shopCatsLoading) return _shopCatsLoading;
+    _shopCatsLoading = fetchJSON(API + '/shop/categories')
+      .then(r => { _shopCats = r.categories || []; _shopCatsLoading = null; return _shopCats; })
+      .catch(() => { _shopCatsLoading = null; return []; });
     return _shopCatsLoading;
   }
   let _shopProds = null, _shopProdsLoading = null;
   async function _loadShopProds() {
     if (_shopProds) return _shopProds;
-    if (!_shopProdsLoading) _shopProdsLoading = fetchJSON(API + '/shop/catalog?withImages=false')
-      .then(r => (_shopProds = (r.items || []).map(p => ({ id: p.id, name: p.name, price: p.price, category: p.category }))))
-      .catch(() => (_shopProds = []));
+    if (_shopProdsLoading) return _shopProdsLoading;
+    _shopProdsLoading = fetchJSON(API + '/products/master?noImages=true')
+      .then(r => {
+        _shopProds = (Array.isArray(r) ? r : (r.items || [])).filter(p => p.sellOnline !== false && p.isActive !== false && Number(p.price) > 0)
+          .map(p => ({ id: p.id, name: p.name, price: p.price, category: p.category }));
+        _shopProdsLoading = null;
+        return _shopProds;
+      })
+      .catch(() => { _shopProdsLoading = null; return []; });
     return _shopProdsLoading;
   }
 
@@ -2159,34 +2167,37 @@ Alpine.store('app', {
       const tl = String(this.form.targetType || '').toLowerCase();
       const v = String(this.form.targetValue || '');
       if (tl === 'category') { const p = v.split('|'); this.form.cat = (p[0] || '').trim(); this.form.search = (p[1] || '').trim(); }
-      else if (tl === 'product') this.form.prodQ = v.trim();
+      else if (tl === 'product') this.pbEnsureProds();
       else if (tl === 'url') this.form.url = v.trim();
       document.getElementById('pbFile').value = '';
     },
     onFile(e) { this.form.file = e.target.files[0] || null; },
     async pbEnsureProds() { if (this.prods.length || this.prodsLoading) return; this.prodsLoading = true; this.prods = await _loadShopProds(); this.prodsLoading = false; },
-    get pbProdFiltered() {
+    pf(n) { return window.fmt(n); },
+    get pbMatches() {
       if (!this.prods.length) return [];
       const q = String(this.form.prodQ || '').trim().toLowerCase();
-      const list = q ? this.prods.filter(p => String(p.name).toLowerCase().includes(q)) : this.prods;
-      return list.slice(0, 12);
+      const list = q ? this.prods.filter(p => (p.name + ' ' + (p.category || '')).toLowerCase().includes(q)) : this.prods;
+      return list.slice(0, 15);
+    },
+    pbPick(id) {
+      const it = this.prods.find(x => String(x.id) === String(id));
+      if (!it) return;
+      this.form.prodQ = '';
+      this.form.targetValue = String(it.id);
+    },
+    pbSelInfo() {
+      const it = this.prods.find(x => String(x.id) === String(this.form.targetValue || ''));
+      return it || null;
     },
     pbSyncTarget() {
       const tl = String(this.form.targetType || '').toLowerCase();
       if (tl === 'category') this.form.targetValue = [this.form.cat, this.form.search].filter(Boolean).join('|');
-      else if (tl === 'product') this.form.targetValue = String(this.form.prodQ || '').trim();
+      else if (tl === 'product') { /* value via pbPick */ }
       else if (tl === 'url') this.form.targetValue = String(this.form.url || '').trim();
       else this.form.targetValue = '';
     },
     pbTargetChanged() { this.pbSyncTarget(); },
-    pbProdPicked() {
-      const q = String(this.form.prodQ || '').trim();
-      const byId = this.prods.find(x => String(x.id) === q);
-      if (byId) { this.pbSyncTarget(); return; }
-      const byName = this.prods.find(x => String(x.name).toLowerCase() === q.toLowerCase());
-      this.form.prodQ = byName ? String(byName.id) : this.form.prodQ;
-      this.pbSyncTarget();
-    },
     pbSample() {
       const tl = String(this.form.targetType || '').toLowerCase();
       const v = String(this.form.targetValue || '').trim();
@@ -2210,11 +2221,8 @@ Alpine.store('app', {
       if (!this.form.id && !this.form.file) { toast('Mag-upload ng image para sa bagong banner (o gamitin ang edit)', 'error'); return; }
       if (this.form.targetType === 'category' && !this.form.targetValue) { toast('Pumili ng kategorya (at opsiyonal na salain)', 'error'); return; }
       if (this.form.targetType === 'product') {
-        const q = String(this.form.prodQ || '').trim();
-        const m = this.prods.find(x => String(x.name).toLowerCase() === q.toLowerCase());
-        if (m) this.form.prodQ = String(m.id);
         this.pbSyncTarget();
-        if (!this.form.targetValue) { toast('Piliin ang produkto sa listahan (i-type at i-click ang lalabas)', 'error'); return; }
+        if (!this.pbSelInfo()) { toast('Pumili ng produkto sa listahan sa ibaba', 'error'); return; }
       }
       this.saving = true; this.msg = '';
       try {
@@ -2302,12 +2310,6 @@ Alpine.data('shopContentPanel', () => ({
     },
     async loadFbLists() { this.fbCats = await _loadShopCats(); },
     async ensureFbProds() { if (this.fbProds.length || this.fbProdLoading) return; this.fbProdLoading = true; this.fbProds = await _loadShopProds(); this.fbProdLoading = false; },
-    fbProdsFor(p) {
-      if (!this.fbProds.length) return [];
-      const q = String(p.prodQ || '').trim().toLowerCase();
-      const list = q ? this.fbProds.filter(x => String(x.name).toLowerCase().includes(q)) : this.fbProds;
-      return list.slice(0, 12);
-    },
     fbAddPost() { this.fbPosts.push({ code: '', ctaLabel: '', ctaTargetType: 'Wala', ctaTargetValue: '', cat: '', search: '', prodQ: '', url: '' }); },
     fbDelPost(i) { this.fbPosts.splice(i, 1); },
     fbPostTargetChanged(p) { this.fbPostCompose(p); },
@@ -2315,19 +2317,28 @@ Alpine.data('shopContentPanel', () => ({
       const tl = String(p.ctaTargetType || 'Wala').toLowerCase();
       if (tl === 'wala' || !tl) p.ctaTargetValue = '';
       else if (tl === 'category') p.ctaTargetValue = [p.cat, p.search].filter(Boolean).join('|');
-      else if (tl === 'product') p.ctaTargetValue = String(p.prodQ || '').trim();
+      else if (tl === 'product') { /* value via fbPick */ }
       else if (tl === 'url') p.ctaTargetValue = String(p.url || '').trim();
-    },
-    fbProdPicked(p) {
-      const q = String(p.prodQ || '').trim();
-      const byId = this.fbProds.find(x => String(x.id) === q);
-      if (byId) { p.ctaTargetValue = String(byId.id); return; }
-      const byName = this.fbProds.find(x => String(x.name).toLowerCase() === q.toLowerCase());
-      p.ctaTargetValue = byName ? String(byName.id) : '';
     },
     fbProdName(p) {
       const x = this.fbProds.find(a => String(a.id) === String(p.ctaTargetValue || '').trim());
       return x ? x.name + ' — ₱' + (Number(x.price) || 0).toFixed(2) : (p.ctaTargetValue ? 'Product #' + p.ctaTargetValue : '');
+    },
+    fbProdsFor(p) {
+      if (!this.fbProds.length) return [];
+      const q = String(p.prodQ || '').trim().toLowerCase();
+      const list = q ? this.fbProds.filter(x => (x.name + ' ' + (x.category || '')).toLowerCase().includes(q)) : this.fbProds;
+      return list.slice(0, 15);
+    },
+    fbSelInfo(p) {
+      const x = this.fbProds.find(a => String(a.id) === String(p.ctaTargetValue || '').trim());
+      return x || null;
+    },
+    fbPick(p, id) {
+      const it = this.fbProds.find(x => String(x.id) === String(id));
+      if (!it) return;
+      p.prodQ = '';
+      p.ctaTargetValue = String(it.id);
     },
     fbPreviewHtml(code) {
       const c = String(code || '');
@@ -2411,7 +2422,7 @@ Alpine.data('shopContentPanel', () => ({
   Alpine.data('feedPanel', () => ({
     posts: [], loading: false, saving: false, msg: '', msgOk: true,
     cats: [], prods: [], prodsLoading: false,
-    f: { id: 0, kind: 'promo', text: '', linkType: 'product', linkValue: '', linkProdQ: '', linkCat: '', linkUrl: '', active: true, image: null, imageUrl: '' },
+    f: { id: 0, kind: 'promo', text: '', linkType: 'product', linkValue: '', linkQ: '', linkCat: '', linkUrl: '', active: true, image: null, imageUrl: '' },
     async init() { await this.load(); this.cats = await _loadShopCats(); },
     async load() {
       this.loading = true;
@@ -2421,11 +2432,11 @@ Alpine.data('shopContentPanel', () => ({
       } catch (e) { this.posts = []; }
       this.loading = false;
     },
-    openAdd() { this.f = { id: 0, kind: 'promo', text: '', linkType: 'product', linkValue: '', linkProdQ: '', linkCat: '', linkUrl: '', active: true, image: null, imageUrl: '' }; },
+    openAdd() { this.f = { id: 0, kind: 'promo', text: '', linkType: 'product', linkValue: '', linkQ: '', linkCat: '', linkUrl: '', active: true, image: null, imageUrl: '' }; this.pbEnsureProds(); },
     openEdit(p) {
-      this.f = { id: p.id, kind: p.kind, text: p.text, linkType: p.linkType || '', linkValue: p.linkValue || '', linkProdQ: '', linkCat: '', linkUrl: '', active: true, image: null, imageUrl: p.imageUrl || '' };
-      if (p.linkType === 'product') this.f.linkProdQ = p.linkValue || '';
-      else if (p.linkType === 'category') { const s = (p.linkValue || '').split('|'); this.f.linkCat = (s[0] || '').trim(); this.f.linkValue = p.linkValue || ''; }
+      this.f = { id: p.id, kind: p.kind, text: p.text, linkType: p.linkType || '', linkValue: p.linkValue || '', linkQ: '', linkCat: '', linkUrl: '', active: true, image: null, imageUrl: p.imageUrl || '' };
+      if (p.linkType === 'product') this.pbEnsureProds();
+      else if (p.linkType === 'category') { const s = (p.linkValue || '').split('|'); this.f.linkCat = (s[0] || '').trim(); }
       else if (p.linkType === 'url') this.f.linkUrl = p.linkValue || '';
     },
     onFile(e) {
@@ -2452,25 +2463,28 @@ Alpine.data('shopContentPanel', () => ({
     },
     linkChanged() {
       const t = String(this.f.linkType || '');
-      if (t === 'product') { this.f.linkValue = String(this.f.linkProdQ || '').trim(); }
+      if (t === 'product') { /* value set via picker */ }
       else if (t === 'category') { this.f.linkValue = this.f.linkCat; }
       else if (t === 'url') { this.f.linkValue = String(this.f.linkUrl || '').trim(); }
       else this.f.linkValue = '';
     },
+    pf(n) { return window.fmt(n); },
     async pbEnsureProds() { if (this.prods.length || this.prodsLoading) return; this.prodsLoading = true; this.prods = await _loadShopProds(); this.prodsLoading = false; },
-    get prodFiltered() {
+    get linkMatches() {
       if (!this.prods.length) return [];
-      const q = String(this.f.linkProdQ || '').trim().toLowerCase();
-      const list = q ? this.prods.filter(x => String(x.name).toLowerCase().includes(q)) : this.prods;
-      return list.slice(0, 12);
+      const q = String(this.f.linkQ || '').trim().toLowerCase();
+      const list = q ? this.prods.filter(x => (x.name + ' ' + (x.category || '')).toLowerCase().includes(q)) : this.prods;
+      return list.slice(0, 15);
     },
-    prodPicked() {
-      // huwag i-clear ang input habang nagta-type — i-save lang ang value kapag may buong match (id o exact name)
-      const q = String(this.f.linkProdQ || '').trim();
-      const byId = this.prods.find(x => String(x.id) === q);
-      if (byId) { this.f.linkValue = String(byId.id); return; }
-      const byName = this.prods.find(x => String(x.name).toLowerCase() === q.toLowerCase());
-      this.f.linkValue = byName ? String(byName.id) : '';
+    pickLinkProduct(id) {
+      const it = this.prods.find(x => String(x.id) === String(id));
+      if (!it) return;
+      this.f.linkValue = String(it.id);
+      this.f.linkQ = '';
+    },
+    linkProductInfo() {
+      const it = this.prods.find(x => String(x.id) === String(this.f.linkValue || ''));
+      return it || null;
     },
     async save() {
       if (!this.f.text.trim() && !this.f.image) { toast('Maglagay ng text o larawan', 'error'); return; }
@@ -2480,15 +2494,7 @@ Alpine.data('shopContentPanel', () => ({
         fd.append('kind', this.f.kind);
         fd.append('text', this.f.text);
         this.linkChanged();
-        if (this.f.linkType === 'product') {
-          const q = String(this.f.linkProdQ || '').trim();
-          if (!this.f.linkValue) {
-            const m = this.prods.find(x => String(x.name).toLowerCase() === q.toLowerCase());
-            if (m) this.f.linkValue = String(m.id);
-          }
-          if (!this.f.linkValue) { toast('Piliin ang produkto sa listahan (i-type at i-click ang lalabas)', 'error'); this.saving = false; return; }
-          this.f.linkProdQ = this.f.linkValue;
-        }
+        if (this.f.linkType === 'product' && !this.f.linkValue) { toast('Pumili ng produkto sa listahan sa ibaba', 'error'); this.saving = false; return; }
         fd.append('linkType', this.f.linkType || '');
         fd.append('linkValue', this.f.linkValue || '');
         if (this.f.image) {

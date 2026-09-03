@@ -2364,12 +2364,39 @@ tailwind.config = {
                 </template>
                 <template x-if="p.ctaTargetType === 'Product'">
                   <div>
-                    <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Produkto (type-to-search — piliin sa listahan)</label>
-                    <input x-model="p.prodQ" @focus="ensureFbProds()" @input="fbProdPicked(p)" list="fbProdsList" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                    <datalist id="fbProdsList">
-                      <template x-for="x in fbProdsFor(p)" :key="x.id"><option :value="String(x.id)" x-text="x.name"></option></template>
-                    </datalist>
-                    <p class="text-[10px] text-gray-400 dark:text-[#7878aa] mt-1" x-text="fbProdName(p)"></p>
+                    <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Produkto (ang item na mapupuntahan)</label>
+                    <template x-if="fbSelInfo(p)">
+                      <div class="flex items-center justify-between gap-2 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 px-3 py-2 mb-2">
+                        <div class="flex items-center gap-2 min-w-0">
+                          <img :src="'/api/dashboard/product-image/' + fbSelInfo(p).id" onerror="this.style.display='none'" class="w-8 h-8 rounded object-cover bg-gray-100 shrink-0">
+                          <div class="min-w-0">
+                            <p class="text-[11px] font-bold text-violet-700 dark:text-violet-300 truncate" x-text="fbSelInfo(p).name"></p>
+                            <p class="text-[10px] text-gray-500" x-text="'₱ ' + fmt(fbSelInfo(p).price)"></p>
+                          </div>
+                        </div>
+                        <button @click="p.ctaTargetValue = ''; p.prodQ = ''" class="text-[10px] px-2 py-1 rounded bg-white dark:bg-[#181848] text-violet-700 dark:text-violet-300 font-bold shrink-0">✕ BAGUHIN</button>
+                      </div>
+                    </template>
+                    <input x-model="p.prodQ" @focus="ensureFbProds()" type="text" placeholder="Maghanap ng produkto (hal. milo)..." class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                    <template x-if="String(p.prodQ || '').trim() && fbProds.length">
+                      <div class="mt-1 border border-gray-200 dark:border-[#222255] rounded-lg overflow-hidden max-h-52 overflow-y-auto bg-white dark:bg-[#181848]">
+                        <template x-if="fbProdsFor(p).length">
+                          <div class="divide-y divide-gray-100 dark:divide-[#222255]">
+                            <template x-for="m in fbProdsFor(p)" :key="m.id">
+                              <button @click="fbPick(p, m.id)" class="w-full flex items-center gap-2 px-2.5 py-2 text-left hover:bg-violet-50 dark:hover:bg-violet-900/20">
+                                <img :src="'/api/dashboard/product-image/' + m.id" onerror="this.style.display='none'" class="w-8 h-8 rounded object-cover bg-gray-100 shrink-0">
+                                <span class="min-w-0 flex-1">
+                                  <span class="block text-[11px] font-semibold text-gray-700 dark:text-slate-200 truncate" x-text="m.name"></span>
+                                  <span class="block text-[10px] text-gray-400" x-text="m.category || ''"></span>
+                                </span>
+                                <span class="text-[11px] font-black text-violet-700 dark:text-violet-300 shrink-0" x-text="'₱ ' + fmt(m.price)"></span>
+                              </button>
+                            </template>
+                          </div>
+                        </template>
+                        <template x-if="!fbProdsFor(p).length"><p class="px-3 py-2.5 text-[11px] text-gray-400 text-center">Walang tugma sa paghahanap mo</p></template>
+                      </div>
+                    </template>
                   </div>
                 </template>
                 <template x-if="p.ctaTargetType === 'URL'">
@@ -2547,12 +2574,40 @@ tailwind.config = {
               </div>
             </template>
             <template x-if="form.targetType === 'product'">
-              <div>
-                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Produkto (type-to-search — piliin sa listahan)</label>
-                <input x-model="form.prodQ" @focus="pbEnsureProds()" @input="pbProdPicked()" list="pbProdsList" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                <datalist id="pbProdsList">
-                  <template x-for="x in pbProdFiltered" :key="x.id"><option :value="String(x.id)" x-text="x.name"></option></template>
-                </datalist>
+              <div class="sm:col-span-2">
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Produkto (ang item na mapupuntahan)</label>
+                <template x-if="pbSelInfo()">
+                  <div class="flex items-center justify-between gap-2 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 px-3 py-2 mb-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <img :src="'/api/dashboard/product-image/' + pbSelInfo().id" onerror="this.style.display='none'" class="w-8 h-8 rounded object-cover bg-gray-100 shrink-0">
+                      <div class="min-w-0">
+                        <p class="text-[11px] font-bold text-violet-700 dark:text-violet-300 truncate" x-text="pbSelInfo().name"></p>
+                        <p class="text-[10px] text-gray-500" x-text="'₱ ' + pf(pbSelInfo().price)"></p>
+                      </div>
+                    </div>
+                    <button @click="form.targetValue = ''; form.prodQ = ''" class="text-[10px] px-2 py-1 rounded bg-white dark:bg-[#181848] text-violet-700 dark:text-violet-300 font-bold shrink-0">✕ BAGUHIN</button>
+                  </div>
+                </template>
+                <input x-model="form.prodQ" @focus="pbEnsureProds()" type="text" placeholder="Maghanap ng produkto (hal. CLVB)..." class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                <template x-if="String(form.prodQ || '').trim() && prods.length">
+                  <div class="mt-1 border border-gray-200 dark:border-[#222255] rounded-lg overflow-hidden max-h-52 overflow-y-auto bg-white dark:bg-[#181848]">
+                    <template x-if="pbMatches.length">
+                      <div class="divide-y divide-gray-100 dark:divide-[#222255]">
+                        <template x-for="m in pbMatches" :key="m.id">
+                          <button @click="pbPick(m.id)" class="w-full flex items-center gap-2 px-2.5 py-2 text-left hover:bg-violet-50 dark:hover:bg-violet-900/20">
+                            <img :src="'/api/dashboard/product-image/' + m.id" onerror="this.style.display='none'" class="w-8 h-8 rounded object-cover bg-gray-100 shrink-0">
+                            <span class="min-w-0 flex-1">
+                              <span class="block text-[11px] font-semibold text-gray-700 dark:text-slate-200 truncate" x-text="m.name"></span>
+                              <span class="block text-[10px] text-gray-400" x-text="m.category || ''"></span>
+                            </span>
+                            <span class="text-[11px] font-black text-violet-700 dark:text-violet-300 shrink-0" x-text="'₱ ' + pf(m.price)"></span>
+                          </button>
+                        </template>
+                      </div>
+                    </template>
+                    <template x-if="!pbMatches.length"><p class="px-3 py-2.5 text-[11px] text-gray-400 text-center">Walang tugma sa paghahanap mo</p></template>
+                  </div>
+                </template>
               </div>
             </template>
             <template x-if="form.targetType === 'url'">
@@ -2639,11 +2694,42 @@ tailwind.config = {
             </div>
             <template x-if="f.linkType === 'product'">
               <div class="sm:col-span-2">
-                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Produkto (type-to-search)</label>
-                <input x-model="f.linkProdQ" @focus="pbEnsureProds()" @input="prodPicked()" list="feedProdsList" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                <datalist id="feedProdsList">
-                  <template x-for="x in prodFiltered" :key="x.id"><option :value="String(x.id)" x-text="x.name"></option></template>
-                </datalist>
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Produkto (ang item na mapupuntahan ng post)</label>
+                <template x-if="linkProductInfo()">
+                  <div class="flex items-center justify-between gap-2 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 px-3 py-2 mb-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <img :src="'/api/dashboard/product-image/' + linkProductInfo().id" onerror="this.style.display='none'" class="w-8 h-8 rounded object-cover bg-gray-100 shrink-0">
+                      <div class="min-w-0">
+                        <p class="text-[11px] font-bold text-violet-700 dark:text-violet-300 truncate" x-text="linkProductInfo().name"></p>
+                        <p class="text-[10px] text-gray-500" x-text="'₱ ' + pf(linkProductInfo().price)"></p>
+                      </div>
+                    </div>
+                    <button @click="f.linkValue = ''; f.linkQ = ''" class="text-[10px] px-2 py-1 rounded bg-white dark:bg-[#181848] text-violet-700 dark:text-violet-300 font-bold shrink-0">✕ BAGUHIN</button>
+                  </div>
+                </template>
+                <input x-model="f.linkQ" @focus="pbEnsureProds()" type="text" placeholder="Maghanap ng produkto (hal. milo)..." class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                <template x-if="String(f.linkQ || '').trim() && prods.length">
+                  <div class="mt-1 border border-gray-200 dark:border-[#222255] rounded-lg overflow-hidden max-h-52 overflow-y-auto bg-white dark:bg-[#181848]">
+                    <template x-if="linkMatches.length">
+                      <div class="divide-y divide-gray-100 dark:divide-[#222255]">
+                        <template x-for="m in linkMatches" :key="m.id">
+                          <button @click="pickLinkProduct(m.id)" class="w-full flex items-center gap-2 px-2.5 py-2 text-left hover:bg-violet-50 dark:hover:bg-violet-900/20">
+                            <img :src="'/api/dashboard/product-image/' + m.id" onerror="this.style.display='none'" class="w-8 h-8 rounded object-cover bg-gray-100 shrink-0">
+                            <span class="min-w-0 flex-1">
+                              <span class="block text-[11px] font-semibold text-gray-700 dark:text-slate-200 truncate" x-text="m.name"></span>
+                              <span class="block text-[10px] text-gray-400" x-text="m.category || ''"></span>
+                            </span>
+                            <span class="text-[11px] font-black text-violet-700 dark:text-violet-300 shrink-0" x-text="'₱ ' + pf(m.price)"></span>
+                          </button>
+                        </template>
+                      </div>
+                    </template>
+                    <template x-if="!linkMatches.length"><p class="px-3 py-2.5 text-[11px] text-gray-400 text-center">Walang tugma sa paghahanap mo</p></template>
+                  </div>
+                </template>
+                <template x-if="String(f.linkQ || '').trim() && !prods.length && !prodsLoading">
+                  <p class="text-[10px] text-amber-500 mt-1">Hindi ma-load ang listahan — suriin ang koneksyon o i-refresh ang page</p>
+                </template>
               </div>
             </template>
             <template x-if="f.linkType === 'category'">
