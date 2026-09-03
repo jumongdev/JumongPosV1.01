@@ -164,7 +164,14 @@ public class PrinterService
         foreach (var item in sale.Items)
         {
             var voided = item.IsVoided;
-            var nameLines = WrapText(item.ProductName, lineChars - (voided ? 9 : 0));
+            // Unit name sa resibo: isang barcode ay pwedeng maraming pack forms (by 5/by 10/box) —
+            // ipakita kung aling unit ang nabenta (skip ang pc/per piece para hindi maingay).
+            var displayName = item.ProductName;
+            if (!string.IsNullOrEmpty(item.UnitName)
+                && !item.UnitName.Equals("pc", StringComparison.OrdinalIgnoreCase)
+                && !item.UnitName.Equals("per piece", StringComparison.OrdinalIgnoreCase))
+                displayName += " (" + item.UnitName + ")";
+            var nameLines = WrapText(displayName, lineChars - (voided ? 9 : 0));
             for (int i = 0; i < nameLines.Count; i++)
             {
                 var txt = i == 0 ? nameLines[i] : "  " + nameLines[i];
