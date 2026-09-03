@@ -2327,10 +2327,13 @@ Alpine.data('shopContentPanel', () => ({
     },
     fbPreviewHtml(code) {
       const c = String(code || '');
-      const ifr = (c.match(/<iframe[^>]*src="[^"]*plugins\/post\.php[^"]*"[^>]*>/i) || [])[0];
-      if (ifr) return ifr;
+      let ifr = (c.match(/<iframe[^>]*src="[^"]*plugins\/post\.php[^"]*"[^>]*>/i) || [])[0];
+      if (ifr) {
+        ifr = ifr.replace(/height="(\d+)"/i, (m, h) => (parseInt(h, 10) < 400 ? 'height="641"' : m));
+        return ifr;
+      }
       const href = (c.match(/data-href="([^"]+)"/i) || [])[1];
-      if (href) return '<iframe src="https://www.facebook.com/plugins/post.php?href=' + encodeURIComponent(href) + '&show_text=true&width=500" width="500" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowfullscreen="true" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>';
+      if (href) return '<iframe src="https://www.facebook.com/plugins/post.php?href=' + encodeURIComponent(href) + '&show_text=true&width=500" width="500" height="641" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowfullscreen="true" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>';
       return '<p class="text-[10px] text-gray-400 text-center py-3">I-paste ang buong embed code para lumabas ang preview</p>';
     },
     subAddRow() {
