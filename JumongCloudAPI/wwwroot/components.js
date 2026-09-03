@@ -87,7 +87,7 @@ Alpine.store('app', {
       'health': 'grp-system', 'suspect1pc': 'grp-system',
       'rpt-sales': 'grp-reports', 'rpt-invcost': 'grp-reports', 'rpt-shifts': 'grp-reports', 'analytics': 'grp-reports', 'rpt-invval': 'grp-reports',
       'grp-reports': 'grp-pos', 'products': 'grp-pos', 'grp-inv': 'grp-pos',
-      'online-orders': 'grp-ecom', 'shop-content': 'grp-ecom', 'msgr-bot': 'grp-ecom', 'promo-banners': 'grp-ecom', 'restock-requests': 'grp-ecom', 'product-suggestions': 'grp-ecom', 'promo-groups': 'grp-ecom', 'promo-free-queue': 'grp-ecom', 'feed-posts': 'grp-ecom',
+      'online-orders': 'grp-ecom', 'shop-content': 'grp-ecom', 'msgr-bot': 'grp-ecom', 'restock-requests': 'grp-ecom', 'product-suggestions': 'grp-ecom', 'promo-free-queue': 'grp-ecom', 'feed-posts': 'grp-ecom',
       'st-receiving': 'grp-inv', 'st-trail': 'grp-inv', 'st-transfer': 'grp-inv',
       'settings': 'grp-settings', 'pospromo': 'grp-settings', 'posqr': 'grp-settings', 'branding': 'grp-settings', 'google-auth': 'grp-settings'
     },
@@ -1991,84 +1991,6 @@ Alpine.store('app', {
     }
   }));
 
-  Alpine.data('promoGroupsPanel', () => ({
-    groups: [], products: [], loading: true, saving: false, msg: '', msgOk: true,
-    form: { id: 0, name: '', buyQty: 60, freeQty: 1, freeProductId: 0, active: true, items: [{ productId: 0, q: '', open: false }, { productId: 0, q: '', open: false }, { productId: 0, q: '', open: false }] },
-    freeQ: '', freeOpen: false,
-    async init() { await this.load(); },
-    async load() {
-      this.loading = true;
-      try { this.groups = await fetchJSON(API + '/promo-groups'); } catch (e) { this.groups = []; }
-      if (!this.products.length) {
-        try { this.products = await fetchJSON(API + '/products/master?noImages=true'); } catch (e) { this.products = []; }
-      }
-      this.loading = false;
-    },
-    searchResults(q) {
-      const s = (q || '').toLowerCase().trim();
-      if (!s) return [];
-      return this.products.filter(p => p.isActive !== false && ((p.name || '').toLowerCase().includes(s) || (p.barcode || '').includes(s))).slice(0, 20);
-    },
-    // Resolve typed text -> product id (exact name, o kaya unique na match)
-    resolveProduct(q) {
-      const s = (q || '').trim().toLowerCase();
-      if (!s) return 0;
-      const exact = this.products.find(p => (p.name || '').toLowerCase() === s);
-      if (exact) return exact.id;
-      const matches = this.products.filter(p => (p.name || '').toLowerCase().includes(s));
-      return matches.length === 1 ? matches[0].id : 0;
-    },
-    pickFirst(it) {
-      const r = this.searchResults(it.q);
-      if (r.length) { it.productId = r[0].id; it.q = r[0].name; }
-      it.open = false;
-    },
-    pickFreeFirst() {
-      const r = this.searchResults(this.freeQ);
-      if (r.length) { this.form.freeProductId = r[0].id; this.freeQ = r[0].name; }
-      this.freeOpen = false;
-    },
-    addItem() { this.form.items.push({ productId: 0, q: '', open: false }); },
-    removeItem(i) { if (this.form.items.length > 2) this.form.items.splice(i, 1); },
-    openEdit(g) {
-      this.form = { id: g.id, name: g.name, buyQty: g.buyQty, freeQty: g.freeQty, freeProductId: g.freeProductId, active: g.active, items: [] };
-      (g.items || []).forEach(x => this.form.items.push({ productId: x.productId, q: this.productName(x.productId), open: false }));
-      while (this.form.items.length < 3) this.form.items.push({ productId: 0, q: '', open: false });
-      const fp = this.productName(g.freeProductId);
-      this.freeQ = fp; this.freeOpen = false;
-    },
-    newGroup() {
-      this.form = { id: 0, name: '', buyQty: 60, freeQty: 1, freeProductId: 0, active: true, items: [{ productId: 0, q: '', open: false }, { productId: 0, q: '', open: false }, { productId: 0, q: '', open: false }] };
-      this.freeQ = ''; this.freeOpen = false;
-    },
-    productName(id) { const p = this.products.find(x => x.id === id); return p ? p.name : ''; },
-    selectedItems() { return this.form.items.filter(x => x.productId > 0); },
-    async save() {
-      // Auto-resolve ang mga nai-type na pangalan (exact o unique match) — para hindi ma-reject kahit hindi nag-click sa list
-      this.form.items.forEach(it => { if (!it.productId) it.productId = this.resolveProduct(it.q); });
-      if (!this.form.freeProductId) this.form.freeProductId = this.resolveProduct(this.freeQ);
-      const items = this.selectedItems();
-      if (!this.form.name || items.length < 2 || this.form.buyQty <= 0 || this.form.freeQty <= 0 || !this.form.freeProductId) {
-        this.msg = 'Kumpletuhin: pangalan, 2+ items, buy qty, free qty, at free product — siguraduhing NAPILI mula sa listahan (i-type at pindutin ang result, o Enter)'; this.msgOk = false; return;
-      }
-      this.saving = true; this.msg = '';
-      try {
-        const body = { name: this.form.name, buyQty: Number(this.form.buyQty), freeQty: Number(this.form.freeQty), freeProductId: this.form.freeProductId, active: this.form.active, items: items.map((x, i) => ({ productId: x.productId, slot: i })) };
-        const url = this.form.id ? API + '/promo-groups/' + this.form.id : API + '/promo-groups';
-        const r = await fetch(url, { method: this.form.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || 'Failed'); }
-        this.msg = 'Promo group saved!'; this.msgOk = true;
-        this.form.id = 0;
-        await this.load();
-      } catch (e) { this.msg = 'Save failed: ' + e.message; this.msgOk = false; }
-      this.saving = false;
-    },
-    async del(g) {
-      if (!confirm('Delete promo group "' + g.name + '"?')) return;
-      try { await fetchJSON(API + '/promo-groups/' + g.id, { method: 'DELETE' }); await this.load(); } catch (e) { toast(e.message, 'error'); }
-    }
-  }));
-
   Alpine.data('promoFreeQueuePanel', () => ({
     rows: [], filter: 'queued', loading: false,
     async init() { await this.load(); await this.refreshBadge(); },
@@ -2146,116 +2068,10 @@ Alpine.store('app', {
     return _shopProdsLoading;
   }
 
-  Alpine.data('promoBannersPanel', () => ({
-    banners: [], pointsRate: 200, loading: false, saving: false, msg: '', msgOk: true,
-    form: { id: 0, targetType: 'category', targetValue: '', sortOrder: 0, active: true, file: null, cat: '', search: '', prodQ: '', url: '' },
-    cats: [], prods: [], prodsLoading: false,
-    async init() { await this.load(); this.cats = await _loadShopCats(); },
-    async load() {
-      try {
-        const r = await fetchJSON(API + '/promo-banners');
-        this.banners = r.banners || [];
-        this.pointsRate = r.pointsRate || 200;
-      } catch (e) { this.banners = []; }
-    },
-    openAdd() {
-      this.form = { id: 0, targetType: 'category', targetValue: '', sortOrder: this.banners.length + 1, active: true, file: null, cat: '', search: '', prodQ: '', url: '' };
-      document.getElementById('pbFile').value = '';
-    },
-    openEdit(b) {
-      this.form = { id: b.id, targetType: b.targetType, targetValue: b.targetValue, sortOrder: b.sortOrder, active: b.active, file: null, cat: '', search: '', prodQ: '', url: '' };
-      const tl = String(this.form.targetType || '').toLowerCase();
-      const v = String(this.form.targetValue || '');
-      if (tl === 'category') { const p = v.split('|'); this.form.cat = (p[0] || '').trim(); this.form.search = (p[1] || '').trim(); }
-      else if (tl === 'product') this.pbEnsureProds();
-      else if (tl === 'url') this.form.url = v.trim();
-      document.getElementById('pbFile').value = '';
-    },
-    onFile(e) { this.form.file = e.target.files[0] || null; },
-    async pbEnsureProds() { if (this.prods.length || this.prodsLoading) return; this.prodsLoading = true; this.prods = await _loadShopProds(); this.prodsLoading = false; },
-    pf(n) { return window.fmt(n); },
-    get pbMatches() {
-      if (!this.prods.length) return [];
-      const q = String(this.form.prodQ || '').trim().toLowerCase();
-      const list = q ? this.prods.filter(p => (p.name + ' ' + (p.category || '')).toLowerCase().includes(q)) : this.prods;
-      return list.slice(0, 15);
-    },
-    pbPick(id) {
-      const it = this.prods.find(x => String(x.id) === String(id));
-      if (!it) return;
-      this.form.prodQ = '';
-      this.form.targetValue = String(it.id);
-    },
-    pbSelInfo() {
-      const it = this.prods.find(x => String(x.id) === String(this.form.targetValue || ''));
-      return it || null;
-    },
-    pbSyncTarget() {
-      const tl = String(this.form.targetType || '').toLowerCase();
-      if (tl === 'category') this.form.targetValue = [this.form.cat, this.form.search].filter(Boolean).join('|');
-      else if (tl === 'product') { /* value via pbPick */ }
-      else if (tl === 'url') this.form.targetValue = String(this.form.url || '').trim();
-      else this.form.targetValue = '';
-    },
-    pbTargetChanged() { this.pbSyncTarget(); },
-    pbSample() {
-      const tl = String(this.form.targetType || '').toLowerCase();
-      const v = String(this.form.targetValue || '').trim();
-      if (tl === 'register') return null;
-      if (tl === 'url') return [{ name: v || '(blangko ang URL)', price: null }];
-      if (tl === 'product') {
-        if (!this.prods.length) return null;
-        const x = this.prods.find(a => String(a.id) === v.trim());
-        return x ? [x] : (v ? [] : null);
-      }
-      if (tl === 'category') {
-        const p = v.split('|');
-        const cat = (p[0] || '').trim().toLowerCase();
-        const q = (p[1] || '').trim().toLowerCase();
-        if (!cat && !q) return [];
-        return this.prods.filter(x => (!cat || String(x.category || '').toLowerCase() === cat) && (!q || String(x.name).toLowerCase().includes(q))).slice(0, 50);
-      }
-      return null;
-    },
-    async save() {
-      if (!this.form.id && !this.form.file) { toast('Mag-upload ng image para sa bagong banner (o gamitin ang edit)', 'error'); return; }
-      if (this.form.targetType === 'category' && !this.form.targetValue) { toast('Pumili ng kategorya (at opsiyonal na salain)', 'error'); return; }
-      if (this.form.targetType === 'product') {
-        this.pbSyncTarget();
-        if (!this.pbSelInfo()) { toast('Pumili ng produkto sa listahan sa ibaba', 'error'); return; }
-      }
-      this.saving = true; this.msg = '';
-      try {
-        const fd = new FormData();
-        if (this.form.id) fd.append('id', this.form.id);
-        fd.append('targetType', this.form.targetType);
-        fd.append('targetValue', this.form.targetValue);
-        fd.append('sortOrder', this.form.sortOrder);
-        fd.append('active', this.form.active ? 'true' : 'false');
-        if (this.form.file) fd.append('image', this.form.file);
-        const r = await fetch(API + '/promo-banners', { method: 'POST', body: fd });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(j.error || 'Save failed');
-        this.msg = 'Banner saved!';
-        this.msgOk = true;
-        await this.load();
-      } catch (e) { this.msg = e.message; this.msgOk = false; }
-      this.saving = false;
-    },
-    async remove(b) {
-      if (!confirm('Delete banner #' + b.id + '?')) return;
-      try {
-        await fetchJSON(API + '/promo-banners/' + b.id, { method: 'DELETE' });
-        await this.load();
-      } catch (e) { toast(e.message, 'error'); }
-    }
-  }));
-
 Alpine.data('shopContentPanel', () => ({
     c: {}, loaded: false, saving: false, suggestions: [],
-    fbCats: [], fbProds: [], fbProdLoading: false, fbPosts: [],
     subRows: [], subAdd: '',
-    async init() { await this.load(); await this.loadSuggestions(); await this.loadFbLists(); },
+    async init() { await this.load(); await this.loadSuggestions(); },
     fields: [
       { k: 'hero_title', label: 'Hero Title', g: 'HERO', t: 'text' },
       { k: 'hero_subtitle', label: 'Hero Subtitle', g: 'HERO', t: 'textarea' },
@@ -2279,16 +2095,6 @@ Alpine.data('shopContentPanel', () => ({
     get groups() { return ['HERO', 'WHOLESALE', 'TRUST BADGES', 'CONTACT / ABOUT'] },
     async load() {
       try { this.c = await fetchJSON(API + '/shop/content'); this.loaded = true; } catch (e) { this.loaded = false; }
-      try { const raw = String(this.c.fb_posts || ''); this.fbPosts = raw ? JSON.parse(raw) : []; if (!Array.isArray(this.fbPosts)) this.fbPosts = []; } catch (e) { this.fbPosts = []; }
-      if (!this.fbPosts.length && String(this.c.fb_embed_home || '').trim())
-        this.fbPosts = [{ code: this.c.fb_embed_home, ctaLabel: this.c.fb_cta_label || '', ctaTargetType: this.c.fb_cta_target_type || 'Wala', ctaTargetValue: this.c.fb_cta_target_value || '' }];
-      this.fbPosts.forEach(p => {
-        p.ctaTargetType = p.ctaTargetType || 'Wala';
-        const tl = String(p.ctaTargetType).toLowerCase();
-        if (tl === 'category') { const s = String(p.ctaTargetValue || '').split('|'); p.cat = (s[0] || '').trim(); p.search = (s[1] || '').trim(); }
-        else if (tl === 'product') p.prodQ = String(p.ctaTargetValue || '').trim();
-        else if (tl === 'url') p.url = String(p.ctaTargetValue || '').trim();
-      });
       this.subRows = String(this.c.subdivisions || '').split('\n').map(s => s.trim()).filter(Boolean);
     },
     async loadSuggestions() {
@@ -2307,49 +2113,6 @@ Alpine.data('shopContentPanel', () => ({
         await fetchJSON(API + '/subdivision-suggestions/' + s.id + '/dismiss', { method: 'POST' });
         await this.loadSuggestions();
       } catch (e) { toast(e.message || 'Failed', 'error'); }
-    },
-    async loadFbLists() { this.fbCats = await _loadShopCats(); },
-    async ensureFbProds() { if (this.fbProds.length || this.fbProdLoading) return; this.fbProdLoading = true; this.fbProds = await _loadShopProds(); this.fbProdLoading = false; },
-    fbAddPost() { this.fbPosts.push({ code: '', ctaLabel: '', ctaTargetType: 'Wala', ctaTargetValue: '', cat: '', search: '', prodQ: '', url: '' }); },
-    fbDelPost(i) { this.fbPosts.splice(i, 1); },
-    fbPostTargetChanged(p) { this.fbPostCompose(p); },
-    fbPostCompose(p) {
-      const tl = String(p.ctaTargetType || 'Wala').toLowerCase();
-      if (tl === 'wala' || !tl) p.ctaTargetValue = '';
-      else if (tl === 'category') p.ctaTargetValue = [p.cat, p.search].filter(Boolean).join('|');
-      else if (tl === 'product') { /* value via fbPick */ }
-      else if (tl === 'url') p.ctaTargetValue = String(p.url || '').trim();
-    },
-    fbProdName(p) {
-      const x = this.fbProds.find(a => String(a.id) === String(p.ctaTargetValue || '').trim());
-      return x ? x.name + ' — ₱' + (Number(x.price) || 0).toFixed(2) : (p.ctaTargetValue ? 'Product #' + p.ctaTargetValue : '');
-    },
-    fbProdsFor(p) {
-      if (!this.fbProds.length) return [];
-      const q = String(p.prodQ || '').trim().toLowerCase();
-      const list = q ? this.fbProds.filter(x => (x.name + ' ' + (x.category || '')).toLowerCase().includes(q)) : this.fbProds;
-      return list.slice(0, 15);
-    },
-    fbSelInfo(p) {
-      const x = this.fbProds.find(a => String(a.id) === String(p.ctaTargetValue || '').trim());
-      return x || null;
-    },
-    fbPick(p, id) {
-      const it = this.fbProds.find(x => String(x.id) === String(id));
-      if (!it) return;
-      p.prodQ = '';
-      p.ctaTargetValue = String(it.id);
-    },
-    fbPreviewHtml(code) {
-      const c = String(code || '');
-      let ifr = (c.match(/<iframe[^>]*src="[^"]*plugins\/post\.php[^"]*"[^>]*>/i) || [])[0];
-      if (ifr) {
-        ifr = ifr.replace(/height="(\d+)"/i, (m, h) => (parseInt(h, 10) < 400 ? 'height="641"' : m));
-        return ifr;
-      }
-      const href = (c.match(/data-href="([^"]+)"/i) || [])[1];
-      if (href) return '<iframe src="https://www.facebook.com/plugins/post.php?href=' + encodeURIComponent(href) + '&show_text=true&width=500" width="500" height="641" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowfullscreen="true" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>';
-      return '<p class="text-[10px] text-gray-400 text-center py-3">I-paste ang buong embed code para lumabas ang preview</p>';
     },
     subAddRow() {
       const n = String(this.subAdd || '').trim();
@@ -2370,7 +2133,6 @@ Alpine.data('shopContentPanel', () => ({
       this.saving = true;
       try {
         this.c.subdivisions = this.subRows.join('\n');
-        this.c.fb_posts = JSON.stringify(this.fbPosts.filter(p => String(p.code || '').trim()));
         const r = await fetchJSON(API + '/shop-content', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.c)
         });
@@ -2422,8 +2184,8 @@ Alpine.data('shopContentPanel', () => ({
   Alpine.data('feedPanel', () => ({
     posts: [], loading: false, saving: false, msg: '', msgOk: true,
     cats: [], prods: [], prodsLoading: false,
-    f: { id: 0, kind: 'promo', text: '', linkType: 'product', linkValue: '', linkQ: '', linkCat: '', linkUrl: '', active: true, image: null, imageUrl: '' },
-    async init() { await this.load(); this.cats = await _loadShopCats(); },
+    f: { id: 0, kind: 'promo', text: '', linkType: 'product', linkValue: '', linkQ: '', linkCat: '', browseCat: '', active: true, image: null, imageUrl: '' },
+    async init() { await this.load(); this.cats = await _loadShopCats(); this.pbEnsureProds(); },
     async load() {
       this.loading = true;
       try {
@@ -2432,12 +2194,11 @@ Alpine.data('shopContentPanel', () => ({
       } catch (e) { this.posts = []; }
       this.loading = false;
     },
-    openAdd() { this.f = { id: 0, kind: 'promo', text: '', linkType: 'product', linkValue: '', linkQ: '', linkCat: '', linkUrl: '', active: true, image: null, imageUrl: '' }; this.pbEnsureProds(); },
+    openAdd() { this.f = { id: 0, kind: 'promo', text: '', linkType: 'product', linkValue: '', linkQ: '', linkCat: '', browseCat: '', active: true, image: null, imageUrl: '' }; },
     openEdit(p) {
-      this.f = { id: p.id, kind: p.kind, text: p.text, linkType: p.linkType || '', linkValue: p.linkValue || '', linkQ: '', linkCat: '', linkUrl: '', active: true, image: null, imageUrl: p.imageUrl || '' };
+      this.f = { id: p.id, kind: p.kind, text: p.text, linkType: p.linkType || '', linkValue: p.linkValue || '', linkQ: '', linkCat: '', browseCat: '', active: true, image: null, imageUrl: p.imageUrl || '' };
       if (p.linkType === 'product') this.pbEnsureProds();
       else if (p.linkType === 'category') { const s = (p.linkValue || '').split('|'); this.f.linkCat = (s[0] || '').trim(); }
-      else if (p.linkType === 'url') this.f.linkUrl = p.linkValue || '';
     },
     onFile(e) {
       const file = e.target.files[0];
@@ -2465,7 +2226,6 @@ Alpine.data('shopContentPanel', () => ({
       const t = String(this.f.linkType || '');
       if (t === 'product') { /* value set via picker */ }
       else if (t === 'category') { this.f.linkValue = this.f.linkCat; }
-      else if (t === 'url') { this.f.linkValue = String(this.f.linkUrl || '').trim(); }
       else this.f.linkValue = '';
     },
     pf(n) { return window.fmt(n); },
@@ -2473,18 +2233,31 @@ Alpine.data('shopContentPanel', () => ({
     get linkMatches() {
       if (!this.prods.length) return [];
       const q = String(this.f.linkQ || '').trim().toLowerCase();
-      const list = q ? this.prods.filter(x => (x.name + ' ' + (x.category || '')).toLowerCase().includes(q)) : this.prods;
-      return list.slice(0, 15);
+      const bc = String(this.f.browseCat || '').trim().toLowerCase();
+      let list = this.prods;
+      if (bc) list = list.filter(x => String(x.category || '').toLowerCase() === bc);
+      if (q) list = list.filter(x => (x.name + ' ' + (x.category || '')).toLowerCase().includes(q));
+      return list.slice(0, 40);
     },
     pickLinkProduct(id) {
       const it = this.prods.find(x => String(x.id) === String(id));
       if (!it) return;
       this.f.linkValue = String(it.id);
       this.f.linkQ = '';
+      this.f.browseCat = '';
     },
     linkProductInfo() {
       const it = this.prods.find(x => String(x.id) === String(this.f.linkValue || ''));
       return it || null;
+    },
+    catalogCount(cat) {
+      if (!cat || !this.prods.length) return 0;
+      return this.prods.filter(x => String(x.category || '').toLowerCase() === String(cat).toLowerCase()).length;
+    },
+    catalogSampleNames(cat) {
+      if (!cat) return '';
+      const items = this.prods.filter(x => String(x.category || '').toLowerCase() === String(cat).toLowerCase()).slice(0, 6);
+      return items.map(x => x.name).join(' · ') + (items.length ? ' ...' : '');
     },
     async save() {
       if (!this.f.text.trim() && !this.f.image) { toast('Maglagay ng text o larawan', 'error'); return; }

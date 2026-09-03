@@ -104,11 +104,9 @@ tailwind.config = {
         { id:'grp-ecom', icon:'🛒', label:'E-COMMERCE', items:[
             { id:'online-orders', icon:'🛒', label:'Online Orders' },
             { id:'shop-content', icon:'🛍️', label:'Shop Content' },
-            { id:'promo-banners', icon:'🎯', label:'Promo Banners' },
             { id:'msgr-bot', icon:'🤖', label:'Messenger Bot' },
             { id:'restock-requests', icon:'🚨', label:'Restock Requests' },
             { id:'product-suggestions', icon:'💡', label:'Product Suggestions' },
-            { id:'promo-groups', icon:'🎁', label:'Promo Groups' },
             { id:'promo-free-queue', icon:'⏳', label:'Free Item Queue' },
             { id:'feed-posts', icon:'📰', label:'Feed Posts' }
         ]},
@@ -2307,112 +2305,6 @@ tailwind.config = {
           </div>
         </div>
 
-        <!-- FB POSTS SA HOME (multi-post: add / preview / delete) -->
-        <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
-          <div class="px-4 py-2.5 border-b border-gray-100 dark:border-[#222255] bg-gray-50 dark:bg-[#0d0d25]/50 flex items-center justify-between">
-            <h4 class="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">📘 FB POSTS SA HOME <span x-show="fbPosts.length" class="ml-1 px-1.5 py-0.5 rounded-full bg-blue-600 text-white text-[9px]" x-text="fbPosts.length"></span></h4>
-            <button @click="fbAddPost()" class="text-[10px] px-2.5 py-1.5 rounded bg-blue-600 text-white font-bold hover:bg-blue-700">➕ ADD ANOTHER POST</button>
-          </div>
-          <div class="p-4 space-y-4">
-            <template x-for="(p, i) in fbPosts" :key="i">
-              <div class="border border-gray-200 dark:border-[#222255] rounded-xl p-3 space-y-2">
-                <div class="flex items-center justify-between">
-                  <p class="text-[11px] font-bold text-gray-500 dark:text-[#7878aa]" x-text="'POST ' + (i + 1)"></p>
-                  <button @click="fbDelPost(i)" class="text-[10px] px-2 py-1 rounded bg-red-500/10 text-red-500 hover:bg-red-500/20">✕ DELETE</button>
-                </div>
-                <div>
-                  <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Embed code (i-paste ang buong &lt;iframe&gt; — FB post → ⋯ → Embed → Get Code)</label>
-                  <textarea x-model="p.code" rows="4" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200 font-mono" placeholder="&lt;iframe src=&quot;https://www.facebook.com/plugins/post.php?...&quot;&gt;"></textarea>
-                </div>
-                <template x-if="String(p.code || '').trim()">
-                  <div>
-                    <p class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">🖼️ Preview (ganito sa home — auto-fit sa phone):</p>
-                    <div class="border border-gray-200 dark:border-[#222255] rounded-lg p-1 bg-gray-50 dark:bg-[#0d0d25]/50 overflow-x-auto">
-                      <div class="w-[500px] max-w-full mx-auto" x-html="fbPreviewHtml(p.code)"></div>
-                    </div>
-                  </div>
-                </template>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div>
-                    <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Button text (sa ilalim ng post; blangko = walang button)</label>
-                    <input x-model="p.ctaLabel" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                  </div>
-                  <div>
-                    <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Saan ituturo ang button</label>
-                    <select x-model="p.ctaTargetType" @change="fbPostTargetChanged(p)" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                      <option>Wala</option>
-                      <option>Product</option>
-                      <option>Category</option>
-                      <option>URL</option>
-                    </select>
-                  </div>
-                </div>
-                <template x-if="p.ctaTargetType === 'Category'">
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Kategorya</label>
-                      <select x-model="p.cat" @change="fbPostTargetChanged(p)" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                        <option value="">-- Piliin ang kategorya --</option>
-                        <template x-for="cat in fbCats" :key="cat"><option :value="cat" x-text="cat"></option></template>
-                      </select>
-                    </div>
-                    <div>
-                      <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Salain (opsyonal — hal. milo)</label>
-                      <input x-model="p.search" @input="fbPostTargetChanged(p)" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                    </div>
-                  </div>
-                </template>
-                <template x-if="p.ctaTargetType === 'Product'">
-                  <div>
-                    <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Produkto (ang item na mapupuntahan)</label>
-                    <template x-if="fbSelInfo(p)">
-                      <div class="flex items-center justify-between gap-2 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 px-3 py-2 mb-2">
-                        <div class="flex items-center gap-2 min-w-0">
-                          <img :src="'/api/dashboard/product-image/' + fbSelInfo(p).id" onerror="this.style.display='none'" class="w-8 h-8 rounded object-cover bg-gray-100 shrink-0">
-                          <div class="min-w-0">
-                            <p class="text-[11px] font-bold text-violet-700 dark:text-violet-300 truncate" x-text="fbSelInfo(p).name"></p>
-                            <p class="text-[10px] text-gray-500" x-text="'₱ ' + fmt(fbSelInfo(p).price)"></p>
-                          </div>
-                        </div>
-                        <button @click="p.ctaTargetValue = ''; p.prodQ = ''" class="text-[10px] px-2 py-1 rounded bg-white dark:bg-[#181848] text-violet-700 dark:text-violet-300 font-bold shrink-0">✕ BAGUHIN</button>
-                      </div>
-                    </template>
-                    <input x-model="p.prodQ" @focus="ensureFbProds()" type="text" placeholder="Maghanap ng produkto (hal. milo)..." class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                    <template x-if="String(p.prodQ || '').trim() && fbProds.length">
-                      <div class="mt-1 border border-gray-200 dark:border-[#222255] rounded-lg overflow-hidden max-h-52 overflow-y-auto bg-white dark:bg-[#181848]">
-                        <template x-if="fbProdsFor(p).length">
-                          <div class="divide-y divide-gray-100 dark:divide-[#222255]">
-                            <template x-for="m in fbProdsFor(p)" :key="m.id">
-                              <button @click="fbPick(p, m.id)" class="w-full flex items-center gap-2 px-2.5 py-2 text-left hover:bg-violet-50 dark:hover:bg-violet-900/20">
-                                <img :src="'/api/dashboard/product-image/' + m.id" onerror="this.style.display='none'" class="w-8 h-8 rounded object-cover bg-gray-100 shrink-0">
-                                <span class="min-w-0 flex-1">
-                                  <span class="block text-[11px] font-semibold text-gray-700 dark:text-slate-200 truncate" x-text="m.name"></span>
-                                  <span class="block text-[10px] text-gray-400" x-text="m.category || ''"></span>
-                                </span>
-                                <span class="text-[11px] font-black text-violet-700 dark:text-violet-300 shrink-0" x-text="'₱ ' + fmt(m.price)"></span>
-                              </button>
-                            </template>
-                          </div>
-                        </template>
-                        <template x-if="!fbProdsFor(p).length"><p class="px-3 py-2.5 text-[11px] text-gray-400 text-center">Walang tugma sa paghahanap mo</p></template>
-                      </div>
-                    </template>
-                  </div>
-                </template>
-                <template x-if="p.ctaTargetType === 'URL'">
-                  <div>
-                    <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Link</label>
-                    <input x-model="p.url" @input="fbPostTargetChanged(p)" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                  </div>
-                </template>
-              </div>
-            </template>
-            <template x-if="fbPosts.length === 0">
-              <p class="text-xs text-gray-400 dark:text-[#7878aa] text-center py-4">Wala pang FB post — i-click ang ➕ ADD ANOTHER POST</p>
-            </template>
-            <p class="text-[10px] text-gray-400 dark:text-[#7878aa]">Pagkatapos magdagdag/mag-edit: 💾 SAVE ALL → lalabas sa home ng shop (ibaba ng banner carousel, isa-isa). Guest → sign-in muna bago ma-click ang target.</p>
-          </div>
-        </div>
 
         <!-- SUBDIVISIONS (delivery address list — add/delete/dedupe) -->
         <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
@@ -2506,149 +2398,6 @@ tailwind.config = {
       </div>
     </div>
 
-    <!-- PROMO BANNERS SECTION                                       -->
-    <div x-show="$store.app.section === 'promo-banners'" x-transition.opacity>
-      <div x-data="promoBannersPanel" class="space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">🎯 Promo Banners <span class="text-[10px] text-gray-400 dark:text-[#7878aa] font-normal">(clickable banners sa shop front — guest = login, member = target)</span></h3>
-          <div class="flex items-center gap-2">
-            <span class="text-xs px-3 py-2 rounded-lg border border-violet-500 text-violet-600 dark:text-violet-400 font-medium">PointsRate: <b x-text="pointsRate"></b></span>
-            <button @click="load()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">REFRESH</button>
-          </div>
-        </div>
-        <div x-show="msg" x-transition.opacity class="text-xs px-4 py-3 rounded-lg border" :class="msgOk ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'" x-text="msg"></div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <template x-for="b in banners" :key="b.id">
-            <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
-              <div class="relative bg-gray-100 dark:bg-[#181848] aspect-[12/5]">
-                <img x-show="b.imageUrl" :src="b.imageUrl" class="w-full h-full object-cover" :alt="'Banner ' + b.id">
-                <div x-show="!b.imageUrl" class="w-full h-full flex items-center justify-center text-3xl">🎨</div>
-                <span class="absolute top-2 right-2 text-[9px] font-bold px-2 py-0.5 rounded-full" :class="b.active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-500'" x-text="b.active ? 'ACTIVE' : 'OFF'"></span>
-              </div>
-              <div class="p-3 space-y-2">
-                <div class="flex items-center justify-between text-xs">
-                  <span class="text-gray-600 dark:text-slate-300 font-bold" x-text="'#' + b.id + ' · ' + b.targetType.toUpperCase()"></span>
-                  <span class="text-gray-400" x-text="b.targetValue || '—'"></span>
-                </div>
-                <div class="flex gap-1.5">
-                  <button @click="openEdit(b)" class="text-[10px] px-2.5 py-1.5 rounded bg-cyan-600 text-white font-bold hover:bg-cyan-700">EDIT</button>
-                  <button @click="remove(b)" class="text-[10px] px-2.5 py-1.5 rounded border border-red-500 text-red-500 hover:bg-red-500/10">DEL</button>
-                </div>
-              </div>
-            </div>
-          </template>
-        </div>
-
-        <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
-          <div class="px-4 py-2.5 border-b border-gray-100 dark:border-[#222255] bg-gray-50 dark:bg-[#0d0d25]/50 flex items-center justify-between">
-            <h4 class="text-[11px] font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">BANNER EDITOR</h4>
-            <button @click="openAdd()" class="text-[10px] font-bold text-cyan-600 dark:text-cyan-400">➕ ADD BANNER</button>
-          </div>
-          <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div class="sm:col-span-2">
-              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Image <span x-show="!form.id" class="text-amber-500">(required para sa bagong banner)</span></label>
-              <input id="pbFile" type="file" @change="onFile($event)" accept="image/png,image/jpeg,image/webp" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg p-2 text-gray-700 dark:text-slate-200">
-            </div>
-            <div>
-              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Target Type</label>
-              <select x-model="form.targetType" @change="pbTargetChanged()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                <option value="category">Category (may optional search)</option>
-                <option value="product">Product</option>
-                <option value="url">URL</option>
-                <option value="register">Register (Sign-in)</option>
-              </select>
-            </div>
-            <template x-if="form.targetType === 'category'">
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Kategorya</label>
-                  <select x-model="form.cat" @change="pbTargetChanged()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                    <option value="">-- Piliin ang kategorya --</option>
-                    <template x-for="cat in cats" :key="cat"><option :value="cat" x-text="cat"></option></template>
-                  </select>
-                </div>
-                <div>
-                  <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Salain (opsyonal — hal. CLVB)</label>
-                  <input x-model="form.search" @input="pbTargetChanged()" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                </div>
-              </div>
-            </template>
-            <template x-if="form.targetType === 'product'">
-              <div class="sm:col-span-2">
-                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Produkto (ang item na mapupuntahan)</label>
-                <template x-if="pbSelInfo()">
-                  <div class="flex items-center justify-between gap-2 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 px-3 py-2 mb-2">
-                    <div class="flex items-center gap-2 min-w-0">
-                      <img :src="'/api/dashboard/product-image/' + pbSelInfo().id" onerror="this.style.display='none'" class="w-8 h-8 rounded object-cover bg-gray-100 shrink-0">
-                      <div class="min-w-0">
-                        <p class="text-[11px] font-bold text-violet-700 dark:text-violet-300 truncate" x-text="pbSelInfo().name"></p>
-                        <p class="text-[10px] text-gray-500" x-text="'₱ ' + pf(pbSelInfo().price)"></p>
-                      </div>
-                    </div>
-                    <button @click="form.targetValue = ''; form.prodQ = ''" class="text-[10px] px-2 py-1 rounded bg-white dark:bg-[#181848] text-violet-700 dark:text-violet-300 font-bold shrink-0">✕ BAGUHIN</button>
-                  </div>
-                </template>
-                <input x-model="form.prodQ" @focus="pbEnsureProds()" type="text" placeholder="Maghanap ng produkto (hal. CLVB)..." class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                <template x-if="String(form.prodQ || '').trim() && prods.length">
-                  <div class="mt-1 border border-gray-200 dark:border-[#222255] rounded-lg overflow-hidden max-h-52 overflow-y-auto bg-white dark:bg-[#181848]">
-                    <template x-if="pbMatches.length">
-                      <div class="divide-y divide-gray-100 dark:divide-[#222255]">
-                        <template x-for="m in pbMatches" :key="m.id">
-                          <button @click="pbPick(m.id)" class="w-full flex items-center gap-2 px-2.5 py-2 text-left hover:bg-violet-50 dark:hover:bg-violet-900/20">
-                            <img :src="'/api/dashboard/product-image/' + m.id" onerror="this.style.display='none'" class="w-8 h-8 rounded object-cover bg-gray-100 shrink-0">
-                            <span class="min-w-0 flex-1">
-                              <span class="block text-[11px] font-semibold text-gray-700 dark:text-slate-200 truncate" x-text="m.name"></span>
-                              <span class="block text-[10px] text-gray-400" x-text="m.category || ''"></span>
-                            </span>
-                            <span class="text-[11px] font-black text-violet-700 dark:text-violet-300 shrink-0" x-text="'₱ ' + pf(m.price)"></span>
-                          </button>
-                        </template>
-                      </div>
-                    </template>
-                    <template x-if="!pbMatches.length"><p class="px-3 py-2.5 text-[11px] text-gray-400 text-center">Walang tugma sa paghahanap mo</p></template>
-                  </div>
-                </template>
-              </div>
-            </template>
-            <template x-if="form.targetType === 'url'">
-              <div>
-                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">URL</label>
-                <input x-model="form.url" @input="pbTargetChanged()" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-              </div>
-            </template>
-            <template x-if="form.targetType === 'register'">
-              <div class="sm:col-span-2">
-                <p class="text-[11px] text-gray-500 dark:text-[#7878aa]">Ang banner ay magbubukas ng Google Sign-in (para sa mga guest).</p>
-              </div>
-            </template>
-            <template x-if="form.targetType !== 'register'">
-              <div class="sm:col-span-2">
-                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">🎯 SAMPLE — kung saan landing ang banner:</label>
-                <div class="rounded-lg bg-gray-50 dark:bg-[#0d0d25]/50 border border-gray-200 dark:border-[#222255] p-2 max-h-32 overflow-y-auto">
-                  <template x-if="pbSample() === null"><p class="text-[10px] text-gray-400">(i-load ang listahan — i-click ang target field)</p></template>
-                  <template x-if="pbSample() && pbSample().length === 0"><p class="text-[10px] text-gray-400">Walang tutugma sa target na ito</p></template>
-                  <template x-for="(s, si) in (pbSample() || [])" :key="si">
-                    <p class="text-[11px] text-gray-600 dark:text-slate-300 truncate"><span x-text="(si + 1) + '. ' + s.name"></span><span x-text="s.price != null ? ' — ₱' + Number(s.price).toFixed(2) : ''"></span></p>
-                  </template>
-                </div>
-              </div>
-            </template>
-            <div>
-              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Sort Order</label>
-              <input x-model.number="form.sortOrder" type="number" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-            </div>
-            <div class="flex items-end">
-              <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-slate-300">
-                <input type="checkbox" x-model="form.active" class="w-4 h-4 accent-emerald-600"> Active
-              </label>
-            </div>
-            <div class="sm:col-span-2">
-              <button @click="save()" :disabled="saving" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 disabled:opacity-50" x-text="saving ? 'SAVING...' : '💾 SAVE BANNER'"></button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- FEED POSTS SECTION (TikTok-style home feed)                        -->
     <div x-show="$store.app.section === 'feed-posts'" x-transition.opacity>
@@ -2687,9 +2436,8 @@ tailwind.config = {
               <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">🔗 Link (opsyonal — kung saan mapupunta pag-click)</label>
               <select x-model="f.linkType" @change="linkChanged()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
                 <option value="">Wala</option>
-                <option value="product">Product</option>
-                <option value="category">Category</option>
-                <option value="url">URL</option>
+                <option value="product">Product (isang item)</option>
+                <option value="category">Catalog (buong kategorya)</option>
               </select>
             </div>
             <template x-if="f.linkType === 'product'">
@@ -2704,12 +2452,18 @@ tailwind.config = {
                         <p class="text-[10px] text-gray-500" x-text="'₱ ' + pf(linkProductInfo().price)"></p>
                       </div>
                     </div>
-                    <button @click="f.linkValue = ''; f.linkQ = ''" class="text-[10px] px-2 py-1 rounded bg-white dark:bg-[#181848] text-violet-700 dark:text-violet-300 font-bold shrink-0">✕ BAGUHIN</button>
+                    <button @click="f.linkValue = ''; f.linkQ = ''; f.browseCat = ''" class="text-[10px] px-2 py-1 rounded bg-white dark:bg-[#181848] text-violet-700 dark:text-violet-300 font-bold shrink-0">✕ BAGUHIN</button>
                   </div>
                 </template>
-                <input x-model="f.linkQ" @focus="pbEnsureProds()" type="text" placeholder="Maghanap ng produkto (hal. milo)..." class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                <template x-if="String(f.linkQ || '').trim() && prods.length">
-                  <div class="mt-1 border border-gray-200 dark:border-[#222255] rounded-lg overflow-hidden max-h-52 overflow-y-auto bg-white dark:bg-[#181848]">
+                <div class="flex flex-col sm:flex-row gap-2 mb-1">
+                  <select x-model="f.browseCat" class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200 sm:w-52">
+                    <option value="">Lahat ng kategorya</option>
+                    <template x-for="cat in cats" :key="cat"><option :value="cat" x-text="cat"></option></template>
+                  </select>
+                  <input x-model="f.linkQ" @focus="pbEnsureProds()" type="text" placeholder="🔍 Salain: maghanap (hal. milo) — opsyonal" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                </div>
+                <template x-if="prods.length">
+                  <div class="border border-gray-200 dark:border-[#222255] rounded-lg overflow-hidden max-h-56 overflow-y-auto bg-white dark:bg-[#181848]">
                     <template x-if="linkMatches.length">
                       <div class="divide-y divide-gray-100 dark:divide-[#222255]">
                         <template x-for="m in linkMatches" :key="m.id">
@@ -2724,27 +2478,27 @@ tailwind.config = {
                         </template>
                       </div>
                     </template>
-                    <template x-if="!linkMatches.length"><p class="px-3 py-2.5 text-[11px] text-gray-400 text-center">Walang tugma sa paghahanap mo</p></template>
+                    <template x-if="!linkMatches.length"><p class="px-3 py-2.5 text-[11px] text-gray-400 text-center">Walang tugma — subukan ang ibang salita o kategorya</p></template>
                   </div>
                 </template>
-                <template x-if="String(f.linkQ || '').trim() && !prods.length && !prodsLoading">
+                <template x-if="!prods.length && !prodsLoading">
                   <p class="text-[10px] text-amber-500 mt-1">Hindi ma-load ang listahan — suriin ang koneksyon o i-refresh ang page</p>
                 </template>
               </div>
             </template>
             <template x-if="f.linkType === 'category'">
               <div class="sm:col-span-2">
-                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Kategorya</label>
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Kategorya (ang BUONG kategoryang ito ang lalabas sa shop)</label>
                 <select x-model="f.linkCat" @change="linkChanged()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
                   <option value="">-- Piliin --</option>
                   <template x-for="cat in cats" :key="cat"><option :value="cat" x-text="cat"></option></template>
                 </select>
-              </div>
-            </template>
-            <template x-if="f.linkType === 'url'">
-              <div class="sm:col-span-2">
-                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">URL</label>
-                <input x-model="f.linkUrl" @input="linkChanged()" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                <template x-if="f.linkCat">
+                  <div class="mt-1 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 px-3 py-2">
+                    <p class="text-[10px] text-violet-700 dark:text-violet-300 font-bold">🎯 SAMPLE: ang buong "<span x-text="f.linkCat"></span>" ang lalabas — <span x-text="catalogCount(f.linkCat) + ' item(s)'"></span></p>
+                    <p class="text-[10px] text-gray-500 mt-0.5 truncate" x-text="catalogSampleNames(f.linkCat)"></p>
+                  </div>
+                </template>
               </div>
             </template>
             <div class="sm:col-span-2">
@@ -2869,99 +2623,6 @@ tailwind.config = {
       </div>
     </div>
 
-    <!-- PROMO GROUPS SECTION                                          -->
-    <div x-show="$store.app.section === 'promo-groups'" x-transition.opacity>
-      <div x-data="promoGroupsPanel" class="space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">🎁 Promo Groups <span class="text-[10px] text-gray-400 dark:text-[#7878aa] font-normal">(buy X get free — combine qty ng items, libre ang napiling product)</span></h3>
-          <div class="flex items-center gap-2">
-            <button @click="newGroup()" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">+ NEW GROUP</button>
-            <button @click="load()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">REFRESH</button>
-          </div>
-        </div>
-        <div x-show="msg" x-transition.opacity class="text-xs px-4 py-3 rounded-lg border" :class="msgOk ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'" x-text="msg"></div>
-
-        <!-- Group form -->
-        <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl p-4 space-y-3">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">PROMO NAME</label>
-              <input x-model="form.name" type="text" placeholder="hal. Mismo 60+1" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-            </div>
-            <div>
-              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">BUY (kabuuang qty ng lahat ng items)</label>
-              <input x-model.number="form.buyQty" type="number" min="1" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-            </div>
-          </div>
-          <div class="space-y-2">
-            <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block">GROUP ITEMS <span class="text-gray-400">(i-type para maghanap)</span></label>
-            <template x-for="(it, i) in form.items" :key="i">
-              <div class="flex items-center gap-2">
-                <span class="text-[11px] font-bold text-gray-400 w-6" x-text="(i + 1) + '.'"></span>
-                <div class="relative flex-1">
-                  <input x-model="it.q" @focus="it.open = true" @input="it.open = true" @keydown.enter.prevent="pickFirst(it)" @click.outside="it.open = false" type="text" placeholder="Search product... (Enter = piliin ang una)" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                  <div x-show="it.open" class="absolute z-20 left-0 right-0 top-full mt-1 bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-lg shadow-xl max-h-52 overflow-y-auto">
-                    <template x-for="p in searchResults(it.q)" :key="p.id">
-                      <button @click="it.productId = p.id; it.q = p.name; it.open = false" class="block w-full text-left px-3 py-1.5 text-[11px] hover:bg-violet-50 dark:hover:bg-[#181848] truncate" x-text="p.name"></button>
-                    </template>
-                    <p x-show="!searchResults(it.q).length" class="px-3 py-2 text-[11px] text-gray-400">Walang match — i-type pa</p>
-                  </div>
-                </div>
-                <button @click="removeItem(i)" x-show="form.items.length > 2" class="text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg p-1.5" title="Remove item">✕</button>
-              </div>
-            </template>
-            <button @click="addItem()" class="text-[11px] px-3 py-1.5 rounded-lg bg-violet-600 text-white font-medium hover:bg-violet-700">+ ADD ITEM</button>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">GET FREE <span class="text-gray-400">(lahat ng items — i-type para maghanap)</span></label>
-              <div class="relative">
-                <input x-model="freeQ" @focus="freeOpen = true" @input="freeOpen = true" @keydown.enter.prevent="pickFreeFirst()" @click.outside="freeOpen = false" type="text" placeholder="Search free product... (Enter = piliin ang una)" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-                <div x-show="freeOpen" class="absolute z-20 left-0 right-0 top-full mt-1 bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-lg shadow-xl max-h-52 overflow-y-auto">
-                  <template x-for="p in searchResults(freeQ)" :key="p.id">
-                    <button @click="form.freeProductId = p.id; freeQ = p.name; freeOpen = false" class="block w-full text-left px-3 py-1.5 text-[11px] hover:bg-violet-50 dark:hover:bg-[#181848] truncate" x-text="p.name"></button>
-                  </template>
-                  <p x-show="!searchResults(freeQ).length" class="px-3 py-2 text-[11px] text-gray-400">Walang match — i-type pa</p>
-                </div>
-              </div>
-            </div>
-            <div>
-              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">FREE QTY (ilan ang libre)</label>
-              <input x-model.number="form.freeQty" type="number" min="1" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
-            </div>
-          </div>
-          <div class="flex items-center justify-between gap-3">
-            <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-slate-300">
-              <input type="checkbox" x-model="form.active" class="w-4 h-4 accent-emerald-600"> Active
-            </label>
-            <div class="flex items-center gap-2">
-              <button @click="newGroup()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">CLEAR</button>
-              <button @click="save()" :disabled="saving" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700 disabled:opacity-50" x-text="saving ? 'SAVING...' : (form.id ? 'UPDATE GROUP' : 'SAVE GROUP')"></button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Group list -->
-        <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
-          <template x-for="g in groups" :key="g.id">
-            <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-[#222255] last:border-0">
-              <span class="text-lg shrink-0">🎁</span>
-              <div class="flex-1 min-w-0">
-                <p class="text-xs font-bold text-gray-800 dark:text-slate-200 truncate" x-text="g.name"></p>
-                <p class="text-[11px] text-gray-500 dark:text-[#7878aa] truncate" x-text="'Items: ' + (g.items || []).map(x => x.name).join(' + ')"></p>
-                <p class="text-[11px] text-gray-500 dark:text-[#7878aa]" x-text="'Buy ' + g.buyQty + ' (total) → FREE ' + g.freeQty + ' x ' + (g.freeName || '')"></p>
-                <span class="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full" :class="g.active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'" x-text="g.active ? 'ACTIVE' : 'OFF'"></span>
-              </div>
-              <div class="flex items-center gap-1.5 shrink-0">
-                <button @click="openEdit(g)" class="text-[10px] px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-medium hover:bg-cyan-700">EDIT</button>
-                <button @click="del(g)" class="text-[10px] px-3 py-1.5 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700">DEL</button>
-              </div>
-            </div>
-          </template>
-          <p x-show="!groups.length" class="text-xs text-center text-gray-400 dark:text-[#7878aa] py-8">Wala pang promo group. Gumawa ng isa gamit ang form sa itaas.</p>
-        </div>
-      </div>
-    </div>
 
     <!-- FREE ITEM QUEUE SECTION                                        -->
     <div x-show="$store.app.section === 'promo-free-queue'" x-transition.opacity>
@@ -3843,8 +3504,8 @@ tailwind.config = {
 
   </div><!-- /main content -->
 
-  <script src="components.js?v=20260910"></script>
-  <script src="app.js?v=20260910"></script>
+  <script src="components.js?v=20260911"></script>
+  <script src="app.js?v=20260911"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script>
   /* ── Web login gating (username + PIN, WEB ACCESS only) ── */

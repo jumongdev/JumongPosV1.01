@@ -92,68 +92,6 @@
     <div id="feedTrack"></div>
     <div id="feedSentinel"></div>
   </div>
-
-  <!-- LEGACY HOME BLOCKS (nakatago — iniingatan para sa JS refs: banners/promo-groups/FB posts) -->
-  <div id="legacyHome" class="hidden">
-    <!-- ===== BANNER CAROUSEL ===== -->
-    <section class="max-w-6xl mx-auto px-4 pt-4">
-      <div id="carousel" class="relative rounded-3xl overflow-hidden card-shadow">
-        <div id="carouselTrack" class="flex transition-transform duration-500 ease-out aspect-[16/6] sm:aspect-[16/4]"></div>
-        <button id="carPrev" onclick="carPrev()" aria-label="Previous" class="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center z-10 transition active:scale-90">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
-        </button>
-        <button id="carNext" onclick="carNext()" aria-label="Next" class="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center z-10 transition active:scale-90">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-        </button>
-        <div id="carDots" class="absolute bottom-2.5 left-0 right-0 flex justify-center gap-1.5 z-10"></div>
-      </div>
-    </section>
-
-    <!-- ===== FACEBOOK POSTS (dashboard-controlled, multi) ===== -->
-    <section id="fbHomeSection" class="hidden max-w-6xl mx-auto px-4 mt-4">
-      <div class="rounded-3xl overflow-hidden card-shadow bg-white">
-        <div id="fbHomeWrap" class="flex flex-col"></div>
-      </div>
-    </section>
-    <style>#fbHomeWrap iframe { max-width: 100%; }</style>
-
-    <!-- ===== PROMO GROUPS ===== -->
-    <section id="promoSection" class="hidden max-w-6xl mx-auto px-4 mt-4">
-      <p class="text-xs font-black text-stone-500 uppercase tracking-widest mb-2">🎁 Mga Promo</p>
-      <div id="promoGroupsRow" class="flex flex-col gap-3"></div>
-    </section>
-
-    <!-- ===== LANDING EXTRAS (guest only) ===== -->
-    <div id="landingExtras"><!-- ===== TRUST BADGES ===== -->
-      <section class="max-w-6xl mx-auto px-4 mt-6">
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-          <div class="rounded-2xl bg-white card-shadow p-3.5 flex items-center gap-3">
-            <span class="text-2xl">🚚</span>
-            <div class="min-w-0"><p class="text-xs font-black text-stone-900 truncate" id="trustDelivery">Fast Local Delivery</p><p class="text-[11px] text-stone-500 truncate" id="trustDeliveryDetail">Straight to your doorstep</p></div>
-          </div>
-          <div class="rounded-2xl bg-white card-shadow p-3.5 flex items-center gap-3">
-            <span class="text-2xl">🏪</span>
-            <div class="min-w-0"><p class="text-xs font-black text-stone-900 truncate" id="trustPickup">Store Pickup</p><p class="text-[11px] text-stone-500 truncate" id="trustPickupDetail">Order online, pick up at the store</p></div>
-          </div>
-          <div class="rounded-2xl bg-white card-shadow p-3.5 flex items-center gap-3">
-            <span class="text-2xl">💵</span>
-            <div class="min-w-0"><p class="text-xs font-black text-stone-900 truncate" id="trustCod">Cash on Delivery</p><p class="text-[11px] text-stone-500 truncate" id="trustCodDetail">Pay when your order arrives</p></div>
-          </div>
-          <div class="rounded-2xl bg-white card-shadow p-3.5 flex items-center gap-3">
-            <span class="text-2xl">📱</span>
-            <div class="min-w-0"><p class="text-xs font-black text-stone-900 truncate" id="trustGcash">GCash Accepted</p><p class="text-[11px] text-stone-500 truncate" id="trustGcashDetail">Easy and convenient payment</p></div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ===== WHOLESALE BANNER ===== -->
-      <section class="max-w-6xl mx-auto px-4 mt-6">
-        <div class="bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-2xl px-5 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p class="text-sm font-bold flex items-center gap-2">📦 <span id="wholesaleText">Need Wholesale / Bulk ordering for Sari-Sari Stores? Message us for special rates.</span></p>
-        </div>
-      </section>
-    </div><!-- /landingExtras -->
-  </div><!-- /legacyHome -->
 </div><!-- /homeView -->
 
 <style>
@@ -353,8 +291,6 @@ let myAddresses = [];
 let myFavs = new Set();
 let favOnly = false;
 let subdivisions = [];
-let promoBanners = [];
-let promoPointsRate = 200;
 let detailUnit = null;
 let openDetailId = null;
 
@@ -395,74 +331,8 @@ async function loadShopContent() {
 
 function applyContent() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-  set('heroTitle', shopContent.hero_title);
-  set('heroSub', shopContent.hero_subtitle);
-  set('heroCta', shopContent.hero_cta);
-  set('wholesaleText', shopContent.wholesale_banner);
-  set('trustDelivery', shopContent.trust_delivery); set('trustDeliveryDetail', shopContent.trust_delivery_detail);
-  set('trustPickup', shopContent.trust_pickup); set('trustPickupDetail', shopContent.trust_pickup_detail);
-  set('trustCod', shopContent.trust_cod); set('trustCodDetail', shopContent.trust_cod_detail);
-  set('trustGcash', shopContent.trust_gcash); set('trustGcashDetail', shopContent.trust_gcash_detail);
-  set('coverageText', shopContent.delivery_coverage);
-  set('addressText', shopContent.pickup_address);
-  set('phoneText', shopContent.phone);
-  set('phoneText2', shopContent.phone);
-  set('aboutText', shopContent.about_text);
   if (shopContent.subdivisions) subdivisions = String(shopContent.subdivisions).split('\n').map(s => s.trim()).filter(Boolean);
   fillSubdivisionSelects();
-  document.querySelectorAll('[data-msg]').forEach(a => a.href = shopContent.messenger_link || '#');
-  const fb = document.getElementById('fbLink'); if (fb) fb.href = shopContent.facebook_link || '#';
-  // Facebook posts (home) — multi-post list + CTA buttons
-  const posts = parseFbPosts();
-  const fbSec = document.getElementById('fbHomeSection');
-  const fbWrap = document.getElementById('fbHomeWrap');
-  if (fbSec && fbWrap) {
-    if (posts.length) {
-      fbWrap.innerHTML = posts.map((p, i) =>
-        '<div class="flex flex-col items-center">' +
-          '<div class="w-full max-w-[500px] flex justify-center overflow-x-auto p-1 sm:p-2">' + fbEmbedHtml(p.code) + '</div>' +
-          '<a href="' + escH(fbPostUrl(p.code)) + '" target="_blank" rel="noopener" class="text-[11px] text-stone-400 hover:text-violet-700 mb-2 -mt-1">Buksan sa Facebook ↗</a>' +
-          (String(p.ctaLabel || '').trim() && String(p.ctaTargetType || '').toLowerCase() !== 'wala'
-            ? '<button onclick="fbCtaClick(' + i + ')" class="mt-1 mb-4 px-6 py-3 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white text-sm font-black shadow-lg active:scale-95 transition">' + escH(p.ctaLabel) + '</button>'
-            : '') +
-        '</div>').join('');
-      fbSec.classList.remove('hidden');
-    } else {
-      fbWrap.innerHTML = '';
-      fbSec.classList.add('hidden');
-    }
-  }
-}
-function parseFbPosts() {
-  const raw = String(shopContent.fb_posts || '').trim();
-  if (raw) {
-    try {
-      const arr = JSON.parse(raw);
-      if (Array.isArray(arr)) return arr.filter(p => p && String(p.code || '').trim());
-    } catch (e) { /* fallback below */ }
-  }
-  const legacy = String(shopContent.fb_embed_home || '').trim();
-  if (legacy) return [{ code: legacy, ctaLabel: shopContent.fb_cta_label || '', ctaTargetType: shopContent.fb_cta_target_type || 'Wala', ctaTargetValue: shopContent.fb_cta_target_value || '' }];
-  return [];
-}
-function fbEmbedHtml(code) {
-  const c = String(code || '');
-  let ifr = (c.match(/<iframe[^>]*src="[^"]*plugins\/post\.php[^"]*"[^>]*>/i) || [])[0];
-  if (ifr) {
-    // i-normalize ang height (kung masyadong maliit ang na-paste, puputulin ang post)
-    ifr = ifr.replace(/height="(\d+)"/i, (m, h) => (parseInt(h, 10) < 400 ? 'height="641"' : m));
-    return ifr;
-  }
-  const href = (c.match(/data-href="([^"]+)"/i) || [])[1];
-  if (href) return '<iframe src="https://www.facebook.com/plugins/post.php?href=' + encodeURIComponent(href) + '&show_text=true&width=500" width="500" height="641" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowfullscreen="true" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>';
-  return '<p class="text-xs text-stone-400 text-center py-4">FB embed code — hindi mabasa. I-paste ang buong &lt;iframe&gt; code.</p>';
-}
-function fbPostUrl(code) {
-  const c = String(code || '');
-  const m = c.match(/href="(https?:\/\/www\.facebook\.com\/[^"]+)"/i);
-  if (m) return decodeURIComponent(m[1]);
-  const dh = c.match(/data-href="([^"]+)"/i);
-  return dh ? dh[1] : 'https://www.facebook.com/';
 }
 
 function fillSubdivisionSelects() {
@@ -665,7 +535,6 @@ async function loadCatalog() {
     }
   } finally {
     showLoading(false);
-    renderPromoGroups();
   }
 }
 
@@ -1421,7 +1290,7 @@ document.addEventListener('touchcancel', () => {
 });
 async function refreshShop() {
   const wasSearch = !!searchQ;
-  await Promise.all([loadCatalog(), loadBanners()]);
+  await Promise.all([loadCatalog()]);
   if (!wasSearch) { searchQ = ''; const si = document.getElementById('searchInput'); if (si) si.value = ''; }
   toast('Shop refreshed ✓', 'ok');
 }
@@ -1885,8 +1754,6 @@ renderTiles();
 updateBadge();
 loadMe();
 initFeed();
-loadBanners();
-loadPromoGroups();
 switchView(sessionStorage.getItem('shop_view') === 'catalog' ? 'catalog' : 'home');
 // PWA - installable app
 if ('serviceWorker' in navigator) {
@@ -2078,43 +1945,6 @@ function initFeed() {
   }
   loadFeed();
 }
-let carouselIdx = 0;
-let carouselTimer = null;
-function renderCarousel() {
-  const wrap = document.getElementById('carousel');
-  const track = document.getElementById('carouselTrack');
-  const dots = document.getElementById('carDots');
-  const slides = promoBanners;
-  if (!wrap || !track || !dots) return;
-  if (!slides.length) { wrap.classList.add('hidden'); return; }
-  wrap.classList.remove('hidden');
-  track.innerHTML = slides.map((b, i) =>
-    '<button onclick="bannerClick(' + b.id + ')" class="shrink-0 w-full h-full relative overflow-hidden active:scale-[.99] transition">' +
-      (b.imageUrl
-        ? '<img src="' + b.imageUrl + '" class="w-full h-full object-cover" alt="promo">'
-        : (b.targetType === 'register'
-          ? '<div class="w-full h-full p-6 sm:p-10 text-white text-left flex flex-col justify-center" style="background:linear-gradient(135deg,#7c3aed,#4f46e5)"><p class="text-lg sm:text-2xl font-black">📝 REGISTER NOW &amp; EARN POINTS</p><p class="text-xs sm:text-sm mt-1 opacity-90">1 point for every ₱' + promoPointsRate + ' spent — pwede sa store at online!</p><span class="inline-block mt-3 text-[11px] sm:text-xs font-bold bg-white/20 rounded-lg px-3 py-1.5 w-fit">SIGN IN / REGISTER →</span></div>'
-          : '<div class="w-full h-full p-6 sm:p-10 text-white text-left flex flex-col justify-center" style="background:linear-gradient(135deg,#10b981,#059669)"><p class="text-lg sm:text-2xl font-black">' + b.targetType.toUpperCase() + '</p><p class="text-xs sm:text-sm mt-1 opacity-90">' + (b.targetValue || '') + '</p></div>')) +
-    '</button>').join('');
-  dots.innerHTML = slides.map((b, i) =>
-    '<button onclick="showCarousel(' + i + ')" aria-label="Slide ' + (i + 1) + '" class="h-1.5 rounded-full transition-all duration-300 ' + (i === 0 ? 'w-5 bg-white' : 'w-1.5 bg-white/50') + '"></button>').join('');
-  carouselIdx = 0;
-  setCarousel();
-  clearInterval(carouselTimer);
-  carouselTimer = setInterval(() => { showCarousel((carouselIdx + 1) % slides.length); }, 5000);
-}
-function setCarousel() {
-  const track = document.getElementById('carouselTrack');
-  if (!track) return;
-  track.style.transform = 'translateX(-' + carouselIdx * 100 + '%)';
-  const dots = document.querySelectorAll('#carDots button');
-  dots.forEach((d, i) => {
-    d.className = 'h-1.5 rounded-full transition-all duration-300 ' + (i === carouselIdx ? 'w-5 bg-white' : 'w-1.5 bg-white/50');
-  });
-}
-function showCarousel(i) { carouselIdx = i; setCarousel(); }
-function carPrev() { showCarousel(((carouselIdx - 1) % promoBanners.length + promoBanners.length) % promoBanners.length); }
-function carNext() { showCarousel((carouselIdx + 1) % promoBanners.length); }
 const CAT_ICONS = {
   alcohol:'🍺', 'beer':'🍺', biscuit:'🍪', 'body care':'🧼', cakes:'🍰', candy:'🍬',
   'canned goods':'🥫', coffee:'☕', condiments:'🧂', seasoning:'🧂', drinks:'🥤',
@@ -2134,58 +1964,6 @@ function renderSideCats() {
   let html = '<button onclick="setCat(\'all\')" title="All Products" class="w-full text-[11px] lg:text-xs font-bold px-1 lg:px-3 py-3 lg:py-2 rounded-lg lg:rounded-xl transition flex items-center justify-center lg:justify-between gap-1 ' + (active === 'all' ? 'bg-violet-700 text-white' : 'text-stone-600 hover:bg-gray-100') + '"><span class="break-words leading-tight">🛒 All</span><span class="opacity-70 hidden lg:inline text-[10px] shrink-0">' + catalog.length + '</span></button>';
   html += cats.map(c => '<button onclick="setCat(\'' + escH(c) + '\')" title="' + escH(c) + '" class="w-full text-[11px] lg:text-xs font-bold px-1 lg:px-3 py-3 lg:py-2 rounded-lg lg:rounded-xl transition flex items-center justify-center lg:justify-between gap-1 ' + (active === c ? 'bg-violet-700 text-white' : 'text-stone-600 hover:bg-gray-100') + '"><span class="break-words leading-tight">' + escH(c) + '</span><span class="opacity-70 hidden lg:inline text-[10px] shrink-0">' + counts[c] + '</span></button>').join('');
   el.innerHTML = html;
-}
-async function loadBanners() {
-  try {
-    const r = await fetchT(API + '/dashboard/promo-banners', {}, 10000);
-    const j = await r.json();
-    promoBanners = (j.banners || []).filter(b => b.active);
-    promoPointsRate = j.pointsRate || 200;
-    renderCarousel();
-  } catch (e) {}
-}
-function bannerClick(id) {
-  const b = promoBanners.find(x => x.id === id);
-  if (!b) return;
-  if (b.targetType === 'register') { signIn(); return; }
-  if (!member) { signIn(); return; }
-  if (b.targetType === 'url') { window.location = b.targetValue || 'https://shop.jumongdev.com'; return; }
-  if (b.targetType === 'product') { const pid = Number(b.targetValue); if (catalog.find(x => x.id === pid)) openDetail(pid); return; }
-  if (b.targetType === 'category') {
-    const parts = (b.targetValue || '').split('|');
-    const cat = (parts[0] || 'all').toLowerCase().trim();
-    searchQ = (parts[1] || '').trim().toLowerCase();
-    activeGroup = 'all';
-    activeCat = cat;
-    favOnly = false;
-    renderChips(); renderSideCats(); renderGrid();
-    document.getElementById('shop').scrollIntoView({ behavior: 'smooth' });
-  }
-}
-function fbCtaClick(i) {
-  const posts = parseFbPosts();
-  const p = posts[i];
-  if (!p) return;
-  const t = String(p.ctaTargetType || '').toLowerCase();
-  const v = String(p.ctaTargetValue || '').trim();
-  if (t === 'wala' || t === '' || !v) return;
-  if (t === 'url') { window.location = v; return; }
-  if (t === 'product') {
-    if (!member) { toast('Sign in with Google para mag-order', 'error'); setTimeout(signIn, 800); return; }
-    const pid = Number(v);
-    if (catalog.find(x => x.id === pid)) { openDetail(pid); return; }
-    toast('Hindi mahanap ang product #' + v, 'error'); return;
-  }
-  if (t === 'category') {
-    if (!member) { toast('Sign in with Google para mag-order', 'error'); setTimeout(signIn, 800); return; }
-    const parts = v.split('|');
-    searchQ = (parts[1] || '').trim().toLowerCase();
-    activeGroup = 'all';
-    activeCat = (parts[0] || 'all').toLowerCase().trim();
-    favOnly = false;
-    renderChips(); renderSideCats(); renderGrid();
-    document.getElementById('shop').scrollIntoView({ behavior: 'smooth' });
-  }
 }
 function signIn() { location.href = 'https://shop.jumongdev.com/api/dashboard/auth/google/start'; }
 let profileOpen = false;
