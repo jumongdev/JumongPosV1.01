@@ -182,6 +182,11 @@
   .feed-link { margin-top: 8px; background: rgba(255,255,255,.95); border-radius: 12px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; }
   .feed-link span { font-size: 11px; font-weight: 700; color: #1c1330; }
   .feed-link .feed-link-go { font-size: 10px; font-weight: 900; color: #6d28d9; white-space: nowrap; }
+  .feed-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px; background: linear-gradient(160deg,#7c3aed,#4f46e5 60%,#312e81); }
+  .feed-empty-ico { font-size: 44px; }
+  .feed-empty-title { font-size: 16px; font-weight: 900; color: #fff; margin-top: 10px; }
+  .feed-empty-sub { font-size: 11.5px; color: #e9d5ff; margin-top: 6px; max-width: 260px; line-height: 1.5; }
+  .feed-empty-fb { margin-top: 14px; font-size: 10px; font-weight: 800; color: #fff; background: rgba(255,255,255,.18); padding: 8px 16px; border-radius: 999px; }
   .scrollbar-hide { scrollbar-width: none; } .scrollbar-hide::-webkit-scrollbar { display: none; }
 </style>
 
@@ -2018,14 +2023,27 @@ async function loadFeed() {
   try {
     const r = await fetchT(API + '/dashboard/feed?limit=5' + (feedBefore ? '&before=' + feedBefore : ''), {}, 15000);
     const list = await r.json();
-    if (!Array.isArray(list) || !list.length) { feedDone = true; }
+    if (!Array.isArray(list) || !list.length) {
+      feedDone = true;
+      if (!feedPosts.length) renderFeedEmpty();
+    }
     else {
       feedPosts = feedPosts.concat(list);
       feedBefore = list[list.length - 1].id;
       renderFeed();
     }
-  } catch (e) { feedDone = true; }
+  } catch (e) { feedDone = true; if (!feedPosts.length) renderFeedEmpty(); }
   feedLoading = false;
+}
+function renderFeedEmpty() {
+  const track = document.getElementById('feedTrack');
+  if (!track) return;
+  track.innerHTML = '<div class="feed-empty">' +
+    '<div class="feed-empty-ico">📢</div>' +
+    '<p class="feed-empty-title">Wala pang post</p>' +
+    '<p class="feed-empty-sub">Bumalik ka mamaya — may mga bagong promo at update na darating!</p>' +
+    '<a href="https://www.facebook.com/Andengs.Superstore" target="_blank" rel="noopener" class="feed-empty-fb">Bisitahin kami sa Facebook ↗</a>' +
+  '</div>';
 }
 function renderFeed() {
   const track = document.getElementById('feedTrack');
