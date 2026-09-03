@@ -206,24 +206,36 @@ public class CustomerService
     {
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        using var cmd = new SQLiteCommand("UPDATE Customers SET LoyaltyPoints = @pts WHERE Id = @id", conn);
+        using var cmd = new SQLiteCommand("UPDATE Customers SET LoyaltyPoints = @pts, PointsDirty = 1 WHERE Id = @id", conn);
         cmd.Parameters.AddWithValue("@pts", points);
         cmd.Parameters.AddWithValue("@id", customerId);
         cmd.ExecuteNonQuery();
-        if (CloudDatabaseHelper.IsConfigured)
+
+        // I-push ang bagong balance sa cloud ACCOUNT (customers are universal by name) —
+        // kung hindi, ang 5-min customer download ay magre-revert ng local points.
+        var c = GetById(customerId);
+        if (c != null)
         {
-            try
-            {
-                using var pgConn = CloudDatabaseHelper.GetConnection()!;
-                pgConn.Open();
-                using var pgCmd = new NpgsqlCommand("UPDATE customers SET loyalty_points = @pts WHERE pos_id = @id", pgConn);
-                pgCmd.Parameters.AddWithValue("pts", points);
-                pgCmd.Parameters.AddWithValue("id", customerId);
-                pgCmd.Parameters.AddWithValue("sid", StoreId);
-                pgCmd.ExecuteNonQuery();
-            }
-            catch { }
+            c.LoyaltyPoints = points;
+            _ = PushPointsAndClearFlagAsync(c);
         }
+    }
+
+    public static async Task PushPointsAndClearFlagAsync(Customer c)
+    {
+        try
+        {
+            if (await SyncService.SyncCustomer(c))
+            {
+                using var conn = DatabaseHelper.GetConnection();
+                conn.Open();
+                using var cmd = new SQLiteCommand("UPDATE Customers SET PointsDirty = 0 WHERE Id = @id AND LoyaltyPoints = @pts", conn);
+                cmd.Parameters.AddWithValue("@id", c.Id);
+                cmd.Parameters.AddWithValue("@pts", c.LoyaltyPoints);
+                cmd.ExecuteNonQuery();
+            }
+        }
+        catch { }
     }
 
     public static void UpdateCreditBalance(int customerId, decimal newBalance)

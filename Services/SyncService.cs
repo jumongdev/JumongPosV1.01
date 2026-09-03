@@ -126,7 +126,7 @@ public static class SyncService
         await PostAsync("/products", data);
     }
 
-    public static async Task SyncCustomer(Customer customer)
+    public static async Task<bool> SyncCustomer(Customer customer)
     {
         var data = new[]
         {
@@ -144,7 +144,7 @@ public static class SyncService
                 ModifiedBy = customer.ModifiedBy
             }
         };
-        await PostAsync("/customers", data);
+        return await PostAsync("/customers", data);
     }
 
     public static async Task SyncUser(User user)
@@ -1500,11 +1500,15 @@ public static class SyncService
                 if (existingId != null)
                 {
                     // Update by name — pero huwag i-overwrite ang Phone kung ginagamit ng ibang customer
-                    // (e-commerce registration duplicate phones ang nag-trigger ng UNIQUE conflict)
+                    // (e-commerce registration duplicate phones ang nag-trigger ng UNIQUE conflict);
+                    // at huwag i-overwrite ang LoyaltyPoints kung may pending local change (PointsDirty=1)
+                    // na hindi pa na-push sa cloud (kung hindi, magre-revert ang bagong award).
                     using var upd = new SQLiteCommand(@"
                         UPDATE Customers SET
                             Phone = CASE WHEN NOT EXISTS (SELECT 1 FROM Customers WHERE Phone = @p AND Phone != '' AND Id != @id) THEN @p ELSE Phone END,
-                            Email=@e, LoyaltyPoints=@pts, IsActive=1, Address=@a, QrCode=@qr
+                            Email=@e,
+                            LoyaltyPoints = CASE WHEN PointsDirty = 1 THEN LoyaltyPoints ELSE @pts END,
+                            IsActive=1, Address=@a, QrCode=@qr
                         WHERE Id=@id", conn);
                     upd.Parameters.AddWithValue("id", Convert.ToInt32(existingId));
                     upd.Parameters.AddWithValue("p", phone);
@@ -1523,7 +1527,7 @@ public static class SyncService
 
                     if (phoneId != null)
                     {
-                        using var upd = new SQLiteCommand("UPDATE Customers SET Name=@n, Email=@e, LoyaltyPoints=@pts, IsActive=1, Address=@a, QrCode=@qr WHERE Id=@id", conn);
+                        using var upd = new SQLiteCommand("UPDATE Customers SET Name=@n, Email=@e, LoyaltyPoints = CASE WHEN PointsDirty = 1 THEN LoyaltyPoints ELSE @pts END, IsActive=1, Address=@a, QrCode=@qr WHERE Id=@id", conn);
                         upd.Parameters.AddWithValue("id", Convert.ToInt32(phoneId));
                         upd.Parameters.AddWithValue("n", name);
                         upd.Parameters.AddWithValue("e", email);

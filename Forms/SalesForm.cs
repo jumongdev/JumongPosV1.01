@@ -852,6 +852,7 @@ public partial class SalesForm : Form
 
         var saleId = SaleService.SaveSale(sale);
 
+        int? prevPts = null, ptsUsed = null;
         if (_selectedCustomer != null)
         {
             // Points ONLY for online-registered customers (may QR code); manual/walk-in accounts = zero points
@@ -869,8 +870,9 @@ public partial class SalesForm : Form
                         acc += item.TotalPrice / pointsRate;
                 }
                 var ptsEarned = (int)acc;
-                var ptsUsed = payForm.PointsUsed;
-                var newPts = _selectedCustomer.LoyaltyPoints + ptsEarned - ptsUsed;
+                ptsUsed = payForm.PointsUsed;
+                prevPts = _selectedCustomer.LoyaltyPoints;
+                var newPts = prevPts.Value + ptsEarned - ptsUsed.Value;
                 if (newPts < 0) newPts = 0;
                 _selectedCustomer.LoyaltyPoints = newPts;
                 CustomerService.UpdateLoyaltyPoints(_selectedCustomer.Id, newPts);
@@ -895,7 +897,7 @@ public partial class SalesForm : Form
             if (printSetting == "True")
             {
                 var cashierName = _currentUser?.FullName ?? _currentUser?.Username ?? "Admin";
-                PrinterService.PrintReceipt(sale, cashierName, _selectedCustomer);
+                PrinterService.PrintReceipt(sale, cashierName, _selectedCustomer, true, prevPts, ptsUsed);
             }
         }
 

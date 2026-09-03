@@ -587,6 +587,10 @@ public class DatabaseHelper
         using var qrCol = new SQLiteCommand("ALTER TABLE Customers ADD COLUMN QrCode TEXT", conn);
         try { qrCol.ExecuteNonQuery(); } catch { /* already exists */ }
 
+        // Loyalty points dirty flag (pending cloud push — download must not revert the local balance)
+        using var ptsDirtyCol = new SQLiteCommand("ALTER TABLE Customers ADD COLUMN PointsDirty INTEGER NOT NULL DEFAULT 0", conn);
+        try { ptsDirtyCol.ExecuteNonQuery(); } catch { /* already exists */ }
+
         // Fix any negative stock values
         using var fixStock = new SQLiteCommand("UPDATE Products SET StockQty = 0 WHERE StockQty < 0", conn);
         fixStock.ExecuteNonQuery();

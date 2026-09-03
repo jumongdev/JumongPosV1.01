@@ -1,5 +1,30 @@
 # JumongPOS — Full Project Guide for AI Agents
 
+## Latest Change (2026-09-03) — LOYALTY POINTS FIX: POS awards now PUSH to the cloud account (v1.1.71 client) + 6 QR customers restored
+
+**Request:** "bakit total ng points nila zero... need maayos yan sa lahat ng customer" + "dapat kasi meron previous tapos meron add tapos new sa resibo nila" + "at sa history ng mga resibo nila dba my mga earn points sila kada bili". **Root cause (pangmatagalang bug):** ang POS award (QR customers) ay nag-update lang ng LOCAL `LoyaltyPoints` (`CustomerService.UpdateLoyaltyPoints` + dead direct-PG by pos_id — hindi ginagamit) — **WALANG API push** → ang cloud ACCOUNT ay hindi kailanman na-accumulate; ang 5-min `DownloadCustomersAsync` ay nag-o-overwrite ng local mula sa cloud (luma) → "pumasok ngayon, mamaya wala na"; ang VOID na-push nga → mas mababa pa ang cloud. E-commerce points OK (cloud-side via AwardOrderPoints). Evidence: order history ay nagpapakita ng `+5` per receipt (sale_items.points_earned, na-sync) pero account balance = 0.
+
+### Ang mga ayos (v1.1.71 client + API latestVer + server data repair)
+
+| File | Change |
+|---|---|
+| `Services/CustomerService.cs` | **`UpdateLoyaltyPoints`** — local UPDATE now sets `PointsDirty=1`; tinanggal ang dead direct-PG block; pagkatapos → re-read customer → **`PushPointsAndClearFlagAsync(c)`** (fire-forget: `SyncService.SyncCustomer` → pag 200 → `PointsDirty=0 WHERE Id AND LoyaltyPoints=@pts` — value-match para hindi ma-clear ng naunang push). Bagong public helper `PushPointsAndClearFlagAsync` (ginagamit din ng voids). |
+| `Data/DatabaseHelper.cs` (client) | Migration: `ALTER TABLE Customers ADD COLUMN PointsDirty INTEGER NOT NULL DEFAULT 0` (guarded try/catch gaya ng QrCode). |
+| `Services/SyncService.cs` | **`SyncCustomer` → `Task<bool>`** (returns PostAsync result; callers `_ =` unchanged). **`DownloadCustomersAsync`** — name-match at phone-match UPDATEs: `LoyaltyPoints = CASE WHEN PointsDirty = 1 THEN LoyaltyPoints ELSE @pts END` (hindi na ma-revert ang pending local award; INSERT path unchanged). |
+| `Services/PrinterService.cs` | **Resibo** — bagong params `ptsPrevious/ptsUsed`; QR customer na may earn/redeem: `POINTS → Previous N → + Earned N → − Redeemed N (kung may) → New Balance N (bold)`; walang ptsPrevious (reprints) → lumang `POINTS EARNED +N / Total Points N` format. |
+| `Forms/SalesForm.cs` | Captures `prevPts` bago mag-update (hoisted `int? prevPts/ptsUsed`) at ipinapasa sa `PrintReceipt(sale, cashier, customer, true, prevPts, ptsUsed)`. |
+| `Services/SaleService.cs` | **`ReverseSalePoints`** (void reversal) — `PointsDirty=1` din; post-void syncs (VoidSale ~669, VoidItem ~870) → `PushPointsAndClearFlagAsync` (push + clear na rin). |
+| `Services/AppVersion.cs` | `"1.1.70"` → `"1.1.71"`; API `latestVer` (DashboardController.cs:9419) → `"1.1.71"` (API version constant stays 1.1.69). |
+
+### Server data repair (floor-only — NEVER binawas ang existing balance)
+
+Ang cloud balances ay may legacy/manual/test-cleanup remnants na hindi ma-reconstruct (verified: Ana Flores 35 nang walang orders; Zeny 25 vs recompute 17). Kaya ang repair = **`GREATEST(current, POS-earned + Online-earned)`**:
+- **POS-earned** = `SUM(sale_items.points_earned)` non-voided per cloud customer (by name via SyncSales remap), all stores
+- **Online-earned** = per paid order `floor(SUM(CASE exempt→0, ppu>0→ppu×qty, else total/200))` — EXACT match ng `AwardOrderPoints` (DashboardController.cs:3922, rate 200, `paid_status='paid'` lang — walang delivered requirement)
+- `UPDATE ... WHERE qr_code <> '' AND recompute > current` → **UPDATE 6**: Retchie De Guzman 0→**5**, Geralyn Belialba 0→**7**, KrisBee Hong 5→**9**, Marischel Realin 0→5, Eline Raymundo 0→5, Kris Panlaqui 0→5. Ana Flores 35 / Zeny Fullido 25 hindi nagalaw (GREATEST) ✓. Hindi naaapektuhan ang non-QR (manual) customers.
+
+**Deployed:** API redeployed (WinRM stop→copy→start, version 1.1.69, latestVer 1.1.71; agent/status outdated=True sa HQ/AA36 = tama). Client v1.1.71 (exe **211,555,772 B**, MZ verified) → drop `C:\JumongAPI\client\` + **GitHub release v1.1.71** (id 381786868, asset 542321279, state=uploaded, size exact). Stores UPDATE APP → pagkatapos: ang bawat award ay ma-push agad sa cloud account; ang download ay hindi na magre-revert; resibo may Previous/+Earned/New Balance. Ang cloud repair ay dadalhin ng download sa lahat ng stores' local within ~5 min (PointsDirty=0 sa kanila). **KNOWN LIMITATION (documented):** cloud points = last-writer-wins per NAME; kung ang parehong customer ay bumibili sa 2+ stores at may mas lumang local total ang isang store na nag-push (credit txn/customer save) sa loob ng 5-min window, maaaring ma-clobber — self-corrects sa susunod na award/void; wala pang cross-store delta aggregation.
+
 ## Latest Change (2026-09-03) — LINKED-CHILD INVARIANT: child = 0 stock + cost naka-lock sa parent (v1.1.69) + Ginebra correction
 
 **Request:** "i created ginebra box right then i receive item thru that box it should count in link account?" + "dapat pag ang item created is link the cost and count does not function he uses the link cost and count" + "200 sa boxes na count pa yan sa inventory count" — ang linked child ay HINDI dapat magkaroon ng sariling count/cost: lahat ng receiving/selling sa pamamagitan ng child → PARENT (×ratio); ang cost = parent cost × ratio (naka-lock); ang PRICE = input ng user (malaya).

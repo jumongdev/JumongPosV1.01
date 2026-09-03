@@ -311,7 +311,7 @@ public class SaleService
         var curPts = Convert.ToInt32(getPts.ExecuteScalar());
         var newPts = Math.Max(0, curPts - ptsAwarded);
 
-        var updPts = new SQLiteCommand("UPDATE Customers SET LoyaltyPoints = @pts WHERE Id = @cid", conn, trans);
+        var updPts = new SQLiteCommand("UPDATE Customers SET LoyaltyPoints = @pts, PointsDirty = 1 WHERE Id = @cid", conn, trans);
         updPts.Parameters.AddWithValue("@pts", newPts);
         updPts.Parameters.AddWithValue("@cid", customerId);
         updPts.ExecuteNonQuery();
@@ -666,7 +666,7 @@ public class SaleService
                         try
                         {
                             var cust = CustomerService.GetById(sale.CustomerId.Value);
-                            if (cust != null) _ = SyncService.SyncCustomer(cust);
+                            if (cust != null) _ = CustomerService.PushPointsAndClearFlagAsync(cust);
                         }
                         catch { }
                     }
@@ -867,7 +867,7 @@ public class SaleService
                     try
                     {
                         var cust = CustomerService.GetById(customerId.Value);
-                        if (cust != null) _ = SyncService.SyncCustomer(cust);
+                        if (cust != null) _ = CustomerService.PushPointsAndClearFlagAsync(cust);
                     }
                     catch { }
                 }

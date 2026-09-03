@@ -20,7 +20,7 @@ public class PrinterService
         }
     }
 
-    public static void PrintReceipt(Sale sale, string cashierName = "Admin", Customer? customer = null, bool includeShopQr = true)
+    public static void PrintReceipt(Sale sale, string cashierName = "Admin", Customer? customer = null, bool includeShopQr = true, int? ptsPrevious = null, int? ptsUsed = null)
     {
         var printerName = GetSetting("PrinterName");
         if (string.IsNullOrEmpty(printerName))
@@ -43,7 +43,7 @@ public class PrinterService
 
         var showQr = includeShopQr &&
             (SyncService.StoreId == "STORE-20260602-7159" || SyncService.StoreId == "STORE-20260602-AA36");
-        var lines = BuildReceiptLines(sale, cashierName, customer, lineChars, showQr);
+        var lines = BuildReceiptLines(sale, cashierName, customer, lineChars, showQr, ptsPrevious, ptsUsed);
         ExtendPaperIfNeeded(doc, lines.Count + (lines.Any(x => x.IsQr) ? 30 : 0));
 
         doc.PrintPage += (sender, e) =>
@@ -117,7 +117,7 @@ public class PrinterService
         public bool IsQr { get; set; }
     }
 
-    private static List<LineEntry> BuildReceiptLines(Sale sale, string cashierName, Customer? customer = null, int lineChars = 32, bool includeShopQr = true)
+    private static List<LineEntry> BuildReceiptLines(Sale sale, string cashierName, Customer? customer = null, int lineChars = 32, bool includeShopQr = true, int? ptsPrevious = null, int? ptsUsed = null)
     {
         var lines = new List<LineEntry>();
 
@@ -211,13 +211,26 @@ public class PrinterService
 
         lines.Add(new LineEntry { Text = "Change", RightText = sale.Change.ToString("N2"), Spacing = 14 });
 
-        // Loyalty points: STAR members (QR code) only - show earned points + new balance
+        // Loyalty points: STAR members (QR code) only - show previous / earned / new balance
         var ptsEarned = sale.Items.Where(x => !x.IsVoided).Sum(x => x.PointsEarned);
-        if (ptsEarned > 0 && customer != null)
+        if (customer != null && !string.IsNullOrEmpty(customer.QrCode) && (ptsEarned > 0 || (ptsUsed ?? 0) > 0))
         {
             lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Spacing = 12 });
-            lines.Add(new LineEntry { Text = "POINTS EARNED", RightText = "+" + ptsEarned.ToString(), Bold = true, Spacing = 14 });
-            lines.Add(new LineEntry { Text = "Total Points", RightText = customer.LoyaltyPoints.ToString(), Spacing = 14 });
+            if (ptsPrevious.HasValue)
+            {
+                lines.Add(new LineEntry { Text = "POINTS", Bold = true, Spacing = 14 });
+                lines.Add(new LineEntry { Text = "Previous", RightText = ptsPrevious.Value.ToString(), Spacing = 14 });
+                if (ptsEarned > 0)
+                    lines.Add(new LineEntry { Text = "Earned", RightText = "+" + ptsEarned.ToString(), Spacing = 14 });
+                if ((ptsUsed ?? 0) > 0)
+                    lines.Add(new LineEntry { Text = "Redeemed", RightText = "-" + ptsUsed.Value.ToString(), Spacing = 14 });
+                lines.Add(new LineEntry { Text = "New Balance", RightText = customer.LoyaltyPoints.ToString(), Bold = true, Spacing = 14 });
+            }
+            else
+            {
+                lines.Add(new LineEntry { Text = "POINTS EARNED", RightText = "+" + ptsEarned.ToString(), Bold = true, Spacing = 14 });
+                lines.Add(new LineEntry { Text = "Total Points", RightText = customer.LoyaltyPoints.ToString(), Spacing = 14 });
+            }
             lines.Add(new LineEntry { Text = "Points redeemable sa susunod na bili", Spacing = 14 });
         }
 
