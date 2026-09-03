@@ -2266,8 +2266,11 @@ tailwind.config = {
                   <template x-for="f in fields.filter(x => x.g === g)" :key="f.k">
                     <div>
                       <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1" x-text="f.label"></label>
-                      <textarea x-show="f.t === 'textarea'" x-model="c[f.k]" rows="2" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></textarea>
+                      <textarea x-show="f.t === 'textarea'" x-model="c[f.k]" :rows="f.rows || 2" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200"></textarea>
                       <input x-show="f.t === 'text'" x-model="c[f.k]" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                      <select x-show="f.t === 'select'" x-model="c[f.k]" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                        <template x-for="o in f.options" :key="o"><option x-text="o"></option></template>
+                      </select>
                     </div>
                   </template>
                 </div>
@@ -3492,8 +3495,8 @@ tailwind.config = {
 
   </div><!-- /main content -->
 
-  <script src="components.js?v=20260906"></script>
-  <script src="app.js?v=20260906"></script>
+  <script src="components.js?v=20260907"></script>
+  <script src="app.js?v=20260907"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script>
   /* ── Web login gating (username + PIN, WEB ACCESS only) ── */

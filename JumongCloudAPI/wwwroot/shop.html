@@ -95,6 +95,17 @@
   </div>
 </section>
 
+<!-- ===== FACEBOOK POST EMBED (dashboard-controlled) ===== -->
+<section id="fbHomeSection" class="hidden max-w-6xl mx-auto px-4 mt-4">
+  <div class="rounded-3xl overflow-hidden card-shadow bg-white">
+    <div id="fbHomeWrap" class="flex justify-center overflow-x-auto p-1 sm:p-2"></div>
+    <div class="px-4 pb-4 flex justify-center">
+      <button id="fbCtaBtn" onclick="fbCtaClick()" class="hidden mt-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white text-sm font-black shadow-lg active:scale-95 transition"></button>
+    </div>
+  </div>
+</section>
+<style>#fbHomeWrap iframe { max-width: 100%; }</style>
+
 <!-- ===== PROMO GROUPS (home) ===== -->
 <section id="promoSection" class="hidden max-w-6xl mx-auto px-4 mt-4">
   <p class="text-xs font-black text-stone-500 uppercase tracking-widest mb-2">🎁 Mga Promo</p>
@@ -361,7 +372,8 @@ const CONTENT_DEFAULTS = {
   phone: '09943398072',
   messenger_link: 'https://m.me/jumongdev',
   facebook_link: 'https://facebook.com/jumongdev',
-  about_text: 'Andengs Superstore is a trusted local supermarket serving households and sari-sari stores with authentic products, fast delivery and easy pickup.'
+  about_text: 'Andengs Superstore is a trusted local supermarket serving households and sari-sari stores with authentic products, fast delivery and easy pickup.',
+  fb_embed_home: '', fb_cta_label: '', fb_cta_target_type: 'Wala', fb_cta_target_value: ''
 };
 let shopContent = Object.assign({}, CONTENT_DEFAULTS);
 
@@ -399,6 +411,21 @@ function applyContent() {
   fillSubdivisionSelects();
   document.querySelectorAll('[data-msg]').forEach(a => a.href = shopContent.messenger_link || '#');
   const fb = document.getElementById('fbLink'); if (fb) fb.href = shopContent.facebook_link || '#';
+  // Facebook post embed (home) + CTA button
+  const fbCode = String(shopContent.fb_embed_home || '').trim();
+  const fbSec = document.getElementById('fbHomeSection');
+  const fbWrap = document.getElementById('fbHomeWrap');
+  if (fbSec && fbWrap) {
+    if (fbCode) { fbWrap.innerHTML = fbCode; fbSec.classList.remove('hidden'); }
+    else { fbWrap.innerHTML = ''; fbSec.classList.add('hidden'); }
+  }
+  const fbBtn = document.getElementById('fbCtaBtn');
+  if (fbBtn) {
+    const lbl = String(shopContent.fb_cta_label || '').trim();
+    const t = String(shopContent.fb_cta_target_type || '').toLowerCase();
+    if (lbl && t !== 'wala' && t !== '') { fbBtn.textContent = lbl; fbBtn.classList.remove('hidden'); }
+    else fbBtn.classList.add('hidden');
+  }
 }
 
 function fillSubdivisionSelects() {
@@ -1964,6 +1991,28 @@ function bannerClick(id) {
     searchQ = (parts[1] || '').trim().toLowerCase();
     activeGroup = 'all';
     activeCat = cat;
+    favOnly = false;
+    renderChips(); renderSideCats(); renderGrid();
+    document.getElementById('shop').scrollIntoView({ behavior: 'smooth' });
+  }
+}
+function fbCtaClick() {
+  const t = String(shopContent.fb_cta_target_type || '').toLowerCase();
+  const v = String(shopContent.fb_cta_target_value || '').trim();
+  if (t === 'wala' || t === '' || !v) return;
+  if (t === 'url') { window.location = v; return; }
+  if (t === 'product') {
+    if (!member) { toast('Sign in with Google para mag-order', 'error'); setTimeout(signIn, 800); return; }
+    const pid = Number(v);
+    if (catalog.find(x => x.id === pid)) { openDetail(pid); return; }
+    toast('Hindi mahanap ang product #' + v, 'error'); return;
+  }
+  if (t === 'category') {
+    if (!member) { toast('Sign in with Google para mag-order', 'error'); setTimeout(signIn, 800); return; }
+    const parts = v.split('|');
+    searchQ = (parts[1] || '').trim().toLowerCase();
+    activeGroup = 'all';
+    activeCat = (parts[0] || 'all').toLowerCase().trim();
     favOnly = false;
     renderChips(); renderSideCats(); renderGrid();
     document.getElementById('shop').scrollIntoView({ behavior: 'smooth' });

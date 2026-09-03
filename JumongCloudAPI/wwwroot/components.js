@@ -2193,9 +2193,13 @@ Alpine.store('app', {
       { k: 'messenger_link', label: 'Messenger Link (m.me/...)', g: 'CONTACT / ABOUT', t: 'text' },
       { k: 'facebook_link', label: 'Facebook Link', g: 'CONTACT / ABOUT', t: 'text' },
       { k: 'about_text', label: 'About Us Text', g: 'CONTACT / ABOUT', t: 'textarea' },
-      { k: 'subdivisions', label: 'Subdivisions (isang subdivision bawat linya — para sa locked picker)', g: 'DELIVERY', t: 'textarea' }
+      { k: 'subdivisions', label: 'Subdivisions (isang subdivision bawat linya — para sa locked picker)', g: 'DELIVERY', t: 'textarea' },
+      { k: 'fb_embed_home', label: 'Facebook Post Embed (Home) — i-paste ang buong <iframe> code (FB post → ⋯ → Embed → Get Code)', g: 'FACEBOOK', t: 'textarea', rows: 6 },
+      { k: 'fb_cta_label', label: 'Button Text (sa ilalim ng post; blangko = walang button)', g: 'FACEBOOK', t: 'text' },
+      { k: 'fb_cta_target_type', label: 'Target ng Button', g: 'FACEBOOK', t: 'select', options: ['Wala', 'Product', 'Category', 'URL'] },
+      { k: 'fb_cta_target_value', label: 'Target Value — Product: Product ID (hal. 310) · Category: category|search (hal. powdered drink|milo choco) · URL: buong link', g: 'FACEBOOK', t: 'text' }
     ],
-    get groups() { return ['HERO', 'WHOLESALE', 'TRUST BADGES', 'CONTACT / ABOUT', 'DELIVERY'] },
+    get groups() { return ['HERO', 'WHOLESALE', 'TRUST BADGES', 'CONTACT / ABOUT', 'DELIVERY', 'FACEBOOK'] },
     async load() {
       try { this.c = await fetchJSON(API + '/shop/content'); this.loaded = true; } catch (e) { this.loaded = false; }
     },
