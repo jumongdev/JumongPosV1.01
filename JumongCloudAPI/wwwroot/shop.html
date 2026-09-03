@@ -79,67 +79,111 @@
   </div>
 </header>
 
-<!-- ===== HOME VIEW (promos + banners only) ===== -->
+<!-- ===== HOME VIEW (TikTok-style feed) ===== -->
 <div id="homeView">
-<!-- ===== BANNER CAROUSEL (replaces hero) ===== -->
-<section class="max-w-6xl mx-auto px-4 pt-4">
-  <div id="carousel" class="relative rounded-3xl overflow-hidden card-shadow">
-    <div id="carouselTrack" class="flex transition-transform duration-500 ease-out aspect-[16/6] sm:aspect-[16/4]"></div>
-    <button id="carPrev" onclick="carPrev()" aria-label="Previous" class="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center z-10 transition active:scale-90">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
-    </button>
-    <button id="carNext" onclick="carNext()" aria-label="Next" class="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center z-10 transition active:scale-90">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-    </button>
-    <div id="carDots" class="absolute bottom-2.5 left-0 right-0 flex justify-center gap-1.5 z-10"></div>
+  <!-- slim top bar -->
+  <div class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-stone-100 px-4 py-2.5 flex items-center justify-between">
+    <p class="font-black text-stone-800 text-sm">🛒 Andengs <span class="text-violet-700">Superstore</span></p>
+    <button id="homeSignIn" onclick="signIn()" class="hidden text-[10px] font-black bg-violet-700 text-white rounded-full px-3.5 py-1.5">SIGN IN ✨</button>
   </div>
-</section>
 
-<!-- ===== FACEBOOK POSTS (dashboard-controlled, multi) ===== -->
-<section id="fbHomeSection" class="hidden max-w-6xl mx-auto px-4 mt-4">
-  <div class="rounded-3xl overflow-hidden card-shadow bg-white">
-    <div id="fbHomeWrap" class="flex flex-col"></div>
+  <!-- FEED (scroll-snap, TikTok style) -->
+  <div id="feedView" class="feed-snap">
+    <div id="feedTrack"></div>
+    <div id="feedSentinel"></div>
   </div>
-</section>
-<style>#fbHomeWrap iframe { max-width: 100%; }</style>
 
-<!-- ===== PROMO GROUPS (home) ===== -->
-<section id="promoSection" class="hidden max-w-6xl mx-auto px-4 mt-4">
-  <p class="text-xs font-black text-stone-500 uppercase tracking-widest mb-2">🎁 Mga Promo</p>
-  <div id="promoGroupsRow" class="flex flex-col gap-3"></div>
-</section>
-
-<!-- ===== LANDING EXTRAS (guest only) ===== -->
-<div id="landingExtras"><!-- ===== TRUST BADGES ===== -->
-<section class="max-w-6xl mx-auto px-4 mt-6">
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-    <div class="rounded-2xl bg-white card-shadow p-3.5 flex items-center gap-3">
-      <span class="text-2xl">🚚</span>
-      <div class="min-w-0"><p class="text-xs font-black text-stone-900 truncate" id="trustDelivery">Fast Local Delivery</p><p class="text-[11px] text-stone-500 truncate" id="trustDeliveryDetail">Straight to your doorstep</p></div>
-    </div>
-    <div class="rounded-2xl bg-white card-shadow p-3.5 flex items-center gap-3">
-      <span class="text-2xl">🏪</span>
-      <div class="min-w-0"><p class="text-xs font-black text-stone-900 truncate" id="trustPickup">Store Pickup</p><p class="text-[11px] text-stone-500 truncate" id="trustPickupDetail">Order online, pick up at the store</p></div>
-    </div>
-    <div class="rounded-2xl bg-white card-shadow p-3.5 flex items-center gap-3">
-      <span class="text-2xl">💵</span>
-      <div class="min-w-0"><p class="text-xs font-black text-stone-900 truncate" id="trustCod">Cash on Delivery</p><p class="text-[11px] text-stone-500 truncate" id="trustCodDetail">Pay when your order arrives</p></div>
-    </div>
-    <div class="rounded-2xl bg-white card-shadow p-3.5 flex items-center gap-3">
-      <span class="text-2xl">📱</span>
-      <div class="min-w-0"><p class="text-xs font-black text-stone-900 truncate" id="trustGcash">GCash Accepted</p><p class="text-[11px] text-stone-500 truncate" id="trustGcashDetail">Easy and convenient payment</p></div>
-    </div>
+  <!-- PROMO CHIPS (orderable promos — above bottom nav) -->
+  <div id="feedPromoBar" class="hidden fixed left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-stone-100 px-3 py-2" style="bottom:56px">
+    <div id="feedPromoChips" class="flex gap-2 overflow-x-auto scrollbar-hide"></div>
   </div>
-</section>
 
-<!-- ===== WHOLESALE BANNER ===== -->
-<section class="max-w-6xl mx-auto px-4 mt-6">
-  <div class="bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-2xl px-5 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-    <p class="text-sm font-bold flex items-center gap-2">📦 <span id="wholesaleText">Need Wholesale / Bulk ordering for Sari-Sari Stores? Message us for special rates.</span></p>
-  </div>
-</section>
-</div><!-- /landingExtras -->
+  <!-- LEGACY HOME BLOCKS (nakatago — iniingatan para sa JS refs: banners/promo-groups/FB posts) -->
+  <div id="legacyHome" class="hidden">
+    <!-- ===== BANNER CAROUSEL ===== -->
+    <section class="max-w-6xl mx-auto px-4 pt-4">
+      <div id="carousel" class="relative rounded-3xl overflow-hidden card-shadow">
+        <div id="carouselTrack" class="flex transition-transform duration-500 ease-out aspect-[16/6] sm:aspect-[16/4]"></div>
+        <button id="carPrev" onclick="carPrev()" aria-label="Previous" class="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center z-10 transition active:scale-90">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <button id="carNext" onclick="carNext()" aria-label="Next" class="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center z-10 transition active:scale-90">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <div id="carDots" class="absolute bottom-2.5 left-0 right-0 flex justify-center gap-1.5 z-10"></div>
+      </div>
+    </section>
+
+    <!-- ===== FACEBOOK POSTS (dashboard-controlled, multi) ===== -->
+    <section id="fbHomeSection" class="hidden max-w-6xl mx-auto px-4 mt-4">
+      <div class="rounded-3xl overflow-hidden card-shadow bg-white">
+        <div id="fbHomeWrap" class="flex flex-col"></div>
+      </div>
+    </section>
+    <style>#fbHomeWrap iframe { max-width: 100%; }</style>
+
+    <!-- ===== PROMO GROUPS ===== -->
+    <section id="promoSection" class="hidden max-w-6xl mx-auto px-4 mt-4">
+      <p class="text-xs font-black text-stone-500 uppercase tracking-widest mb-2">🎁 Mga Promo</p>
+      <div id="promoGroupsRow" class="flex flex-col gap-3"></div>
+    </section>
+
+    <!-- ===== LANDING EXTRAS (guest only) ===== -->
+    <div id="landingExtras"><!-- ===== TRUST BADGES ===== -->
+      <section class="max-w-6xl mx-auto px-4 mt-6">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <div class="rounded-2xl bg-white card-shadow p-3.5 flex items-center gap-3">
+            <span class="text-2xl">🚚</span>
+            <div class="min-w-0"><p class="text-xs font-black text-stone-900 truncate" id="trustDelivery">Fast Local Delivery</p><p class="text-[11px] text-stone-500 truncate" id="trustDeliveryDetail">Straight to your doorstep</p></div>
+          </div>
+          <div class="rounded-2xl bg-white card-shadow p-3.5 flex items-center gap-3">
+            <span class="text-2xl">🏪</span>
+            <div class="min-w-0"><p class="text-xs font-black text-stone-900 truncate" id="trustPickup">Store Pickup</p><p class="text-[11px] text-stone-500 truncate" id="trustPickupDetail">Order online, pick up at the store</p></div>
+          </div>
+          <div class="rounded-2xl bg-white card-shadow p-3.5 flex items-center gap-3">
+            <span class="text-2xl">💵</span>
+            <div class="min-w-0"><p class="text-xs font-black text-stone-900 truncate" id="trustCod">Cash on Delivery</p><p class="text-[11px] text-stone-500 truncate" id="trustCodDetail">Pay when your order arrives</p></div>
+          </div>
+          <div class="rounded-2xl bg-white card-shadow p-3.5 flex items-center gap-3">
+            <span class="text-2xl">📱</span>
+            <div class="min-w-0"><p class="text-xs font-black text-stone-900 truncate" id="trustGcash">GCash Accepted</p><p class="text-[11px] text-stone-500 truncate" id="trustGcashDetail">Easy and convenient payment</p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== WHOLESALE BANNER ===== -->
+      <section class="max-w-6xl mx-auto px-4 mt-6">
+        <div class="bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-2xl px-5 py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p class="text-sm font-bold flex items-center gap-2">📦 <span id="wholesaleText">Need Wholesale / Bulk ordering for Sari-Sari Stores? Message us for special rates.</span></p>
+        </div>
+      </section>
+    </div><!-- /landingExtras -->
+  </div><!-- /legacyHome -->
 </div><!-- /homeView -->
+
+<style>
+  .feed-snap { height: calc(100vh - 104px); overflow-y: auto; scroll-snap-type: y mandatory; scrollbar-width: none; }
+  @supports (height: 100dvh) { .feed-snap { height: calc(100dvh - 104px); } }
+  .feed-snap::-webkit-scrollbar { display: none; }
+  .feed-post { position: relative; height: calc(100vh - 104px); scroll-snap-align: start; overflow: hidden; background: #1c1330; }
+  @supports (height: 100dvh) { .feed-post { height: calc(100dvh - 104px); } }
+  .feed-post img.feed-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .feed-post::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 45%; background: linear-gradient(to top, rgba(12,8,28,.82), transparent); pointer-events: none; }
+  .feed-grad { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .feed-grad span { font-size: 60px; }
+  .feed-rail { position: absolute; right: 10px; bottom: 120px; z-index: 5; display: flex; flex-direction: column; gap: 14px; }
+  .rail-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; }
+  .rail-ico { font-size: 24px; filter: drop-shadow(0 1px 3px rgba(0,0,0,.5)); }
+  .rail-num { font-size: 10px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+  .feed-caption { position: absolute; left: 14px; right: 70px; bottom: 16px; z-index: 5; }
+  .feed-name { font-size: 13px; font-weight: 900; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+  .feed-badge { font-size: 9px; font-weight: 800; color: #e9d5ff; margin-top: 2px; text-transform: uppercase; letter-spacing: .08em; }
+  .feed-text { font-size: 12.5px; color: #fff; margin-top: 6px; line-height: 1.45; max-height: 3.6em; overflow: hidden; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+  .feed-link { margin-top: 8px; background: rgba(255,255,255,.95); border-radius: 12px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; }
+  .feed-link span { font-size: 11px; font-weight: 700; color: #1c1330; }
+  .feed-link .feed-link-go { font-size: 10px; font-weight: 900; color: #6d28d9; white-space: nowrap; }
+  .scrollbar-hide { scrollbar-width: none; } .scrollbar-hide::-webkit-scrollbar { display: none; }
+</style>
 
 <!-- ===== CATALOG VIEW (items only) ===== -->
 <div id="catalogView" class="hidden lg:block">
@@ -771,19 +815,30 @@ function renderPromoGroups() {
   const row = document.getElementById('promoGroupsRow');
   const sec = document.getElementById('promoSection');
   if (!row || !sec) return;
-  if (!promoGroups.length) { sec.classList.add('hidden'); return; }
-  sec.classList.remove('hidden');
-  row.innerHTML = promoGroups.map(g => {
-    const free = catalog.find(x => x.id === g.freeProductId);
-    const items = (g.items || []).map(x => x.name).filter(Boolean).slice(0, 3);
-    return '<button onclick="promoClick(' + g.id + ')" class="w-full text-left rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white p-4 card-shadow active:scale-[.98] transition">' +
-      '<p class="text-[10px] font-black uppercase tracking-widest text-white/70">🎁 Promo</p>' +
-      '<p class="font-black text-base mt-1">' + escH(g.name) + '</p>' +
-      '<p class="text-[11px] text-white/85 mt-1">Bumili ng ' + g.buyQty + ' pcs (kahit anong combo ng: ' + escH(items.join(' + ')) + ')</p>' +
-      '<div class="mt-2 rounded-xl bg-white/15 px-3 py-2"><p class="text-[11px] font-bold">🎉 GET ' + g.freeQty + ' FREE: ' + escH(free ? free.name : '') + '</p></div>' +
-      '<span class="inline-block mt-3 text-[11px] font-black bg-white text-violet-700 rounded-full px-4 py-1.5">PUMILI NG PRODUCT →</span>' +
-    '</button>';
-  }).join('');
+  if (!promoGroups.length) { sec.classList.add('hidden'); }
+  else {
+    sec.classList.remove('hidden');
+    row.innerHTML = promoGroups.map(g => {
+      const free = catalog.find(x => x.id === g.freeProductId);
+      const items = (g.items || []).map(x => x.name).filter(Boolean).slice(0, 3);
+      return '<button onclick="promoClick(' + g.id + ')" class="w-full text-left rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white p-4 card-shadow active:scale-[.98] transition">' +
+        '<p class="text-[10px] font-black uppercase tracking-widest text-white/70">🎁 Promo</p>' +
+        '<p class="font-black text-base mt-1">' + escH(g.name) + '</p>' +
+        '<p class="text-[11px] text-white/85 mt-1">Bumili ng ' + g.buyQty + ' pcs (kahit anong combo ng: ' + escH(items.join(' + ')) + ')</p>' +
+        '<div class="mt-2 rounded-xl bg-white/15 px-3 py-2"><p class="text-[11px] font-bold">🎉 GET ' + g.freeQty + ' FREE: ' + escH(free ? free.name : '') + '</p></div>' +
+        '<span class="inline-block mt-3 text-[11px] font-black bg-white text-violet-700 rounded-full px-4 py-1.5">PUMILI NG PRODUCT →</span>' +
+      '</button>';
+    }).join('');
+  }
+  // chips bar (orderable promos above bottom nav)
+  const bar = document.getElementById('feedPromoBar');
+  const chips = document.getElementById('feedPromoChips');
+  if (bar && chips) {
+    if (!promoGroups.length) { bar.classList.add('hidden'); return; }
+    bar.classList.remove('hidden');
+    chips.innerHTML = promoGroups.map(g =>
+      '<button onclick="promoClick(' + g.id + ')" class="shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-[10px] font-black shadow">🎁 ' + escH(g.name) + '</button>').join('');
+  }
 }
 let promoOrderGroup = null;
 let promoOrderItems = [];
@@ -1885,6 +1940,7 @@ loadShopContent();
 renderTiles();
 updateBadge();
 loadMe();
+initFeed();
 loadBanners();
 loadPromoGroups();
 switchView(sessionStorage.getItem('shop_view') === 'catalog' ? 'catalog' : 'home');
@@ -1943,7 +1999,127 @@ function applyMemberUI() {
     ms.classList.add('hidden');
     gs.classList.remove('hidden');
   }
+  const si = document.getElementById('homeSignIn');
+  if (si) si.classList.toggle('hidden', !!member);
   updateCartBar();
+}
+// ── FEED (TikTok-style home) ──
+const FEED_GRADS = [
+  'linear-gradient(160deg,#7c3aed,#4f46e5 60%,#312e81)',
+  'linear-gradient(160deg,#0ea5e9,#2563eb 60%,#1e3a8a)',
+  'linear-gradient(160deg,#f59e0b,#ea580c 60%,#7c2d12)',
+  'linear-gradient(160deg,#10b981,#059669 60%,#064e3b)',
+  'linear-gradient(160deg,#ec4899,#be185d 60%,#831843)'
+];
+let feedPosts = [], feedBefore = 0, feedLoading = false, feedDone = false;
+async function loadFeed() {
+  if (feedLoading || feedDone) return;
+  feedLoading = true;
+  try {
+    const r = await fetchT(API + '/dashboard/feed?limit=5' + (feedBefore ? '&before=' + feedBefore : ''), {}, 15000);
+    const list = await r.json();
+    if (!Array.isArray(list) || !list.length) { feedDone = true; }
+    else {
+      feedPosts = feedPosts.concat(list);
+      feedBefore = list[list.length - 1].id;
+      renderFeed();
+    }
+  } catch (e) { feedDone = true; }
+  feedLoading = false;
+}
+function renderFeed() {
+  const track = document.getElementById('feedTrack');
+  if (!track) return;
+  const start = feedPosts.length - (feedBefore ? 0 : feedPosts.length);
+  track.insertAdjacentHTML('beforeend', feedPosts.map((p, i) => feedCard(p, i)).join(''));
+  feedPosts.forEach((p, i) => { if (p.linkType === 'product') fillFeedProduct(i, p); });
+}
+function feedCard(p, i) {
+  const grad = FEED_GRADS[i % FEED_GRADS.length];
+  const noImg = p.imageUrl
+    ? '<img class="feed-img" src="' + p.imageUrl + '" alt="post">'
+    : '<div class="feed-grad" style="background:' + grad + '"><span>📷</span></div>';
+  return '<div class="feed-post" data-fp="' + p.id + '">' +
+    noImg +
+    '<div class="feed-rail">' +
+      '<div class="rail-btn" onclick="feedLike(' + i + ')"><span class="rail-ico">' + (p.likedByMe ? '❤️' : '🤍') + '</span><span class="rail-num" id="flike' + p.id + '">' + (p.likeCount || 0) + '</span></div>' +
+      (p.linkType ? '<div class="rail-btn" onclick="feedOpenLink(' + i + ')"><span class="rail-ico">🔗</span><span class="rail-num">ITEM</span></div>' : '') +
+    '</div>' +
+    '<div class="feed-caption">' +
+      '<p class="feed-name">🏪 ' + escH(p.posterName || 'Andengs Superstore') + '</p>' +
+      '<p class="feed-badge">' + (p.kind === 'promo' ? '🎁 PROMO' : '📢 UPDATE') + ' · ' + timeAgo(p.createdAt) + '</p>' +
+      (p.text ? '<p class="feed-text">' + escH(p.text) + '</p>' : '') +
+      (p.linkType ? '<div class="feed-link" onclick="feedOpenLink(' + i + ')"><span id="flink' + p.id + '">🔗 ' + p.linkType + '</span><span class="feed-link-go">TINGNAN →</span></div>' : '') +
+    '</div>' +
+  '</div>';
+}
+function timeAgo(iso) {
+  try {
+    const t = new Date(iso); const d = (Date.now() - t.getTime()) / 1000;
+    if (d < 60) return 'ngayon lang';
+    if (d < 3600) return Math.floor(d / 60) + ' min ang nakalipas';
+    if (d < 86400) return Math.floor(d / 3600) + ' oras ang nakalipas';
+    return Math.floor(d / 86400) + ' araw ang nakalipas';
+  } catch (e) { return ''; }
+}
+async function ensureCatalogLoaded() {
+  if (catalog.length) return;
+  await loadCatalog();
+}
+async function fillFeedProduct(i, p) {
+  try {
+    await ensureCatalogLoaded();
+    const it = catalog.find(x => x.id === Number(p.linkValue));
+    const el = document.getElementById('flink' + p.id);
+    if (el && it) el.textContent = '📦 ' + it.name + ' · ₱' + (Number(it.price) || 0).toFixed(2);
+    else if (el) el.textContent = '🔗 item #' + p.linkValue;
+  } catch (e) { }
+}
+async function feedOpenLink(i) {
+  const p = feedPosts[i];
+  if (!p || !p.linkType) return;
+  if (!member) { toast('Sign in with Google para mag-order', 'error'); setTimeout(signIn, 800); return; }
+  if (p.linkType === 'url') { window.location = p.linkValue; return; }
+  if (p.linkType === 'product') {
+    await ensureCatalogLoaded();
+    const pid = Number(p.linkValue);
+    if (catalog.find(x => x.id === pid)) { openDetail(pid); return; }
+    toast('Hindi mahanap ang item #' + p.linkValue, 'error'); return;
+  }
+  if (p.linkType === 'category') {
+    const parts = (p.linkValue || '').split('|');
+    searchQ = (parts[1] || '').trim().toLowerCase();
+    activeGroup = 'all';
+    activeCat = (parts[0] || 'all').toLowerCase().trim();
+    favOnly = false;
+    switchView('catalog');
+    renderChips(); renderSideCats(); renderGrid();
+    document.getElementById('shop').scrollIntoView({ behavior: 'smooth' });
+  }
+}
+async function feedLike(i) {
+  const p = feedPosts[i];
+  if (!p) return;
+  if (!member) { toast('Sign in with Google para mag-like', 'error'); setTimeout(signIn, 800); return; }
+  const target = p.likedByMe ? 'DELETE' : 'POST';
+  try {
+    const r = await fetchT(API + '/dashboard/feed/' + p.id + '/like', { method: target }, 10000);
+    if (!r.ok) throw 0;
+    p.likedByMe = !p.likedByMe;
+    p.likeCount = (p.likeCount || 0) + (p.likedByMe ? 1 : -1);
+    const ico = document.querySelector('.feed-post[data-fp="' + p.id + '"] .rail-ico');
+    const num = document.getElementById('flike' + p.id);
+    if (ico) ico.textContent = p.likedByMe ? '❤️' : '🤍';
+    if (num) num.textContent = Math.max(0, p.likeCount);
+  } catch (e) { toast('Like failed', 'error'); }
+}
+function initFeed() {
+  const sentinel = document.getElementById('feedSentinel');
+  if (sentinel && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => { if (entries.some(e => e.isIntersecting)) loadFeed(); }, { root: document.getElementById('feedView'), rootMargin: '300px' });
+    io.observe(sentinel);
+  }
+  loadFeed();
 }
 let carouselIdx = 0;
 let carouselTimer = null;

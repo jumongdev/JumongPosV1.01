@@ -87,7 +87,7 @@ Alpine.store('app', {
       'health': 'grp-system', 'suspect1pc': 'grp-system',
       'rpt-sales': 'grp-reports', 'rpt-invcost': 'grp-reports', 'rpt-shifts': 'grp-reports', 'analytics': 'grp-reports', 'rpt-invval': 'grp-reports',
       'grp-reports': 'grp-pos', 'products': 'grp-pos', 'grp-inv': 'grp-pos',
-      'online-orders': 'grp-ecom', 'shop-content': 'grp-ecom', 'msgr-bot': 'grp-ecom', 'promo-banners': 'grp-ecom', 'restock-requests': 'grp-ecom', 'product-suggestions': 'grp-ecom', 'promo-groups': 'grp-ecom', 'promo-free-queue': 'grp-ecom',
+      'online-orders': 'grp-ecom', 'shop-content': 'grp-ecom', 'msgr-bot': 'grp-ecom', 'promo-banners': 'grp-ecom', 'restock-requests': 'grp-ecom', 'product-suggestions': 'grp-ecom', 'promo-groups': 'grp-ecom', 'promo-free-queue': 'grp-ecom', 'feed-posts': 'grp-ecom',
       'st-receiving': 'grp-inv', 'st-trail': 'grp-inv', 'st-transfer': 'grp-inv',
       'settings': 'grp-settings', 'pospromo': 'grp-settings', 'posqr': 'grp-settings', 'branding': 'grp-settings', 'google-auth': 'grp-settings'
     },
@@ -2401,6 +2401,139 @@ Alpine.data('shopContentPanel', () => ({
         this.msgOk = !!r.ok;
       } catch (e) { this.msg = 'Test failed: ' + e.message; this.msgOk = false; }
       this.testing = false;
+    }
+  }));
+
+  Alpine.data('feedPanel', () => ({
+    posts: [], loading: false, saving: false, msg: '', msgOk: true,
+    cats: [], prods: [], prodsLoading: false,
+    f: { id: 0, kind: 'promo', text: '', linkType: 'product', linkValue: '', linkProdQ: '', linkCat: '', linkUrl: '', active: true, image: null, imageUrl: '' },
+    async init() { await this.load(); this.cats = await _loadShopCats(); },
+    async load() {
+      this.loading = true;
+      try {
+        const r = await fetchJSON(API + '/feed?limit=100');
+        this.posts = Array.isArray(r) ? r : [];
+      } catch (e) { this.posts = []; }
+      this.loading = false;
+    },
+    openAdd() { this.f = { id: 0, kind: 'promo', text: '', linkType: 'product', linkValue: '', linkProdQ: '', linkCat: '', linkUrl: '', active: true, image: null, imageUrl: '' }; },
+    openEdit(p) {
+      this.f = { id: p.id, kind: p.kind, text: p.text, linkType: p.linkType || '', linkValue: p.linkValue || '', linkProdQ: '', linkCat: '', linkUrl: '', active: true, image: null, imageUrl: p.imageUrl || '' };
+      if (p.linkType === 'product') this.f.linkProdQ = p.linkValue || '';
+      else if (p.linkType === 'category') { const s = (p.linkValue || '').split('|'); this.f.linkCat = (s[0] || '').trim(); this.f.linkValue = p.linkValue || ''; }
+      else if (p.linkType === 'url') this.f.linkUrl = p.linkValue || '';
+    },
+    onFile(e) {
+      const file = e.target.files[0];
+      if (!file) { this.f.image = null; return; }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          // TikTok-style: i-resize sa max 1080x1920 (9:16) + JPEG compress ~0.82
+          const MAX_W = 1080, MAX_H = 1920;
+          let w = img.width, h = img.height;
+          const scale = Math.min(1, MAX_W / w, MAX_H / h);
+          w = Math.round(w * scale); h = Math.round(h * scale);
+          const cv = document.createElement('canvas');
+          cv.width = w; cv.height = h;
+          cv.getContext('2d').drawImage(img, 0, 0, w, h);
+          const out = cv.toDataURL('image/jpeg', 0.82);
+          this.f.image = { name: 'post.jpg', dataUrl: out };
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    },
+    linkChanged() {
+      const t = String(this.f.linkType || '');
+      if (t === 'product') { this.f.linkValue = String(this.f.linkProdQ || '').trim(); }
+      else if (t === 'category') { this.f.linkValue = this.f.linkCat; }
+      else if (t === 'url') { this.f.linkValue = String(this.f.linkUrl || '').trim(); }
+      else this.f.linkValue = '';
+    },
+    async pbEnsureProds() { if (this.prods.length || this.prodsLoading) return; this.prodsLoading = true; this.prods = await _loadShopProds(); this.prodsLoading = false; },
+    get prodFiltered() {
+      if (!this.prods.length) return [];
+      const q = String(this.f.linkProdQ || '').trim().toLowerCase();
+      const list = q ? this.prods.filter(x => String(x.name).toLowerCase().includes(q)) : this.prods;
+      return list.slice(0, 12);
+    },
+    prodPicked() {
+      const q = String(this.f.linkProdQ || '').trim();
+      const byId = this.prods.find(x => String(x.id) === q);
+      if (byId) { this.linkChanged(); return; }
+      const byName = this.prods.find(x => String(x.name).toLowerCase() === q.toLowerCase());
+      if (byName) { this.f.linkProdQ = String(byName.id); this.linkChanged(); return; }
+      this.f.linkProdQ = '';
+      this.linkChanged();
+    },
+    async save() {
+      if (!this.f.text.trim() && !this.f.image) { toast('Maglagay ng text o larawan', 'error'); return; }
+      this.saving = true; this.msg = '';
+      try {
+        const fd = new FormData();
+        fd.append('kind', this.f.kind);
+        fd.append('text', this.f.text);
+        this.linkChanged();
+        fd.append('linkType', this.f.linkType || '');
+        fd.append('linkValue', this.f.linkValue || '');
+        if (this.f.image) {
+          const blob = await (await fetch(this.f.image.dataUrl)).blob();
+          fd.append('image', blob, 'post.jpg');
+        }
+        if (this.f.id) {
+          fd.append('active', this.f.active ? 'true' : 'false');
+          const r = await fetch(API + '/feed/' + this.f.id, { method: 'PUT', body: fd });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(j.error || 'Save failed');
+        } else {
+          const r = await fetch(API + '/feed', { method: 'POST', body: fd });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(j.error || 'Save failed');
+        }
+        this.msg = 'Post saved!';
+        this.msgOk = true;
+        this.openAdd();
+        await this.load();
+      } catch (e) { this.msg = e.message; this.msgOk = false; }
+      this.saving = false;
+    },
+    async del(p) {
+      if (!confirm('Delete post #' + p.id + '?')) return;
+      try {
+        await fetchJSON(API + '/feed/' + p.id, { method: 'DELETE' });
+        await this.load();
+      } catch (e) { toast(e.message, 'error'); }
+    },
+    async toggleActive(p) {
+      try {
+        await fetchJSON(API + '/feed/' + p.id, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ kind: p.kind, text: p.text, linkType: p.linkType, linkValue: p.linkValue, active: !p.isActive })
+        });
+        p.isActive = !p.isActive;
+      } catch (e) { toast(e.message, 'error'); }
+    },
+    async moveUp(i) {
+      if (i <= 0) return;
+      const arr = this.posts.slice();
+      [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]];
+      this.posts = arr;
+      await this.saveOrder();
+    },
+    async moveDown(i) {
+      if (i >= this.posts.length - 1) return;
+      const arr = this.posts.slice();
+      [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]];
+      this.posts = arr;
+      await this.saveOrder();
+    },
+    async saveOrder() {
+      try {
+        await fetchJSON(API + '/feed/reorder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: this.posts.map(p => p.id) }) });
+      } catch (e) { toast('Reorder failed: ' + e.message, 'error'); }
     }
   }));
 

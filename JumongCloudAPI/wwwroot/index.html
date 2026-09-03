@@ -109,7 +109,8 @@ tailwind.config = {
             { id:'restock-requests', icon:'🚨', label:'Restock Requests' },
             { id:'product-suggestions', icon:'💡', label:'Product Suggestions' },
             { id:'promo-groups', icon:'🎁', label:'Promo Groups' },
-            { id:'promo-free-queue', icon:'⏳', label:'Free Item Queue' }
+            { id:'promo-free-queue', icon:'⏳', label:'Free Item Queue' },
+            { id:'feed-posts', icon:'📰', label:'Feed Posts' }
         ]},
         { id:'shop', icon:'🛍️', label:'ONLINE SHOP' },
         { id:'grp-settings', icon:'⚙️', label:'SETTINGS', items:[
@@ -2594,6 +2595,117 @@ tailwind.config = {
       </div>
     </div>
 
+    <!-- FEED POSTS SECTION (TikTok-style home feed)                        -->
+    <div x-show="$store.app.section === 'feed-posts'" x-transition.opacity>
+      <div x-data="feedPanel" class="space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="text-sm font-bold text-gray-700 dark:text-slate-200">📰 Feed Posts <span class="text-[10px] text-gray-400 dark:text-[#7878aa] font-normal">(TikTok-style home feed — post mo rito ang promos at updates)</span></h3>
+          <div class="flex items-center gap-2">
+            <button @click="load()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">REFRESH</button>
+            <button @click="openAdd()" class="text-xs px-4 py-2 rounded-lg bg-violet-600 text-white font-medium hover:bg-violet-700">➕ NEW POST</button>
+          </div>
+        </div>
+        <div x-show="msg" class="text-xs px-4 py-3 rounded-lg border" :class="msgOk ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'" x-text="msg"></div>
+
+        <!-- POST COMPOSER -->
+        <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+          <div class="px-4 py-2.5 border-b border-gray-100 dark:border-[#222255] bg-gray-50 dark:bg-[#0d0d25]/50">
+            <h4 class="text-[11px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400">✍️ POST COMPOSER <span x-show="f.id" class="text-gray-400">(edit #<span x-text="f.id"></span>)</span></h4>
+          </div>
+          <div class="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="sm:col-span-2">
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Text ng post</label>
+              <textarea x-model="f.text" rows="3" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200" placeholder="🔥 GRAB NOW..."></textarea>
+            </div>
+            <div>
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Uri ng post</label>
+              <select x-model="f.kind" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                <option value="promo">🎁 PROMO</option>
+                <option value="update">📢 UPDATE</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Larawan <span class="text-gray-400">(auto-resize 1080×1920 9:16)</span></label>
+              <input type="file" @change="onFile($event)" accept="image/jpeg,image/png,image/webp" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg p-2 text-gray-700 dark:text-slate-200">
+            </div>
+            <div class="sm:col-span-2">
+              <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">🔗 Link (opsyonal — kung saan mapupunta pag-click)</label>
+              <select x-model="f.linkType" @change="linkChanged()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                <option value="">Wala</option>
+                <option value="product">Product</option>
+                <option value="category">Category</option>
+                <option value="url">URL</option>
+              </select>
+            </div>
+            <template x-if="f.linkType === 'product'">
+              <div class="sm:col-span-2">
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Produkto (type-to-search)</label>
+                <input x-model="f.linkProdQ" @focus="pbEnsureProds()" @input="prodPicked()" list="feedProdsList" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                <datalist id="feedProdsList">
+                  <template x-for="x in prodFiltered" :key="x.id"><option :value="String(x.id)" x-text="x.name"></option></template>
+                </datalist>
+              </div>
+            </template>
+            <template x-if="f.linkType === 'category'">
+              <div class="sm:col-span-2">
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">Kategorya</label>
+                <select x-model="f.linkCat" @change="linkChanged()" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+                  <option value="">-- Piliin --</option>
+                  <template x-for="cat in cats" :key="cat"><option :value="cat" x-text="cat"></option></template>
+                </select>
+              </div>
+            </template>
+            <template x-if="f.linkType === 'url'">
+              <div class="sm:col-span-2">
+                <label class="text-[11px] text-gray-500 dark:text-[#7878aa] block mb-1">URL</label>
+                <input x-model="f.linkUrl" @input="linkChanged()" type="text" class="w-full text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2 text-gray-700 dark:text-slate-200">
+              </div>
+            </template>
+            <div class="sm:col-span-2">
+              <button @click="save()" :disabled="saving" class="text-xs px-4 py-2 rounded-lg bg-violet-600 text-white font-medium hover:bg-violet-700 disabled:opacity-50" x-text="saving ? 'SAVING...' : (f.id ? '💾 I-SAVE ANG EDIT' : '📢 I-PUBLISH SA FEED')"></button>
+              <button x-show="f.id" @click="openAdd()" class="text-xs px-4 py-2 rounded-lg border border-gray-300 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] ml-2">CANCEL</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- POST LIST -->
+        <div class="bg-white dark:bg-[#16163a] border border-gray-200 dark:border-[#222255] rounded-xl overflow-hidden">
+          <div class="px-4 py-2.5 border-b border-gray-100 dark:border-[#222255] bg-gray-50 dark:bg-[#0d0d25]/50 flex items-center justify-between">
+            <h4 class="text-[11px] font-bold uppercase tracking-wider text-gray-600 dark:text-slate-300">📰 MGA POST <span class="ml-1 px-1.5 py-0.5 rounded-full bg-violet-600 text-white text-[9px]" x-text="posts.length"></span></h4>
+            <p class="text-[10px] text-gray-400 dark:text-[#7878aa]">pinakabago sa itaas ng feed</p>
+          </div>
+          <div class="p-4 space-y-2">
+            <template x-if="loading"><p class="text-xs text-gray-400 text-center py-4">Loading...</p></template>
+            <template x-if="!loading && posts.length === 0"><p class="text-xs text-gray-400 dark:text-[#7878aa] text-center py-4">Wala pang post — gumawa ng una sa POST COMPOSER sa itaas</p></template>
+            <template x-for="(p, i) in posts" :key="p.id">
+              <div class="flex items-center gap-3 border border-gray-100 dark:border-[#222255] rounded-xl px-3 py-2.5">
+                <div class="w-12 h-12 rounded-lg bg-gray-100 dark:bg-[#181848] overflow-hidden shrink-0 flex items-center justify-center">
+                  <img x-show="p.imageUrl" :src="p.imageUrl" class="w-full h-full object-cover">
+                  <span x-show="!p.imageUrl" class="text-lg">📄</span>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <span class="text-[9px] font-black px-2 py-0.5 rounded-full" :class="p.kind === 'promo' ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'" x-text="p.kind === 'promo' ? '🎁 PROMO' : '📢 UPDATE'"></span>
+                    <span class="text-[10px] text-gray-400" x-text="p.likeCount + ' ❤️'"></span>
+                    <span class="text-[10px] text-gray-400" x-text="p.linkType ? '🔗 ' + p.linkType : ''"></span>
+                  </div>
+                  <p class="text-xs text-gray-700 dark:text-slate-200 truncate mt-0.5" x-text="p.text || '(walang text)'"></p>
+                </div>
+                <div class="flex flex-col gap-1 shrink-0">
+                  <div class="flex gap-1">
+                    <button @click="moveUp(i)" :disabled="i === 0" class="text-[10px] px-2 py-1 rounded bg-gray-100 dark:bg-[#181848] text-gray-500 dark:text-[#7878aa] disabled:opacity-30">↑</button>
+                    <button @click="moveDown(i)" :disabled="i === posts.length - 1" class="text-[10px] px-2 py-1 rounded bg-gray-100 dark:bg-[#181848] text-gray-500 dark:text-[#7878aa] disabled:opacity-30">↓</button>
+                  </div>
+                  <button @click="openEdit(p)" class="text-[10px] px-2 py-1 rounded bg-cyan-600 text-white font-bold">EDIT</button>
+                  <button @click="del(p)" class="text-[10px] px-2 py-1 rounded bg-red-500/10 text-red-500 hover:bg-red-500/20">✕</button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- RESTOCK REQUESTS SECTION                                       -->
     <div x-show="$store.app.section === 'restock-requests'" x-transition.opacity>
       <div x-data="restockPanel" class="space-y-4">
@@ -3645,8 +3757,8 @@ tailwind.config = {
 
   </div><!-- /main content -->
 
-  <script src="components.js?v=20260909"></script>
-  <script src="app.js?v=20260909"></script>
+  <script src="components.js?v=20260910"></script>
+  <script src="app.js?v=20260910"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script>
   /* ── Web login gating (username + PIN, WEB ACCESS only) ── */

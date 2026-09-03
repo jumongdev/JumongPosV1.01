@@ -1193,7 +1193,28 @@ public static class PgDatabaseHelper
                 created_by TEXT NOT NULL DEFAULT 'Admin',
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
-            CREATE INDEX IF NOT EXISTS idx_customer_updates_customer ON customer_updates (customer_id);";
+            CREATE INDEX IF NOT EXISTS idx_customer_updates_customer ON customer_updates (customer_id);
+            CREATE TABLE IF NOT EXISTS feed_posts (
+                id SERIAL PRIMARY KEY,
+                poster_type TEXT NOT NULL DEFAULT 'owner',
+                poster_name TEXT NOT NULL DEFAULT '',
+                kind TEXT NOT NULL DEFAULT 'update',
+                text TEXT NOT NULL DEFAULT '',
+                image_url TEXT NOT NULL DEFAULT '',
+                link_type TEXT NOT NULL DEFAULT '',
+                link_value TEXT NOT NULL DEFAULT '',
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS idx_feed_posts_active ON feed_posts (is_active, sort_order DESC, id DESC);
+            CREATE TABLE IF NOT EXISTS feed_likes (
+                post_id INTEGER NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
+                customer_id INTEGER NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (post_id, customer_id)
+            );";
         try { custMig.ExecuteNonQuery(); } catch { }
 
         // Seed: subdivision list para sa locked delivery picker (editable sa Shop Content panel)
