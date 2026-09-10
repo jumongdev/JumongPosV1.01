@@ -91,10 +91,19 @@ public class PendingOrdersForm : Form
                 return;
             }
 
-            // Add stock locally for checked items
+            // ⚠ STOCK-SAFETY (2026-09-05): huwag i-local-receive ang mga item na REJECTED ng server
+            // (shortage = kulang ang HQ stock). Dati: nag-receive pa rin nang lokal kahit na ang
+            // server ay nag-save ng received_qty=0 -> PHANTOM STOCK (Nescafe #981, Redhorse #1007).
+            var shortageIds = new HashSet<int>();
+            if (result.Shortages != null)
+                foreach (var s in result.Shortages) shortageIds.Add(s.ProductId);
+            var acceptedItems = checkedItems.Where(ci => !shortageIds.Contains(ci.ProductId)).ToList();
+            var blockedItems = checkedItems.Where(ci => shortageIds.Contains(ci.ProductId)).ToList();
+
+            // Add stock locally ONLY for server-accepted items
             var userName = _currentUser?.FullName ?? _currentUser?.Username ?? "System";
             var receivingItems = new List<(int ProductId, string ProductName, string Barcode, int StockBefore, int Qty)>();
-            foreach (var ci in checkedItems)
+            foreach (var ci in acceptedItems)
             {
                 var found = ProductService.GetByBarcode(ci.Barcode)
                          ?? ProductService.GetAll().FirstOrDefault(p =>
@@ -108,14 +117,15 @@ public class PendingOrdersForm : Form
                 var error = StockService.ConfirmReceiving(receivingItems, _currentUser?.Id ?? 0, userName, $"WH-Transfer #{transfer.OrderId}");
                 if (error != null)
                     MessageBox.Show($"Stock receiving error: {error}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _ = SyncService.SyncStockSnapshotAsync(receivingItems.Select(r => (r.ProductId, r.ProductName, "", r.StockBefore + r.Qty)).ToList());
             }
 
-            _ = SyncService.SyncStockSnapshotAsync(receivingItems.Select(r => (r.ProductId, r.ProductName, "", r.StockBefore + r.Qty)).ToList());
-
-            var shortageMsg = (result.Shortages != null && result.Shortages.Count > 0)
-                ? $"\n{result.Shortages.Count} item(s) reported as shortage."
-                : "";
-            MessageBox.Show($"Transfer #{transfer.OrderId} received — {receivingItems.Count} item(s) added to stock.{shortageMsg}", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            var msg = $"Transfer #{transfer.OrderId} — {receivingItems.Count} item(s) na-receive sa stock.";
+            if (blockedItems.Count > 0)
+                msg += "\n\n⚠ HINDI na-receive (kulang ang stock sa HQ):\n• " +
+                       string.Join("\n• ", blockedItems.Select(b => $"{b.ProductName} ({b.Qty})")) +
+                       "\nMananatiling PARTIAL ang transfer — gumawa ng bagong transfer kapag may stock na ang HQ.";
+            MessageBox.Show(msg, "Transfer", MessageBoxButtons.OK, MessageBoxIcon.Information);
             _ = LoadTransfers();
         }
         catch (Exception ex)

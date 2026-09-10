@@ -126,6 +126,72 @@ public static class SyncService
         await PostAsync("/products", data);
     }
 
+    // ── E-COMMERCE CUSTOMER CHAT (HQ POS messenger — cloud shop_chat_* tables) ──
+    // Lightweight lang: walang sync-queue, maikling timeout — para sa polling lang.
+    private static readonly JsonSerializerOptions ChatJsonOpts = new() { PropertyNameCaseInsensitive = true };
+
+    private static string ChatUrl(string path) => ApiUrl.TrimEnd('/') + "/dashboard/" + path.TrimStart('/');
+
+    public static async Task<List<CloudChatConversation>?> GetChatConversationsAsync()
+    {
+        try
+        {
+            using var resp = await _client.GetAsync(ChatUrl("/chats"));
+            if (!resp.IsSuccessStatusCode) return null;
+            var json = await resp.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<List<CloudChatConversation>>(json, ChatJsonOpts);
+        }
+        catch { return null; }
+    }
+
+    public static async Task<List<CloudChatMessage>?> GetChatMessagesAsync(long conversationId)
+    {
+        try
+        {
+            using var resp = await _client.GetAsync(ChatUrl($"/chats/{conversationId}/messages"));
+            if (!resp.IsSuccessStatusCode) return null;
+            var json = await resp.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<List<CloudChatMessage>>(json, ChatJsonOpts);
+        }
+        catch { return null; }
+    }
+
+    public static async Task<int> GetChatUnreadAsync()
+    {
+        try
+        {
+            using var resp = await _client.GetAsync(ChatUrl("/chats/unread"));
+            if (!resp.IsSuccessStatusCode) return 0;
+            var json = await resp.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("count", out var c) ? c.GetInt32() : 0;
+        }
+        catch { return 0; }
+    }
+
+    public static async Task<bool> ReplyChatAsync(long conversationId, string message, string replyBy)
+    {
+        try
+        {
+            var payload = new { message, replyBy };
+            var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var resp = await _client.PostAsync(ChatUrl($"/chats/{conversationId}/reply"), content);
+            return resp.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public static async Task MarkChatSeenAsync(long conversationId)
+    {
+        try
+        {
+            var content = new StringContent("{}", Encoding.UTF8, "application/json");
+            using var resp = await _client.PostAsync(ChatUrl($"/chats/{conversationId}/seen"), content);
+        }
+        catch { }
+    }
+
     public static async Task<bool> SyncCustomer(Customer customer)
     {
         var data = new[]
@@ -196,6 +262,8 @@ public static class SyncService
                 PaymentMethod = sale.PaymentMethod,
                 CustomerId = sale.CustomerId,
                 CustomerName = sale.CustomerName ?? "",
+                CustomerQr = sale.CustomerQr ?? "",
+                TotalPointsEarned = sale.TotalPointsEarned,
                 UserId = sale.UserId,
                 IsVoided = sale.IsVoided,
                 ReferenceNo = sale.ReferenceNo,

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Print Test — Server Printers</title>
+<style>
+  body { font-family: 'Segoe UI', sans-serif; background: #10102a; color: #e5e7eb; padding: 20px; max-width: 720px; margin: auto; }
+  h1 { color: #22d3ee; font-size: 18px; }
+  .card { background: #1a1a44; border: 1px solid #222255; border-radius: 12px; padding: 16px; margin-top: 14px; }
+  label { display: block; font-size: 11px; color: #8b8bb5; margin: 10px 0 4px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+  select, input, textarea { width: 100%; background: #181848; color: #fff; border: 1px solid #222255; border-radius: 8px; padding: 9px; font-size: 13px; box-sizing: border-box; }
+  textarea { min-height: 180px; font-family: 'Courier New', monospace; }
+  button { margin-top: 12px; background: #0891b2; color: #fff; border: 0; border-radius: 8px; padding: 10px 18px; font-weight: 700; cursor: pointer; }
+  button:hover { background: #06b6d4; }
+  .ok { color: #34d399; font-size: 12px; margin-top: 8px; }
+  .err { color: #f87171; font-size: 12px; margin-top: 8px; }
+  .small { font-size: 11px; color: #7878aa; margin-top: 8px; }
+  .print-only { display: none; white-space: pre; font-family: 'Courier New', monospace; font-size: 10pt; }
+  @media print {
+    body { background: #fff !important; color: #000 !important; }
+    h1, .card, label, select, input, button, textarea, #plist { display: none !important; }
+    .print-only { display: block !important; }
+  }
+</style>
+</head>
+<body>
+<h1>🖨️ Server Printer Test</h1>
+<p class="small">Ang mga printer ay naka-install sa SERVER PC. Ito ang API gateway para makapag-print ang kahit anong app. (Key: JumongPrint2026)</p>
+
+<div class="card">
+  <button onclick="loadPrinters()">1️⃣ I-LIST ANG PRINTERS</button>
+  <div id="plist" class="small"></div>
+</div>
+
+<div class="card">
+  <label>Printer</label>
+  <select id="printer"></select>
+  <label>Paper</label>
+  <select id="paper">
+    <option value="80">Thermal 80mm (XP-80C / kitchen)</option>
+    <option value="210" selected>A4 / Letter (HP Smart Tank)</option>
+  </select>
+  <label>Text na ipi-print (check / order slip / resibo)</label>
+  <textarea id="txt" oninput="syncPrintOut()">CHECK #0001
+==============
+1x  Milo 24g       115.00
+2x  Coke 1.5        63.00
+-----------------------
+TOTAL              241.00
+Cash               250.00
+Change               9.00
+
+Cashier: RACHEL
+</textarea>
+  <button onclick="doPrint()">🖨️ PRINT SA SERVER</button>
+  <div id="res"></div>
+  <p class="small">Para sa Ctrl+P: malinis ang lalabas (puti, text lang) — i-click ang HP printer sa dialog.</p>
+</div>
+<pre id="printout" class="print-only"></pre>
+
+<script>
+const API = 'https://admin.jumongdev.com/api/print';
+const KEY = 'JumongPrint2026';
+function syncPrintOut() {
+  document.getElementById('printout').textContent = document.getElementById('txt').value;
+}
+document.addEventListener('beforeprint', syncPrintOut);
+document.addEventListener('afterprint', syncPrintOut);
+async function loadPrinters() {
+  const box = document.getElementById('plist');
+  box.className = 'small';
+  try {
+    const r = await fetch(API + '/printers?key=' + KEY);
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+    const sel = document.getElementById('printer');
+    sel.innerHTML = j.printers.map(p => '<option' + (p.isDefault ? ' selected' : '') + '>' + p.name.replace(/</g, '&lt;') + '</option>').join('');
+    box.textContent = j.count + ' printer(s) sa server: ' + j.printers.map(p => p.name).join(' | ');
+  } catch (e) { box.textContent = 'ERROR: ' + e.message; box.className = 'err'; }
+}
+async function doPrint() {
+  const res = document.getElementById('res');
+  res.className = 'small'; res.textContent = 'Piniprint...';
+  const thermal = document.getElementById('paper').value === '80';
+  try {
+    const body = {
+      printer: document.getElementById('printer').value,
+      text: document.getElementById('txt').value,
+      paperWidthMm: Number(document.getElementById('paper').value),
+      thermal,
+      fontSize: thermal ? 9 : 10,
+      copies: 1
+    };
+    const r = await fetch(API + '/text?key=' + KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+    res.className = 'ok'; res.textContent = '✅ Na-send sa spooler → ' + j.printer;
+  } catch (e) { res.className = 'err'; res.textContent = 'ERROR: ' + e.message; }
+}
+loadPrinters();
+</script>
+</body>
+</html>

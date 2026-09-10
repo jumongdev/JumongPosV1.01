@@ -1,7 +1,7 @@
-﻿namespace JumongPosV1._01.Services;
+namespace JumongPosV1._01.Services;
 
 public static class AppVersion
 {
-    public const string Current = "1.1.72";
+    public const string Current = "1.1.79";
 }
 

@@ -1,21 +1,27 @@
 # JumongPOS - Project Guide for AI Agents
 
-> CONDENSED 2026-09-04: core operational reference lang ito (connections, machines, deploy, structure, rules).
+> CONDENSED 2026-09-05: core operational reference lang ito (connections, machines, deploy, structure, rules).
 > Lahat ng detailed change history ay nasa CHANGELOG.md (rolling session logs + v1.0.x/v1.1.x archive).
 > Huwag na magdagdag ng session logs dito - ilagay sa CHANGELOG.md. May format ito:
 > "## Latest Change (YYYY-MM-DD) - one-line summary" + detail, lagi sa ITAAS ng CHANGELOG.md.
 
-## Quick Status (2026-09-04)
-- POS client: 1.1.72 (Services/AppVersion.cs) | Cloud API constant: 1.1.71 | latestVer: 1.1.72 (DashboardController.cs)
+## Quick Status (2026-09-05)
+- POS client: 1.1.78 (Services/AppVersion.cs) | Cloud API constant: 1.1.74 | latestVer: 1.1.78 (DashboardController.cs) — lahat ng 4 stores updated via agents (exe swap)
+- **E-COMMERCE IN-APP CHAT (live, WALANG AI — real person):** customer ↔ shop app `💬` bubble (member only) ↔ **dashboard sidebar 💬 Customer Chat** (admin) ↔ **HQ POS `💬 CHAT` button** (cashier on duty, HQ store lang; cashier name naka-save sa `reply_by`, HINDI ipinapakita sa customer). Tables: `shop_chat_conversations` + `shop_chat_messages` (seen_by_admin/customer, reply_by). Conv card: 📞 phone + 🏘️ default subdivision (block/lot) mula sa customers + customer_addresses.
+- **Dashboard ➖ DEDUCT STOCK tool** (sidebar POS CLIENT group): per-store stock deduction via agents na may remark (`Adjustment: <remark>` trail, UserName 'Dashboard'); 📦 live stock chips per store; 🕘 HISTORY panel (GET /adjust-log — cloud stock_trails `Adjustment:%`).
+- **🏦 CHECKS app (EastWest + RCBC):** dashboard POS CLIENT → Checks — record (bank dropdown, check no, DUE date, payee=Suppliers, amount, auto words) + print sa **HP Smart Tank** via server (`/api/checks`, `CheckPrintService`); **per-bank** `check_template` calibration (⚙️ Print Position Settings + TEST PRINT) + **record block sa ibaba ng check** (date created/bank/check no/payee/amount/words/due date/agent/contact + signature) sa visible bond paper ng carrier; tables `checks` + `check_template`; GOTCHA: maliit na check (6.25×2.75") = PaperOut sa HP → **A4 carrier sheet** (check taped flush top-left, paper size A4).
+- **Dashboard 🛰 MONITOR = HINDI PA TAPOS** (plan lang: app_events table + e-commerce health alerts).
 - Home ng shop = FEED POSTS lang (feed_posts table; dashboard: Feed Posts panel). Wala nang promo banners/FB posts/promo groups UI.
-- STOCK LINK model: linked child product = stock/cost nasa PARENT (x link_ratio); child stock laging 0; cost lock = parent cost x ratio; price = libre.
+- STOCK LINK model: linked child product = stock/cost nasa PARENT (x link_ratio); child stock laging 0; cost lock = parent cost x ratio; price = libre. **GOTCHA:** kapag nag-link ng BOX matapos ang pack conversion, ang ratio ay nasa PACK units (hal. Birch 730 = 20 by-8 sleeves/box, HINDI 160 sachets).
 - Loyalty points: QR/online-registered customers (may qr_code) lang ang kumikita; POS awards push agad sa cloud (PointsDirty flag); resibo may Previous/+Earned/New.
 - E-commerce: kailangan Google login para makita ang presyo at mag-order; COD lang; stock HELD sa HQ simula SUBMIT ng order; cancel = release.
-- Sari-sari tier = REMOVED. Messenger bot = backup lang; ang shop widget ay "Customer Service" (hold customer sa shop).
-- Pack conversions done (single pack = 1 punch): MILO CHOCO 24G by-12 @115, BEAR BRAND 33G by-8 @87, Kopiko twins by-10/by-5 units.
+- Sari-sari tier = REMOVED. Messenger bot = backup lang.
+- Pack conversions done (single pack = 1 punch): MILO CHOCO 24G by-12 @115, BEAR BRAND 33G by-8 @87, Kopiko twins by-10/by-5 units, **BIRCH TREE MILK FORTIFIED 33G by-8 @75/71.5** (id 51).
 - Warehouse (wh_products) RETIRED - mobile app (whmobile/whapp) at e-commerce ay sa HQ server products na lahat.
 - HQ POS local stock = mirror ng server via 10s stock-pull; lahat ng mobile/ecom deltas naa-apply sa local.
 - HQ CloudApiUrl = LAN http://DESKTOP-I097OO9:5000/api | ibang stores = https://admin.jumongdev.com/api
+- **Transfer receive STOCK-SAFETY (v1.1.78):** POS client ay HINDI na nag-local-receive ng server `Shortages` items (kulang ang HQ stock) — PHANTOM stock na dati (Nescafe #981, Redhorse #1007). Kapag may shortage: mananatiling 'partial' ang transfer, malinaw na mensahe.
+- **Shop print flyer:** `https://admin.jumongdev.com/shop-qr-flyer.html` (Legal 8.5x13, 6 cards: QR `assets/shop_qr_1000.png` → shop.jumongdev.com).
 
 ---
 ## Reference
@@ -134,8 +140,8 @@ The batch file lives on the Desktop so it's easy to find. It must always be run 
 | `DESKTOP-I097OO9` @ `192.168.1.21` (Ethernet, 1 Gbps) + `192.168.1.41` (Wi-Fi) | **SERVER ONLY** (Cloud API host, no dev) | API service at `C:\JumongAPI\` (+ client drop `C:\JumongAPI\client\`), Cloudflare tunnel, PostgreSQL, Cloudflare config. Repo clone kept at `C:\Users\ADMIN\Desktop\JumongPosV1.01` (read-only reference — NO dev work here anymore) |
 | `DESKTOP-Q36S34R` (DHCP — was `192.168.1.55`, now `192.168.1.35` as of 2026-08-12) | **DEV PC (all development happens here)** | Cloned repo at **`C:\dev\JumongPosV1.01`**, non-git assets at `C:\dev\extras\`, client publish output `C:\dev\out\client`, Gradle at `C:\dev\gradle\gradle-8.14.3`, dev DB `C:\dev\JumongPosV1.01\JumongPos.db` (STORE-DEV-0001) |
 | `DESKTOP-UU8E0D4` @ `192.168.1.25` (verified 2026-08-15; was .26) | **HQ store (Andengs Superstore - HQ)** | POS client at **`C:\Users\ADMIN\Desktop\JumongPosHW\`** ← NOT in `C:\JumongAPI\client\` |
-| `DESKTOP-U5BO3Q0` @ `192.168.1.100` | HVR store (moved to new PC 2026-08-19; was DESKTOP-TK63MO6 @ 192.168.1.15) | POS client (path TBD on new PC), agent on `DESKTOP-U5BO3Q0`; inbound RDP/WinRM/ICMP BLOCKED (lanfix not yet done); sleep = never |
-| `DESKTOP-NISQ3Q7` @ `192.168.1.152` | U Got Minimart - Naic | (needs path verify) |
+| `DESKTOP-U5BO3Q0` @ `192.168.1.100` | HVR store (moved to new PC 2026-08-19; was DESKTOP-TK63MO6 @ 192.168.1.15) | POS client at **`C:\Users\ADMIN\Desktop\HVR_POS\`** (verified 2026-09-05), agent on `DESKTOP-U5BO3Q0`; inbound RDP/WinRM/ICMP BLOCKED (lanfix not yet done); sleep = never |
+| `DESKTOP-NISQ3Q7` @ `192.168.1.152` | U Got Minimart - Naic | POS client at **`C:\JumongPos\`** (verified 2026-09-05), agent at `C:\JumongPos\agent\` (LUMANG agent build — walang per-heartbeat version refresh; i-restart para mag-update ang appVersion) |
 | `DESKTOP-TK63MO6` @ `192.168.0.103` | ACGS - Naic Market | POS client at `C:\JumongPos\` (verified 2026-08-12) |
 
 > **GOTCHA:** `C:\JumongAPI\client\` is where the **newest client build gets published** on the dev/API host — it is NOT the running install on the HQ machine. The real HQ POS runs from `C:\Users\ADMIN\Desktop\JumongPosHW\` on the HQ machine. When diagnosing/fixing a store, always target the correct machine via the Agent (see Agent section), not the local `C:\JumongAPI\client\` folder.

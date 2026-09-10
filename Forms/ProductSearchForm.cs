@@ -194,19 +194,21 @@ public class ProductSearchForm : Form
             {
                 var prod = _results[e.RowIndex];
                 var threshold = ProductService.GetLowStockThreshold();
-                if (prod.StockQty <= 0)
+                // STOCK LINK: ipakita ang effective stock (child = parent stock ÷ ratio)
+                var stock = ProductService.EffectiveStockQty(prod);
+                if (stock <= 0)
                 {
                     e.Value = "OUT";
                     e.CellStyle.ForeColor = CRedDark;
                 }
-                else if (prod.StockQty <= threshold)
+                else if (stock <= threshold)
                 {
-                    e.Value = prod.StockQty.ToString();
+                    e.Value = stock.ToString();
                     e.CellStyle.ForeColor = CAmberDark;
                 }
                 else
                 {
-                    e.Value = prod.StockQty.ToString();
+                    e.Value = stock.ToString();
                     e.CellStyle.ForeColor = CGreenDark;
                 }
                 e.FormattingApplied = true;

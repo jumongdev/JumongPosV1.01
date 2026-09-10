@@ -141,19 +141,6 @@
             </LinearLayout>
 
             <TextView
-                android:id="@+id/btnReturnHq"
-                android:layout_width="wrap_content"
-                android:layout_height="34dp"
-                android:paddingLeft="10dp"
-                android:paddingRight="10dp"
-                android:text="🏠 HQ"
-                android:textColor="#10b981"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:gravity="center"
-                android:background="@drawable/bg_outline_green" />
-
-            <TextView
                 android:id="@+id/btnCollectOnly"
                 android:layout_width="wrap_content"
                 android:layout_height="34dp"
@@ -192,6 +179,18 @@
                 android:gravity="center"
                 android:background="@drawable/bg_outline_red" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/btnEndShift"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:layout_marginTop="10dp"
+            android:text="🔚 END SHIFT &amp; REMIT"
+            android:textColor="#10b981"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:background="@drawable/bg_outline_green" />
 
         <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
             android:id="@+id/refreshLayout"
@@ -821,5 +820,192 @@
                     android:background="@drawable/bg_red" />
             </LinearLayout>
         </LinearLayout>
+    </FrameLayout>
+
+    <!-- ═══ END SHIFT (1x/day + remittance + carry-over) ═══ -->
+    <FrameLayout
+        android:id="@+id/endShiftOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#D010102a"
+        android:visibility="gone">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🔚 End Shift"
+                    android:textColor="#FFFFFF"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="PERANG ISUSUKO MO SA TINDAHAN. Kasama ang LAHAT ng hindi pa na-remit (kahapon at ngayon) — kaya malaki kung may naipon. Isang beses lang kada araw."
+                    android:textColor="#8b8bb5"
+                    android:textSize="12sp"
+                    android:layout_marginTop="6dp" />
+                <TextView
+                    android:id="@+id/esStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#fbbf24"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="8dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="12dp">
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:background="#1a1a44"
+                        android:padding="10dp">
+                        <TextView
+                            android:id="@+id/esOrders"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="#FFFFFF"
+                            android:textSize="22sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="COLLECTIBLE"
+                            android:textColor="#8b8bb5"
+                            android:textSize="9sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginLeft="8dp"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:background="#1a1a44"
+                        android:padding="10dp">
+                        <TextView
+                            android:id="@+id/esCash"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="#34d399"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="CASH"
+                            android:textColor="#8b8bb5"
+                            android:textSize="9sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginLeft="8dp"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:background="#1a1a44"
+                        android:padding="10dp">
+                        <TextView
+                            android:id="@+id/esGcash"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="#60a5fa"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="GCASH"
+                            android:textColor="#8b8bb5"
+                            android:textSize="9sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/esToday"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#8b8bb5"
+                    android:textSize="11sp"
+                    android:layout_marginTop="8dp" />
+
+                <TextView
+                    android:id="@+id/esConfirm"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="12dp"
+                    android:text="🔚 END SHIFT &amp; REMIT ₱0.00"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    android:background="@drawable/bg_green" />
+
+                <TextView
+                    android:id="@+id/esErr"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#ef4444"
+                    android:textSize="12sp"
+                    android:layout_marginTop="8dp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📦 Carry-over (bukas) — items nasa iyo pa"
+                    android:textColor="#fbbf24"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="4dp" />
+                <LinearLayout
+                    android:id="@+id/esCarryList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <TextView
+                        android:id="@+id/esCarryEmpty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Walang carry-over."
+                        android:textColor="#8b8bb5"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/esClose"
+                    android:layout_width="match_parent"
+                    android:layout_height="46dp"
+                    android:layout_marginTop="16dp"
+                    android:text="CLOSE"
+                    android:textColor="#a8a29e"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    android:background="@drawable/bg_outline" />
+            </LinearLayout>
+        </ScrollView>
     </FrameLayout>
 </FrameLayout>

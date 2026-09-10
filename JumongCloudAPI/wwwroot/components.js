@@ -9,6 +9,20 @@ window.fmtInt = n => Number(n || 0).toLocaleString('en-PH');
 window.esc = s => (s + '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 window.shortStore = (sid, name) => (name && name.trim()) ? name.trim() : (sid ? sid.replace('STORE-', '').slice(0, 12) : 'Unknown');
 
+// Points/walk-in badge sa mga resibo (recent sales tables)
+window.pointsBadge = x => {
+  if (!x || x.isVoided) return '—';
+  if (x.customerQr) return x.totalPointsEarned > 0 ? '⭐ +' + x.totalPointsEarned : '⭐ +0';
+  return '🚶 Walk-in';
+};
+window.pointsBadgeCls = x => {
+  if (!x || x.isVoided) return 'bg-gray-100 dark:bg-[#222255] text-gray-400';
+  if (x.customerQr) return x.totalPointsEarned > 0
+    ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
+    : 'bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300';
+  return 'bg-gray-100 dark:bg-[#222255] text-gray-500 dark:text-[#7878aa]';
+};
+
 // Product-image thumbnails: IO-gated direct URL loading (no base64, browser-cached 1h)
 let _pimgObs = null;
 function _pimgSet(img) {
@@ -74,6 +88,7 @@ Alpine.store('app', {
     editorOpen: false, editingId: null, editingProductData: null,
     saleModalOpen: false, saleInvoiceNo: '', saleItems: [], saleLoading: false,
     salePaymentMethod: '', saleReferenceNo: '', saleEwPaid: 0, saleGrandTotal: 0,
+    saleCustomerQr: '', salePoints: 0, saleCustomerName: '',
     _sidebarOpen: window.innerWidth < 768 ? false : localStorage.getItem('sidebar') !== 'collapsed',
     _stBadge: 0,
     _shopBadge: 0,
@@ -81,13 +96,14 @@ Alpine.store('app', {
     _restockBadge: 0,
     _suggBadge: 0,
     _promoQBadge: 0,
+    _chatBadge: 0,
     groupOpen: {},
     groupParents: {
       'ai-chat': 'grp-ai', 'ai-kb': 'grp-ai',
       'health': 'grp-system', 'suspect1pc': 'grp-system',
       'rpt-sales': 'grp-reports', 'rpt-invcost': 'grp-reports', 'rpt-shifts': 'grp-reports', 'analytics': 'grp-reports', 'rpt-invval': 'grp-reports',
-      'grp-reports': 'grp-pos', 'products': 'grp-pos', 'grp-inv': 'grp-pos',
-      'online-orders': 'grp-ecom', 'shop-content': 'grp-ecom', 'msgr-bot': 'grp-ecom', 'restock-requests': 'grp-ecom', 'product-suggestions': 'grp-ecom', 'promo-free-queue': 'grp-ecom', 'feed-posts': 'grp-ecom',
+      'grp-reports': 'grp-pos', 'products': 'grp-pos', 'suppliers': 'grp-pos', 'pricecheck': 'grp-pos', 'remittance': 'grp-pos', 'checks': 'grp-pos', 'grp-inv': 'grp-pos',
+      'online-orders': 'grp-ecom', 'shop-content': 'grp-ecom', 'msgr-bot': 'grp-ecom', 'restock-requests': 'grp-ecom', 'product-suggestions': 'grp-ecom', 'promo-free-queue': 'grp-ecom', 'feed-posts': 'grp-ecom', 'chats': 'grp-ecom',
       'st-receiving': 'grp-inv', 'st-trail': 'grp-inv', 'st-transfer': 'grp-inv',
       'settings': 'grp-settings', 'pospromo': 'grp-settings', 'posqr': 'grp-settings', 'branding': 'grp-settings', 'google-auth': 'grp-settings'
     },
@@ -101,7 +117,7 @@ Alpine.store('app', {
       if (id === 'grp-pos' || id === 'grp-reports' || id === 'grp-inv') {
         if (id === 'grp-reports') return ['rpt-sales', 'rpt-invcost', 'rpt-shifts', 'analytics', 'rpt-invval'].includes(this.section);
         if (id === 'grp-inv') return this.section === 'stock' || ['st-receiving', 'st-trail', 'st-transfer'].includes(this.section);
-        return this.section === 'products' || this.section === 'stock' || this.section === 'rpt-sales' || this.section === 'rpt-invcost' || this.section === 'rpt-shifts' || this.section === 'analytics' || this.section === 'rpt-invval';
+        return this.section === 'products' || this.section === 'suppliers' || this.section === 'pricecheck' || this.section === 'remittance' || this.section === 'checks' || this.section === 'stock' || this.section === 'rpt-sales' || this.section === 'rpt-invcost' || this.section === 'rpt-shifts' || this.section === 'analytics' || this.section === 'rpt-invval';
       }
       if (id === 'grp-inv' && this.section === 'stock') return true;
       const parent = this.groupParents[this.section];
@@ -128,6 +144,9 @@ Alpine.store('app', {
       this.saleReferenceNo = '';
       this.saleEwPaid = 0;
       this.saleGrandTotal = 0;
+      this.saleCustomerQr = '';
+      this.salePoints = 0;
+      this.saleCustomerName = '';
       try {
         let url = API + '/sale-items?invoiceNo=' + encodeURIComponent(invoiceNo);
         if (storeId) url += '&storeId=' + encodeURIComponent(storeId);
@@ -137,7 +156,10 @@ Alpine.store('app', {
         this.saleReferenceNo = data.referenceNo || '';
         this.saleEwPaid = data.ewPaid || 0;
         this.saleGrandTotal = data.grandTotal || 0;
-      } catch (e) { this.saleItems = []; this.salePaymentMethod = ''; this.saleReferenceNo = ''; this.saleEwPaid = 0; this.saleGrandTotal = 0 }
+        this.saleCustomerQr = data.customerQr || '';
+        this.salePoints = data.totalPointsEarned || 0;
+        this.saleCustomerName = data.customerName || '';
+      } catch (e) { this.saleItems = []; this.salePaymentMethod = ''; this.saleReferenceNo = ''; this.saleEwPaid = 0; this.saleGrandTotal = 0; this.saleCustomerQr = ''; this.salePoints = 0; this.saleCustomerName = '' }
       this.saleLoading = false;
     },
     saleTotalRevenue() { return this.saleItems.reduce((s, x) => s + x.totalPrice, 0) },
@@ -487,6 +509,7 @@ Alpine.store('app', {
     backToCats() { this.products = []; this.prodSearch = ''; this.trail = null; this.trailRows = [] },
     trailType(r) {
       if (r.InvoiceNo) return 'Sale';
+      if ((r.Reference || '').startsWith('Adjustment')) return 'Adjustment';
       if ((r.Reference || '').includes('void')) return 'Void/Return';
       const ref = (r.Reference || '').toUpperCase();
       if (ref.startsWith('RECV') || ref.startsWith('RR-') || ref.startsWith('WH-TRANSFER') || ref.startsWith('TRANSFER')) return 'Receiving';
@@ -496,6 +519,7 @@ Alpine.store('app', {
       if (t === 'Sale') return 'bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300';
       if (t === 'Void/Return') return 'bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300';
       if (t === 'Receiving') return 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300';
+      if (t === 'Adjustment') return 'bg-violet-100 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300';
       return 'bg-gray-100 dark:bg-[#222255] text-gray-500 dark:text-[#7878aa]';
     },
     fmtTrailDate(v) {
@@ -521,11 +545,15 @@ Alpine.store('app', {
   /* ΓöÇΓöÇ Master Products ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
   Alpine.data('masterProducts', () => ({
     d: [], loading: true, search: '', catFilter: '', status: 'active', stockTotals: {}, stockTotalsByName: {},
-    hqStockByBc: {}, hqStockByName: {},
-    batchBusy: false, batchDone: 0, batchTotal: 0,
+    hqStockByBc: {}, hqStockByName: {}, storeQtyByBc: {},
+    batchBusy: false, batchDone: 0, batchTotal: 0, supplierFilter: '', suppliersOpts: [],
     async init() {
       window.addEventListener('load-products', () => this.load());
       if (Alpine.store('app').section === 'products') await this.load();
+      this.loadSuppliers();
+    },
+    async loadSuppliers() {
+      try { this.suppliersOpts = await fetchJSON(API + '/suppliers'); } catch (e) { this.suppliersOpts = []; }
     },
     async load(force) {
       if (!force) {
@@ -543,16 +571,20 @@ Alpine.store('app', {
     },
     async loadTotals() {
       const c = Alpine.store('app').cache.stockTotals;
-      if (c && Date.now() - c.t < 30000) { this.stockTotals = c.data; this.stockTotalsByName = c.byName; this.hqStockByBc = c.hq || {}; this.hqStockByName = c.hqByName || {}; return }
+      if (c && Date.now() - c.t < 30000) { this.stockTotals = c.data; this.stockTotalsByName = c.byName; this.hqStockByBc = c.hq || {}; this.hqStockByName = c.hqByName || {}; this.storeQtyByBc = c.byStore || {}; return }
       try {
         const all = await fetchJSON(API + '/stock-status');
-        const byBc = {}, byName = {}, seen = {}, hqByBc = {}, hqByName = {};
+        const byBc = {}, byName = {}, seen = {}, hqByBc = {}, hqByName = {}, byStore = {};
         all.forEach(x => {
           const key = (x.barcode || '') + '|' + x.storeId;
           if (seen[key]) return;
           seen[key] = true;
           const q = Number(x.stockQty) || 0;
-          if (x.barcode) byBc[x.barcode] = (byBc[x.barcode] || 0) + q;
+          if (x.barcode) {
+            byBc[x.barcode] = (byBc[x.barcode] || 0) + q;
+            const m = (byStore[x.barcode] = byStore[x.barcode] || {});
+            m[x.storeId] = q;
+          }
           else byName[x.name] = (byName[x.name] || 0) + q;
           if (x.storeId === 'STORE-20260602-7159') {
             if (x.barcode) hqByBc[x.barcode] = q;
@@ -563,8 +595,27 @@ Alpine.store('app', {
         this.stockTotalsByName = byName;
         this.hqStockByBc = hqByBc;
         this.hqStockByName = hqByName;
-        Alpine.store('app').cache.stockTotals = { data: byBc, byName: byName, hq: hqByBc, hqByName: hqByName, t: Date.now() };
+        this.storeQtyByBc = byStore;
+        Alpine.store('app').cache.stockTotals = { data: byBc, byName: byName, hq: hqByBc, hqByName: hqByName, byStore: byStore, t: Date.now() };
       } catch (e) { /* keep previous totals */ }
+    },
+    _stockBarcode(p) { if (!p) return ''; return p.stockParentId ? (p.stockParentBarcode || '') : (p.barcode || '') },
+    // Per-store breakdown ng TOTAL STOCK (kung saang store may stock, galing sa stock-status)
+    stockBreakdown(p) {
+      const bc = this._stockBarcode(p);
+      const m = bc ? this.storeQtyByBc[bc] : null;
+      if (!m) return '';
+      const parts = [];
+      Object.keys(m).forEach(sid => { const q = Number(m[sid]) || 0; if (q > 0) parts.push(window.shortStore(sid, Alpine.store('app').storeMap[sid]) + ': ' + q); });
+      return parts.join(' · ');
+    },
+    stockTitle(p) {
+      if (!p) return '';
+      const tot = this.totalStock(p), hq = this.hqStock(p), bd = this.stockBreakdown(p);
+      let s = 'TOTAL = stock sa LAHAT ng store · SERVER = HQ store lang';
+      if (bd) s += ' — may stock: ' + bd;
+      else if (tot <= 0 && hq <= 0) s += ' — walang stock';
+      return s;
     },
     totalStock(p) { if (!p) return 0; if (p.stockParentId) { const ps = p.stockParentBarcode ? (this.stockTotals[p.stockParentBarcode] || 0) : 0; return Math.floor(ps / (p.linkRatio || 1)); } if (p.barcode) return this.stockTotals[p.barcode] || 0; return this.stockTotalsByName[p.name] || 0 },
     hqStock(p) { if (!p) return 0; if (p.stockParentId) { const ps = p.stockParentBarcode ? (this.hqStockByBc[p.stockParentBarcode] || 0) : 0; return Math.floor(ps / (p.linkRatio || 1)); } if (p.barcode) return this.hqStockByBc[p.barcode] || 0; return this.hqStockByName[p.name] || 0 },
@@ -577,7 +628,15 @@ Alpine.store('app', {
       else if (this.status === 'inactive') items = items.filter(x => x.isActive === false);
       if (this.search) { const q = this.search.toLowerCase(); items = items.filter(x => (x.name || '').toLowerCase().includes(q) || (x.barcode || '').toLowerCase().includes(q) || (x.category || '').toLowerCase().includes(q)) }
       if (this.catFilter) items = items.filter(x => x.category === this.catFilter);
+      if (this.supplierFilter) items = items.filter(x => (x.supplierIds || []).includes(this.supplierFilter));
       return items;
+    },
+    supplierName(sid) { const s = this.suppliersOpts.find(o => o.id === sid); return s ? s.companyName : ('#' + sid) },
+    supChips(x) {
+      const ids = (x.supplierIds || []).slice(0, 2);
+      const rest = (x.supplierIds || []).length - ids.length;
+      const names = ids.map(i => this.supplierName(i));
+      return names.join(' · ') + (rest > 0 ? ' +' + rest : '');
     },
     margin(p) { return p.price > 0 ? ((p.price - p.cost) / p.price * 100).toFixed(1) : '0.0' },
     marginClass(m) { const v = parseFloat(m); return v > 20 ? 'text-emerald-400' : v > 0 ? 'text-amber-400' : 'text-red-400' },
@@ -723,10 +782,12 @@ Alpine.store('app', {
     pointsExempt: false, pointsPerUnit: 0, isActive: true, sellOnline: true,
     units: [], productId: null, categories: [],
     linkParentId: 0, linkRatio: 1, linkParentName: '', linkQ: '', linkOpen: false, linkProducts: [],
+    supplierIds: [], suppliersAll: [], supQ: '', supOpen: false,
     async init() {
       this.$watch('$store.app.section', () => { if (this.$store.app.section !== 'products') this.reset() });
       this.$watch('$store.app.editorOpen', (v) => { if (v) this.open(Alpine.store('app').editingId) });
       try { this.categories = await fetchJSON(API + '/products/categories') } catch (e) {}
+      try { this.suppliersAll = await fetchJSON(API + '/suppliers') } catch (e) { this.suppliersAll = [] }
     },
     open(id) {
       this.productId = id || null;
@@ -735,10 +796,25 @@ Alpine.store('app', {
       if (id && p) {
         this.name = p.name; this.barcode = p.barcode || ''; this.category = p.category || ''; this.price = p.price; this.cost = p.cost; this.imageData = p.imageData || ''; this.pointsExempt = p.pointsExempt || false; this.pointsPerUnit = p.pointsPerUnit || 0; this.isActive = p.isActive !== false; this.sellOnline = p.sellOnline !== false; this.units = (p.units || []).map(u => ({ ...u }));
         this.linkParentId = p.stockParentId || 0; this.linkRatio = p.linkRatio || 1; this.linkParentName = p.stockParentName || ''; this.linkQ = p.stockParentName || '';
+        this.supplierIds = (p.supplierIds || []).slice(0, 3);
       }
-      else { this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.sellOnline = true; this.units = []; this.linkParentId = 0; this.linkRatio = 1; this.linkParentName = ''; this.linkQ = ''; }
+      else { this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.sellOnline = true; this.units = []; this.linkParentId = 0; this.linkRatio = 1; this.linkParentName = ''; this.linkQ = ''; this.supplierIds = []; }
+      this.supQ = ''; this.supOpen = false;
     },
-    reset() { this.productId = null; this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.removeImage = false; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.sellOnline = true; this.units = []; this.linkParentId = 0; this.linkRatio = 1; this.linkParentName = ''; this.linkQ = ''; this.linkOpen = false; Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null; Alpine.store('app').editingProductData = null },
+    reset() { this.productId = null; this.name = ''; this.barcode = ''; this.category = ''; this.price = 0; this.cost = 0; this.imageData = ''; this.removeImage = false; this.pointsExempt = false; this.pointsPerUnit = 0; this.isActive = true; this.sellOnline = true; this.units = []; this.linkParentId = 0; this.linkRatio = 1; this.linkParentName = ''; this.linkQ = ''; this.linkOpen = false; this.supplierIds = []; this.supQ = ''; this.supOpen = false; Alpine.store('app').editorOpen = false; Alpine.store('app').editingId = null; Alpine.store('app').editingProductData = null },
+    supSel(sid) { return this.suppliersAll.find(s => s.id === sid) || { companyName: '#' + sid } },
+    supName(sid) { return this.supSel(sid).companyName },
+    toggleSupplier(sid) {
+      if (this.supplierIds.includes(sid)) { this.supplierIds = this.supplierIds.filter(x => x !== sid); return; }
+      if (this.supplierIds.length >= 3) { toast('Max 3 suppliers lang bawat product', 'error'); return; }
+      this.supplierIds.push(sid);
+    },
+    get supResults() {
+      const q = (this.supQ || '').toLowerCase().trim();
+      let list = this.suppliersAll.filter(s => !this.supplierIds.includes(s.id));
+      if (q) list = list.filter(s => (s.companyName || '').toLowerCase().includes(q) || (s.agent || '').toLowerCase().includes(q));
+      return list.slice(0, 15);
+    },
     async loadLinkProducts() {
       if (this.linkProducts.length) return;
       try {
@@ -794,7 +870,8 @@ Alpine.store('app', {
         pointsExempt: this.pointsExempt, pointsPerUnit: parseInt(this.pointsPerUnit) || 0,
         stockParentId: this.linkParentId || 0, linkRatio: Math.floor(Number(this.linkRatio) || 1),
         units: this.units.filter(u => u.unitName).map(u => ({ ...u, cost: (u.qtyPerUnit || 1) * (parseFloat(this.cost) || 0), pointsPerUnit: parseInt(u.pointsPerUnit) || 0 })),
-        clearUnits: this.productId && !this.units.filter(u => u.unitName).length ? true : undefined
+        clearUnits: this.productId && !this.units.filter(u => u.unitName).length ? true : undefined,
+        supplierIds: this.supplierIds.slice(0, 3)
       };
       try {
         const api = API + '/products/master';
@@ -988,6 +1065,70 @@ Alpine.store('app', {
       this.ordersLoading = false;
     },
     closeOrders() { this.ordersOpen = false; },
+    // 🧾 Buong laman ng resibo (parang sa Recent Sales)
+    custItemsOpen: false, custItemsTitle: '', custItemsNote: '', custItemsRows: [], custItemsLoading: false,
+    custItemsHasCost: false, custItemsTotals: { rev: 0, cost: 0, profit: 0 },
+    custMeta: { paymentMethod: '', refNo: '', ewPaid: 0, grandTotal: 0, paidStatus: '' },
+    async viewOrderItems(o) {
+      this.custItemsTitle = o.orderNo + ' · ' + (o.type === 'ecommerce' ? '🛒 ONLINE' : o.type === 'wholesale' ? '📦 WHOLESALE' : '🏪 IN-STORE') + (o.storeName ? ' · ' + o.storeName : '');
+      this.custItemsNote = o.awardPoints > 0 ? '⭐ +' + o.awardPoints + ' pts ang na-earn sa resibong ito' : (o.type === 'pos' ? (o.qr ? '⭐ Member — walang na-earn (+0)' : '🚶 Walk-in / walang points account') : (o.type === 'wholesale' ? '📦 Wholesale — walang points' : ''));
+      this.custItemsRows = []; this.custItemsOpen = true; this.custItemsLoading = true;
+      this.custItemsHasCost = false;
+      this.custItemsTotals = { rev: 0, cost: 0, profit: 0 };
+      this.custMeta = { paymentMethod: o.paymentMethod || '', refNo: '', ewPaid: 0, grandTotal: o.total || 0, paidStatus: o.paidStatus || 'paid' };
+      try {
+        let rows = [];
+        if (o.type === 'pos') {
+          const data = await fetchJSON(API + '/sale-items?invoiceNo=' + encodeURIComponent(o.orderNo) + (o.storeId ? '&storeId=' + encodeURIComponent(o.storeId) : ''));
+          rows = (data.items || []).map(it => ({
+            name: it.productName || 'Item', qty: it.quantity, qpu: it.qtyPerUnit || 1,
+            price: it.price || 0, total: it.totalPrice || 0, unitCost: it.unitCost || 0,
+            totalCost: it.totalCost || 0, pts: it.pointsEarned || 0, profit: it.profit || 0,
+            margin: (it.totalPrice > 0 ? (it.profit / it.totalPrice * 100) : 0)
+          }));
+          this.custItemsHasCost = true;
+          this.custItemsTotals = {
+            rev: rows.reduce((s, r) => s + r.total, 0),
+            cost: rows.reduce((s, r) => s + r.totalCost, 0),
+            profit: rows.reduce((s, r) => s + r.profit, 0)
+          };
+          this.custMeta = {
+            paymentMethod: data.paymentMethod || o.paymentMethod || '',
+            refNo: data.referenceNo || '', ewPaid: data.ewPaid || 0,
+            grandTotal: data.grandTotal || this.custItemsTotals.rev || o.total || 0,
+            paidStatus: 'paid'
+          };
+        } else if (o.type === 'ecommerce') {
+          const j = await fetchJSON(API + '/shop/orders/' + o.id);
+          const ord = j.order || {};
+          rows = (j.items || []).map(it => ({
+            name: it.productName || it.name || 'Item',
+            qty: it.quantity != null ? it.quantity : (it.qty || 1),
+            qpu: it.qtyPerUnit || it.unitQty || 1,
+            price: it.price || ((it.total || it.totalPrice || 0) / (it.quantity || it.qty || 1)),
+            total: it.total != null ? it.total : (it.totalPrice != null ? it.totalPrice : it.subtotal || 0),
+            unitCost: 0, totalCost: 0, pts: 0, profit: 0, margin: 0
+          }));
+          this.custMeta = {
+            paymentMethod: ord.paymentMethod || o.paymentMethod || '',
+            refNo: '', ewPaid: 0,
+            grandTotal: ord.total || o.total || rows.reduce((s, r) => s + r.total, 0),
+            paidStatus: ord.paidStatus || o.paidStatus || ''
+          };
+        } else if (o.type === 'wholesale') {
+          const j = await fetchJSON(API + '/warehouse/sales/' + o.id + '/items');
+          rows = (j || []).map(it => ({
+            name: it.productName || 'Item', qty: it.qty || 1, qpu: 1,
+            price: (it.subtotal || 0) / (it.qty || 1), total: it.subtotal || 0,
+            unitCost: 0, totalCost: 0, pts: 0, profit: 0, margin: 0
+          }));
+        }
+        this.custItemsRows = rows;
+        if (!this.custMeta.grandTotal) this.custMeta.grandTotal = rows.reduce((s, r) => s + r.total, 0);
+      } catch (e) { this.custItemsRows = []; }
+      this.custItemsLoading = false;
+    },
+    closeCustItems() { this.custItemsOpen = false; },
     // 📢 UPDATE sa account ng customer (makikita sa bell ng shop app)
     async openUpdates(x) {
       this.upTarget = x; this.upInput = ''; this.upList = []; this.upOpen = true;
@@ -1312,7 +1453,7 @@ Alpine.store('app', {
     detailPayments: [], drivers: [], assignDriverId: '',
     detailTimeline: [], detailPick: { picked: 0, total: 0 },
     receiptOpen: false, editOpen: false, editItems: [], editQ: '', editResults: [], editTimer: null,
-    remit: { shifts: [], payments: [] }, ecomShift: { shift: null, carriedOver: [] },
+    remit: { closedShifts: [] }, ecomShift: { shift: null, carriedOver: [] },
     settings: { deliveryFee: 0, freeDeliveryMin: 0 }, settingsSaved: '',
     init() {
       if (Alpine.store('app').section === 'online-orders') { this.load(); this.loadSettings(); this.loadRemittances(); this.loadEcomShift(); }
@@ -1391,14 +1532,7 @@ Alpine.store('app', {
       } catch (e) { toast(e.message, 'error'); }
     },
     async loadRemittances() {
-      try { this.remit = await fetchJSON(API + '/remittances'); } catch (e) { this.remit = { shifts: [], payments: [] }; }
-    },
-    async remitPayment(p) {
-      try {
-        await fetchJSON(API + '/payments/' + p.id + '/remit', { method: 'POST' });
-        toast('Remitted: ' + p.orderNo + ' ' + p.method + ' ' + fmt(p.amount));
-        await this.loadRemittances();
-      } catch (e) { toast(e.message, 'error'); }
+      try { this.remit = await fetchJSON(API + '/remittances'); } catch (e) { this.remit = { closedShifts: [] }; }
     },
     async loadEcomShift() {
       try { this.ecomShift = await fetchJSON(API + '/ecom-shift'); } catch (e) { this.ecomShift = { shift: null, carriedOver: [] }; }
@@ -1560,6 +1694,67 @@ Alpine.store('app', {
   }));
 
   // AGENTS remote diagnostic panel
+  Alpine.data('chatsPanel', () => ({
+    convs: [], openConv: null, msgs: [], reply: '', sending: false, loading: false, lastPoll: 0,
+    async init() {
+      if (Alpine.store('app').section === 'chats') await this.load();
+      this.$watch('$store.app.section', v => { if (v === 'chats') { this.load(); } });
+      setInterval(() => { if (Alpine.store('app').section === 'chats') this.tick(); }, 4000);
+    },
+    async load() {
+      this.loading = true;
+      try { this.convs = await fetchJSON(API + '/chats'); } catch (e) { }
+      this.loading = false;
+      await this.refreshBadge();
+      if (this.openConv && this.msgs) { const c = this.convs.find(x => x.id === this.openConv.id); if (c) this.openConv = c; }
+    },
+    async refreshBadge() {
+      try { const r = await fetchJSON(API + '/chats/unread'); Alpine.store('app')._chatBadge = r.count || 0; } catch (e) { }
+    },
+    async tick() {
+      if (this.openConv) { const t = Date.now(); if (t - this.lastPoll > 3000) { this.lastPoll = t; await this.pollMsgs(); } }
+      await this.load();
+    },
+    async open(c) {
+      this.openConv = c; this.msgs = []; this.reply = '';
+      await this.pollMsgs();
+    },
+    async pollMsgs() {
+      if (!this.openConv) return;
+      try {
+        const list = await fetchJSON(API + '/chats/' + this.openConv.id + '/messages');
+        const same = list.length === this.msgs.length && list.every((m, i) => this.msgs[i] && m.id === this.msgs[i].id);
+        if (!same) this.msgs = list;
+        if (list.some(m => m.sender === 'customer' && !m.seenByAdmin)) {
+          await fetchJSON(API + '/chats/' + this.openConv.id + '/seen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+          if (this.openConv) this.openConv.unread = 0;
+          this.msgs = this.msgs.map(m => (m.sender === 'customer' && !m.seenByAdmin) ? { ...m, seenByAdmin: true } : m);
+          await this.refreshBadge();
+        }
+      } catch (e) { }
+    },
+    async sendReply() {
+      const msg = (this.reply || '').trim();
+      if (!msg || !this.openConv || this.sending) return;
+      this.sending = true;
+      try {
+        const who = localStorage.getItem('jpos_web_user') || '';
+        await fetchJSON(API + '/chats/' + this.openConv.id + '/reply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: msg, replyBy: who }) });
+        this.reply = '';
+        await this.pollMsgs();
+      } catch (e) { }
+      this.sending = false;
+    },
+    fmtWhen(v) {
+      const d = new Date(v);
+      if (isNaN(d)) return '';
+      const now = new Date();
+      const sameDay = d.toDateString() === now.toDateString();
+      return sameDay ? d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true }) : d.toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+    },
+    msgTime(v) { const d = new Date(v); return isNaN(d) ? '' : d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true }); }
+  }));
+
   Alpine.data('agentsPanel', () => ({
     d: [], loading: false, selectedStore: '', cmdType: 'sql', cmdPayload: '', results: '', sending: false, pos: {},
     async init() {
@@ -1638,6 +1833,173 @@ Alpine.store('app', {
       } catch (ex) { this.pushStatus = 'Push error: ' + ex.message }
       this.pushing = false;
     }
+  }));
+
+  Alpine.data('deductPanel', () => ({
+    d: [], prods: [], prodQ: '', prodOpen: false, prod: null, qty: 1, remark: '',
+    sel: {}, running: false, rows: [], hint: 'Pumili ng product, qty, remark, at kahit isang store.',
+    stock: {}, stockLoading: false,
+    async init() {
+      if (Alpine.store('app').section === 'deduct') await this.load();
+      this.$watch('$store.app.section', v => { if (v === 'deduct') this.load(); });
+      setInterval(() => { if (Alpine.store('app').section === 'deduct') this.load(true); }, 20000);
+    },
+    fresh(a) { if (!a || !a.lastSeen) return false; return (Date.now() - new Date(a.lastSeen).getTime()) < 90000; },
+    esc(v) { return String(v == null ? '' : v).replace(/'/g, "''"); },
+    stores() { return this.d.filter(a => a.storeId !== 'STORE-DEV-0001'); },
+    async load(silent) {
+      try { this.d = await fetchJSON(API + '/agent/status'); } catch (e) { if (!silent) this.d = []; }
+      if (!this.prods.length) { try { this.prods = await fetchJSON(API + '/products/master?noImages=true'); } catch (e) { } }
+      if (!silent) await this.loadHistory();
+    },
+    get suggestions() {
+      const q = (this.prodQ || '').trim().toLowerCase();
+      if (q.length < 2) return [];
+      return this.prods.filter(p => p.isActive !== false && ((p.name || '').toLowerCase().includes(q) || (p.barcode || '').toLowerCase().includes(q))).slice(0, 30);
+    },
+    selectProd(p) {
+      this.prod = p; this.prodQ = p.name; this.prodOpen = false;
+      this.stock = {};
+      this.loadStocks();
+    },
+    parseTSV(out) {
+      const lines = (out || '').replace(/\r/g, '').split('\n').filter(l => l.trim() !== '');
+      if (!lines.length) return [];
+      const cols = lines[0].split('\t');
+      return lines.slice(1).map(l => { const v = l.split('\t'); const o = {}; cols.forEach((c, i) => o[c] = v[i] !== undefined ? v[i] : ''); return o; });
+    },
+    async exec(storeId, payload) {
+      const r = await fetchJSON(API + '/agent/send/' + encodeURIComponent(storeId), { method: 'POST', body: JSON.stringify({ type: 'sql', payload: payload }), headers: { 'Content-Type': 'application/json' } });
+      const cmdId = r.commandId;
+      for (let i = 0; i < 20; i++) {
+        await new Promise(res => setTimeout(res, 1500));
+        try {
+          const list = await fetchJSON(API + '/agent/results/' + encodeURIComponent(storeId));
+          const hit = list.find(x => x.commandId === cmdId);
+          if (hit) return { error: hit.error || '', output: hit.output || '' };
+        } catch (e) { }
+      }
+      throw new Error('Timeout — agent may be offline.');
+    },
+    _findSql() {
+      const bc = (this.prod.barcode || '').trim();
+      return bc
+        ? "SELECT Id, StockQty, StockParentId, StockLinkRatio FROM Products WHERE IsActive=1 AND Barcode='" + this.esc(bc) + "' ORDER BY Id LIMIT 1"
+        : "SELECT Id, StockQty, StockParentId, StockLinkRatio FROM Products WHERE IsActive=1 AND Name='" + this.esc(this.prod.name) + "' ORDER BY Id LIMIT 1";
+    },
+    async queryStock(sid) {
+      const fr = await this.exec(sid, this._findSql());
+      if (fr.error) return { state: 'err' };
+      const rows = this.parseTSV(fr.output);
+      if (!rows.length) return { state: 'none' };
+      const row = rows[0];
+      if (Number(row.StockParentId) > 0) {
+        const ratio = Number(row.StockLinkRatio) > 0 ? Number(row.StockLinkRatio) : 1;
+        const pr = await this.exec(sid, "SELECT StockQty FROM Products WHERE Id=" + Number(row.StockParentId));
+        if (!pr.error) {
+          const pf = this.parseTSV(pr.output);
+          if (pf.length) return { state: 'ok', avail: Math.floor((Number(pf[0].StockQty) || 0) / ratio), isChild: true, ratio: ratio };
+        }
+        return { state: 'ok', avail: 0, isChild: true, ratio: ratio };
+      }
+      return { state: 'ok', avail: Number(row.StockQty) || 0 };
+    },
+    async loadStocks() {
+      if (!this.prod) return;
+      const targets = this.stores().filter(a => this.fresh(a)).map(a => a.storeId);
+      if (!targets.length) return;
+      this.stockLoading = true;
+      targets.forEach(s => this.stock[s] = { state: 'loading' });
+      await Promise.all(targets.map(async s => { try { this.stock[s] = await this.queryStock(s); } catch (e) { this.stock[s] = { state: 'err' }; } }));
+      this.stockLoading = false;
+    },
+    stockClsOf(sid) {
+      const st = this.stock[sid];
+      if (!st || st.state === 'loading' || st.state === 'err') return 'bg-gray-200 dark:bg-[#222255] text-gray-500 dark:text-[#7878aa]';
+      if (st.state === 'none') return 'bg-gray-200 dark:bg-[#222255] text-gray-500 dark:text-[#7878aa]';
+      return st.avail > 0 ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400';
+    },
+    stockTxt(sid) {
+      const st = this.stock[sid];
+      if (!this.prod) return '';
+      if (!st || st.state === 'loading') return '…';
+      if (st.state === 'none') return 'wala dito';
+      if (st.state === 'err') return '?';
+      return '📦 ' + st.avail;
+    },
+    stockTip(sid) {
+      const st = this.stock[sid];
+      if (st && st.isChild) return 'Linked child — available sa parent: ' + st.avail + ' (floor parent ÷ ' + st.ratio + ')';
+      return '';
+    },
+    async run() {
+      const targets = Object.keys(this.sel).filter(sid => this.sel[sid]);
+      if (!this.prod) { this.hint = 'Pumili ng product.'; return }
+      const qtyN = Math.floor(Number(this.qty) || 0);
+      if (qtyN < 1) { this.hint = 'Ilagay ang qty (1 o higit pa).'; return }
+      const rmk = (this.remark || '').trim();
+      if (!rmk) { this.hint = 'Kailangan ang remark/dahilan.'; return }
+      if (!targets.length) { this.hint = 'Pumili ng kahit isang store.'; return }
+      const note = this.prod.stockParentId ? ' (babawas sa PARENT ' + this.prod.stockParentName + ': qty × ' + (this.prod.linkRatio || 1) + ')' : '';
+      if (!confirm('Deduct ' + qtyN + ' pcs ng "' + this.prod.name + '"' + note + '\nRemark: "' + rmk + '"\nStores (' + targets.length + '): ' + targets.map(sid => Alpine.store('app').storeMap[sid] || sid).join(', ') + '\n\nItuloy?')) return;
+      this.running = true; this.hint = '';
+      this.rows = targets.map(sid => ({ storeId: sid, state: 'sending', msg: 'Hinahanap ang product...' }));
+      for (let i = 0; i < targets.length; i++) {
+        const sid = targets[i];
+        try {
+          const bc = (this.prod.barcode || '').trim();
+          const findSql = bc
+            ? "SELECT Id, StockQty, Name, COALESCE(Barcode,'') AS Barcode, StockParentId, StockLinkRatio FROM Products WHERE IsActive=1 AND Barcode='" + this.esc(bc) + "' ORDER BY Id LIMIT 1"
+            : "SELECT Id, StockQty, Name, COALESCE(Barcode,'') AS Barcode, StockParentId, StockLinkRatio FROM Products WHERE IsActive=1 AND Name='" + this.esc(this.prod.name) + "' ORDER BY Id LIMIT 1";
+          const fr = await this.exec(sid, findSql);
+          if (fr.error) { this.rows[i].state = 'error'; this.rows[i].msg = 'SQL error: ' + fr.error; continue }
+          const found = this.parseTSV(fr.output);
+          if (!found.length) { this.rows[i].state = 'skip'; this.rows[i].msg = 'Walang ganyang product sa store na ito.'; continue }
+          let row = found[0];
+          let dedQty = qtyN;
+          let tid = Number(row.Id), before = Number(row.StockQty) || 0, tName = row.Name, tBc = row.Barcode || bc;
+          let prefix = '';
+          if (Number(row.StockParentId) > 0) {
+            const ratio = Number(row.StockLinkRatio) > 0 ? Number(row.StockLinkRatio) : 1;
+            dedQty = qtyN * ratio;
+            const pr = await this.exec(sid, "SELECT Id, StockQty, Name, COALESCE(Barcode,'') AS Barcode FROM Products WHERE Id=" + Number(row.StockParentId));
+            if (pr.error) { this.rows[i].state = 'error'; this.rows[i].msg = 'Parent lookup error: ' + pr.error; continue }
+            const pf = this.parseTSV(pr.output);
+            if (!pf.length) { this.rows[i].state = 'skip'; this.rows[i].msg = 'Hindi mahanap ang parent product.'; continue }
+            tid = Number(pf[0].Id); before = Number(pf[0].StockQty) || 0; tName = pf[0].Name; tBc = pf[0].Barcode || '';
+            prefix = 'Linked child → parent ' + tName + ' × ' + ratio + '. ';
+          }
+          if (before - dedQty < 0) { this.rows[i].state = 'skip'; this.rows[i].msg = 'Kulang ang stock (may ' + before + ' lang, bawas ' + dedQty + ') — walang nabawas.'; continue }
+          const after = before - dedQty;
+          const up = await this.exec(sid, 'UPDATE Products SET StockQty=' + after + ' WHERE Id=' + tid);
+          if (up.error) { this.rows[i].state = 'error'; this.rows[i].msg = 'UPDATE error: ' + up.error; continue }
+          const ins = "INSERT INTO StockTrail (ProductId, ProductName, Barcode, QuantityAdded, StockBefore, StockAfter, Reference, UserId, UserName, InvoiceNo, CustomerName, CreatedAt) VALUES (" + tid + ", '" + this.esc(tName) + "', '" + this.esc(tBc) + "', " + (-dedQty) + ", " + before + ", " + after + ", 'Adjustment: " + this.esc(rmk) + "', 0, 'Dashboard', '', '', datetime('now','localtime'))";
+          const tr = await this.exec(sid, ins);
+          if (tr.error) { this.rows[i].state = 'error'; this.rows[i].msg = 'Trail INSERT error: ' + tr.error; continue }
+          this.rows[i].state = 'done';
+          this.rows[i].msg = prefix + 'Stock: ' + before + ' → ' + after + ' (−' + dedQty + '). Trail: Adjustment: ' + rmk;
+        } catch (ex) { this.rows[i].state = 'error'; this.rows[i].msg = (ex && ex.message) ? ex.message : String(ex); }
+      }
+      this.running = false;
+      this.hint = 'Tapos. Ang StockTrail ay mag-a-auto-sync sa cloud kapag nag-sync ang POS app ng store.';
+      this.loadStocks();
+      this.loadHistory();
+    },
+    hist: [], histLoading: false, histStore: '',
+    async loadHistory() {
+      this.histLoading = true;
+      try {
+        const url = API + '/adjust-log?limit=50' + (this.histStore ? '&storeId=' + encodeURIComponent(this.histStore) : '');
+        this.hist = await fetchJSON(url);
+      } catch (e) { }
+      this.histLoading = false;
+    },
+    histDate(v) {
+      const d = new Date(v);
+      return isNaN(d) ? String(v) : d.toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' });
+    },
+    histRemark(r) { return String(r || '').replace(/^Adjustment:\s*/i, ''); },
+    histQty(v) { const n = Number(v); return (n > 0 ? '+' : '') + n; }
   }));
 
   Alpine.data('posQrPanel', () => ({
@@ -2325,6 +2687,279 @@ Alpine.data('shopContentPanel', () => ({
       try {
         await fetchJSON(API + '/feed/reorder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: this.posts.map(p => p.id) }) });
       } catch (e) { toast('Reorder failed: ' + e.message, 'error'); }
+    }
+  }));
+
+  /* ── Price Check (master < minimum markup) ─────────────────────────────── */
+  Alpine.data('priceCheckPanel', () => ({
+    items: [], categories: [], summary: { belowCost: 0, total: 0, fix: 0, box: 0, tobacco: 0 },
+    loading: false, tag: '', category: '', maxPct: 5,
+    async init() {
+      if (Alpine.store('app').section === 'pricecheck') await this.load();
+      this.$watch('$store.app.section', v => { if (v === 'pricecheck') this.load(); });
+      window.addEventListener('refresh-data', () => { if (Alpine.store('app').section === 'pricecheck') this.load(); });
+    },
+    async load() {
+      this.loading = true;
+      try {
+        let url = API + '/price-check?maxPct=' + this.maxPct;
+        if (this.tag) url += '&tag=' + encodeURIComponent(this.tag);
+        if (this.category) url += '&category=' + encodeURIComponent(this.category);
+        const r = await fetchJSON(url);
+        this.items = r.items || [];
+        this.categories = r.categories || [];
+        this.summary = r.summary || this.summary;
+      } catch (e) { this.items = []; }
+      this.loading = false;
+    },
+    suggest(cost) { return Math.ceil((Number(cost || 0) * 1.05) / 0.25) * 0.25; },
+    exportCSV() {
+      const head = ['Name', 'Barcode', 'Category', 'Unit', 'Price', 'Cost', 'Markup%', 'Suggested x1.05', 'OnlinePrice', 'OnlineMarkup%', 'Tag'];
+      const rows = this.items.map(x => [x.name, x.barcode, x.category, x.unit, x.price, x.cost, x.markup, this.suggest(x.cost), x.onlinePrice || '', x.onlineMarkup || '', x.tag]);
+      const csv = [head, ...rows].map(r => r.map(v => (v == null ? '' : '"' + String(v).replace(/"/g, '""') + '"')).join(',')).join('\r\n');
+      const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'price-check-' + new Date().toISOString().slice(0, 10) + '.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+  }));
+
+
+
+  /* ── Remittance (NASA DRIVER vs NASA TINDAHAN) ────────────────────────── */
+  Alpine.data('remittancePanel', () => ({
+    pending: [], pendingRows: [], remitted: { rows: [], total: 0, count: 0 }, closedShifts: [],
+    filter: 'ALL', loading: false,
+    async init() {
+      if (Alpine.store('app').section === 'remittance') await this.load();
+      this.$watch('$store.app.section', v => { if (v === 'remittance') this.load(); });
+      window.addEventListener('refresh-data', () => { if (Alpine.store('app').section === 'remittance') this.load(); });
+      setInterval(() => { if (Alpine.store('app').section === 'remittance') this.load(); }, 60000);
+    },
+    async load() {
+      this.loading = true;
+      try {
+        const r = await fetchJSON(API + '/remittances');
+        this.pending = r.pending || [];
+        this.pendingRows = r.pendingRows || [];
+        this.remitted = r.remitted || { rows: [], total: 0, count: 0 };
+        this.closedShifts = r.closedShifts || [];
+      } catch (e) { this.pending = []; this.pendingRows = []; this.remitted = { rows: [], total: 0, count: 0 }; this.closedShifts = []; }
+      this.loading = false;
+    },
+    get rows() {
+      const merged = (this.pendingRows || []).map(p => ({ orderNo: p.orderNo, method: p.method, amount: p.amount, date: p.deliveredDate, status: 'DRIVER', who: p.driverName + ' (hindi pa na-remit)', remittedAt: '' }))
+        .concat((this.remitted.rows || []).map(r => ({ orderNo: r.orderNo, method: r.method, amount: r.amount, date: r.deliveredDate, status: 'TINDAHAN', who: r.remittedBy + ' · ' + r.remittedAt, remittedAt: r.remittedAt })));
+      merged.sort((a, b) => b.date.localeCompare(a.date) || (a.status === b.status ? 0 : (a.status === 'DRIVER' ? -1 : 1)));
+      return this.filter === 'ALL' ? merged : merged.filter(x => (this.filter === 'DRIVER') ? x.status === 'DRIVER' : x.status === 'TINDAHAN');
+    },
+    fmtDay(d) {
+      const m = { '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec' };
+      const p = String(d || '').split('-');
+      return p.length === 3 ? (m[p[1]] || p[1]) + ' ' + parseInt(p[2], 10) : String(d || '');
+    },
+    exportCSV() {
+      const head = ['Delivered', 'Order', 'Method', 'Amount', 'Status', 'Sino'];
+      const rr = this.rows.map(x => [x.date, x.orderNo, x.method, x.amount, x.status === 'DRIVER' ? 'NASA DRIVER' : 'NASA TINDAHAN', x.who]);
+      const csv = [head, ...rr].map(r => r.map(v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+      const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'remittance-' + new Date().toISOString().slice(0, 10) + '.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+  }));
+
+
+
+  /* ── Suppliers (registry — company / agent / contact) ─────────────────── */
+  Alpine.data('suppliersPanel', () => ({
+    d: [], loading: true, showArchived: false, search: '',
+    modalOpen: false, form: { id: null, companyName: '', agent: '', contactNo: '', notes: '' }, saving: false,
+    async init() {
+      if (Alpine.store('app').section === 'suppliers') await this.load();
+      this.$watch('$store.app.section', v => { if (v === 'suppliers') this.load(); });
+      window.addEventListener('refresh-data', () => { if (Alpine.store('app').section === 'suppliers') this.load(); });
+    },
+    async load() {
+      this.loading = true;
+      try { this.d = await fetchJSON(API + '/suppliers?includeArchived=' + (this.showArchived ? 'true' : 'false')); } catch (e) { this.d = []; }
+      this.loading = false;
+    },
+    get filtered() {
+      if (!this.search) return this.d;
+      const q = this.search.toLowerCase();
+      return this.d.filter(s => (s.companyName + ' ' + (s.agent || '') + ' ' + (s.contactNo || '')).toLowerCase().includes(q));
+    },
+    openAdd() { this.form = { id: null, companyName: '', agent: '', contactNo: '', notes: '' }; this.modalOpen = true; },
+    openEdit(s) { this.form = { id: s.id, companyName: s.companyName, agent: s.agent || '', contactNo: s.contactNo || '', notes: s.notes || '' }; this.modalOpen = true; },
+    closeModal() { this.modalOpen = false; },
+    async save() {
+      if (!(this.form.companyName || '').trim()) { toast('Company name required', 'error'); return; }
+      this.saving = true;
+      try {
+        const body = JSON.stringify({ companyName: this.form.companyName.trim(), agent: this.form.agent || '', contactNo: this.form.contactNo || '', notes: this.form.notes || '' });
+        const r = this.form.id
+          ? await fetch(API + '/suppliers/' + this.form.id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body })
+          : await fetch(API + '/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || 'Failed');
+        toast(this.form.id ? 'Supplier updated' : 'Supplier added', 'success');
+        this.modalOpen = false;
+        await this.load();
+        dispatchEvent(new CustomEvent('load-products')); // i-refresh din ang supplier filter/dropdown ng master
+      } catch (e) { toast(e.message, 'error'); }
+      this.saving = false;
+    },
+    async archive(s) {
+      if (!confirm('I-archive si "' + s.companyName + '"? (hindi mabubura — maitatago sa mga tag)')) return;
+      try {
+        await fetchJSON(API + '/suppliers/' + s.id + '/archive', { method: 'POST' });
+        await this.load(); dispatchEvent(new CustomEvent('load-products'));
+      } catch (e) { toast(e.message, 'error'); }
+    },
+    async restore(s) {
+      try {
+        await fetchJSON(API + '/suppliers/' + s.id + '/restore', { method: 'POST' });
+        await this.load(); dispatchEvent(new CustomEvent('load-products'));
+      } catch (e) { toast(e.message, 'error'); }
+    }
+  }));
+
+  /* ── Checks (EastWest / RCBC recording + printing — server-side HP Smart Tank) ── */
+  Alpine.data('checksPanel', () => ({
+    d: [], loading: true, search: '', status: 'all',
+    suppliers: [], printers: [], template: null, banks: [], templateBank: 'EastWest Bank',
+    settingsOpen: false, savingTemplate: false, testPrinting: false, printing: false,
+    modalOpen: false, saving: false, wordsPreview: '', _wordsTimer: null,
+    form: { id: null, bank: 'EastWest Bank', checkNo: '', checkDate: '', supplierId: 0, amount: null, memo: '' },
+    async init() {
+      this.form.checkDate = this.today();
+      if (Alpine.store('app').section === 'checks') { await this.load(); this.loadSuppliers(); this.loadBanks(); }
+      this.$watch('$store.app.section', v => { if (v === 'checks') { this.load(); this.loadSuppliers(); this.loadBanks(); } });
+      window.addEventListener('refresh-data', () => { if (Alpine.store('app').section === 'checks') this.load(); });
+    },
+    today() {
+      const x = new Date();
+      return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+    },
+    async load() {
+      this.loading = true;
+      try {
+        const p = new URLSearchParams();
+        if (this.status && this.status !== 'all') p.set('status', this.status);
+        const qs = p.toString();
+        this.d = await fetchJSON('/api/checks' + (qs ? '?' + qs : ''));
+      } catch (e) { this.d = []; }
+      this.loading = false;
+    },
+    async loadSuppliers() {
+      try { this.suppliers = await fetchJSON(API + '/suppliers'); } catch (e) { this.suppliers = []; }
+    },
+    async loadBanks() {
+      try { this.banks = await fetchJSON('/api/checks/banks'); } catch (e) { this.banks = ['EastWest Bank', 'RCBC']; }
+      if (!this.banks.includes(this.form.bank)) this.form.bank = this.banks[0] || 'EastWest Bank';
+      if (!this.banks.includes(this.templateBank)) this.templateBank = this.banks[0] || 'EastWest Bank';
+    },
+    async toggleSettings() {
+      this.settingsOpen = !this.settingsOpen;
+      if (this.settingsOpen && !this.template) {
+        try { this.template = await fetchJSON('/api/checks/template?bank=' + encodeURIComponent(this.templateBank)); } catch (e) { toast('Template load failed: ' + e.message, 'error'); }
+        try { this.printers = await fetchJSON('/api/checks/printers'); } catch (e) { this.printers = []; }
+      }
+    },
+    async switchTemplateBank() {
+      try { this.template = await fetchJSON('/api/checks/template?bank=' + encodeURIComponent(this.templateBank)); } catch (e) { toast('Template load failed: ' + e.message, 'error'); }
+    },
+    get filtered() {
+      if (!this.search) return this.d;
+      const q = this.search.toLowerCase();
+      return this.d.filter(c => (c.checkNo + ' ' + c.payee + ' ' + c.bank + ' ' + (c.memo || '')).toLowerCase().includes(q));
+    },
+    fmtDate(s) { if (!s) return ''; const p = String(s).slice(0, 10).split('-'); return p.length === 3 ? (p[1] + '-' + p[2] + '-' + p[0]) : s; },
+    fmtDateTime(s) {
+      if (!s) return '—';
+      const d = new Date(s);
+      if (isNaN(d.getTime())) return String(s).slice(0, 16).replace('T', ' ');
+      const p = n => String(n).padStart(2, '0');
+      return p(d.getMonth() + 1) + '-' + p(d.getDate()) + '-' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+    },
+    fmtAmt(n) { return Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+    openAdd() {
+      this.form = { id: null, bank: (this.banks.includes('EastWest Bank') ? 'EastWest Bank' : (this.banks[0] || 'EastWest Bank')), checkNo: '', checkDate: this.today(), supplierId: 0, amount: null, memo: '' };
+      this.wordsPreview = ''; this.modalOpen = true;
+    },
+    openEdit(c) {
+      this.form = { id: c.id, bank: c.bank, checkNo: c.checkNo, checkDate: c.checkDate, supplierId: c.supplierId, amount: c.amount, memo: c.memo || '' };
+      this.wordsPreview = c.amountWords || ''; this.modalOpen = true;
+    },
+    closeModal() { this.modalOpen = false; },
+    queueWords() { clearTimeout(this._wordsTimer); this._wordsTimer = setTimeout(() => this.previewWords(), 400); },
+    async previewWords() {
+      const a = Number(this.form.amount || 0);
+      if (!a) { this.wordsPreview = ''; return; }
+      try { const r = await fetchJSON('/api/checks/words?amount=' + a); this.wordsPreview = r.words; } catch (e) { }
+    },
+    async save(andPrint) {
+      if (!(this.form.checkNo || '').trim()) { toast('Check number required', 'error'); return; }
+      if (!this.form.supplierId) { toast('Pumili ng payee (supplier)', 'error'); return; }
+      if (!(this.form.amount > 0)) { toast('Amount must be greater than 0', 'error'); return; }
+      this.saving = true;
+      try {
+        const body = JSON.stringify({
+          bank: this.form.bank, checkNo: this.form.checkNo.trim(), checkDate: this.form.checkDate,
+          supplierId: this.form.supplierId, amount: this.form.amount, memo: this.form.memo || '', createdBy: 'Admin'
+        });
+        const r = this.form.id
+          ? await fetch('/api/checks/' + this.form.id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body })
+          : await fetch('/api/checks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || 'Failed');
+        toast(this.form.id ? 'Check updated' : 'Check saved', 'success');
+        const id = this.form.id || j.id;
+        this.modalOpen = false;
+        await this.load();
+        if (andPrint) await this.printCheck({ id });
+      } catch (e) { toast(e.message, 'error'); }
+      this.saving = false;
+    },
+    async printCheck(c) {
+      if (this.printing) return;
+      this.printing = true;
+      try {
+        const r = await fetch('/api/checks/' + c.id + '/print', { method: 'POST' });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || 'Print failed');
+        toast('🖨️ Na-print: ' + j.printed, 'success');
+        await this.load();
+      } catch (e) { toast('PRINT ERROR: ' + e.message, 'error'); }
+      this.printing = false;
+    },
+    async setStatus(c, st) {
+      const label = st === 'void' ? 'i-VOID' : 'mark as CLEARED';
+      if (!confirm('Sigurado ka bang ' + label + ' ang check ' + c.checkNo + '?')) return;
+      try { await fetchJSON('/api/checks/' + c.id + '/' + st, { method: 'POST' }); await this.load(); toast('Updated', 'success'); } catch (e) { toast(e.message, 'error'); }
+    },
+    async saveTemplate() {
+      this.savingTemplate = true;
+      try {
+        const r = await fetch('/api/checks/template', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.template) });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || 'Save failed');
+        toast('Settings saved', 'success');
+      } catch (e) { toast(e.message, 'error'); }
+      this.savingTemplate = false;
+    },
+    async testPrint() {
+      this.testPrinting = true;
+      try {
+        const r = await fetch('/api/checks/test-print?bank=' + encodeURIComponent(this.templateBank), { method: 'POST' });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || 'Print failed');
+        toast('🖨️ Test print sent (' + this.templateBank + ') — SAMPLE SUPPLIER INC · 50,000.00', 'success');
+      } catch (e) { toast('TEST PRINT ERROR: ' + e.message, 'error'); }
+      this.testPrinting = false;
     }
   }));
 

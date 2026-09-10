@@ -89,7 +89,7 @@
       <a href="/updates/JumongDriver.apk" style="display:block;text-align:center;border:2px solid #c4b5fd;color:#7c3aed;font-weight:700;border-radius:12px;padding:13px;font-size:13px;text-decoration:none;">📲 DOWNLOAD APK (Android)</a>
     </div>
     <p id="lgErr" class="hidden" style="text-align:center;font-size:12px;color:#ef4444;margin-top:12px;"></p>
-    <p style="text-align:center;font-size:10px;color:#a8a29e;margin-top:16px;">v1.1.50 · driver app</p>
+    <p style="text-align:center;font-size:10px;color:#a8a29e;margin-top:16px;">v1.1.52 · driver app</p>
   </div>
 </div>
 
@@ -102,7 +102,7 @@
         <p class="text-[11px] text-stone-400" id="drvName"></p>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
-        <button onclick="returnToHq()" class="text-[10px] font-bold text-emerald-700 border border-emerald-300 rounded-lg px-2.5 py-1.5">🏠 RETURN TO HQ</button>
+        <button id="esBtnMain" onclick="openEndShift()" class="text-[10px] font-bold text-emerald-700 border border-emerald-300 rounded-lg px-2.5 py-1.5">🔚 END SHIFT</button>
         <button onclick="openInstall()" class="text-[10px] font-bold text-violet-700 border border-violet-300 rounded-lg px-2.5 py-1.5">📲 INSTALL</button>
         <button onclick="logout()" class="text-[11px] font-bold text-red-500 border border-red-200 rounded-lg px-3 py-1.5">SIGN OUT</button>
       </div>
@@ -199,6 +199,44 @@
 
 <div id="toastBox"></div>
 
+<!-- END SHIFT SCREEN -->
+<div id="endShiftScreen" class="hidden max-w-md mx-auto px-4 py-4 space-y-3">
+  <button onclick="backFromEnd()" class="text-xs font-bold text-violet-700">← Back to deliveries</button>
+  <div class="card p-4">
+    <p class="font-extrabold text-stone-900">🔚 End Shift</p>
+    <p class="text-[11px] text-stone-400 mt-1">Isang beses lang kada araw. I-a-remit ang LAHAT ng nakolekta (cash + gcash) — isusuko mo na ang pera sa tindahan. Ang hindi pa nai-deliver ay dadalhin bukas.</p>
+    <p id="esStatus" class="text-[11px] font-bold text-stone-600 mt-2"></p>
+  </div>
+
+  <div id="esOpenBox" class="hidden space-y-3">
+    <div class="grid grid-cols-3 gap-2 text-center">
+      <div class="card p-3"><p class="text-xl font-black text-stone-900" id="esOrders">0</p><p class="text-[10px] text-stone-400 font-bold uppercase tracking-wide">Collectible</p></div>
+      <div class="card p-3"><p class="text-xl font-black text-emerald-600" id="esCash">₱0.00</p><p class="text-[10px] text-stone-400 font-bold uppercase tracking-wide">Cash</p></div>
+      <div class="card p-3"><p class="text-xl font-black text-blue-600" id="esGcash">₱0.00</p><p class="text-[10px] text-stone-400 font-bold uppercase tracking-wide">GCash</p></div>
+    </div>
+    <p class="text-[10px] text-stone-400 text-center" id="esToday"></p>
+    <button id="esBtn" onclick="confirmEndShift()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl py-4 text-sm transition">🔚 END SHIFT &amp; REMIT ₱0.00</button>
+    <p id="esErr" class="hidden text-center text-xs text-red-500"></p>
+  </div>
+
+  <div id="esDoneBox" class="hidden space-y-3">
+    <div class="card p-4 text-center">
+      <p class="text-2xl">✅</p>
+      <p class="font-extrabold text-stone-900">End shift completed</p>
+      <p class="text-xs text-stone-500 mt-1" id="esDoneText"></p>
+    </div>
+  </div>
+
+  <div class="card p-4">
+    <div class="flex items-center justify-between">
+      <p class="text-[11px] text-stone-400 font-bold uppercase tracking-wide">📦 Carry-over (bukas)</p>
+      <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-700" id="esCarryCount">0</span>
+    </div>
+    <p class="text-[10px] text-stone-400 mt-1">Mga order na hindi pa nai-deliver — nasa iyo pa ang items. I-deliver bukas o i-cancel para ibalik ang stock sa tindahan.</p>
+    <div id="esCarryList" class="space-y-2 mt-2 max-h-64 overflow-y-auto"></div>
+  </div>
+</div>
+
 <script>
 const API = 'https://admin.jumongdev.com/api/dashboard';
 let token = localStorage.getItem('drv_token') || '';
@@ -278,7 +316,7 @@ setTimeout(() => {
     _diag.push('url:' + location.pathname);
     fetch('https://admin.jumongdev.com/api/dashboard/crash-report', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ app: 'driver-app', version: '1.1.50', device: navigator.platform || '', type: 'diag', log: _diag.join('\n').slice(0, 2000) })
+      body: JSON.stringify({ app: 'driver-app', version: '1.1.52', device: navigator.platform || '', type: 'diag', log: _diag.join('\n').slice(0, 2000) })
     }).catch(() => {});
   } catch (_) {}
 }, 3000);
@@ -331,8 +369,8 @@ loadPaymentQrs();
 })();
 
 function show(id) {
-  const map = { loginScreen: 'flex', mainScreen: 'block', detailScreen: 'block', payScreen: 'block' };
-  ['loginScreen', 'mainScreen', 'detailScreen', 'payScreen'].forEach(s => {
+  const map = { loginScreen: 'flex', mainScreen: 'block', detailScreen: 'block', payScreen: 'block', endShiftScreen: 'block' };
+  ['loginScreen', 'mainScreen', 'detailScreen', 'payScreen', 'endShiftScreen'].forEach(s => {
     const el = document.getElementById(s);
     if (!el) return;
     if (s === id) { el.classList.remove('hidden'); el.style.display = (map[s] || 'block'); }
@@ -344,7 +382,7 @@ function report(msg) {
   try {
     fetch('https://admin.jumongdev.com/api/dashboard/crash-report', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ app: 'driver-app', version: '1.1.50', device: navigator.platform || '', type: 'login', log: msg + '\nua:' + (navigator.userAgent || '').slice(0, 120) })
+      body: JSON.stringify({ app: 'driver-app', version: '1.1.52', device: navigator.platform || '', type: 'login', log: msg + '\nua:' + (navigator.userAgent || '').slice(0, 120) })
     }).catch(() => {});
   } catch (_) {}
 }
@@ -403,6 +441,7 @@ async function loadOrders() {
         '</div>' +
       '</div>';
     }).join('');
+    refreshEndBadge();
   } catch (e) { toast('Failed to load: ' + e.message, 'error'); }
 }
 
@@ -471,14 +510,122 @@ async function markArrived() {
     openDetail(curOrder.id);
   } catch (e) { toast(e.message, 'error'); }
 }
-async function returnToHq() {
-  if (!confirm('Umuwi ka na ba sa tindahan? I-uulat nito ang iyong mga nakolektang payments para sa remittance.')) return;
+// ─── END SHIFT (1x/day, kasama remittance) ───────────
+let endInfo = null;
+async function loadEndInfo() {
   try {
-    const r = await api('/driver/return-to-hq', { method: 'POST' });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.error || 'Failed');
-    toast('🏠 Returned to HQ — nakolekta: ' + fmt(j.cashTotal) + ' cash · ' + fmt(j.gcashTotal) + ' gcash (' + j.delivered + ' orders)');
+    const r = await api('/driver/endshift-info');
+    if (r.status === 401) { setErr('⚠ Hindi na-validate ang session — mag-login ulit'); logout(); return; }
+    endInfo = await r.json();
+  } catch (e) { endInfo = null; }
+}
+function endBadge() {
+  const btn = document.getElementById('esBtnMain');
+  if (!btn || !endInfo) return;
+  if (endInfo.closedToday) {
+    btn.textContent = '🔚 END SHIFT ✓ DONE';
+    btn.className = 'text-[10px] font-bold text-stone-400 border border-gray-200 rounded-lg px-2.5 py-1.5 cursor-default';
+    btn.onclick = null;
+  } else {
+    btn.textContent = '🔚 END SHIFT';
+    btn.className = 'text-[10px] font-bold text-emerald-700 border border-emerald-300 rounded-lg px-2.5 py-1.5';
+    btn.onclick = openEndShift;
+  }
+}
+async function refreshEndBadge() { await loadEndInfo(); endBadge(); }
+function backFromEnd() { show('main'); loadOrders(); }
+
+async function openEndShift() {
+  const err = document.getElementById('esErr');
+  err.classList.add('hidden');
+  await loadEndInfo();
+  if (!endInfo) { toast('Hindi ma-load ang end-shift info', 'error'); return; }
+  show('endShiftScreen');
+  renderEndShift();
+}
+
+function renderEndShift() {
+  const st = document.getElementById('esStatus');
+  const open = document.getElementById('esOpenBox');
+  const done = document.getElementById('esDoneBox');
+  const total = (endInfo.sweep.cash + endInfo.sweep.gcash);
+  st.textContent = endInfo.driverName + ' — ' + (endInfo.closedToday ? 'Tapos na ang end shift ngayon ✓' : 'Handa ka nang mag-end shift');
+  if (endInfo.closedToday) {
+    open.classList.add('hidden'); done.classList.remove('hidden');
+    const lc = endInfo.lastClosed || {};
+    document.getElementById('esDoneText').textContent =
+      'Na-remit: ' + (lc.deliveredOrders || 0) + ' order(s) · Cash ' + fmt(lc.cashTotal || 0) + ' · GCash ' + fmt(lc.gcashTotal || 0) + (lc.endedAt ? ' · ' + lc.endedAt : '');
+    document.getElementById('esErr').classList.add('hidden');
+  } else {
+    open.classList.remove('hidden'); done.classList.add('hidden');
+    document.getElementById('esOrders').textContent = endInfo.sweep.count;
+    document.getElementById('esCash').textContent = fmt(endInfo.sweep.cash);
+    document.getElementById('esGcash').textContent = fmt(endInfo.sweep.gcash);
+    document.getElementById('esToday').textContent =
+      'Delivered ngayon: ' + endInfo.today.count + ' order(s) · Cash ' + fmt(endInfo.today.cash) + ' · GCash ' + fmt(endInfo.today.gcash);
+    const btn = document.getElementById('esBtn');
+    btn.textContent = '🔚 END SHIFT & REMIT ' + fmt(total);
+    btn.disabled = false;
+  }
+  renderCarryOver();
+}
+
+function renderCarryOver() {
+  const list = endInfo.carryOver || [];
+  document.getElementById('esCarryCount').textContent = list.length;
+  const wrap = document.getElementById('esCarryList');
+  wrap.innerHTML = list.length
+    ? list.map(o =>
+        '<div class="border border-gray-100 rounded-xl p-3">' +
+          '<div class="flex items-center justify-between gap-2">' +
+            '<p class="font-extrabold text-xs truncate">' + o.orderNo + (o.days >= 1 ? ' <span class="text-[9px] font-black text-red-500">' + o.days + 'D OLD</span>' : '') + '</p>' +
+            '<span class="text-[9px] font-black px-2 py-0.5 rounded-full ' + (o.status === 'arrived' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700') + '">' + o.status.toUpperCase() + '</span>' +
+          '</div>' +
+          '<p class="text-[12px] font-semibold mt-1">' + esc(o.customerName) + '</p>' +
+          '<p class="text-[10px] text-stone-400">📍 Blk ' + esc(o.block || '-') + ' Lot ' + esc(o.lot || '-') + ', ' + esc(o.subdivision || '') + (o.address ? ' · ' + esc(o.address) : '') + '</p>' +
+          '<div class="flex items-center justify-between mt-2">' +
+            '<span class="font-black text-stone-900 text-xs">' + fmt(o.total) + '</span>' +
+            '<div class="flex gap-2">' +
+              '<button onclick="esDeliver(' + o.id + ')" class="text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg px-2.5 py-1.5">DELIVER</button>' +
+              '<button onclick="esCancel(' + o.id + ')" class="text-[10px] font-bold text-red-500 border border-red-200 rounded-lg px-2.5 py-1.5">CANCEL</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>').join('')
+    : '<p class="text-center text-xs text-stone-400 py-3">Wala kang carry-over — lahat ay nai-deliver o walang nakatalaga.</p>';
+}
+
+async function esDeliver(id) { openDetail(id); }
+
+async function esCancel(id) {
+  try {
+    const r = await api('/driver/orders/' + id);
+    if (r.status === 401) { setErr('⚠ Hindi na-validate ang session — mag-login ulit'); logout(); return; }
+    if (!r.ok) { toast('Order not found', 'error'); return; }
+    curOrder = (await r.json()).order;
+    openCancel();
   } catch (e) { toast(e.message, 'error'); }
+}
+
+async function confirmEndShift() {
+  const total = (endInfo.sweep.cash + endInfo.sweep.gcash);
+  const msg = endInfo.sweep.count > 0
+    ? 'I-end shift mo na ba?\n\nRemit: ' + endInfo.sweep.count + ' order(s)\nCash: ' + fmt(endInfo.sweep.cash) + '\nGCash: ' + fmt(endInfo.sweep.gcash) + '\n\nIsinuko mo na ba ang perang ito sa tindahan? Hindi mo na ito maaaring baguhin (1x per day).'
+    : 'Wala kang nakolektang payment. I-end shift mo na ba? (1x per day — hindi na maaaring baguhin.)';
+  if (!confirm(msg)) return;
+  const err = document.getElementById('esErr');
+  err.classList.add('hidden');
+  const btn = document.getElementById('esBtn');
+  btn.disabled = true; btn.textContent = 'PROCESSING…';
+  try {
+    const r = await api('/driver/end-shift', { method: 'POST' });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 409) { err.textContent = j.error || 'Naka-end shift ka na ngayon'; err.classList.remove('hidden'); btn.disabled = false; btn.textContent = '🔚 END SHIFT & REMIT ' + fmt(total); return; }
+    if (!r.ok) throw new Error(j.error || 'End shift failed');
+    await loadEndInfo();
+    renderEndShift();
+    endBadge();
+    toast('✅ End shift OK — na-remit ang ' + fmt(j.cashTotal) + ' cash + ' + fmt(j.gcashTotal) + ' gcash');
+  } catch (e) { err.textContent = e.message; err.classList.remove('hidden'); btn.disabled = false; btn.textContent = '🔚 END SHIFT & REMIT ' + fmt(total); }
 }
 function backToList() { curOrder = null; show('main'); loadOrders(); }
 function backToDetail() { show('detail'); }

@@ -13,20 +13,25 @@ public partial class SelectCustomerForm : Form
         InitializeComponent();
         lblHeader.Text = orderType == "Online"
             ? "SELECT CUSTOMER FOR ONLINE ORDER"
-            : "SELECT CUSTOMER";
+            : "SELECT CUSTOMER — TOP = WALK-IN (no points)";
+        // I-load ang list kapag may handle na ang form (DataGridView DataSource sa ctor = NRE sa band layout)
+        Shown += (_, _) => RefreshGrid("");
         txtSearch.Focus();
         DebugHelper.AddFormLabel(this);
     }
 
     private void RefreshGrid(string keyword)
     {
-        if (keyword.Length < 1)
+        var results = keyword.Length < 1
+            ? CustomerService.GetAll().Where(c => c.IsActive).OrderBy(c => c.Name).ToList()
+            : CustomerService.Search(keyword).Where(c => c.IsActive).ToList();
+        _list = results;
+
+        var rows = new List<object>
         {
-            dgvCustomers.Visible = false;
-            return;
-        }
-        var results = CustomerService.Search(keyword).Where(c => c.IsActive).ToList();
-        dgvCustomers.DataSource = results.Select(c => new
+            new { Id = 0, Name = "🧾 WALK-IN (no points)", Phone = "", Address = "—", Credit = "—", Points = 0 }
+        };
+        rows.AddRange(results.Select(c => new
         {
             c.Id,
             Name = string.IsNullOrEmpty(c.QrCode) ? c.Name : "⭐ " + c.Name,
@@ -34,8 +39,9 @@ public partial class SelectCustomerForm : Form
             Address = string.IsNullOrEmpty(c.Address) ? "—" : c.Address,
             Credit = c.CreditBalance.ToString("N2"),
             Points = c.LoyaltyPoints
-        }).ToList();
-        dgvCustomers.Visible = results.Count > 0;
+        }));
+        dgvCustomers.DataSource = rows;
+        dgvCustomers.Visible = true;
         if (dgvCustomers.Columns["Id"] != null) dgvCustomers.Columns["Id"].Width = 35;
     }
 
@@ -44,15 +50,13 @@ public partial class SelectCustomerForm : Form
         if (dgvCustomers.SelectedRows.Count > 0)
         {
             var id = Convert.ToInt32(dgvCustomers.SelectedRows[0].Cells["Id"].Value);
-            var results = CustomerService.Search(txtSearch.Text);
-            SelectedCustomer = results.FirstOrDefault(c => c.Id == id);
-            if (SelectedCustomer != null)
-            {
-                DialogResult = DialogResult.OK;
-                Close();
-            }
+            SelectedCustomer = id == 0 ? null : _list.FirstOrDefault(c => c.Id == id);
+            DialogResult = DialogResult.OK;
+            Close();
         }
     }
+
+    private List<Customer> _list = new();
 
     private void InitializeComponent()
     {

@@ -83,12 +83,16 @@ public partial class ProductsForm : Form
         {
             if (dgvProducts.Rows[e.RowIndex].DataBoundItem is Product val)
             {
-                if (val.StockQty == 0)
+                // STOCK LINK: ipakita ang effective stock (child = parent stock ÷ ratio)
+                var stock = ProductService.EffectiveStockQty(val);
+                if (val.StockParentId > 0)
+                    e.Value = stock.ToString();
+                if (stock == 0)
                 {
                     e.CellStyle!.ForeColor = ThemeManager.Current.AccentRed;
                     e.CellStyle.SelectionForeColor = ThemeManager.Current.AccentRed;
                 }
-                else if (val.StockQty <= ProductService.GetLowStockThreshold())
+                else if (stock <= ProductService.GetLowStockThreshold())
                 {
                     e.CellStyle!.ForeColor = ThemeManager.Current.AccentOrange;
                     e.CellStyle.SelectionForeColor = ThemeManager.Current.AccentOrange;
@@ -161,7 +165,7 @@ public partial class ProductsForm : Form
             cmbCategory.Text = p.Category;
             txtPrice.Text = p.Price.ToString("N2");
             txtCost.Text = p.Cost.ToString("N2");
-            txtStock.Text = p.StockQty.ToString();
+            txtStock.Text = ProductService.EffectiveStockQty(p).ToString();
             lblFormTitle.Text = $"EDIT: {p.Name}";
             lblFormTitle.ForeColor = Color.FromArgb(46, 204, 113);
             _picProduct.Image = Base64ToImage(p.ImageData);
@@ -223,7 +227,7 @@ public partial class ProductsForm : Form
             cmbCategory.Text = _selected.Category;
             txtPrice.Text = _selected.Price.ToString("N2");
             txtCost.Text = _selected.Cost.ToString("N2");
-            txtStock.Text = _selected.StockQty.ToString();
+            txtStock.Text = ProductService.EffectiveStockQty(_selected).ToString();
         }
         SetReadOnly(true);
     }
@@ -347,7 +351,7 @@ public partial class ProductsForm : Form
             foreach (var prod in group.OrderBy(p => p.Name))
             {
                 var name = prod.Name;
-                var stockQty = prod.StockQty.ToString().PadLeft(5);
+                var stockQty = ProductService.EffectiveStockQty(prod).ToString().PadLeft(5);
                 if (name.Length > nameW)
                 {
                     var firstLine = name.Substring(0, nameW);

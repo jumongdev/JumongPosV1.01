@@ -218,27 +218,34 @@ public class PrinterService
 
         lines.Add(new LineEntry { Text = "Change", RightText = sale.Change.ToString("N2"), Spacing = 14 });
 
-        // Loyalty points: STAR members (QR code) only - show previous / earned / new balance
+        // Loyalty points status: LAGING nakikita kung ⭐ may points o 🚶 walk-in / walang points account
         var ptsEarned = sale.Items.Where(x => !x.IsVoided).Sum(x => x.PointsEarned);
-        if (customer != null && !string.IsNullOrEmpty(customer.QrCode) && (ptsEarned > 0 || (ptsUsed ?? 0) > 0))
+        if (ptsEarned == 0) ptsEarned = sale.TotalPointsEarned;
+        var memberQr = !string.IsNullOrEmpty(customer?.QrCode) || !string.IsNullOrEmpty(sale.CustomerQr);
+        lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Spacing = 12 });
+        if (!memberQr)
         {
-            lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Spacing = 12 });
-            if (ptsPrevious.HasValue)
+            lines.Add(new LineEntry { Text = customer == null ? "Walk-in — walang points" : "Walang points account (hindi online-registered)", Spacing = 14 });
+        }
+        else
+        {
+            lines.Add(new LineEntry { Text = "POINTS", Bold = true, Spacing = 14 });
+            if (customer != null && ptsPrevious.HasValue)
             {
-                lines.Add(new LineEntry { Text = "POINTS", Bold = true, Spacing = 14 });
                 lines.Add(new LineEntry { Text = "Previous", RightText = ptsPrevious.Value.ToString(), Spacing = 14 });
-                if (ptsEarned > 0)
-                    lines.Add(new LineEntry { Text = "Earned", RightText = "+" + ptsEarned.ToString(), Spacing = 14 });
+                lines.Add(new LineEntry { Text = "Earned", RightText = "+" + ptsEarned.ToString(), Spacing = 14 });
                 if ((ptsUsed ?? 0) > 0)
                     lines.Add(new LineEntry { Text = "Redeemed", RightText = "-" + ptsUsed.Value.ToString(), Spacing = 14 });
                 lines.Add(new LineEntry { Text = "New Balance", RightText = customer.LoyaltyPoints.ToString(), Bold = true, Spacing = 14 });
             }
             else
             {
-                lines.Add(new LineEntry { Text = "POINTS EARNED", RightText = "+" + ptsEarned.ToString(), Bold = true, Spacing = 14 });
-                lines.Add(new LineEntry { Text = "Total Points", RightText = customer.LoyaltyPoints.ToString(), Spacing = 14 });
+                lines.Add(new LineEntry { Text = "Earned", RightText = "+" + ptsEarned.ToString(), Spacing = 14 });
+                if (customer != null)
+                    lines.Add(new LineEntry { Text = "Total Points", RightText = customer.LoyaltyPoints.ToString(), Spacing = 14 });
             }
-            lines.Add(new LineEntry { Text = "Points redeemable sa susunod na bili", Spacing = 14 });
+            if (ptsEarned > 0 || (ptsUsed ?? 0) > 0)
+                lines.Add(new LineEntry { Text = "Points redeemable sa susunod na bili", Spacing = 14 });
         }
 
         lines.Add(new LineEntry { Text = new string('-', lineChars + 2), Spacing = 12 });

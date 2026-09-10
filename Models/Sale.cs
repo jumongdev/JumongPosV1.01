@@ -18,6 +18,8 @@ public class Sale
     public int? UserId { get; set; }
     public string OrderType { get; set; } = "Walk-in";
     public string CustomerName { get; set; } = "";
+    public string CustomerQr { get; set; } = "";
+    public int TotalPointsEarned { get; set; }
     public string ReferenceNo { get; set; } = "";
     public decimal CashPaid { get; set; }
     public decimal EwPaid { get; set; }
@@ -29,4 +31,9 @@ public class Sale
     public List<SaleItem> Items { get; set; } = new();
 
     public string Status => IsVoided ? "VOIDED" : "OK";
+
+    public string PointsStatus => IsVoided ? "—"
+        : !string.IsNullOrEmpty(CustomerQr)
+            ? (TotalPointsEarned > 0 ? "⭐ +" + TotalPointsEarned : "⭐ +0")
+            : "🚶 Walk-in";
 }

@@ -1400,7 +1400,15 @@ function openCheckout() {
     promoLineHtml() +
     '<div class="flex justify-between pt-1.5"><span class="text-stone-500">Delivery Fee</span><span class="font-semibold">' + (checkoutFee > 0 ? fmt(checkoutFee) : '<span class="text-emerald-600 font-bold">FREE</span>') + '</span></div>';
   document.getElementById('coTotal').textContent = fmt(sub + checkoutFee);
-  closeCart();
+  // SWAP cart drawer -> checkout nang WALANG history.back():
+  // ang closeCart() (popOverlay -> history.back) ay nag-trigger ng stale popstate na
+  // agad na magsasara sa bagong-open na checkoutModal (race). I-hide na lang + i-remove sa stack.
+  const cd = document.getElementById('cartDrawer');
+  const co = document.getElementById('cartOverlay');
+  if (cd) cd.classList.add('hidden');
+  if (co) co.classList.add('hidden');
+  const si = overlayStack.indexOf('cartDrawer');
+  if (si >= 0) overlayStack.splice(si, 1);
   document.getElementById('checkoutModal').classList.remove('hidden');
   pushOverlay();
 }
@@ -1730,20 +1738,6 @@ window.addEventListener('popstate', () => {
   else if (top === 'addrFormModal') closeAddrForm();
   else if (top === 'successModal') closeSuccess();
 });
-loadBranding();
-loadPromo();
-loadCatalog();
-loadShopSettings();
-loadShopContent();
-renderTiles();
-updateBadge();
-loadMe();
-initFeed();
-switchView(sessionStorage.getItem('shop_view') === 'catalog' ? 'catalog' : 'home');
-// PWA - installable app
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
-}
 
 // ─── MEMBER / PROFILE (Google Sign-In) ───────────────
 async function loadMe() {
@@ -1791,6 +1785,7 @@ function applyMemberUI() {
     renderChips();
     renderSideCats();
     renderGrid();
+    if (window.chatOnAuth) chatOnAuth();
   } else {
     ms.classList.add('hidden');
     gs.classList.remove('hidden');
@@ -2102,6 +2097,23 @@ if (window.visualViewport) {
     if (co && !co.classList.contains('hidden')) co.style.bottom = kb + 'px';
   });
 }
+
+// ── BOOT (inilipat dito SA DULO — kailangan lahat ng let/const declarations ay na-execute na
+//    bago ang mga tawag; dati ito ay nasa gitna → TDZ ReferenceError sa initFeed → patay ang script) ──
+loadBranding();
+loadPromo();
+loadCatalog();
+loadShopSettings();
+loadShopContent();
+renderTiles();
+updateBadge();
+loadMe();
+initFeed();
+switchView(sessionStorage.getItem('shop_view') === 'catalog' ? 'catalog' : 'home');
+// PWA - installable app
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
 </script>
 
 <!-- ===== PROFILE MODAL ===== -->
@@ -2310,7 +2322,155 @@ if (window.visualViewport) {
   </div>
 </div>
 
+<!-- ===== LIVE CHAT (customer ↔ admin — ang tindahan ang sumasagot, walang AI) ===== -->
+<div id="chatBubble" class="fixed z-[70] right-4 bottom-[96px] lg:bottom-6">
+  <button onclick="toggleChat()" class="relative w-14 h-14 rounded-full bg-violet-700 text-white shadow-xl flex items-center justify-center active:scale-95 transition-transform" aria-label="Chat with store">
+    <svg id="chatIconOpen" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-5 4V6a2 2 0 0 1 1-2z"/></svg>
+    <svg id="chatIconClose" class="hidden w-6 h-6" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+    <span id="chatBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold min-w-[20px] h-[20px] rounded-full items-center justify-center px-1">0</span>
+  </button>
+</div>
+
+<div id="chatSheet" class="hidden fixed inset-0 z-[95]">
+  <div class="absolute inset-0 bg-black/50" onclick="toggleChat()"></div>
+  <div class="absolute bottom-0 inset-x-0 lg:inset-x-auto lg:right-5 lg:bottom-6 lg:w-[380px] h-[72vh] lg:h-[560px] bg-white lg:rounded-3xl rounded-t-3xl shadow-2xl flex flex-col overflow-hidden safe-bottom">
+    <div class="bg-gradient-to-r from-violet-700 to-indigo-700 text-white px-4 py-3 flex items-center gap-2.5 shrink-0">
+      <div class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-base">🏪</div>
+      <div class="flex-1 min-w-0">
+        <p class="font-extrabold text-sm leading-tight">Customer Service</p>
+        <p class="text-[10px] text-violet-200 truncate" id="chatShopSub">Andengs Superstore — sasagutin ka ng tindahan</p>
+      </div>
+      <button onclick="toggleChat()" class="p-1.5 -mr-1.5 hover:bg-white/20 rounded-lg"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <div id="chatMsgs" class="flex-1 overflow-y-auto px-3.5 py-3 space-y-2 bg-stone-50"></div>
+    <div id="chatGuest" class="hidden px-5 py-8 text-center bg-white border-t border-gray-100">
+      <p class="text-4xl mb-2">💬</p>
+      <p class="font-bold text-stone-700 text-sm">Sign in para makipag-chat sa tindahan</p>
+      <p class="text-[11px] text-stone-400 mt-1 mb-4">Kailangan mong mag-login gamit ang Google para mag-message</p>
+      <button onclick="signIn()" class="bg-violet-700 text-white font-bold rounded-xl px-6 py-2.5 text-sm">SIGN IN</button>
+    </div>
+    <div id="chatComposer" class="shrink-0 bg-white border-t border-gray-100 px-3 py-2.5 flex items-end gap-2">
+      <input id="chatInput" type="text" placeholder="Type a message..." maxlength="1000" class="flex-1 bg-stone-100 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-violet-500/40">
+      <button onclick="chatSend()" class="bg-violet-700 text-white rounded-xl w-10 h-10 flex items-center justify-center active:scale-95 transition-transform disabled:opacity-40" id="chatSendBtn"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M3 20.5v-17l18 8.5-18 8.5z"/></svg></button>
+    </div>
+  </div>
+</div>
+
 <!-- spacer so the fixed bottom nav doesn't cover the footer -->
 <div class="lg:hidden h-[72px]"></div>
+<script>
+/* ── LIVE CHAT (customer ↔ admin) — real store staff replies via dashboard ── */
+(function () {
+  var conv = null, lastId = 0, chatOpen = false, unread = 0, pollTimer = null;
+  function $(id) { return document.getElementById(id); }
+  function scrollBottom() { var m = $('chatMsgs'); if (m) m.scrollTop = m.scrollHeight; }
+  function renderBadge() {
+    var b = $('chatBadge');
+    if (!b) return;
+    if (unread > 0) { b.textContent = unread > 99 ? '99+' : unread; b.classList.remove('hidden'); b.classList.add('flex'); }
+    else { b.classList.add('hidden'); b.classList.remove('flex'); }
+  }
+  function showBubble(on) { var bb = $('chatBubble'); if (bb) bb.classList.toggle('hidden', !on); }
+  function bubble(m, isMine) {
+    var div = document.createElement('div');
+    div.className = 'flex ' + (isMine ? 'justify-end' : 'justify-start');
+    var inner = document.createElement('div');
+    inner.className = 'max-w-[80%] rounded-2xl px-3 py-2 text-sm ' +
+      (isMine ? 'bg-violet-700 text-white rounded-br-md' : 'bg-white border border-gray-200 text-stone-800 rounded-bl-md shadow-sm');
+    if (!isMine) {
+      var who = document.createElement('div');
+      who.className = 'text-[9px] font-extrabold text-violet-600 mb-0.5 uppercase tracking-wide';
+      who.textContent = 'Andengs Superstore';
+      inner.appendChild(who);
+    }
+    var t = document.createElement('div');
+    t.textContent = m.message; // safe — no HTML injection
+    inner.appendChild(t);
+    var time = document.createElement('div');
+    time.className = 'text-[9px] mt-1 ' + (isMine ? 'text-violet-200' : 'text-stone-400') + ' text-right';
+    var d = new Date(m.createdAt);
+    time.textContent = isNaN(d) ? '' : d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true });
+    inner.appendChild(time);
+    div.appendChild(inner);
+    return div;
+  }
+  function renderAll(msgs) {
+    var box = $('chatMsgs');
+    box.innerHTML = '';
+    lastId = 0;
+    msgs.forEach(function (m) { box.appendChild(bubble(m, m.sender === 'customer')); if (m.id > lastId) lastId = m.id; });
+    scrollBottom();
+  }
+  function guestMode() {
+    $('chatGuest').classList.remove('hidden');
+    $('chatComposer').classList.add('hidden');
+  }
+  function memberMode() {
+    $('chatGuest').classList.add('hidden');
+    $('chatComposer').classList.remove('hidden');
+  }
+  async function markSeen() {
+    try { await fetchT(API + '/dashboard/shop/chat/seen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }, 10000); } catch (e) { }
+  }
+  async function poll() {
+    if (!member) { showBubble(true); return; }
+    if (!conv && !$('chatSheet').classList.contains('hidden')) { /* opening soon */ }
+    try {
+      var r = await fetchT(API + '/dashboard/shop/chat', {}, 10000);
+      var j = await r.json();
+      if (!r.ok) return;
+      var newConv = j.conversation;
+      if (!newConv) { conv = null; lastId = 0; unread = 0; renderBadge(); if (!$('chatSheet').classList.contains('hidden')) { $('chatMsgs').innerHTML = '<div class="text-center text-xs text-stone-400 py-10">Magsimula ng mensahe — sasagutin ka ng tindahan.</div>'; scrollBottom(); } return; }
+      conv = { id: newConv.id };
+      if (chatOpen) {
+        if (lastId === 0) renderAll(j.messages || []);
+        else {
+          var box = $('chatMsgs');
+          (j.messages || []).forEach(function (m) {
+            if (m.id > lastId) { box.appendChild(bubble(m, m.sender === 'customer')); lastId = m.id; }
+          });
+          scrollBottom();
+        }
+        if (j.unreadCustomer > 0) { markSeen(); unread = 0; renderBadge(); }
+      } else {
+        unread = j.unreadCustomer || 0;
+        renderBadge();
+      }
+    } catch (e) { /* keep silent */ }
+  }
+  window.chatOnAuth = function () { showBubble(true); memberMode(); poll(); };
+  window.toggleChat = function () {
+    chatOpen = !chatOpen;
+    $('chatSheet').classList.toggle('hidden', !chatOpen);
+    $('chatIconOpen').classList.toggle('hidden', chatOpen);
+    $('chatIconClose').classList.toggle('hidden', !chatOpen);
+    if (chatOpen) {
+      if (!member) { guestMode(); scrollBottom(); return; }
+      memberMode();
+      lastId = 0;
+      poll();
+    }
+  };
+  window.chatSend = async function () {
+    var inp = $('chatInput');
+    var msg = inp.value.trim();
+    if (!msg || !member) return;
+    $('chatSendBtn').disabled = true;
+    try {
+      await fetchT(API + '/dashboard/shop/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: msg }) }, 15000);
+      inp.value = '';
+      lastId = 0;
+      await poll();
+    } catch (e) { }
+    $('chatSendBtn').disabled = false;
+    inp.focus();
+  };
+  $('chatInput').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chatSend(); } });
+  // Baseline unread badge: kung member, i-poll agad; saka tuwing 4s
+  showBubble(true);
+  window.addEventListener('load', function () { if (member) { memberMode(); poll(); } });
+  pollTimer = setInterval(function () { if (member) poll(); }, 4000);
+})();
+</script>
 </body>
 </html>

@@ -652,6 +652,20 @@ public class DatabaseHelper
             alter.ExecuteNonQuery();
         }
 
+        // Migrate: CustomerQr + TotalPointsEarned sa Sales (visibility: may points o walk-in)
+        using var checkCq = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('Sales') WHERE name = 'CustomerQr'", conn);
+        if (Convert.ToInt32(checkCq.ExecuteScalar()) == 0)
+        {
+            using var alter = new SQLiteCommand("ALTER TABLE Sales ADD COLUMN CustomerQr TEXT NOT NULL DEFAULT ''", conn);
+            alter.ExecuteNonQuery();
+        }
+        using var checkTpe = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('Sales') WHERE name = 'TotalPointsEarned'", conn);
+        if (Convert.ToInt32(checkTpe.ExecuteScalar()) == 0)
+        {
+            using var alter = new SQLiteCommand("ALTER TABLE Sales ADD COLUMN TotalPointsEarned INTEGER NOT NULL DEFAULT 0", conn);
+            alter.ExecuteNonQuery();
+        }
+
         // Migrate: add Synced flag to VoidLog, CreditTransactions, DailyClose, Expenses
         using var checkVlSynced = new SQLiteCommand("SELECT COUNT(*) FROM pragma_table_info('VoidLog') WHERE name = 'Synced'", conn);
         if (Convert.ToInt32(checkVlSynced.ExecuteScalar()) == 0)

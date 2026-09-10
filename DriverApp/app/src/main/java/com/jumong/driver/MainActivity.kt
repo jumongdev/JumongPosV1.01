@@ -16,6 +16,7 @@ import android.widget.BaseAdapter
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.ListView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -24,6 +25,7 @@ import androidx.core.content.FileProvider
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import org.json.JSONArray
 import org.json.JSONObject
+import android.util.Log
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
@@ -63,6 +65,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var payScreen: View
     private lateinit var cancelOverlay: View
     private lateinit var updateOverlay: View
+    private lateinit var endShiftOverlay: View
+    private var endInfo: JSONObject? = null
+    private var endShiftOpen = false
     private lateinit var updVersion: TextView
     private lateinit var updChangelog: android.widget.LinearLayout
     private lateinit var orderList: ListView
@@ -103,6 +108,11 @@ class MainActivity : AppCompatActivity() {
         token = prefs.getString("token", "") ?: ""
         drvName = prefs.getString("name", "") ?: ""
 
+        // Report crashes remotely (hindi na kami maghuhula kung may mag-close na app)
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            try { reportCrash("uncaught", (t?.name ?: "?") + "\n" + Log.getStackTraceString(e)) } catch (_: Exception) {}
+        }
+
         bindViews()
         wireEvents()
 
@@ -111,6 +121,7 @@ class MainActivity : AppCompatActivity() {
             override fun handleOnBackPressed() {
                 when {
                     cancelOverlay.visibility == View.VISIBLE -> cancelOverlay.visibility = View.GONE
+                    endShiftOverlay.visibility == View.VISIBLE -> closeEndShift()
                     payScreen.visibility == View.VISIBLE -> showScreen(detailScreen)
                     detailScreen.visibility == View.VISIBLE -> backToList()
                     else -> { isEnabled = false; onBackPressedDispatcher.onBackPressed() }
@@ -140,6 +151,7 @@ class MainActivity : AppCompatActivity() {
         payScreen = findViewById(R.id.payScreen)
         cancelOverlay = findViewById(R.id.cancelOverlay)
         updateOverlay = findViewById(R.id.updateOverlay)
+        endShiftOverlay = findViewById(R.id.endShiftOverlay)
         updVersion = findViewById(R.id.updVersion)
         updChangelog = findViewById(R.id.updChangelog)
         orderList = findViewById(R.id.orderList)
@@ -190,7 +202,9 @@ class MainActivity : AppCompatActivity() {
             findViewById<TextView>(R.id.btnCollectOnly).setTextColor(if (onlyCollect) 0xFFfbbf24.toInt() else 0xFFa78bfa.toInt())
             rebindOrders()
         }
-        findViewById<View>(R.id.btnReturnHq).setOnClickListener { returnToHq() }
+        findViewById<View>(R.id.btnEndShift).setOnClickListener { openEndShift() }
+        findViewById<View>(R.id.esConfirm).setOnClickListener { confirmEndShift() }
+        findViewById<View>(R.id.esClose).setOnClickListener { closeEndShift() }
         findViewById<View>(R.id.btnLogout).setOnClickListener { logout() }
         findViewById<View>(R.id.btnBackDetail).setOnClickListener { backToList() }
         findViewById<View>(R.id.btnArrived).setOnClickListener { markArrived() }
@@ -232,6 +246,27 @@ class MainActivity : AppCompatActivity() {
 
     private fun toast(msg: String) {
         Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+    }
+
+    private fun reportCrash(type: String, log: String) {
+        Thread {
+            try {
+                val conn = URL(API + "/crash-report").openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.doOutput = true
+                conn.connectTimeout = 10000; conn.readTimeout = 10000
+                conn.setRequestProperty("Content-Type", "application/json")
+                val body = "{\"app\":\"driver-native\",\"version\":\"" + jsonEsc(currentVersion()) + "\",\"device\":\"" + jsonEsc(Build.MODEL) + "\",\"type\":\"" + jsonEsc(type) + "\",\"log\":" + JSONObject.quote(log.take(2500)) + "}"
+                conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                conn.responseCode
+                conn.disconnect()
+            } catch (_: Exception) {}
+        }.start()
+    }
+
+    private fun endErr(tag: String, t: Throwable) {
+        try { reportCrash("endshift", tag + "\n" + Log.getStackTraceString(t)) } catch (_: Exception) {}
+        try { toast("End shift error: " + (t.message ?: t.javaClass.simpleName)) } catch (_: Exception) {}
     }
 
     private fun fmt(v: Double): String =
@@ -287,6 +322,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 orders = JSONArray(body)
                 rebindOrders()
+                refreshEsBadge()
             } catch (e: Exception) { toast("Failed to load orders: " + e.message) }
         }
     }
@@ -402,7 +438,9 @@ class MainActivity : AppCompatActivity() {
                 cancelOverlay.visibility = View.GONE
                 findViewById<EditText>(R.id.etReason).setText("")
                 toast("Order cancelled — ibinalik ang stock ✓")
-                backToList()
+                if (endShiftOpen) {
+                    loadEndInfo { renderEndShift(); updateEsMain() }
+                } else backToList()
             } else { tvCancelErr.text = errMsg(status, body, "Cancel failed"); tvCancelErr.visibility = View.VISIBLE }
         }
     }
@@ -413,15 +451,208 @@ class MainActivity : AppCompatActivity() {
         loadOrders()
     }
 
-    private fun returnToHq() {
-        runApi("POST", "/driver/return-to-hq", token, null) { status, body ->
+    // ─── END SHIFT (1x/day, kasama ang remittance + carry-over) ──
+    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+    private fun refreshEsBadge() {
+        try { loadEndInfo { updateEsMain() } } catch (t: Throwable) { endErr("refreshEsBadge", t) }
+    }
+
+    private fun loadEndInfo(cb: (() -> Unit)? = null) {
+        runApi("GET", "/driver/endshift-info", token, null) { status, body ->
             if (status == 200) {
-                try {
-                    val j = JSONObject(body)
-                    toast("🏠 Returned to HQ — nakolekta: ₱" + fmt(j.optDouble("cashTotal")) + " cash · ₱" + fmt(j.optDouble("gcashTotal")) + " gcash (" + j.optInt("delivered") + " orders)")
-                } catch (e: Exception) { toast("🏠 Returned to HQ ✓") }
-            } else toast(errMsg(status, body, "Failed"))
+                try { endInfo = JSONObject(body) } catch (e: Exception) { endInfo = null }
+            } else endInfo = null
+            cb?.invoke()
         }
+    }
+
+    private fun updateEsMain() {
+        try {
+            val btn = findViewById<TextView>(R.id.btnEndShift)
+            val done = endInfo != null && endInfo!!.optBoolean("closedToday")
+            if (done) {
+                btn.text = "✅ END SHIFT DONE (bukas na ulit)"
+                btn.setBackgroundResource(R.drawable.bg_outline)
+                btn.setTextColor(0xFFa8a29e.toInt())
+                btn.setAlpha(0.6f)
+                btn.setOnClickListener(null)
+            } else {
+                btn.text = "🔚 END SHIFT & REMIT"
+                btn.setBackgroundResource(R.drawable.bg_outline_green)
+                btn.setTextColor(0xFF10b981.toInt())
+                btn.setAlpha(1f)
+                btn.setOnClickListener { openEndShift() }
+            }
+        } catch (t: Throwable) { endErr("updateEsMain", t) }
+    }
+
+    private fun openEndShift() {
+        try {
+            endShiftOpen = true
+            endShiftOverlay.visibility = View.VISIBLE
+            findViewById<TextView>(R.id.esStatus).text = "Kumukuha ng impormasyon..."
+            loadEndInfo { renderEndShift() }
+        } catch (t: Throwable) { endErr("openEndShift", t) }
+    }
+
+    private fun closeEndShift() {
+        endShiftOpen = false
+        endShiftOverlay.visibility = View.GONE
+        findViewById<TextView>(R.id.esErr).visibility = View.GONE
+    }
+
+    private fun renderEndShift() {
+        try {
+            val e = endInfo ?: run { toast("Hindi ma-load ang end-shift info"); return }
+            val closed = e.optBoolean("closedToday")
+            val confirm = findViewById<View>(R.id.esConfirm)
+            val total = e.optJSONObject("sweep")?.let { it.optDouble("cash") + it.optDouble("gcash") } ?: 0.0
+            findViewById<TextView>(R.id.esStatus).text =
+                if (closed) "✅ Tapos na ang end shift ngayon (1x per day lang)." else drvName + " — isusuko mo na ang pera sa tindahan?"
+            if (closed) {
+                confirm.visibility = View.GONE
+                val lc = e.optJSONObject("lastClosed")
+                findViewById<TextView>(R.id.esToday).text =
+                    "Na-remit kanina: " + (lc?.optInt("deliveredOrders") ?: 0) + " order(s) · Cash ₱" + fmt(lc?.optDouble("cashTotal") ?: 0.0) + " · GCash ₱" + fmt(lc?.optDouble("gcashTotal") ?: 0.0)
+            } else {
+                confirm.visibility = View.VISIBLE
+                val sw = e.optJSONObject("sweep")
+                findViewById<TextView>(R.id.esOrders).text = (sw?.optInt("count") ?: 0).toString()
+                findViewById<TextView>(R.id.esCash).text = "₱" + fmt(sw?.optDouble("cash") ?: 0.0)
+                findViewById<TextView>(R.id.esGcash).text = "₱" + fmt(sw?.optDouble("gcash") ?: 0.0)
+                val td = e.optJSONObject("today")
+                findViewById<TextView>(R.id.esToday).text =
+                    "Delivered ngayon: " + (td?.optInt("count") ?: 0) + " order(s) · Cash ₱" + fmt(td?.optDouble("cash") ?: 0.0) + " · GCash ₱" + fmt(td?.optDouble("gcash") ?: 0.0)
+                findViewById<TextView>(R.id.esConfirm).text = "🔚 END SHIFT & REMIT ₱" + fmt(total)
+            }
+            renderCarryOver(e.optJSONArray("carryOver") ?: JSONArray())
+        } catch (t: Throwable) { endErr("renderEndShift", t) }
+    }
+
+    private fun renderCarryOver(list: JSONArray) {
+        try {
+            val box = findViewById<android.widget.LinearLayout>(R.id.esCarryList)
+            val empty = findViewById<TextView>(R.id.esCarryEmpty)
+            // esCarryEmpty ay child #0 — tanggalin lang ang mga lumang ROW (huwag i-remove ang empty para hindi ma-null ang reference)
+            while (box.childCount > 1) box.removeViewAt(box.childCount - 1)
+            empty.visibility = if (list.length() == 0) View.VISIBLE else View.GONE
+            if (list.length() == 0) return
+        for (i in 0 until list.length()) {
+            val o = list.optJSONObject(i) ?: continue
+            val id = o.optInt("id")
+            val card = LinearLayout(this)
+            card.orientation = LinearLayout.VERTICAL
+            card.setBackgroundResource(R.drawable.bg_input)
+            card.setPadding(dp(12), dp(10), dp(12), dp(10))
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            lp.topMargin = dp(6)
+            box.addView(card, lp)
+
+            val top = LinearLayout(this)
+            top.orientation = LinearLayout.HORIZONTAL
+            val tvNo = TextView(this)
+            tvNo.text = o.optString("orderNo") + if (o.optInt("days") >= 1) "  ⚠ ${o.optInt("days")}D" else ""
+            tvNo.setTextColor(0xFFE5E7EB.toInt()); tvNo.textSize = 13f
+            tvNo.setTypeface(null, android.graphics.Typeface.BOLD)
+            top.addView(tvNo, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            val st = o.optString("status")
+            val tvSt = TextView(this)
+            tvSt.text = st.uppercase()
+            tvSt.setTextColor(if (st == "arrived") 0xFF60a5fa.toInt() else 0xFFa78bfa.toInt())
+            tvSt.textSize = 10f
+            tvSt.setTypeface(null, android.graphics.Typeface.BOLD)
+            top.addView(tvSt)
+            card.addView(top)
+
+            val tvC = TextView(this)
+            tvC.text = o.optString("customerName") + "\n📍 Blk " + o.optString("block", "-") + " Lot " + o.optString("lot", "-") + (if (o.optString("subdivision").isNotEmpty()) ", " + o.optString("subdivision") else "")
+            tvC.setTextColor(0xFFa1a1cc.toInt()); tvC.textSize = 12f
+            tvC.setPadding(0, dp(6), 0, dp(6))
+            card.addView(tvC)
+
+            val row = LinearLayout(this)
+            row.orientation = LinearLayout.HORIZONTAL
+            row.gravity = android.view.Gravity.CENTER_VERTICAL
+            val tvTotal = TextView(this)
+            tvTotal.text = "₱" + fmt(o.optDouble("total"))
+            tvTotal.setTextColor(0xFFFFFFFF.toInt()); tvTotal.textSize = 14f
+            tvTotal.setTypeface(null, android.graphics.Typeface.BOLD)
+            row.addView(tvTotal, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            val btnDeliver = TextView(this)
+            btnDeliver.text = "DELIVER"
+            btnDeliver.setTextColor(0xFF3b82f6.toInt()); btnDeliver.textSize = 12f
+            btnDeliver.setTypeface(null, android.graphics.Typeface.BOLD)
+            btnDeliver.setBackgroundResource(R.drawable.bg_outline)
+            btnDeliver.setPadding(dp(14), dp(6), dp(14), dp(6))
+            btnDeliver.setOnClickListener {
+                closeEndShift()
+                openDetail(id)
+            }
+            row.addView(btnDeliver, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+            val btnCancel = TextView(this)
+            btnCancel.text = "CANCEL"
+            btnCancel.setTextColor(0xFFf87171.toInt()); btnCancel.textSize = 12f
+            btnCancel.setTypeface(null, android.graphics.Typeface.BOLD)
+            btnCancel.setBackgroundResource(R.drawable.bg_outline_red)
+            btnCancel.setPadding(dp(14), dp(6), dp(14), dp(6))
+            btnCancel.setOnClickListener {
+                curOrder = JSONObject().put("id", id)
+                cancelOverlay.visibility = View.VISIBLE
+            }
+            val bl = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            bl.leftMargin = dp(8)
+            row.addView(btnCancel, bl)
+            card.addView(row)
+        }
+        } catch (t: Throwable) { endErr("renderCarryOver", t) }
+    }
+
+    private fun confirmEndShift() {
+        try {
+            val e = endInfo ?: return
+            val sw = e.optJSONObject("sweep")
+            val count = sw?.optInt("count") ?: 0
+            val cash = sw?.optDouble("cash") ?: 0.0
+            val gcash = sw?.optDouble("gcash") ?: 0.0
+            val msg = if (count > 0)
+                "I-end shift mo na ba?\n\nRemit: $count order(s)\nCash: ₱" + fmt(cash) + "\nGCash: ₱" + fmt(gcash) +
+                "\n\nIsinuko mo na ba ang perang ito sa tindahan? 1x per day lang — hindi mo na ito maaaring baguhin."
+            else "Wala kang nakolektang payment. I-end shift mo na ba? (1x per day — hindi na maaaring baguhin.)"
+            android.app.AlertDialog.Builder(this)
+                .setTitle("🔚 End Shift")
+                .setMessage(msg)
+                .setPositiveButton("END SHIFT") { _, _ -> doEndShift() }
+                .setNegativeButton("BALIK", null)
+                .show()
+        } catch (t: Throwable) { endErr("confirmEndShift", t) }
+    }
+
+    private fun doEndShift() {
+        try {
+            findViewById<View>(R.id.esConfirm).isEnabled = false
+            runApi("POST", "/driver/end-shift", token, null) { status, body ->
+                try {
+                    findViewById<View>(R.id.esConfirm).isEnabled = true
+                    val err = findViewById<TextView>(R.id.esErr)
+                    if (status == 200) {
+                        try {
+                            val j = JSONObject(body)
+                            err.visibility = View.GONE
+                            loadEndInfo {
+                                renderEndShift()
+                                updateEsMain()
+                                toast("✅ End shift OK — na-remit ang ₱" + fmt(j.optDouble("cashTotal")) + " cash + ₱" + fmt(j.optDouble("gcashTotal")) + " gcash")
+                            }
+                        } catch (e: Exception) { toast("End shift OK ✓") }
+                    } else {
+                        err.text = errMsg(status, body, "End shift failed")
+                        err.visibility = View.VISIBLE
+                        loadEndInfo { renderEndShift() }
+                    }
+                } catch (t: Throwable) { endErr("doEndShift-cb", t) }
+            }
+        } catch (t: Throwable) { endErr("doEndShift", t) }
     }
 
     // ─── PAYMENT ─────────────────────────────────────────────

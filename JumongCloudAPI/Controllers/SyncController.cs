@@ -148,9 +148,9 @@ public class SyncController : ControllerBase
             }
 
             using var cmd = new NpgsqlCommand(
-                "INSERT INTO sales (pos_id, store_id, invoice_no, sale_date, sub_total, discount, tax, grand_total, amount_paid, change, payment_method, customer_id, user_id, is_voided, reference_no, order_type, cash_paid, ew_paid, cashier_name, customer_name, synced_at) " +
-                "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,@p12,@p13,@p14,@p15,@p16,@p17,@p18,NOW()) " +
-                "ON CONFLICT (store_id, pos_id) DO UPDATE SET invoice_no=@p1, sale_date=@p2, sub_total=@p3, discount=@p4, tax=@p5, grand_total=@p6, amount_paid=@p7, change=@p8, payment_method=@p9, customer_id=@p10, user_id=@p11, is_voided=@p12, reference_no=@p13, order_type=@p14, cash_paid=@p15, ew_paid=@p16, cashier_name=@p17, customer_name=@p18, synced_at=NOW()",
+                "INSERT INTO sales (pos_id, store_id, invoice_no, sale_date, sub_total, discount, tax, grand_total, amount_paid, change, payment_method, customer_id, user_id, is_voided, reference_no, order_type, cash_paid, ew_paid, cashier_name, customer_name, customer_qr, total_points_earned, synced_at) " +
+                "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11,@p12,@p13,@p14,@p15,@p16,@p17,@p18,@p19,@p20,NOW()) " +
+                "ON CONFLICT (store_id, pos_id) DO UPDATE SET invoice_no=@p1, sale_date=@p2, sub_total=@p3, discount=@p4, tax=@p5, grand_total=@p6, amount_paid=@p7, change=@p8, payment_method=@p9, customer_id=@p10, user_id=@p11, is_voided=@p12, reference_no=@p13, order_type=@p14, cash_paid=@p15, ew_paid=@p16, cashier_name=@p17, customer_name=@p18, customer_qr=@p19, total_points_earned=@p20, synced_at=NOW()",
                 conn, tx);
             cmd.Parameters.AddWithValue("p0", payload.Sale.PosId);
             cmd.Parameters.AddWithValue("@sid", sid);
@@ -172,6 +172,8 @@ public class SyncController : ControllerBase
             cmd.Parameters.AddWithValue("p16", payload.Sale.EwPaid);
             cmd.Parameters.AddWithValue("p17", payload.Sale.CashierName ?? "");
             cmd.Parameters.AddWithValue("p18", (object?)(payload.Sale.CustomerName?.Trim() ?? "") ?? "");
+            cmd.Parameters.AddWithValue("p19", payload.Sale.CustomerQr ?? "");
+            cmd.Parameters.AddWithValue("p20", payload.Sale.TotalPointsEarned);
             cmd.ExecuteNonQuery();
 
             foreach (var item in payload.Items)
@@ -329,6 +331,8 @@ public class SyncSaleDto
     public string PaymentMethod { get; set; } = "Cash";
     public int? CustomerId { get; set; }
     public string CustomerName { get; set; } = "";
+    public string CustomerQr { get; set; } = "";
+    public int TotalPointsEarned { get; set; }
     public int? UserId { get; set; }
     public bool IsVoided { get; set; }
     public string ReferenceNo { get; set; } = "";

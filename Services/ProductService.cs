@@ -136,29 +136,93 @@ public class ProductService
 
     public static List<Product> Search(string keyword, string? category = null, string? stockFilter = null)
     {
-        var list = new List<Product>();
-        using var conn = DatabaseHelper.GetConnection();
-        conn.Open();
-        var sql = "SELECT * FROM Products WHERE IsActive = 1";
-        if (!string.IsNullOrEmpty(keyword))
-            sql += " AND (Name LIKE @q OR Barcode LIKE @q)";
-        if (!string.IsNullOrEmpty(category))
-            sql += " AND Category = @cat";
-        if (stockFilter == "low")
-            sql += " AND StockQty > 0 AND StockQty <= @thresh";
-        else if (stockFilter == "out")
-            sql += " AND StockQty = 0";
-        sql += " ORDER BY Name LIMIT 200";
-        using var cmd = new SQLiteCommand(sql, conn);
-        if (!string.IsNullOrEmpty(keyword))
-            cmd.Parameters.AddWithValue("@q", $"%{keyword}%");
-        if (!string.IsNullOrEmpty(category))
-            cmd.Parameters.AddWithValue("@cat", category);
-        if (stockFilter == "low")
-            cmd.Parameters.AddWithValue("@thresh", GetLowStockThreshold());
-        using var rdr = cmd.ExecuteReader();
-        while (rdr.Read()) list.Add(Map(rdr));
-        return list;
+        var needsStockFilter = stockFilter == "low" || stockFilter == "out";
+        if (!needsStockFilter)
+        {
+            var list = new List<Product>();
+            using var conn = DatabaseHelper.GetConnection();
+            conn.Open();
+            var sql = "SELECT * FROM Products WHERE IsActive = 1";
+            if (!string.IsNullOrEmpty(keyword))
+                sql += " AND (Name LIKE @q OR Barcode LIKE @q)";
+            if (!string.IsNullOrEmpty(category))
+                sql += " AND Category = @cat";
+            sql += " ORDER BY Name LIMIT 200";
+            using var cmd = new SQLiteCommand(sql, conn);
+            if (!string.IsNullOrEmpty(keyword))
+                cmd.Parameters.AddWithValue("@q", $"%{keyword}%");
+            if (!string.IsNullOrEmpty(category))
+                cmd.Parameters.AddWithValue("@cat", category);
+            using var rdr = cmd.ExecuteReader();
+            while (rdr.Read()) list.Add(Map(rdr));
+            return list;
+        }
+
+        // STOCK LINK: low/out filter — ang linked children ay i-filter ayon sa effective stock
+        // (stock ng PARENT ÷ ratio), hindi sa sariling StockQty na laging 0.
+        var threshold = GetLowStockThreshold();
+        var ids = new List<int>();
+        using (var conn2 = DatabaseHelper.GetConnection())
+        {
+            conn2.Open();
+            var sql2 = @"SELECT p.Id, p.StockQty, p.StockParentId, p.StockLinkRatio,
+                                COALESCE(par.StockQty, p.StockQty) AS LinkParentStock
+                         FROM Products p
+                         LEFT JOIN Products par ON par.Id = p.StockParentId
+                         WHERE p.IsActive = 1";
+            if (!string.IsNullOrEmpty(keyword))
+                sql2 += " AND (p.Name LIKE @q OR p.Barcode LIKE @q)";
+            if (!string.IsNullOrEmpty(category))
+                sql2 += " AND p.Category = @cat";
+            using var cmd2 = new SQLiteCommand(sql2, conn2);
+            if (!string.IsNullOrEmpty(keyword))
+                cmd2.Parameters.AddWithValue("@q", $"%{keyword}%");
+            if (!string.IsNullOrEmpty(category))
+                cmd2.Parameters.AddWithValue("@cat", category);
+            using var rdr2 = cmd2.ExecuteReader();
+            while (rdr2.Read())
+            {
+                var eff = rdr2.GetInt32(1);
+                if (rdr2.GetInt32(2) > 0 && !rdr2.IsDBNull(4))
+                {
+                    var ratio = rdr2.GetInt32(3) > 0 ? rdr2.GetInt32(3) : 1;
+                    eff = (int)Math.Floor(rdr2.GetInt32(4) / (double)ratio);
+                }
+                if (stockFilter == "low" && eff > 0 && eff <= threshold) ids.Add(rdr2.GetInt32(0));
+                else if (stockFilter == "out" && eff == 0) ids.Add(rdr2.GetInt32(0));
+            }
+        }
+        var result = new List<Product>();
+        if (ids.Count == 0) return result;
+        using (var conn3 = DatabaseHelper.GetConnection())
+        {
+            conn3.Open();
+            var sql3 = "SELECT * FROM Products WHERE Id IN (";
+            sql3 += string.Join(",", ids.Select((_, i) => $"@id{i}"));
+            sql3 += ") ORDER BY Name";
+            using var cmd3 = new SQLiteCommand(sql3, conn3);
+            for (var i = 0; i < ids.Count; i++)
+                cmd3.Parameters.AddWithValue($"@id{i}", ids[i]);
+            using var rdr3 = cmd3.ExecuteReader();
+            while (rdr3.Read()) result.Add(Map(rdr3));
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// STOCK LINK: effective available pieces ng isang product para sa display/list.
+    /// Para sa linked child, ang stock ay nasa PARENT — ibabalik ang floor(parent stock ÷ ratio).
+    /// </summary>
+    public static int EffectiveStockQty(Product p)
+    {
+        if (p != null && p.StockParentId > 0)
+        {
+            var ratio = p.StockLinkRatio > 0 ? p.StockLinkRatio : 1;
+            var parent = GetById(p.StockParentId);
+            if (parent != null)
+                return (int)Math.Floor(parent.StockQty / (double)ratio);
+        }
+        return p?.StockQty ?? 0;
     }
 
     public static int GetLowStockThreshold()
@@ -177,15 +241,33 @@ public class ProductService
 
     public static (int total, int lowStock, int outOfStock) GetStockStats()
     {
+        var total = 0;
+        var lowStock = 0;
+        var outOfStock = 0;
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
         var threshold = GetLowStockThreshold();
-        var cmd = new SQLiteCommand("SELECT COUNT(*), SUM(CASE WHEN StockQty = 0 THEN 1 ELSE 0 END), SUM(CASE WHEN StockQty > 0 AND StockQty <= @thresh THEN 1 ELSE 0 END) FROM Products WHERE IsActive = 1", conn);
-        cmd.Parameters.AddWithValue("@thresh", threshold);
+        // STOCK LINK: isali ang parent stock para sa derived availability ng linked children
+        using var cmd = new SQLiteCommand(@"
+            SELECT p.StockQty, p.StockParentId, p.StockLinkRatio,
+                   COALESCE(par.StockQty, p.StockQty) AS ParentStock
+            FROM Products p
+            LEFT JOIN Products par ON par.Id = p.StockParentId
+            WHERE p.IsActive = 1", conn);
         using var rdr = cmd.ExecuteReader();
-        if (rdr.Read())
-            return (Convert.ToInt32(rdr[0]), rdr[2] != DBNull.Value ? Convert.ToInt32(rdr[2]) : 0, rdr[1] != DBNull.Value ? Convert.ToInt32(rdr[1]) : 0);
-        return (0, 0, 0);
+        while (rdr.Read())
+        {
+            total++;
+            var eff = rdr.GetInt32(0);
+            if (rdr.GetInt32(1) > 0 && !rdr.IsDBNull(3))
+            {
+                var ratio = rdr.GetInt32(2) > 0 ? rdr.GetInt32(2) : 1;
+                eff = (int)Math.Floor(rdr.GetInt32(3) / (double)ratio);
+            }
+            if (eff == 0) outOfStock++;
+            else if (eff <= threshold) lowStock++;
+        }
+        return (total, lowStock, outOfStock);
     }
 
     public static (decimal retailValue, decimal costValue) GetStockValues()

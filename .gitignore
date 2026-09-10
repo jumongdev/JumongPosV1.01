@@ -42,3 +42,6 @@ DriverApp/*.keystore
 DriverApp/build/
 DriverApp/.gradle/
 DriverApp/app/build/
+
+# Continue/opencode local tool state (may API keys - huwag i-commit)
+.continue/

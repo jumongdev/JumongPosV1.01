@@ -238,6 +238,14 @@ public static class PgDatabaseHelper
         mig2.CommandText = "ALTER TABLE sales ADD COLUMN IF NOT EXISTS cashier_name TEXT DEFAULT ''";
         mig2.ExecuteNonQuery();
 
+        // Migration: visibility ng points/walk-in sa resibo (POS 1.1.79)
+        using var migQr = conn.CreateCommand();
+        migQr.CommandText = "ALTER TABLE sales ADD COLUMN IF NOT EXISTS customer_qr TEXT NOT NULL DEFAULT ''";
+        migQr.ExecuteNonQuery();
+        using var migTpe = conn.CreateCommand();
+        migTpe.CommandText = "ALTER TABLE sales ADD COLUMN IF NOT EXISTS total_points_earned INTEGER NOT NULL DEFAULT 0";
+        migTpe.ExecuteNonQuery();
+
         // Migration: add inventory cost columns to daily_closes
         using var invMig = conn.CreateCommand();
         invMig.CommandText = "ALTER TABLE daily_closes ADD COLUMN IF NOT EXISTS total_inventory_cost NUMERIC NOT NULL DEFAULT 0";
@@ -1208,7 +1216,23 @@ public static class PgDatabaseHelper
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
-            CREATE INDEX IF NOT EXISTS idx_feed_posts_active ON feed_posts (is_active, sort_order DESC, id DESC);
+            CREATE INDEX IF NOT EXISTS idx_feed_posts_active ON feed_posts (is_active, sort_order DESC, id DESC);            CREATE TABLE IF NOT EXISTS suppliers (
+                id SERIAL PRIMARY KEY,
+                company_name TEXT NOT NULL,
+                agent TEXT NOT NULL DEFAULT '',
+                contact_no TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS idx_suppliers_name ON suppliers (LOWER(company_name));
+            CREATE TABLE IF NOT EXISTS master_product_suppliers (
+                product_id INTEGER NOT NULL REFERENCES master_products(id) ON DELETE CASCADE,
+                supplier_id INTEGER NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+                PRIMARY KEY (product_id, supplier_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_mps_product ON master_product_suppliers (product_id);
             CREATE TABLE IF NOT EXISTS feed_likes (
                 post_id INTEGER NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
                 customer_id INTEGER NOT NULL,
@@ -1216,6 +1240,36 @@ public static class PgDatabaseHelper
                 PRIMARY KEY (post_id, customer_id)
             );";
         try { custMig.ExecuteNonQuery(); } catch { }
+
+        // E-commerce IN-APP CHAT (customer ↔ admin — real person replies, no AI)
+        using var chatMig = conn.CreateCommand();
+        chatMig.CommandText = @"
+            CREATE TABLE IF NOT EXISTS shop_chat_conversations (
+                id BIGSERIAL PRIMARY KEY,
+                customer_id INTEGER NOT NULL UNIQUE,
+                customer_name TEXT NOT NULL DEFAULT '',
+                last_message TEXT NOT NULL DEFAULT '',
+                last_sender TEXT NOT NULL DEFAULT '',
+                last_at TIMESTAMPTZ,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS idx_chat_conv_updated ON shop_chat_conversations (updated_at DESC);
+            CREATE TABLE IF NOT EXISTS shop_chat_messages (
+                id BIGSERIAL PRIMARY KEY,
+                conversation_id BIGINT NOT NULL REFERENCES shop_chat_conversations(id) ON DELETE CASCADE,
+                sender TEXT NOT NULL DEFAULT 'customer',
+                message TEXT NOT NULL,
+                seen_by_admin INTEGER NOT NULL DEFAULT 0,
+                seen_by_customer INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS idx_chat_msgs_conv ON shop_chat_messages (conversation_id, id);";
+        try { chatMig.ExecuteNonQuery(); } catch { }
+        // reply_by: kung sino ang sumagot (cashier sa HQ POS o dashboard)
+        using var chatRb = conn.CreateCommand();
+        chatRb.CommandText = "ALTER TABLE shop_chat_messages ADD COLUMN IF NOT EXISTS reply_by TEXT NOT NULL DEFAULT ''";
+        try { chatRb.ExecuteNonQuery(); } catch { }
 
         // Seed: subdivision list para sa locked delivery picker (editable sa Shop Content panel)
         using var subSeed = conn.CreateCommand();
@@ -1244,5 +1298,79 @@ Pagsinag Place North East
 Pasinaya Homes Hilaga
 Pagsinag Place East') ON CONFLICT (key) DO NOTHING";
         try { subSeed.ExecuteNonQuery(); } catch { }
+
+        // CHECKS (EastWest / RCBC check recording + printing). Ang check_template ay PER-BANK —
+        // X/Y positions (mm) na inadjust ng admin via TEST PRINT (ikaw ang mag-calibrate).
+        using var checkMig = conn.CreateCommand();
+        checkMig.CommandText = @"
+            CREATE TABLE IF NOT EXISTS checks (
+                id SERIAL PRIMARY KEY,
+                bank TEXT NOT NULL DEFAULT 'EastWest Bank',
+                check_no TEXT NOT NULL,
+                check_date DATE NOT NULL,
+                supplier_id INTEGER REFERENCES suppliers(id),
+                payee TEXT NOT NULL,
+                amount NUMERIC(14,2) NOT NULL,
+                amount_words TEXT NOT NULL DEFAULT '',
+                memo TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'issued',
+                printed_at TIMESTAMPTZ,
+                print_count INTEGER NOT NULL DEFAULT 0,
+                created_by TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_checks_bank_no ON checks (bank, check_no);
+            CREATE INDEX IF NOT EXISTS idx_checks_date ON checks (check_date DESC);
+            CREATE TABLE IF NOT EXISTS check_template (
+                id INTEGER PRIMARY KEY DEFAULT 1,
+                bank TEXT NOT NULL DEFAULT 'EastWest Bank',
+                printer TEXT NOT NULL DEFAULT 'HP Smart Tank 580-590 series',
+                paper_w_mm NUMERIC(6,2) NOT NULL DEFAULT 158.75,
+                paper_h_mm NUMERIC(6,2) NOT NULL DEFAULT 69.85,
+                font_name TEXT NOT NULL DEFAULT 'Arial',
+                date_mode TEXT NOT NULL DEFAULT 'boxes',
+                date_format TEXT NOT NULL DEFAULT 'MM-dd-yyyy',
+                date_mm_x NUMERIC(6,2) NOT NULL DEFAULT 40,
+                date_mm_y NUMERIC(6,2) NOT NULL DEFAULT 8,
+                date_dd_x NUMERIC(6,2) NOT NULL DEFAULT 52,
+                date_dd_y NUMERIC(6,2) NOT NULL DEFAULT 8,
+                date_yyyy_x NUMERIC(6,2) NOT NULL DEFAULT 62,
+                date_yyyy_y NUMERIC(6,2) NOT NULL DEFAULT 8,
+                date_pitch_mm NUMERIC(5,2) NOT NULL DEFAULT 3.5,
+                date_font_size NUMERIC(5,2) NOT NULL DEFAULT 10,
+                payee_x NUMERIC(6,2) NOT NULL DEFAULT 15,
+                payee_y NUMERIC(6,2) NOT NULL DEFAULT 25,
+                payee_max_w_mm NUMERIC(6,2) NOT NULL DEFAULT 95,
+                payee_font_size NUMERIC(5,2) NOT NULL DEFAULT 11,
+                amount_x NUMERIC(6,2) NOT NULL DEFAULT 100,
+                amount_y NUMERIC(6,2) NOT NULL DEFAULT 25,
+                amount_font_size NUMERIC(5,2) NOT NULL DEFAULT 11,
+                words_x NUMERIC(6,2) NOT NULL DEFAULT 15,
+                words_y NUMERIC(6,2) NOT NULL DEFAULT 40,
+                words_max_w_mm NUMERIC(6,2) NOT NULL DEFAULT 140,
+                words_font_size NUMERIC(5,2) NOT NULL DEFAULT 9,
+                words_include_pesos BOOLEAN NOT NULL DEFAULT FALSE,
+                words_include_only BOOLEAN NOT NULL DEFAULT TRUE,
+                words_asterisks BOOLEAN NOT NULL DEFAULT FALSE,
+                record_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                record_x NUMERIC(6,2) NOT NULL DEFAULT 15,
+                record_y NUMERIC(6,2) NOT NULL DEFAULT 80,
+                record_font_size NUMERIC(5,2) NOT NULL DEFAULT 9,
+                record_line_mm NUMERIC(5,2) NOT NULL DEFAULT 5,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            ALTER TABLE check_template ADD COLUMN IF NOT EXISTS bank TEXT NOT NULL DEFAULT 'EastWest Bank';
+            ALTER TABLE check_template ADD COLUMN IF NOT EXISTS date_mode TEXT NOT NULL DEFAULT 'boxes';
+            ALTER TABLE check_template ADD COLUMN IF NOT EXISTS date_format TEXT NOT NULL DEFAULT 'MM-dd-yyyy';
+            ALTER TABLE check_template ADD COLUMN IF NOT EXISTS record_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+            ALTER TABLE check_template ADD COLUMN IF NOT EXISTS record_x NUMERIC(6,2) NOT NULL DEFAULT 15;
+            ALTER TABLE check_template ADD COLUMN IF NOT EXISTS record_y NUMERIC(6,2) NOT NULL DEFAULT 80;
+            ALTER TABLE check_template ADD COLUMN IF NOT EXISTS record_font_size NUMERIC(5,2) NOT NULL DEFAULT 9;
+            ALTER TABLE check_template ADD COLUMN IF NOT EXISTS record_line_mm NUMERIC(5,2) NOT NULL DEFAULT 5;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_check_template_bank ON check_template (bank);
+            INSERT INTO check_template (id, bank) VALUES (1, 'EastWest Bank') ON CONFLICT (id) DO NOTHING;
+            INSERT INTO check_template (id, bank) VALUES (2, 'RCBC') ON CONFLICT (id) DO NOTHING;";
+        try { checkMig.ExecuteNonQuery(); } catch { }
     }
 }

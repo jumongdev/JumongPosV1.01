@@ -36,8 +36,8 @@ public class SaleService
         try
         {
             var sql = @"INSERT INTO Sales (InvoiceNo, SaleDate, SubTotal, Discount, Tax, GrandTotal, 
-                        AmountPaid, Change, PaymentMethod, ReferenceNo, CustomerId, UserId, OrderType, CashPaid, EwPaid)
-                        VALUES (@inv, @dt, @sub, @disc, @tax, @total, @paid, @chg, @pm, @ref, @cid, @uid, @otype, @cp, @ep);
+                        AmountPaid, Change, PaymentMethod, ReferenceNo, CustomerId, UserId, OrderType, CashPaid, EwPaid, CustomerQr, TotalPointsEarned)
+                        VALUES (@inv, @dt, @sub, @disc, @tax, @total, @paid, @chg, @pm, @ref, @cid, @uid, @otype, @cp, @ep, @cqr, @tpe);
                         SELECT last_insert_rowid();";
 
             using var cmd = new SQLiteCommand(sql, conn);
@@ -56,6 +56,8 @@ public class SaleService
             cmd.Parameters.AddWithValue("@otype", sale.OrderType);
             cmd.Parameters.AddWithValue("@cp", sale.CashPaid);
             cmd.Parameters.AddWithValue("@ep", sale.EwPaid);
+            cmd.Parameters.AddWithValue("@cqr", sale.CustomerQr ?? "");
+            cmd.Parameters.AddWithValue("@tpe", sale.TotalPointsEarned);
 
             var saleId = Convert.ToInt32(cmd.ExecuteScalar());
 
@@ -267,6 +269,8 @@ public class SaleService
             CustomerId = rdr["CustomerId"] == DBNull.Value ? null : Convert.ToInt32(rdr["CustomerId"]),
             UserId = rdr["UserId"] == DBNull.Value ? null : Convert.ToInt32(rdr["UserId"]),
             CustomerName = rdr["CustomerName"]?.ToString() ?? "",
+            CustomerQr = rdr["CustomerQr"] != DBNull.Value ? Convert.ToString(rdr["CustomerQr"]) ?? "" : "",
+            TotalPointsEarned = rdr["TotalPointsEarned"] != DBNull.Value ? Convert.ToInt32(rdr["TotalPointsEarned"]) : 0,
             CashPaid = rdr["CashPaid"] != DBNull.Value ? Convert.ToDecimal(rdr["CashPaid"]) : 0,
             EwPaid = rdr["EwPaid"] != DBNull.Value ? Convert.ToDecimal(rdr["EwPaid"]) : 0,
             IsVoided = Convert.ToBoolean(rdr["IsVoided"]),
@@ -440,6 +444,8 @@ public class SaleService
             CustomerId = rdr["CustomerId"] != DBNull.Value ? Convert.ToInt32(rdr["CustomerId"]) : null,
             UserId = rdr["UserId"] != DBNull.Value ? Convert.ToInt32(rdr["UserId"]) : null,
             OrderType = rdr["OrderType"]?.ToString() ?? "Walk-in",
+            CustomerQr = rdr["CustomerQr"] != DBNull.Value ? Convert.ToString(rdr["CustomerQr"]) ?? "" : "",
+            TotalPointsEarned = rdr["TotalPointsEarned"] != DBNull.Value ? Convert.ToInt32(rdr["TotalPointsEarned"]) : 0,
             ReferenceNo = rdr["ReferenceNo"]?.ToString() ?? "",
             IsVoided = rdr["IsVoided"] != DBNull.Value && Convert.ToBoolean(rdr["IsVoided"]),
             VoidedAt = rdr["VoidedAt"]?.ToString(),

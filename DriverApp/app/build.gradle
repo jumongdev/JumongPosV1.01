@@ -11,8 +11,8 @@ android {
         applicationId "com.jumong.driver"
         minSdk 24
         targetSdk 36
-        versionCode 6
-        versionName "2.0.4"
+        versionCode 10
+        versionName "2.0.8"
     }
 
     buildTypes {

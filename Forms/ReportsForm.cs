@@ -34,6 +34,7 @@ public partial class ReportsForm : Form
         dgvSales.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "SaleDate", HeaderText = "DATE", Width = 140, DefaultCellStyle = new DataGridViewCellStyle { Format = "yyyy-MM-dd HH:mm", ForeColor = ThemeManager.Current.TextSecondary } });
         dgvSales.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "EffectiveTotal", HeaderText = "TOTAL", Width = 100, DefaultCellStyle = new DataGridViewCellStyle { Format = "N2", Alignment = DataGridViewContentAlignment.MiddleRight, ForeColor = ThemeManager.Current.AccentCyan, Font = new Font("Segoe UI", 9F, FontStyle.Bold) } });
         dgvSales.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "PaymentMethod", HeaderText = "METHOD", Width = 90, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextSecondary } });
+        dgvSales.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "PointsStatus", HeaderText = "POINTS", Width = 110, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextPrimary } });
         dgvSales.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "OrderType", HeaderText = "TYPE", Width = 80, DefaultCellStyle = new DataGridViewCellStyle { ForeColor = ThemeManager.Current.TextSecondary } });
         dgvSales.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = "Status", HeaderText = "STATUS", Width = 90 });
         dgvSales.DataSource = sales;
@@ -64,6 +65,20 @@ public partial class ReportsForm : Form
                 if (e.CellStyle != null)
                 {
                     e.CellStyle.ForeColor = row.IsVoided ? ThemeManager.Current.AccentRed : ThemeManager.Current.AccentGreen;
+                    e.CellStyle.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
+                }
+            }
+            else if (e.ColumnIndex == dgvSales.Columns["PointsStatus"]?.Index)
+            {
+                var isMember = !string.IsNullOrEmpty(row.CustomerQr);
+                e.Value = row.IsVoided ? "—" : isMember
+                    ? (row.TotalPointsEarned > 0 ? "⭐ +" + row.TotalPointsEarned : "⭐ +0 (member)")
+                    : "🚶 Walk-in";
+                if (e.CellStyle != null)
+                {
+                    e.CellStyle.ForeColor = isMember && row.TotalPointsEarned > 0
+                        ? ThemeManager.Current.AccentGreen
+                        : ThemeManager.Current.TextMuted;
                     e.CellStyle.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
                 }
             }
