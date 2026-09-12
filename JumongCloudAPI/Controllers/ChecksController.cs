@@ -143,6 +143,7 @@ public class ChecksController : ControllerBase
     public IActionResult Void(int id) => SetStatus(id, "void");
 
     [HttpPost("{id:int}/clear")]
+    [HttpPost("{id:int}/cleared")] // alias — luma/na-cache na UI ay gumagamit ng /cleared
     public IActionResult Clear(int id) => SetStatus(id, "cleared");
 
     private IActionResult SetStatus(int id, string status)

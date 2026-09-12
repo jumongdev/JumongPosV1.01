@@ -13,7 +13,7 @@ public partial class SelectCustomerForm : Form
         InitializeComponent();
         lblHeader.Text = orderType == "Online"
             ? "SELECT CUSTOMER FOR ONLINE ORDER"
-            : "SELECT CUSTOMER — TOP = WALK-IN (no points)";
+            : "SELECT CUSTOMER — ⭐ online-registered lang · TOP = WALK-IN";
         // I-load ang list kapag may handle na ang form (DataGridView DataSource sa ctor = NRE sa band layout)
         Shown += (_, _) => RefreshGrid("");
         txtSearch.Focus();
@@ -22,9 +22,11 @@ public partial class SelectCustomerForm : Form
 
     private void RefreshGrid(string keyword)
     {
+        // ⭐ ONLY: mga online-registered customers (may QR code) lang ang pwedeng i-pick;
+        // ang mga walang star (manual POS customers, walang points) ay HINDI na lalabas dito.
         var results = keyword.Length < 1
-            ? CustomerService.GetAll().Where(c => c.IsActive).OrderBy(c => c.Name).ToList()
-            : CustomerService.Search(keyword).Where(c => c.IsActive).ToList();
+            ? CustomerService.GetAll().Where(c => c.IsActive && !string.IsNullOrEmpty(c.QrCode)).OrderBy(c => c.Name).ToList()
+            : CustomerService.Search(keyword).Where(c => c.IsActive && !string.IsNullOrEmpty(c.QrCode)).ToList();
         _list = results;
 
         var rows = new List<object>
@@ -42,7 +44,27 @@ public partial class SelectCustomerForm : Form
         }));
         dgvCustomers.DataSource = rows;
         dgvCustomers.Visible = true;
+        // Explicit widths para LAGING kita ang buong pangalan at points (hindi napi-putol)
         if (dgvCustomers.Columns["Id"] != null) dgvCustomers.Columns["Id"].Width = 35;
+        if (dgvCustomers.Columns["Name"] != null) dgvCustomers.Columns["Name"].Width = 270;
+        if (dgvCustomers.Columns["Phone"] != null) dgvCustomers.Columns["Phone"].Width = 100;
+        if (dgvCustomers.Columns["Address"] != null) dgvCustomers.Columns["Address"].Width = 110;
+        if (dgvCustomers.Columns["Credit"] != null) dgvCustomers.Columns["Credit"].Width = 75;
+        if (dgvCustomers.Columns["Points"] != null) dgvCustomers.Columns["Points"].Width = 70;
+        // Tooltip para sa mahabang pangalan/address
+        dgvCustomers.CellToolTipTextNeeded -= OnCellToolTip;
+        dgvCustomers.CellToolTipTextNeeded += OnCellToolTip;
+    }
+
+    private void OnCellToolTip(object? s, DataGridViewCellToolTipTextNeededEventArgs e)
+    {
+        if (e.ColumnIndex < 0 || e.RowIndex < 0) return;
+        var col = dgvCustomers.Columns[e.ColumnIndex].Name;
+        if (col == "Name" || col == "Address")
+        {
+            var v = dgvCustomers.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString();
+            if (!string.IsNullOrEmpty(v)) e.ToolTipText = v;
+        }
     }
 
     private void SelectCurrent()
@@ -138,7 +160,7 @@ public partial class SelectCustomerForm : Form
             BorderStyle = BorderStyle.FixedSingle,
             CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
             GridColor = Color.FromArgb(230, 230, 235),
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             MultiSelect = false
         };

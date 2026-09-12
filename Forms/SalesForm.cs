@@ -24,6 +24,7 @@ public partial class SalesForm : Form
     private Label _lblCustomerBanner = null!;
     private Button _btnChat = null!;
     private Label _lblChatBadge = null!;
+    private ToolTip _customerInfoTooltip = null!;
     private System.Windows.Forms.Timer? _chatBadgeTimer;
 
     private static Color CTopbar       => ThemeManager.Current.TopbarBg;
@@ -87,6 +88,20 @@ public partial class SalesForm : Form
 
         _ = CheckForUpdatesAsync();
         StartChatPollingIfHq();
+    }
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        // 🆕 SELECT CUSTOMER FIRST — sa bawat bagong cart (initial load + pagkatapos ng sale).
+        // Cancel/Escape = WALK-IN; pwede pa ring magpalit ng customer anytime (customer button).
+        PromptNewCartCustomer();
+    }
+
+    private void PromptNewCartCustomer()
+    {
+        if (_cart.Count > 0) return;
+        AttachCustomer();
     }
 
     private async Task CheckForUpdatesAsync()
@@ -166,27 +181,26 @@ public partial class SalesForm : Form
         if (_selectedCustomer != null)
         {
             var c = _selectedCustomer;
-            var eligible = !string.IsNullOrEmpty(c.QrCode) ? "  ·  ⭐EARN" : "  ·  ⛔no points";
-            lblCustomerInfo.Text = $"{c.Name}  ·  {c.DisplayPhone}  ·  Credit: \u20b1{c.CreditBalance:N2}  ·  Points: {c.LoyaltyPoints}{eligible}";
+            var eligible = !string.IsNullOrEmpty(c.QrCode) ? "⭐" : "⛔";
+            // PANGALAN + POINTS ang nasa unahan (laging kita); ang credit/phone ay nasa dulo
+            // (AutoEllipsis) + full detail sa tooltip kapag hinover.
+            lblCustomerInfo.Text = $"{eligible} {c.Name}  ·  Pts: {c.LoyaltyPoints}  ·  Credit: \u20b1{c.CreditBalance:N2}  ·  {c.DisplayPhone}";
+            _customerInfoTooltip.SetToolTip(lblCustomerInfo,
+                $"{c.Name}\nPhone: {c.DisplayPhone}\nCredit: \u20b1{c.CreditBalance:N2}\nPoints: {c.LoyaltyPoints}" +
+                (string.IsNullOrEmpty(c.QrCode) ? "" : "\nOnline-registered (⭐ points eligible)"));
             lblCustomerInfo.ForeColor = _orderType == "Online" ? CAmberMid : CBlueMid;
-            lblOrderChip.Text = "CUSTOMER";
-            lblOrderChip.ForeColor = CBlueDark;
-            lblOrderChip.BackColor = CBlueLight;
-            lblOrderChip.Visible = true;
         }
         else
         {
             lblCustomerInfo.Text = "🧾 WALK-IN — walang points";
+            _customerInfoTooltip.SetToolTip(lblCustomerInfo, "");
             lblCustomerInfo.ForeColor = CTextMuted;
-            lblOrderChip.Text = "WALK-IN";
-            lblOrderChip.ForeColor = CTextMuted;
-            lblOrderChip.BackColor = Color.FromArgb(226, 228, 235);
-            lblOrderChip.Visible = true;
         }
     }
 
-    // 💬 CUSTOMER CHAT (e-commerce) — HQ store lang; ang cashier ay pwedeng sumagot
+    // 💬 CUSTOMER CHAT (e-commerce) — HQ store + DEV PC (foundation para ma-test); ang ibang stores ay wala
     private static bool ChatVisibleHere => SyncService.StoreId == "STORE-20260602-7159"
+        || SyncService.StoreId == "STORE-DEV-0001"
         || Environment.GetCommandLineArgs().Any(a => a == "--devchat"); // dev/test override only
 
     private void OpenChatWindow()
@@ -718,6 +732,14 @@ public partial class SalesForm : Form
             {
                 dgvCart.FirstDisplayedScrollingRowIndex = 0;
                 dgvCart.ClearSelection();
+                try
+                {
+                    // F3 FIX: i-select ang ROW 0 (ang pinakabagong punch, dahil Insert(0))
+                    // para ang F3 ay mag-edit ng bagong punch na item, hindi ang lumang current row.
+                    dgvCart.CurrentCell = dgvCart.Rows[0].Cells[0];
+                    dgvCart.Rows[0].Selected = true;
+                }
+                catch { }
             }
         }));
     }
@@ -987,6 +1009,7 @@ public partial class SalesForm : Form
         UpdateCustomerDisplay();
         _paying = false;
         btnPay.Enabled = true;
+        PromptNewCartCustomer(); // 🆕 bagong cart pagkatapos ng sale: select customer muna
     }
 
     private void InitializeComponent()
@@ -1110,32 +1133,15 @@ public partial class SalesForm : Form
             e.Graphics.DrawLine(pen, 0, _pnlCustomerBar.Height - 1, _pnlCustomerBar.Width, _pnlCustomerBar.Height - 1);
         };
 
-        var lblCustIcon = new Label
-        {
-            Text = "\u25cf",
-            Font = new Font("Segoe UI", 16F),
-            ForeColor = CBlueMid,
-            TextAlign = ContentAlignment.MiddleCenter
-        };
-
+        _customerInfoTooltip = new ToolTip();
         lblCustomerInfo = new Label
         {
             Text = "Walk-in customer",
             Font = new Font("Segoe UI", 9F),
             ForeColor = CTextMuted,
-            TextAlign = ContentAlignment.MiddleLeft
-        };
-
-        lblOrderChip = new Label
-        {
-            Text = "Walk-in",
-            Font = new Font("Segoe UI", 8F, FontStyle.Bold),
-            ForeColor = CBlueDark,
-            BackColor = CBlueLight,
-            TextAlign = ContentAlignment.MiddleCenter,
-            Padding = new Padding(6, 2, 6, 2),
-            Visible = false,
-            AutoSize = true
+            TextAlign = ContentAlignment.MiddleLeft,
+            AutoSize = false,
+            AutoEllipsis = true
         };
 
         var btnScanQr = new Button
@@ -1210,13 +1216,18 @@ public partial class SalesForm : Form
 
         UpdateCustomerDisplay();
 
-        _pnlCustomerBar.Controls.AddRange(new Control[] { lblCustIcon, lblCustomerInfo, lblOrderChip, btnCustomer, btnChat, btnScanQr });
+        _pnlCustomerBar.Controls.AddRange(new Control[] { lblCustomerInfo, btnCustomer, btnChat, btnScanQr });
 
         btnScanQr.Dock = DockStyle.Right;
         btnChat.Dock = DockStyle.Right;
         btnCustomer.Dock = DockStyle.Right;
-        lblOrderChip.Dock = DockStyle.Right;
         lblCustomerInfo.Dock = DockStyle.Fill;
+        // LAYOUT FIX (2026-09-12): walang dot icon at walang duplicate chip — ang status ay nasa info line
+        // (⭐ Name · Pts ... / 🧾 WALK-IN); BringToFront sa buttons para laging nasa harap (walang puting overlay).
+        lblCustomerInfo.Padding = new Padding(12, 0, 0, 0);
+        btnCustomer.BringToFront();
+        btnChat.BringToFront();
+        btnScanQr.BringToFront();
 
         _pnlSearch = new Panel { BackColor = CCard };
         _pnlSearch.Paint += (s, e) =>
@@ -1589,10 +1600,7 @@ public partial class SalesForm : Form
 
         _pnlCustomerBar.Location = new Point(0, topH);
         _pnlCustomerBar.Size     = new Size(leftW, custH);
-        var cc = _pnlCustomerBar.Controls;
-        cc[0].Location = new Point(12, (custH - 28) / 2); cc[0].Size = new Size(28, 28);
-        cc[1].Location = new Point(38, (custH - 20) / 2); cc[1].Size = new Size(leftW - 220, 20);
-        cc[2].Location = new Point(leftW - 140, (custH - 20) / 2); cc[2].Size = new Size(120, 20);
+        // lahat ng customer bar controls (lblCustomerInfo + docked buttons) ay auto-layout — walang manual bounds
 
         _pnlSearch.Location = new Point(0, topH + custH);
         _pnlSearch.Size     = new Size(leftW, searchH);
@@ -1810,7 +1818,6 @@ public partial class SalesForm : Form
     private Panel _pnlTotals = null!;
     private Label _lblTime = null!;
     private Label lblCustomerInfo = null!;
-    private Label lblOrderChip = null!;
     private Label lblCartMeta = null!;
     private Label lblDiscountVal = null!;
     private Label lblTaxVal = null!;

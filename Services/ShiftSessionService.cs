@@ -69,6 +69,10 @@ public static class ShiftSessionService
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
         Upsert(conn, "ShiftSessionActive", "0");
+        // PHANTOM OPENING FUND FIX (2026-09-12): i-reset ang opening balance pagkatapos ng bawat close —
+        // hindi dapat mag-migrate ang lumang "initial fund" sa susunod na shift (HQ -6,200 incident: ang
+        // opening 6,200 ay na-carried over sa 2 closes kahit walang pera).
+        Upsert(conn, "ShiftOpeningBalance", "0.00");
     }
 
     private static void Upsert(SQLiteConnection conn, string key, string value)

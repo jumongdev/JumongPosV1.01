@@ -1281,45 +1281,70 @@ tailwind.config = {
               <template x-if="loading"><div class="flex justify-center py-8"><span class="spinner"></span></div></template>
               <template x-if="!loading && filtered.length===0"><p class="text-center text-gray-400 text-xs py-8">Wala pang check — i-click ang ＋ NEW CHECK</p></template>
               <template x-if="filtered.length > 0">
-                <table class="w-full text-xs">
-                  <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Due Date</th>
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Check No.</th>
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Bank</th>
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Payee</th>
-                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Amount</th>
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Status</th>
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Created</th>
-                    <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Printed</th>
-                    <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
-                  </tr></thead>
-                  <tbody>
-                    <template x-for="c in filtered" :key="c.id">
-                      <tr class="border-b border-gray-50 dark:border-[#222255]/40">
-                        <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="fmtDate(c.checkDate)"></td>
-                        <td class="px-3 py-2 font-semibold" x-text="c.checkNo"></td>
-                        <td class="px-3 py-2"><span class="text-[9px] font-black px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300" x-text="c.bank"></span></td>
-                        <td class="px-3 py-2" x-text="c.payee"></td>
-                        <td class="px-3 py-2 text-right font-semibold" x-text="'₱' + fmtAmt(c.amount)"></td>
-                        <td class="px-3 py-2"><span class="text-[9px] font-black px-1.5 py-0.5 rounded"
-                          :class="c.status==='issued' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' : c.status==='cleared' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'"
-                          x-text="c.status.toUpperCase()"></span></td>
-                        <td class="px-3 py-2 text-gray-400 dark:text-[#5a5a8a]" x-text="fmtDateTime(c.createdAt)"></td>
-                        <td class="px-3 py-2 text-gray-400 dark:text-[#5a5a8a]" x-text="c.printCount > 0 ? ('🖨️ x' + c.printCount) : '—'"></td>
-                        <td class="px-3 py-2 text-right whitespace-nowrap">
-                          <button @click="printCheck(c)" :disabled="printing" class="text-[10px] px-2 py-1 rounded bg-cyan-600 text-white hover:bg-cyan-700 disabled:opacity-50 mr-1" x-text="c.printCount>0 ? '🖨️ REPRINT' : '🖨️ PRINT'"></button>
-                          <template x-if="c.status==='issued'">
-                            <span>
-                              <button @click="openEdit(c)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">✏️</button>
-                              <button @click="setStatus(c,'cleared')" class="text-[10px] px-2 py-1 rounded border border-emerald-200 dark:border-emerald-900/30 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 mr-1">✔ CLEARED</button>
-                            </span>
+                <div class="space-y-2">
+                  <template x-if="isHistoryView">
+                    <p class="text-[10px] font-bold text-amber-600 dark:text-amber-400">👁 HISTORY VIEW — hindi kasama sa payable total</p>
+                  </template>
+                  <template x-for="sec in dueSections" :key="sec.key">
+                    <div class="border border-gray-200 dark:border-[#222255] rounded-lg overflow-hidden">
+                      <div class="flex items-center justify-between px-3 py-1.5 text-[10px] font-black uppercase tracking-wider" :class="sec.cls">
+                        <span x-text="sec.title"></span>
+                        <span x-text="sec.count + ' check(s) · ₱' + fmtAmt(sec.total)"></span>
+                      </div>
+                      <div class="overflow-x-auto">
+                      <table class="text-xs table-fixed" style="width:1190px">
+                        <colgroup>
+                          <col style="width:85px"><col style="width:105px"><col style="width:120px"><col style="width:170px"><col style="width:115px"><col style="width:85px"><col style="width:140px"><col style="width:70px"><col style="width:300px">
+                        </colgroup>
+                        <thead>
+                          <tr class="bg-gray-50 dark:bg-[#0c0c22] text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                            <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255] whitespace-nowrap">Due Date</th>
+                            <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255] whitespace-nowrap">Check No.</th>
+                            <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255] whitespace-nowrap">Bank</th>
+                            <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255] whitespace-nowrap">Payee</th>
+                            <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255] whitespace-nowrap">Amount</th>
+                            <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255] whitespace-nowrap">Status</th>
+                            <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255] whitespace-nowrap">Created</th>
+                            <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255] whitespace-nowrap">Printed</th>
+                            <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255] whitespace-nowrap">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <template x-for="c in sec.items" :key="c.id">
+                            <tr class="border-b border-gray-50 dark:border-[#222255]/40">
+                              <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap overflow-hidden text-ellipsis" x-text="fmtDate(c.checkDate)"></td>
+                              <td class="px-3 py-2 font-semibold whitespace-nowrap overflow-hidden text-ellipsis" x-text="c.checkNo"></td>
+                              <td class="px-3 py-2 whitespace-nowrap overflow-hidden text-ellipsis"><span class="text-[9px] font-black px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300" x-text="c.bank"></span></td>
+                              <td class="px-3 py-2 truncate" :title="c.payee" x-text="c.payee"></td>
+                              <td class="px-3 py-2 text-right font-semibold whitespace-nowrap" x-text="'₱' + fmtAmt(c.amount)"></td>
+                              <td class="px-3 py-2 whitespace-nowrap"><span class="text-[9px] font-black px-1.5 py-0.5 rounded"
+                                :class="c.status==='issued' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' : c.status==='cleared' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'"
+                                x-text="c.status.toUpperCase()"></span></td>
+                              <td class="px-3 py-2 text-gray-400 dark:text-[#5a5a8a] whitespace-nowrap overflow-hidden text-ellipsis" x-text="fmtDateTime(c.createdAt)"></td>
+                              <td class="px-3 py-2 text-gray-400 dark:text-[#5a5a8a] whitespace-nowrap" x-text="c.printCount > 0 ? ('🖨️ x' + c.printCount) : '—'"></td>
+                              <td class="px-3 py-2 text-right whitespace-nowrap">
+                                <button @click="printCheck(c)" :disabled="printing" class="text-[10px] px-2 py-1 rounded bg-cyan-600 text-white hover:bg-cyan-700 disabled:opacity-50 mr-1" x-text="c.printCount>0 ? '🖨️ REPRINT' : '🖨️ PRINT'"></button>
+                                <template x-if="c.status==='issued'">
+                                  <span>
+                                    <button @click="openEdit(c)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] mr-1">✏️</button>
+                                    <button @click="setStatus(c,'cleared')" class="text-[10px] px-2 py-1 rounded border border-emerald-200 dark:border-emerald-900/30 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 mr-1">✔ CLEARED</button>
+                                  </span>
+                                </template>
+                                <button x-show="c.status!=='void'" @click="setStatus(c,'void')" class="text-[10px] px-2 py-1 rounded border border-red-200 dark:border-red-900/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">✖ VOID</button>
+                              </td>
+                            </tr>
                           </template>
-                          <button x-show="c.status!=='void'" @click="setStatus(c,'void')" class="text-[10px] px-2 py-1 rounded border border-red-200 dark:border-red-900/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">✖ VOID</button>
-                        </td>
-                      </tr>
-                    </template>
-                  </tbody>
-                </table>
+                        </tbody>
+                      </table>
+                      </div>
+                    </div>
+                  </template>
+                  <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-cyan-50 dark:bg-[#0f2440] border border-cyan-200 dark:border-[#1d3d63] text-xs font-black text-cyan-800 dark:text-cyan-300">
+                    <span>GRAND TOTAL (PAYABLE)</span>
+                    <span x-text="'₱' + fmtAmt(dueGrand) + ' · ' + dueGrandCount + ' check(s)'"></span>
+                  </div>
+                  <p class="text-[9px] text-gray-400 dark:text-[#5a5a8a] text-right px-1">✖ hindi kasama sa total ang cleared/void checks (nasa status selector)</p>
+                </div>
               </template>
             </div>
           </div>
@@ -2243,11 +2268,19 @@ tailwind.config = {
         <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
           <div class="px-4 py-3 border-b border-gray-100 dark:border-[#222255] flex items-center justify-between gap-3 flex-wrap">
             <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">CUSTOMERS</h3>
-            <div class="flex gap-1.5">
-              <button @click="setPtsFilter('all')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="ptsFilter==='all' ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-gray-100 dark:bg-[#181848] text-gray-600 dark:text-slate-300 border-gray-200 dark:border-[#222255]'">ALL (<span x-text="d.length"></span>)</button>
-              <button @click="setPtsFilter('star')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="ptsFilter==='star' ? 'bg-amber-500 text-white border-amber-500' : 'bg-amber-50 dark:bg-[#181848] text-amber-600 dark:text-amber-400 border-amber-200 dark:border-[#222255]'">⭐ WITH POINTS (<span x-text="withStar"></span>)</button>
-              <button @click="setPtsFilter('nostar')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="ptsFilter==='nostar' ? 'bg-gray-700 text-white border-gray-700' : 'bg-gray-100 dark:bg-[#181848] text-gray-600 dark:text-slate-300 border-gray-200 dark:border-[#222255]'">⛔ WITHOUT (<span x-text="withoutStar"></span>)</button>
-              <button @click="setPtsFilter('nophone')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="ptsFilter==='nophone' ? 'bg-amber-500 text-white border-amber-500' : 'bg-amber-50 dark:bg-[#181848] text-amber-600 dark:text-amber-400 border-amber-200 dark:border-[#222255]'">📱 NO PHONE (<span x-text="noPhone"></span>)</button>
+            <div class="flex items-center gap-3 flex-wrap">
+              <div class="flex gap-1.5">
+                <button @click="setPtsFilter('all')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="ptsFilter==='all' ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-gray-100 dark:bg-[#181848] text-gray-600 dark:text-slate-300 border-gray-200 dark:border-[#222255]'">ALL (<span x-text="d.length"></span>)</button>
+                <button @click="setPtsFilter('star')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="ptsFilter==='star' ? 'bg-amber-500 text-white border-amber-500' : 'bg-amber-50 dark:bg-[#181848] text-amber-600 dark:text-amber-400 border-amber-200 dark:border-[#222255]'">⭐ WITH POINTS (<span x-text="withStar"></span>)</button>
+                <button @click="setPtsFilter('nostar')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="ptsFilter==='nostar' ? 'bg-gray-700 text-white border-gray-700' : 'bg-gray-100 dark:bg-[#181848] text-gray-600 dark:text-slate-300 border-gray-200 dark:border-[#222255]'">⛔ WITHOUT (<span x-text="withoutStar"></span>)</button>
+                <button @click="setPtsFilter('nophone')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="ptsFilter==='nophone' ? 'bg-amber-500 text-white border-amber-500' : 'bg-amber-50 dark:bg-[#181848] text-amber-600 dark:text-amber-400 border-amber-200 dark:border-[#222255]'">📱 NO PHONE (<span x-text="noPhone"></span>)</button>
+              </div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <label class="flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-[#7878aa] cursor-pointer">
+                  <input type="checkbox" x-model="showInactive" class="accent-cyan-600"> may inactive (<span x-text="inactiveCount"></span>)
+                </label>
+                <button @click="deactivateNonStar()" :disabled="deactivating" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50" x-text="deactivating ? 'DEACTIVATING...' : '⬇️ DEACTIVATE W/O ⭐'"></button>
+              </div>
             </div>
           </div>
           <div class="overflow-x-auto">
@@ -2267,8 +2300,11 @@ tailwind.config = {
                 </tr></thead>
                 <tbody>
                   <template x-for="(x,i) in filtered" :key="i">
-                    <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                      <td class="px-3 py-2 font-medium" x-text="x.name"></td>
+                    <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]" :class="x.isActive === false ? 'opacity-40' : ''">
+                      <td class="px-3 py-2 font-medium">
+                        <span x-text="x.name"></span>
+                        <template x-if="x.isActive === false"><span class="ml-1 text-[9px] font-black px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">INACTIVE</span></template>
+                      </td>
                       <td class="px-3 py-2">
                         <template x-if="x.phone"><span x-text="x.phone"></span></template>
                         <template x-if="!x.phone && x.googleSub">
@@ -2291,6 +2327,9 @@ tailwind.config = {
                       <td class="px-3 py-2 text-right whitespace-nowrap">
                         <button @click="viewOrders(x)" class="text-[10px] px-2.5 py-1.5 rounded-lg bg-violet-600 text-white font-medium hover:bg-violet-700">📋 ORDERS</button>
                         <button @click="openUpdates(x)" class="text-[10px] px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700" title="Mag-post ng update sa account ng customer (makikita sa bell ng shop app)">📢 UPDATE</button>
+                        <template x-if="x.isActive === false">
+                          <button @click="activateCustomer(x)" class="text-[10px] px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700">↩️ BALIK</button>
+                        </template>
                       </td>
                     </tr>
                   </template>
@@ -4304,8 +4343,8 @@ tailwind.config = {
 
   </div><!-- /main content -->
 
-  <script src="components.js?v=20260910c"></script>
-  <script src="app.js?v=20260910c"></script>
+  <script src="components.js?v=20260912a"></script>
+  <script src="app.js?v=20260912a"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script>
   /* ── Web login gating (username + PIN, WEB ACCESS only) ── */

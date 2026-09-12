@@ -1015,8 +1015,9 @@ Alpine.store('app', {
 
 
   /* ΓöÇΓöÇ Customers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
-  Alpine.data('customersList', () => ({
-    d: [], loading: true, orders: [], ordersOpen: false, ordersName: '', ordersLoading: false, ptsFilter: 'all',
+Alpine.data('customersList', () => ({
+    d: [], loading: true, orders: [], ordersOpen: false, ordersName: '', ordersLoading: false, ptsFilter: 'star',
+    showInactive: false, deactivating: false,
     phoneOpen: false, phoneTarget: null, phoneInput: '', phoneSaving: false,
     upOpen: false, upTarget: null, upInput: '', upList: [], upSaving: false,
     async init() { window.addEventListener('load-customers', () => this.load()); await this.load() },
@@ -1026,14 +1027,30 @@ Alpine.store('app', {
       this.loading = false;
     },
     setPtsFilter(f) { this.ptsFilter = f; },
-    get withStar() { return this.d.filter(x => !!x.qrCode).length },
-    get withoutStar() { return this.d.filter(x => !x.qrCode).length },
-    get noPhone() { return this.d.filter(x => !!x.googleSub && !x.phone).length },
+    _act(x) { return x.isActive !== false; },
+    get withStar() { return this.d.filter(x => this._act(x) && !!x.qrCode).length },
+    get withoutStar() { return this.d.filter(x => this._act(x) && !x.qrCode).length },
+    get noPhone() { return this.d.filter(x => this._act(x) && !!x.googleSub && !x.phone).length },
+    get inactiveCount() { return this.d.filter(x => x.isActive === false).length },
     get filtered() {
-      if (this.ptsFilter === 'star') return this.d.filter(x => !!x.qrCode);
-      if (this.ptsFilter === 'nostar') return this.d.filter(x => !x.qrCode);
-      if (this.ptsFilter === 'nophone') return this.d.filter(x => !!x.googleSub && !x.phone);
-      return this.d;
+      const base = this.showInactive ? this.d : this.d.filter(x => this._act(x));
+      if (this.ptsFilter === 'star') return base.filter(x => !!x.qrCode);
+      if (this.ptsFilter === 'nostar') return base.filter(x => !x.qrCode);
+      if (this.ptsFilter === 'nophone') return base.filter(x => !!x.googleSub && !x.phone);
+      return base;
+    },
+    async deactivateNonStar() {
+      if (!confirm('I-DEACTIVATE ang LAHAT ng customer na walang ⭐ (hindi naka-register sa e-commerce)?\n\nPara sa mga may credit balance, may "↩️ BALIK" para ma-restore.')) return;
+      this.deactivating = true;
+      try {
+        const r = await fetchJSON(API + '/customers/deactivate-non-star', { method: 'POST' });
+        toast('Na-deactivate: ' + (r.deactivated || 0) + ' customers', 'success');
+        await this.load();
+      } catch (e) { toast(e.message || 'Hindi na-deactivate', 'error'); }
+      this.deactivating = false;
+    },
+    async activateCustomer(x) {
+      try { await fetchJSON(API + '/customers/' + x.id + '/activate', { method: 'POST' }); toast('Na-restore: ' + x.name, 'success'); await this.load(); } catch (e) { toast(e.message || 'Hindi na-restore', 'error'); }
     },
     addrText(x) {
       const parts = [];
@@ -2829,7 +2846,7 @@ Alpine.data('shopContentPanel', () => ({
 
   /* ── Checks (EastWest / RCBC recording + printing — server-side HP Smart Tank) ── */
   Alpine.data('checksPanel', () => ({
-    d: [], loading: true, search: '', status: 'all',
+    d: [], loading: true, search: '', status: 'issued',
     suppliers: [], printers: [], template: null, banks: [], templateBank: 'EastWest Bank',
     settingsOpen: false, savingTemplate: false, testPrinting: false, printing: false,
     modalOpen: false, saving: false, wordsPreview: '', _wordsTimer: null,
@@ -2877,6 +2894,59 @@ Alpine.data('shopContentPanel', () => ({
       const q = this.search.toLowerCase();
       return this.d.filter(c => (c.checkNo + ' ' + c.payee + ' ' + c.bank + ' ' + (c.memo || '')).toLowerCase().includes(q));
     },
+    // ── DUE GROUPING (withdrawal date: Sabado/Linggo -> Lunes, dahil Lunes ang check withdrawal) ──
+    _dayNames: ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'],
+    _parseDate(s) {
+      const p = String(s).slice(0, 10).split('-');
+      if (p.length !== 3) return null;
+      return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    },
+    _effDate(d) {
+      const wd = d.getDay();
+      const x = new Date(d);
+      if (wd === 6) x.setDate(x.getDate() + 2); // Sabado -> Lunes
+      else if (wd === 0) x.setDate(x.getDate() + 1); // Linggo -> Lunes
+      return x;
+    },
+    _dateKey(d) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    },
+    get dueSections() {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const past = [], todayArr = [], upcoming = new Map();
+      this.filtered.forEach(c => {
+        const d = this._parseDate(c.checkDate);
+        if (!d) return;
+        const eff = this._effDate(d);
+        if (eff < today) { past.push(c); return; }
+        if (eff.getTime() === today.getTime()) { todayArr.push(c); return; }
+        const key = this._dateKey(eff);
+        if (!upcoming.has(key)) upcoming.set(key, { date: eff, items: [] });
+        upcoming.get(key).items.push(c);
+      });
+      const mk = (key, title, cls, items) => {
+        const payable = items.filter(c => c.status === 'issued');
+        return {
+          key, title, cls, count: payable.length,
+          total: payable.reduce((s, c) => s + Number(c.amount || 0), 0),
+          items
+        };
+      };
+      const sections = [];
+      if (past.length) sections.push(mk('past', '🔴 PAST DUE', 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400', past));
+      if (todayArr.length) sections.push(mk('today', '🟡 DUE TODAY', 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400', todayArr));
+      [...upcoming.values()].sort((a, b) => a.date - b.date).forEach(g => {
+        const wd = g.date.getDay();
+        const title = wd === 1
+          ? '🟢 DUE MON — kasama ang Sat·Sun·Mon (Lunes ang withdrawal)'
+          : '🟢 DUE ' + this._dayNames[wd] + ' ' + this.fmtDate(this._dateKey(g.date));
+        sections.push(mk(this._dateKey(g.date), title, 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400', g.items));
+      });
+      return sections;
+    },
+    get dueGrand() { return this.filtered.filter(c => c.status === 'issued').reduce((s, c) => s + Number(c.amount || 0), 0); },
+    get dueGrandCount() { return this.filtered.filter(c => c.status === 'issued').length; },
+    get isHistoryView() { return this.status === 'cleared' || this.status === 'void'; },
     fmtDate(s) { if (!s) return ''; const p = String(s).slice(0, 10).split('-'); return p.length === 3 ? (p[1] + '-' + p[2] + '-' + p[0]) : s; },
     fmtDateTime(s) {
       if (!s) return '—';
@@ -2939,7 +3009,7 @@ Alpine.data('shopContentPanel', () => ({
     async setStatus(c, st) {
       const label = st === 'void' ? 'i-VOID' : 'mark as CLEARED';
       if (!confirm('Sigurado ka bang ' + label + ' ang check ' + c.checkNo + '?')) return;
-      try { await fetchJSON('/api/checks/' + c.id + '/' + st, { method: 'POST' }); await this.load(); toast('Updated', 'success'); } catch (e) { toast(e.message, 'error'); }
+      try { await fetchJSON('/api/checks/' + c.id + '/' + (st === 'cleared' ? 'clear' : st), { method: 'POST' }); await this.load(); toast('Updated', 'success'); } catch (e) { toast(e.message, 'error'); }
     },
     async saveTemplate() {
       this.savingTemplate = true;

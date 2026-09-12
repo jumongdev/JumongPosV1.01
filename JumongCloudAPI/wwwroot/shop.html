@@ -540,6 +540,24 @@ async function loadCatalog() {
   }
 }
 
+// B: FRESH catalog fetch (walang localStorage cache) — ginagamit sa checkout para hindi ma-submit
+// ang stale cart items na out of stock na o naalis na sa catalog.
+async function refreshCatalog() {
+  try {
+    const url = API + '/dashboard/shop/catalog?storeId=' + STORE + '&withImages=false&_t=' + Date.now();
+    const r = await fetchT(url, {}, 30000);
+    const j = await r.json();
+    if (j && Array.isArray(j.items)) {
+      catalog = j.items;
+      member = !!j.member;
+      try { localStorage.setItem('shop_catalog_cache_v2', JSON.stringify({ ts: Date.now(), items: catalog, member })); } catch (e) { /* ignore */ }
+      categories = [...new Set(catalog.map(p => p.category).filter(Boolean))].sort((a, b) => String(a).toLowerCase().localeCompare(String(b).toLowerCase()));
+      renderChips();
+      renderGrid();
+    }
+  } catch (e) { /* server pa rin ang final gate */ }
+}
+
 function showLoading(on) {
   const g = document.getElementById('grid');
   if (on) {
@@ -1431,6 +1449,32 @@ async function placeOrder() {
   btn.textContent = 'PLACING ORDER…';
   try {
     if (document.getElementById('coSubdivision').value === '__suggest__') suggestSubdivision(subdivision);
+    // B: FRESH stock re-validation bago i-submit — i-alis/adjust ang mga out-of-stock na item
+    // (dati, ang stale cart ay pinapayagan; server-side fail-closed na ang huling gate).
+    await refreshCatalog();
+    let removed = 0, adjusted = 0;
+    cart = cart.filter(c => {
+      const p = catalog.find(x => x.id === c.id);
+      if (!p) { removed++; return false; }
+      const u = (c.unitName && (p.units || []).find(x => x.unitName === c.unitName)) || defUnit(p);
+      const need = (u && u.qtyPerUnit > 1 ? u.qtyPerUnit : 1);
+      const avail = Math.floor(stockOf(p) / need);
+      if (avail <= 0) { removed++; return false; }
+      if (c.qty > avail) { c.qty = avail; adjusted++; }
+      return true;
+    });
+    saveCart();
+    if (removed || adjusted) {
+      if (cart.length === 0) {
+        closeCheckout();
+        toast('Wala nang available na item sa cart (out of stock) — alisin o magdagdag ulit', 'error');
+      } else {
+        renderCart();
+        renderCartTotals();
+        toast('Inayos ang cart: ' + (removed ? removed + ' naalis (out of stock) ' : '') + (adjusted ? adjusted + ' na-adjust sa available' : ''), 'error');
+      }
+      return;
+    }
     const body = {
       customerName: name,
       phone,

@@ -260,11 +260,14 @@ public class DailyCloseService
 
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var sql = "SELECT InvoiceNo, SaleDate, CASE WHEN PaymentMethod = 'Split' THEN EwPaid ELSE GrandTotal END, ReferenceNo FROM Sales " +
-                  "WHERE (PaymentMethod = 'E-Wallet' OR (PaymentMethod = 'Split' AND EwPaid > 0)) AND IsVoided = 0";
+        var sql = "SELECT s.InvoiceNo, s.SaleDate, " +
+                  "CASE WHEN s.PaymentMethod = 'Split' THEN s.EwPaid ELSE COALESCE(SUM(CASE WHEN si.IsVoided = 0 THEN si.TotalPrice ELSE 0 END), 0) END AS NetAmount, " +
+                  "MAX(s.ReferenceNo) AS RefNo FROM Sales s " +
+                  "LEFT JOIN SaleItems si ON si.SaleId = s.Id " +
+                  "WHERE (s.PaymentMethod = 'E-Wallet' OR (s.PaymentMethod = 'Split' AND s.EwPaid > 0)) AND s.IsVoided = 0";
         if (!string.IsNullOrEmpty(since))
-            sql += " AND SaleDate > @since";
-        sql += " AND SaleDate <= @end ORDER BY SaleDate";
+            sql += " AND s.SaleDate > @since";
+        sql += " AND s.SaleDate <= @end GROUP BY s.Id, s.InvoiceNo, s.SaleDate, s.PaymentMethod, s.EwPaid ORDER BY s.SaleDate";
 
         using var cmd = new System.Data.SQLite.SQLiteCommand(sql, conn);
         if (!string.IsNullOrEmpty(since))
@@ -277,8 +280,8 @@ public class DailyCloseService
             list.Add((
                 rdr["InvoiceNo"].ToString() ?? "",
                 rdr["SaleDate"].ToString() ?? "",
-                Convert.ToDecimal(rdr[2]),
-                rdr["ReferenceNo"].ToString() ?? ""
+                Convert.ToDecimal(rdr["NetAmount"]),
+                rdr["RefNo"].ToString() ?? ""
             ));
         }
         return list;
@@ -291,11 +294,14 @@ public class DailyCloseService
 
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        var sql = "SELECT InvoiceNo, SaleDate, CASE WHEN PaymentMethod = 'Split' THEN EwPaid ELSE GrandTotal END AS GrandTotal, ReferenceNo FROM Sales " +
-                  "WHERE (PaymentMethod = 'E-Wallet' OR (PaymentMethod = 'Split' AND EwPaid > 0)) AND IsVoided = 0";
+        var sql = "SELECT s.InvoiceNo, s.SaleDate, " +
+                  "CASE WHEN s.PaymentMethod = 'Split' THEN s.EwPaid ELSE COALESCE(SUM(CASE WHEN si.IsVoided = 0 THEN si.TotalPrice ELSE 0 END), 0) END AS NetAmount, " +
+                  "MAX(s.ReferenceNo) AS RefNo FROM Sales s " +
+                  "LEFT JOIN SaleItems si ON si.SaleId = s.Id " +
+                  "WHERE (s.PaymentMethod = 'E-Wallet' OR (s.PaymentMethod = 'Split' AND s.EwPaid > 0)) AND s.IsVoided = 0";
         if (!string.IsNullOrEmpty(since))
-            sql += " AND SaleDate > @since";
-        sql += " AND SaleDate <= @end ORDER BY SaleDate";
+            sql += " AND s.SaleDate > @since";
+        sql += " AND s.SaleDate <= @end GROUP BY s.Id, s.InvoiceNo, s.SaleDate, s.PaymentMethod, s.EwPaid ORDER BY s.SaleDate";
 
         using var cmd = new System.Data.SQLite.SQLiteCommand(sql, conn);
         if (!string.IsNullOrEmpty(since))
@@ -308,8 +314,8 @@ public class DailyCloseService
             list.Add((
                 rdr["InvoiceNo"]?.ToString() ?? "",
                 rdr["SaleDate"]?.ToString()?[..16] ?? "",
-                Convert.ToDecimal(rdr["GrandTotal"]),
-                rdr["ReferenceNo"]?.ToString() ?? ""
+                Convert.ToDecimal(rdr["NetAmount"]),
+                rdr["RefNo"]?.ToString() ?? ""
             ));
         }
         return list;
