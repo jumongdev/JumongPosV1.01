@@ -139,7 +139,7 @@
               <span class="text-xl">👤</span>
               <div class="flex-1 text-left">
                 <p class="text-white text-sm font-medium" id="custName">Walk-in Customer</p>
-                <p class="text-gray-500 text-[11px]">Tap to select or add customer</p>
+                <p class="text-gray-500 text-[11px]">Tap to select customer</p>
               </div>
               <span class="text-gray-500 text-lg">›</span>
             </button>
@@ -355,6 +355,14 @@
         <div class="nav-item active" id="navSell" onclick="switchTab('sell')"><span class="icon">🛒</span>SELL</div>
         <div class="nav-item" id="navInventory" onclick="switchTab('inventory')"><span class="icon">📦</span>INVENTORY</div>
         <div class="nav-item" id="navMenu" onclick="openBurgerMenu()"><span class="icon">☰</span>MENU</div>
+      </div>
+
+      <!-- 💬 CUSTOMER CHAT floating button (badge = unread customer messages) -->
+      <div id="chatFab" class="fixed z-40 right-4" style="bottom:84px;" onclick="openChat()">
+        <div class="relative w-14 h-14 rounded-full flex items-center justify-center shadow-2xl" style="background:linear-gradient(135deg,#7c5ce6,#5b3fd6);">
+          <span class="text-2xl">💬</span>
+          <span id="chatFabBadge" class="hidden absolute -top-1 -right-1 min-w-[22px] h-[22px] px-1 rounded-full bg-red-600 text-white text-[11px] font-black items-center justify-center border-2 border-[#16163a]" style="display:flex;">0</span>
+        </div>
       </div>
     </div>
 
@@ -660,12 +668,31 @@
       </div>
     </div>
 
+    <!-- 💬 CUSTOMER CHAT OVERLAY (mobile reply — customer ↔ shop chat) -->
+    <div id="chatOverlay" class="hidden fixed inset-0 z-[70] bg-[#0d0d24] flex-col" style="display:flex;flex-direction:column;">
+      <div class="flex items-center justify-between px-4 py-3" style="background:linear-gradient(135deg,#7c5ce6,#5b3fd6);">
+        <div class="flex items-center gap-2">
+          <button id="chatBackBtn" onclick="chatBack()" class="text-white text-2xl font-bold hidden leading-none">‹</button>
+          <p class="text-white font-bold text-sm" id="chatTitle">💬 CUSTOMER CHAT</p>
+        </div>
+        <button onclick="closeChat()" class="text-white text-xl font-bold">✕</button>
+      </div>
+      <div id="chatListView" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
+      <div id="chatThreadView" class="flex-1 hidden flex-col" style="min-height:0;">
+        <div class="flex-1 overflow-y-auto p-3 space-y-2" id="chatMsgs"></div>
+        <div class="flex gap-2 p-3 border-t border-[#222255]">
+          <input id="chatReplyInput" class="input-field flex-1" type="text" placeholder="Type your reply..." onkeydown="if(event.key==='Enter'){event.preventDefault();sendChatReply();}">
+          <button class="btn-primary px-4" onclick="sendChatReply()">SEND</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script>
     const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
     const IN_APP = typeof AndroidPrinter !== 'undefined';
-    const WEB_VER = '20260813-2';
+    const WEB_VER = '20260914-1';
 
     // ─── Crash reporting: send any native crash.log (from the uncaught-exception
     // handler in MainActivity) to the server on the next successful launch. Also
@@ -3455,6 +3482,122 @@
     bindLiveSearch('txSearch', searchTxProducts);
     bindLiveSearch('recvSearch', searchRecvProducts);
     bindLiveSearch('custSearch', searchCustomers);
+
+    // ─── 💬 CUSTOMER CHAT (customer ↔ shop; mobile reply mula sa whmobile) ─────
+    // Endpoints ay open (walang auth): /dashboard/chats, /chats/{id}/messages,
+    // /chats/{id}/reply (replyBy = naka-login na user), /chats/{id}/seen.
+    let chatConvs = [], chatOpenConv = null, chatPoll = null;
+    function chatEsc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+    function chatTime(s) { try { const d = new Date(s); if (isNaN(d)) return ''; return d.toLocaleString('en-PH', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
+
+    async function chatUnreadPoll() {
+      try {
+        const b = document.getElementById('chatFabBadge');
+        if (!session) { b.classList.add('hidden'); return; }
+        const r = await fetch(API + '/dashboard/chats/unread', { signal: AbortSignal.timeout(8000) });
+        const j = await r.json();
+        const n = j.count || 0;
+        if (n > 0) { b.textContent = n > 99 ? '99+' : n; b.classList.remove('hidden'); }
+        else b.classList.add('hidden');
+      } catch (e) {}
+    }
+
+    function openChat() {
+      document.getElementById('chatOverlay').classList.remove('hidden');
+      chatBack();
+      loadChatConvs();
+      if (chatPoll) clearInterval(chatPoll);
+      chatPoll = setInterval(() => {
+        if (!document.getElementById('chatThreadView').classList.contains('hidden')) pollChatMsgs();
+      }, 4000);
+      chatUnreadPoll();
+    }
+    function closeChat() {
+      document.getElementById('chatOverlay').classList.add('hidden');
+      if (chatPoll) { clearInterval(chatPoll); chatPoll = null; }
+      chatOpenConv = null;
+      chatUnreadPoll();
+    }
+    function chatBack() {
+      chatOpenConv = null;
+      document.getElementById('chatListView').classList.remove('hidden');
+      document.getElementById('chatThreadView').classList.add('hidden');
+      document.getElementById('chatBackBtn').classList.add('hidden');
+      document.getElementById('chatTitle').textContent = '💬 CUSTOMER CHAT';
+    }
+
+    async function loadChatConvs() {
+      const list = document.getElementById('chatListView');
+      list.innerHTML = '<p class="text-center text-gray-500 text-xs py-8">Loading…</p>';
+      try { chatConvs = await (await fetch(API + '/dashboard/chats', { signal: AbortSignal.timeout(10000) })).json(); }
+      catch (e) { chatConvs = []; }
+      if (!chatConvs.length) { list.innerHTML = '<p class="text-center text-gray-500 text-xs py-8">Wala pang customer na nag-message.</p>'; return; }
+      list.innerHTML = chatConvs.map(c => {
+        const contact = [c.phone ? '📞 ' + chatEsc(c.phone) : '', c.subdivision ? '🏘️ ' + chatEsc(c.subdivision) : (c.block ? '🏘️ Blk ' + chatEsc(c.block) + ' Lot ' + chatEsc(c.lot) : '')].filter(Boolean).join(' · ');
+        return '<div class="card" onclick="openChatConv(' + c.id + ')" style="cursor:pointer;">' +
+          '<div class="flex items-start justify-between gap-2">' +
+            '<p class="text-white text-sm font-bold leading-snug">' + chatEsc(c.customerName) + '</p>' +
+            '<span class="text-[10px] text-gray-500 shrink-0">' + chatTime(c.lastAt) + '</span>' +
+          '</div>' +
+          (contact ? '<p class="text-[11px] text-gray-400 mt-0.5">' + contact + '</p>' : '') +
+          '<div class="flex items-center justify-between gap-2 mt-1">' +
+            '<p class="text-[11px] text-gray-400 truncate">' + (c.lastSender === 'admin' ? '→ ' : '') + chatEsc(c.lastMessage) + '</p>' +
+            (c.unread > 0 ? '<span class="shrink-0 min-w-[20px] h-5 px-1 rounded-full bg-red-600 text-white text-[10px] font-black flex items-center justify-center">' + c.unread + '</span>' : '') +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    async function openChatConv(id) {
+      chatOpenConv = chatConvs.find(c => c.id === id) || null;
+      if (!chatOpenConv) return;
+      document.getElementById('chatListView').classList.add('hidden');
+      const tv = document.getElementById('chatThreadView');
+      tv.classList.remove('hidden');
+      document.getElementById('chatBackBtn').classList.remove('hidden');
+      document.getElementById('chatTitle').textContent = '💬 ' + chatOpenConv.customerName;
+      document.getElementById('chatMsgs').innerHTML = '<p class="text-center text-gray-500 text-xs py-6">Loading…</p>';
+      await fetch(API + '/dashboard/chats/' + id + '/seen', { method: 'POST' }).catch(() => {});
+      await pollChatMsgs(true);
+    }
+
+    async function pollChatMsgs(first) {
+      if (!chatOpenConv) return;
+      try {
+        const msgs = await (await fetch(API + '/dashboard/chats/' + chatOpenConv.id + '/messages?after=0', { signal: AbortSignal.timeout(10000) })).json();
+        const box = document.getElementById('chatMsgs');
+        const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 40;
+        box.innerHTML = msgs.map(m => {
+          const mine = m.sender === 'admin';
+          return '<div class="flex ' + (mine ? 'justify-end' : 'justify-start') + '">' +
+            '<div class="max-w-[80%] rounded-2xl px-3 py-2 ' + (mine ? 'bg-[#7c5ce6] text-white' : 'bg-[#181848] text-gray-200') + '">' +
+              '<p class="text-sm whitespace-pre-wrap break-words">' + chatEsc(m.message) + '</p>' +
+              '<p class="text-[9px] mt-1 ' + (mine ? 'text-white/70' : 'text-gray-500') + '">' + (mine ? '👤 ' + chatEsc(m.replyBy || 'Admin') + ' · ' : '') + chatTime(m.createdAt) + '</p>' +
+            '</div></div>';
+        }).join('') || '<p class="text-center text-gray-500 text-xs py-6">Wala pang mensahe.</p>';
+        if (first || atBottom) box.scrollTop = box.scrollHeight;
+      } catch (e) {}
+    }
+
+    async function sendChatReply() {
+      const inp = document.getElementById('chatReplyInput');
+      const msg = (inp.value || '').trim();
+      if (!msg || !chatOpenConv) return;
+      const replyBy = (session && (session.fullName || session.username)) || 'Mobile';
+      inp.value = '';
+      try {
+        const r = await fetch(API + '/dashboard/chats/' + chatOpenConv.id + '/reply', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg, replyBy })
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || 'Failed');
+        await pollChatMsgs();
+      } catch (e) { toast('Chat send failed: ' + e.message, 'error'); inp.value = msg; }
+    }
+
+    setInterval(chatUnreadPoll, 10000);
+    setTimeout(chatUnreadPoll, 2500);
   </script>
 </body>
 </html>

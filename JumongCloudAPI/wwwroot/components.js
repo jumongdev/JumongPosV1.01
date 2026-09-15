@@ -1017,7 +1017,7 @@ Alpine.store('app', {
   /* ΓöÇΓöÇ Customers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 Alpine.data('customersList', () => ({
     d: [], loading: true, orders: [], ordersOpen: false, ordersName: '', ordersLoading: false, ptsFilter: 'star',
-    showInactive: false, deactivating: false,
+    showInactive: false, deactivating: false, ptsSummary: null,
     phoneOpen: false, phoneTarget: null, phoneInput: '', phoneSaving: false,
     upOpen: false, upTarget: null, upInput: '', upList: [], upSaving: false,
     async init() { window.addEventListener('load-customers', () => this.load()); await this.load() },
@@ -1025,6 +1025,10 @@ Alpine.data('customersList', () => ({
       this.loading = true;
       try { this.d = await fetchJSON(API + '/customers?' + Alpine.store('app').storeParam.replace('&', '')) } catch (e) { this.d = [] }
       this.loading = false;
+      this.loadPtsSummary();
+    },
+    async loadPtsSummary() {
+      try { this.ptsSummary = await fetchJSON(API + '/customers/points-summary') } catch (e) { this.ptsSummary = null }
     },
     setPtsFilter(f) { this.ptsFilter = f; },
     _act(x) { return x.isActive !== false; },
@@ -1040,7 +1044,7 @@ Alpine.data('customersList', () => ({
       return base;
     },
     async deactivateNonStar() {
-      if (!confirm('I-DEACTIVATE ang LAHAT ng customer na walang ⭐ (hindi naka-register sa e-commerce)?\n\nPara sa mga may credit balance, may "↩️ BALIK" para ma-restore.')) return;
+      if (!confirm('I-DEACTIVATE ang LAHAT ng customer na walang ⭐ (hindi naka-register sa e-commerce)?\n\nI-ZERO din ang points nila (testing/manual lang ang mga ito).\n\nPara sa mga may credit balance, may "↩️ BALIK" para ma-restore.')) return;
       this.deactivating = true;
       try {
         const r = await fetchJSON(API + '/customers/deactivate-non-star', { method: 'POST' });

@@ -85,27 +85,16 @@ public class CustomerService
 
     public static string? Save(Customer c, string modifiedBy = "")
     {
+        // ONE RULE (v1.1.82): ang mga customer ay sa E-COMMERCE (Google) registration lang ginagawa.
+        // Ang POS ay HINDI na pwedeng gumawa ng bagong customer — UPDATE lang sa existing.
+        if (c.Id == 0)
+            return "Hindi na pwedeng gumawa ng customer sa POS. Ang mga customer ay sa e-commerce (shop) registration lang — i-link ng Google account.";
+
         if (!string.IsNullOrEmpty(c.Phone) && IsPhoneTaken(c.Phone, c.Id))
             return $"Phone number '{c.Phone}' already exists for another customer.";
 
         using var conn = DatabaseHelper.GetConnection();
         conn.Open();
-        if (c.Id == 0)
-        {
-            var sql = "INSERT INTO Customers (Name, Phone, Email, Address, CreditLimit, IsActive, ModifiedBy) VALUES (@n, @p, @e, @a, @cl, @act, @mb)";
-            using var cmd = new SQLiteCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@n", c.Name);
-            cmd.Parameters.AddWithValue("@p", c.Phone);
-            cmd.Parameters.AddWithValue("@e", c.Email);
-            cmd.Parameters.AddWithValue("@a", c.Address);
-            cmd.Parameters.AddWithValue("@cl", c.CreditLimit);
-            cmd.Parameters.AddWithValue("@act", c.IsActive ? 1 : 0);
-            cmd.Parameters.AddWithValue("@mb", modifiedBy);
-            cmd.ExecuteNonQuery();
-            using var idCmd = new SQLiteCommand("SELECT last_insert_rowid()", conn);
-            c.Id = Convert.ToInt32(idCmd.ExecuteScalar());
-        }
-        else
         {
             var sql = "UPDATE Customers SET Name=@n, Phone=@p, Email=@e, Address=@a, CreditLimit=@cl, IsActive=@act, ModifiedBy=@mb WHERE Id=@id";
             using var cmd = new SQLiteCommand(sql, conn);

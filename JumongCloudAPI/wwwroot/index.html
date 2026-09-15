@@ -881,9 +881,29 @@ tailwind.config = {
                     <div class="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 rounded-xl p-3">
                       <div class="text-[10px] uppercase tracking-wider text-gray-500 dark:text-[#7878aa] font-bold">Zero-Cost Items</div>
                       <div class="text-lg font-bold" :class="total.zeroCostItems > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-600 dark:text-gray-300'" x-text="fmtInt(total.zeroCostItems)"></div>
-                    </div>
-                  </div>
-                  <div class="overflow-x-auto">
+            </div>
+          </div>
+          <!-- ⭐ POINTS LIABILITY (LIVE): 1 pt = ₱1 — ito ang halagang dapat i-set aside sa bank -->
+          <div class="px-4 py-2.5 border-b border-gray-100 dark:border-[#222255] bg-amber-50 dark:bg-amber-900/10 flex items-center justify-between gap-3 flex-wrap">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-[10px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">⭐ Points Liability (LIVE)</span>
+              <template x-if="ptsSummary">
+                <span class="text-sm font-black text-amber-600 dark:text-amber-400">
+                  <span x-text="ptsSummary.activePoints.toLocaleString()"></span> pts
+                  <span class="text-gray-400 dark:text-[#7878aa] font-bold mx-1">·</span>
+                  &#8369;<span x-text="fmt(ptsSummary.value)"></span>
+                  <span class="text-gray-400 dark:text-[#7878aa] font-bold mx-1">·</span>
+                  <span class="text-[11px] font-bold text-gray-500 dark:text-[#7878aa]"><span x-text="ptsSummary.activeCustomers"></span> customers</span>
+                </span>
+              </template>
+              <template x-if="!ptsSummary"><span class="text-xs text-gray-400">…</span></template>
+              <template x-if="ptsSummary && ptsSummary.inactivePoints > 0">
+                <span class="text-[10px] text-gray-400 dark:text-[#5a5a8a]">(may <span x-text="ptsSummary.inactivePoints.toLocaleString()"></span> pts sa inactive/manual)</span>
+              </template>
+            </div>
+            <span class="text-[10px] text-gray-500 dark:text-[#7878aa]">1 pt = &#8369;1 — i-set aside sa bank ang halagang ito</span>
+          </div>
+          <div class="overflow-x-auto">
                     <table class="w-full text-xs">
                       <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
                         <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Store</th>
@@ -4343,8 +4363,8 @@ tailwind.config = {
 
   </div><!-- /main content -->
 
-  <script src="components.js?v=20260912a"></script>
-  <script src="app.js?v=20260912a"></script>
+  <script src="components.js?v=20260914a"></script>
+  <script src="app.js?v=20260914a"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script>
   /* ── Web login gating (username + PIN, WEB ACCESS only) ── */

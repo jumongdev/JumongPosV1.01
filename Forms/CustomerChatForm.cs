@@ -26,6 +26,7 @@ public class CustomerChatForm : Form
     private List<CloudChatMessage> _msgs = new();
     private long _lastMsgId;
     private bool _busy;
+    private readonly ToolTip _tip = new();
 
     private static Color CHeaderBg => ThemeManager.Current.StatusBlueMid;
     private static Color CHeaderText => Color.White;
@@ -62,8 +63,15 @@ public class CustomerChatForm : Form
         Controls.Add(pnlHeader);
 
         // Split: conversations (left) + thread (right)
-        var split = new SplitContainer { Dock = DockStyle.Fill, SplitterDistance = 330, FixedPanel = FixedPanel.Panel1, BackColor = CSurface };
+        // GOTCHA (2026-09-14): ang SplitterDistance sa object initializer ay naka-clamp sa maliit na
+        // default size (bago pa ma-parent ang control) → + FixedPanel.Panel1 = permanenteng napiit ang
+        // list column (~150px). I-set lang pagkatapos ma-add at mag-layout (Shown) sa totoong width.
+        var split = new SplitContainer { Dock = DockStyle.Fill, Panel1MinSize = 320, FixedPanel = FixedPanel.Panel1, BackColor = CSurface };
         Controls.Add(split);
+        Shown += (_, _) =>
+        {
+            if (split.Width > 420) split.SplitterDistance = 420;
+        };
 
         // LEFT: conversation list (dock order: fill first, top last — reverse z-order layout)
         var pnlConv = new Panel { Dock = DockStyle.Fill, BackColor = CSurface };
@@ -110,7 +118,7 @@ public class CustomerChatForm : Form
         pnlComposer.Controls.AddRange(new Control[] { sepTop, _txtReply, _btnSend });
         _pnlThread.Controls.Add(pnlComposer);
         var pnlThreadHeader = new Panel { Dock = DockStyle.Top, Height = 52, BackColor = CViolet };
-        _lblThreadInfo = new Label { Text = "Pumili ng customer sa kaliwa", Font = new Font("Segoe UI", 9.5F), ForeColor = Color.White, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(14, 0, 0, 0) };
+        _lblThreadInfo = new Label { Text = "Pumili ng customer sa kaliwa", Font = new Font("Segoe UI", 9.5F), ForeColor = Color.White, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(14, 0, 0, 0), AutoEllipsis = true };
         pnlThreadHeader.Controls.Add(_lblThreadInfo);
         _pnlThread.Controls.Add(pnlThreadHeader);
         split.Panel2.Controls.Add(_pnlThread);
@@ -179,7 +187,7 @@ public class CustomerChatForm : Form
         var card = new Panel
         {
             Width = Math.Max(260, width),
-            Height = 88,
+            Height = 96,
             BackColor = selected ? Color.FromArgb(124, 92, 230) : CCard,
             Cursor = Cursors.Hand,
             Tag = c
@@ -193,15 +201,33 @@ public class CustomerChatForm : Form
         var fg = selected ? Color.White : CText;
         var fgSub = selected ? Color.FromArgb(235, 230, 255) : CTextMuted;
         var timeStr = c.LastAt.HasValue ? c.LastAt.Value.ToLocalTime().ToString("MM/dd HH:mm") : "";
-        var lblName = new Label { Text = c.CustomerName, Font = new Font("Segoe UI", 9.5F, FontStyle.Bold), ForeColor = fg, AutoSize = false, Location = new Point(10, 6), Size = new Size(width - 92, 18) };
-        var lblTime = new Label { Text = timeStr, Font = new Font("Segoe UI", 7.5F), ForeColor = fgSub, AutoSize = false, Location = new Point(width - 74, 8), Size = new Size(64, 14), TextAlign = ContentAlignment.MiddleRight };
+        // NAME FIX (2026-09-12 v2): AutoSize + MaximumSize = TALAGANG nag-wrap (gaya ng message bubbles).
+        // Ang Label na AutoSize=false ay HINDI nag-wrap — napi-putol pa rin ang mahabang pangalan.
+        var nameMaxW = width - 92;
+        var lblName = new Label
+        {
+            Text = c.CustomerName,
+            Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+            ForeColor = fg,
+            AutoSize = true,
+            MaximumSize = new Size(nameMaxW, 0),
+            Location = new Point(10, 4),
+            UseMnemonic = false
+        };
+        var nameSize = lblName.GetPreferredSize(new Size(nameMaxW, 0));
+        lblName.Size = nameSize;
+        var nameH = nameSize.Height;
+        card.Height = Math.Max(74, nameH + 54);
+        _tip.SetToolTip(lblName, c.CustomerName + (string.IsNullOrEmpty(c.Phone) ? "" : "\n📞 " + c.Phone));
+        _tip.SetToolTip(card, c.CustomerName);
+        var lblTime = new Label { Text = timeStr, Font = new Font("Segoe UI", 7.5F), ForeColor = fgSub, AutoSize = false, Location = new Point(width - 74, 6), Size = new Size(64, 14), TextAlign = ContentAlignment.MiddleRight };
         var contact = $"\U0001F4DE {(string.IsNullOrEmpty(c.Phone) ? "—" : c.Phone)}";
         if (!string.IsNullOrEmpty(c.Subdivision) || !string.IsNullOrEmpty(c.Block))
             contact += $"  \U0001F3D8\ufe0f {(string.IsNullOrEmpty(c.Subdivision) ? $"Blk {c.Block} Lot {c.Lot}" : c.Subdivision)}";
-        var lblContact = new Label { Text = contact, Font = new Font("Segoe UI", 8F), ForeColor = fgSub, AutoSize = false, Location = new Point(10, 26), Size = new Size(width - 20, 16) };
+        var lblContact = new Label { Text = contact, Font = new Font("Segoe UI", 8F), ForeColor = fgSub, AutoSize = false, Location = new Point(10, 4 + nameH + 6), Size = new Size(width - 20, 16) };
         var last = (c.LastSender == "admin" ? "→ " : "") + c.LastMessage;
-        var lblLast = new Label { Text = last, Font = new Font("Segoe UI", 8.5F), ForeColor = fgSub, AutoSize = false, Location = new Point(10, 48), Size = new Size(width - (c.Unread > 0 ? 46 : 20), 16) };
-        var lblBadge = new Label { Text = c.Unread > 0 ? c.Unread.ToString() : "", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.White, BackColor = CRedBadge, AutoSize = false, TextAlign = ContentAlignment.MiddleCenter, Location = new Point(width - 34, 50), Size = new Size(24, 16), Visible = c.Unread > 0 };
+        var lblLast = new Label { Text = last, Font = new Font("Segoe UI", 8.5F), ForeColor = fgSub, AutoSize = false, Location = new Point(10, 4 + nameH + 26), Size = new Size(width - (c.Unread > 0 ? 46 : 20), 16) };
+        var lblBadge = new Label { Text = c.Unread > 0 ? c.Unread.ToString() : "", Font = new Font("Segoe UI", 8F, FontStyle.Bold), ForeColor = Color.White, BackColor = CRedBadge, AutoSize = false, TextAlign = ContentAlignment.MiddleCenter, Location = new Point(width - 34, 4 + nameH + 26), Size = new Size(24, 16), Visible = c.Unread > 0 };
         card.Controls.AddRange(new Control[] { lblName, lblTime, lblContact, lblLast, lblBadge });
         card.Click += (_, _) => OpenConversation(c);
         foreach (Control ch in card.Controls) ch.Click += (_, _) => OpenConversation(c);
@@ -220,6 +246,7 @@ public class CustomerChatForm : Form
         if (!string.IsNullOrEmpty(c.Address)) info += $"   • {c.Address}";
         _lblThreadInfo.Text = info;
         _lblThreadInfo.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        _tip.SetToolTip(_lblThreadInfo, info);
         RenderMsgs();
         if (_msgs.Any(m => m.Sender == "customer" && !m.SeenByAdmin))
             await SyncService.MarkChatSeenAsync(c.Id);
@@ -285,11 +312,13 @@ public class CustomerChatForm : Form
             ForeColor = isMine ? Color.FromArgb(230, 225, 255) : CTextHint,
             BackColor = bubbleBg,
             AutoSize = true,
+            MaximumSize = new Size(maxTextW, 0),
             Location = new Point(pad, 6 + textSize.Height + 2)
         };
         var metaSize = lblMeta.GetPreferredSize(new Size(maxTextW, 0));
+        lblMeta.Size = metaSize;
 
-        var w = Math.Min(maxTextW, textSize.Width) + pad * 2 + 4;
+        var w = Math.Min(maxTextW, Math.Max(textSize.Width, metaSize.Width)) + pad * 2 + 4;
         var h = 6 + textSize.Height + 2 + metaSize.Height + 6;
         var panel = new Panel { Width = Math.Max(60, w), Height = Math.Max(30, h) };
 

@@ -65,85 +65,9 @@ public partial class CustomersForm : Form
         lblMetricPoints.Text = $"POINTS: {totalPoints:N0}";
     }
 
-    private void btnSave_Click(object? sender, EventArgs e)
-    {
-        var name = txtName.Text.Trim();
-        var phone = txtPhone.Text.Trim();
-        var email = txtEmail.Text.Trim();
-        var address = txtAddress.Text.Trim();
-
-        if (string.IsNullOrEmpty(name))
-        {
-            ShowValidationAlert("Customer name is required.");
-            txtName.Focus();
-            return;
-        }
-        if (name.Length < 2)
-        {
-            ShowValidationAlert("Customer name must be at least 2 characters.");
-            txtName.Focus();
-            return;
-        }
-        if (!string.IsNullOrEmpty(phone) && !IsValidPhone(phone))
-        {
-            ShowValidationAlert("Phone number must contain only digits, spaces, hyphens, or + sign.");
-            txtPhone.Focus();
-            return;
-        }
-
-        var c = _selected ?? new Customer();
-        c.Name = name;
-        c.Phone = phone;
-        c.Email = email;
-        c.Address = address;
-        c.CreditLimit = decimal.TryParse(txtCreditLimit.Text, out var cl) ? cl : 0;
-        c.IsActive = chkActive.Checked;
-
-        var modifiedBy = _currentUser != null && !string.IsNullOrEmpty(_currentUser.FullName)
-            ? _currentUser.FullName : _currentUser?.Username ?? "";
-        var error = CustomerService.Save(c, modifiedBy);
-        if (error != null)
-        {
-            ShowValidationAlert(error);
-            return;
-        }
-
-        LoadCustomers(txtSearch.Text.Trim());
-        ClearForm();
-        ShowSuccessAlert(_selected != null ? "Customer updated successfully." : "Customer created successfully.");
-    }
-
-    private bool IsValidPhone(string phone)
-    {
-        foreach (var ch in phone)
-        {
-            if (!char.IsDigit(ch) && ch != ' ' && ch != '-' && ch != '+' && ch != '(' && ch != ')')
-                return false;
-        }
-        return true;
-    }
-
     private void ShowValidationAlert(string message)
     {
         MessageBox.Show(message, "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-    }
-
-    private void ShowSuccessAlert(string message)
-    {
-        MessageBox.Show(message, "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-    }
-
-    private void ClearForm()
-    {
-        _selected = null;
-        txtName.Clear();
-        txtPhone.Clear();
-        txtEmail.Clear();
-        txtAddress.Clear();
-        txtCreditLimit.Clear();
-        chkActive.Checked = true;
-        lblFormTitle.Text = "NEW CUSTOMER";
-        lblFormTitle.ForeColor = ThemeManager.Current.AccentCyan;
     }
 
     private void InitializeComponent()
@@ -201,28 +125,7 @@ public partial class CustomersForm : Form
             TextAlign = ContentAlignment.MiddleRight
         };
 
-        var btnClean = new Button
-        {
-            Text = "\u267B CLEAN DUPES",
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            Location = new Point(720, 12),
-            Size = new Size(120, 28),
-            FlatStyle = FlatStyle.Flat,
-            FlatAppearance = { BorderSize = 0 },
-            BackColor = t.AccentOrange,
-            ForeColor = Color.White,
-            Cursor = Cursors.Hand,
-            Visible = _currentUser?.Role == "Admin"
-        };
-        btnClean.Click += (_, _) =>
-        {
-            if (MessageBox.Show("Delete duplicate customers (same name + phone) with 0 points?", "Clean Duplicates", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-            var deleted = CustomerService.RemoveDuplicatesNoPoints();
-            MessageBox.Show($"{deleted} duplicate(s) removed.", "Done", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            LoadCustomers(txtSearch.Text.Trim());
-        };
-
-        pnlToolbar.Controls.AddRange(new Control[] { lblPageTitle, lblSearchIcon, txtSearch, btnClean });
+        pnlToolbar.Controls.AddRange(new Control[] { lblPageTitle, lblSearchIcon, txtSearch });
 
         // ── METRICS BAR ──
         var pnlMetrics = new Panel
@@ -319,7 +222,7 @@ public partial class CustomersForm : Form
 
         lblFormTitle = new Label
         {
-            Text = "NEW CUSTOMER",
+            Text = "CUSTOMER DETAILS (VIEW-ONLY)",
             Font = new Font("Segoe UI", 11F, FontStyle.Bold),
             ForeColor = t.AccentCyan,
             Location = new Point(15, 10),
@@ -351,7 +254,8 @@ public partial class CustomersForm : Form
             BackColor = t.InputBg,
             ForeColor = t.InputFg,
             Font = new Font("Segoe UI", 10F),
-            TextAlign = HorizontalAlignment.Right
+            TextAlign = HorizontalAlignment.Right,
+            ReadOnly = true
         };
         var lblCredHint = new Label
         {
@@ -371,49 +275,30 @@ public partial class CustomersForm : Form
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
             ForeColor = t.InputFg,
             Location = new Point(15, y),
-            Size = new Size(200, 20)
+            Size = new Size(200, 20),
+            Enabled = false
         };
         pnlRight.Controls.Add(chkActive);
         y += 28;
 
-        // Buttons
-        var btnNew = new Button
+        // Buttons — VIEW-ONLY since v1.1.82: customers are created via E-COMMERCE registration lang.
+        // Manual create/edit/delete ay REMOVED na (One Rule: lahat ng customer galing sa e-commerce).
+        var lblReadOnlyNote = new Label
         {
-            Text = "+ NEW",
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            Text = "🔒 Read-only — ang mga customer ay sa e-commerce registration lang ginagawa.\n\n(1 pt = ₱1; redeemable points ang ipapakita)",
+            Font = new Font("Segoe UI", 8F),
+            ForeColor = t.TextMuted,
             Location = new Point(15, y),
-            Size = new Size(95, 34),
-            FlatStyle = FlatStyle.Flat,
-            FlatAppearance = { BorderSize = 0 },
-            BackColor = t.AccentBlue,
-            ForeColor = Color.White,
-            Cursor = Cursors.Hand
+            Size = new Size(310, 44),
+            TextAlign = ContentAlignment.MiddleLeft
         };
-        btnNew.Click += (_, _) =>
-        {
-            ClearForm();
-            txtName.Focus();
-        };
-
-        btnSave = new Button
-        {
-            Text = "\u2714 SAVE",
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            Location = new Point(115, y),
-            Size = new Size(100, 34),
-            FlatStyle = FlatStyle.Flat,
-            FlatAppearance = { BorderSize = 0 },
-            BackColor = t.AccentGreen,
-            ForeColor = Color.White,
-            Cursor = Cursors.Hand
-        };
-        btnSave.Click += btnSave_Click;
+        y += 52;
 
         var btnCreditHistory = new Button
         {
             Text = "\uD83D\uDCCB CREDIT HISTORY",
             Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-            Location = new Point(15, y + 40),
+            Location = new Point(15, y),
             Size = new Size(200, 34),
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
@@ -435,7 +320,7 @@ public partial class CustomersForm : Form
         {
             Text = "\uD83D\uDED2 PURCHASE HISTORY",
             Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-            Location = new Point(15, y + 80),
+            Location = new Point(15, y + 40),
             Size = new Size(200, 34),
             FlatStyle = FlatStyle.Flat,
             FlatAppearance = { BorderSize = 0 },
@@ -453,21 +338,7 @@ public partial class CustomersForm : Form
             ShowPurchaseHistory(_selected);
         };
 
-        var btnDelete = new Button
-        {
-            Text = "\u2716 DELETE",
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            Location = new Point(15, y + 160),
-            Size = new Size(200, 34),
-            FlatStyle = FlatStyle.Flat,
-            FlatAppearance = { BorderSize = 0 },
-            BackColor = t.AccentRed,
-            ForeColor = Color.White,
-            Cursor = Cursors.Hand
-        };
-        btnDelete.Click += BtnDelete_Click;
-
-        pnlRight.Controls.AddRange(new Control[] { lblFormTitle, btnNew, btnSave, btnCreditHistory, btnPurchaseHistory, btnDelete });
+        pnlRight.Controls.AddRange(new Control[] { lblFormTitle, lblReadOnlyNote, btnCreditHistory, btnPurchaseHistory });
 
         pnlMain.Controls.AddRange(new Control[] { pnlLeft, pnlRight });
         Controls.Clear();
@@ -508,7 +379,8 @@ public partial class CustomersForm : Form
             BorderStyle = BorderStyle.FixedSingle,
             BackColor = inputBg,
             ForeColor = inputFg,
-            Font = new Font("Segoe UI", 10F)
+            Font = new Font("Segoe UI", 10F),
+            ReadOnly = true
         };
         parent.Controls.AddRange(new Control[] { lbl, box });
         y += 48;
@@ -557,34 +429,6 @@ public partial class CustomersForm : Form
             return;
         }
         ShowPurchaseHistory(c);
-    }
-
-    private void BtnDelete_Click(object? sender, EventArgs e)
-    {
-        if (dgvCustomers.CurrentRow?.DataBoundItem is not Customer c)
-        {
-            ShowValidationAlert("Select a customer first.");
-            return;
-        }
-
-        if (c.CreditBalance > 0)
-        {
-            MessageBox.Show($"Cannot delete '{c.Name}' — outstanding credit balance of \u20b1{c.CreditBalance:N2}. Settle the balance first.", "Delete Blocked", MessageBoxButtons.OK, MessageBoxIcon.Stop);
-            return;
-        }
-        if (c.LoyaltyPoints > 0)
-        {
-            MessageBox.Show($"Cannot delete '{c.Name}' — they have {c.LoyaltyPoints} loyalty points on record.", "Delete Blocked", MessageBoxButtons.OK, MessageBoxIcon.Stop);
-            return;
-        }
-
-        if (MessageBox.Show($"Delete customer '{c.Name}'? This cannot be undone.", "Confirm Delete — Step 1", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-        if (MessageBox.Show($"Really delete '{c.Name}'? This is final.", "Confirm Delete — Step 2", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
-
-        CustomerService.Delete(c.Id);
-        LoadCustomers(txtSearch.Text.Trim());
-        ClearForm();
-        ShowSuccessAlert($"Customer '{c.Name}' has been deleted.");
     }
 
     private void ShowCreditHistory(Customer customer)
@@ -886,7 +730,6 @@ public partial class CustomersForm : Form
     private TextBox txtSearch = null!;
     private DataGridView dgvCustomers = null!;
     private TextBox txtName = null!, txtPhone = null!, txtEmail = null!, txtAddress = null!, txtCreditLimit = null!;
-    private Button btnSave = null!;
     private Label lblFormTitle = null!;
     private Label lblMetricTotal = null!, lblMetricCredit = null!, lblMetricDebtors = null!, lblMetricPoints = null!;
     private CheckBox chkActive = null!;

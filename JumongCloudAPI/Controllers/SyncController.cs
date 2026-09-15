@@ -45,10 +45,47 @@ public class SyncController : ControllerBase
     [HttpPost("customers")]
     public IActionResult SyncCustomers([FromBody] List<JsonElement> items)
     {
-        return SyncTable("customers", items, new[] { "pos_id", "name", "phone", "email", "loyalty_points", "is_active", "credit_balance", "credit_limit", "address", "created_at", "modified_by" },
-            "INSERT INTO customers (pos_id, name, phone, email, loyalty_points, is_active, credit_balance, credit_limit, address, created_at, modified_by, synced_at) " +
-            "VALUES (@p0,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,NOW()) " +
-            "ON CONFLICT (name) DO UPDATE SET pos_id=@p0, phone=@p2, email=@p3, loyalty_points=@p4, is_active=@p5, credit_balance=@p6, credit_limit=@p7, address=@p8, modified_by=@p10, synced_at=NOW()", "");
+        // ONE RULE (v1.1.82): ang cloud customers ay sa E-COMMERCE (Google) registration lang ginagawa.
+        // Ang POS sync ay UPDATE-ONLY sa existing na may google_sub — NEVER INSERT. Kaya kahit lumang
+        // POS build ang mag-push, hindi makakagawa ng manual customer sa cloud.
+        try
+        {
+            using var conn = Data.PgDatabaseHelper.GetConnection();
+            var updated = 0; var skipped = 0;
+            foreach (var item in items)
+            {
+                var name = item.TryGetProperty("name", out var nEl) ? nEl.GetString() ?? "" : "";
+                if (string.IsNullOrEmpty(name)) { skipped++; continue; }
+
+                int posId = item.TryGetProperty("pos_id", out var pEl) && pEl.ValueKind == JsonValueKind.Number ? pEl.GetInt32() : 0;
+                var phone = item.TryGetProperty("phone", out var phEl) ? phEl.GetString() ?? "" : "";
+                var email = item.TryGetProperty("email", out var eEl) ? eEl.GetString() ?? "" : "";
+                var points = item.TryGetProperty("loyalty_points", out var lpEl) && lpEl.ValueKind == JsonValueKind.Number ? lpEl.GetInt32() : 0;
+                var isActive = !(item.TryGetProperty("is_active", out var iaEl) && iaEl.ValueKind == JsonValueKind.False);
+                var creditBalance = item.TryGetProperty("credit_balance", out var cbEl) && cbEl.ValueKind == JsonValueKind.Number ? cbEl.GetDecimal() : 0m;
+                var creditLimit = item.TryGetProperty("credit_limit", out var clEl) && clEl.ValueKind == JsonValueKind.Number ? clEl.GetDecimal() : 0m;
+                var address = item.TryGetProperty("address", out var aEl) ? aEl.GetString() ?? "" : "";
+                var modifiedBy = item.TryGetProperty("modified_by", out var mbEl) ? mbEl.GetString() ?? "" : "";
+
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"UPDATE customers SET pos_id=@p0, phone=@p2, email=@p3, loyalty_points=@p4, is_active=@p5,
+                    credit_balance=@p6, credit_limit=@p7, address=@p8, modified_by=@p10, synced_at=NOW()
+                    WHERE name = @name AND COALESCE(google_sub,'') <> ''";
+                cmd.Parameters.AddWithValue("p0", posId);
+                cmd.Parameters.AddWithValue("p2", phone);
+                cmd.Parameters.AddWithValue("p3", email);
+                cmd.Parameters.AddWithValue("p4", points);
+                cmd.Parameters.AddWithValue("p5", isActive);
+                cmd.Parameters.AddWithValue("p6", creditBalance);
+                cmd.Parameters.AddWithValue("p7", creditLimit);
+                cmd.Parameters.AddWithValue("p8", address);
+                cmd.Parameters.AddWithValue("p10", modifiedBy);
+                cmd.Parameters.AddWithValue("name", name);
+                if (cmd.ExecuteNonQuery() > 0) updated++; else skipped++;
+            }
+            return Ok(new { ok = true, updated, skipped });
+        }
+        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
     }
 
     [HttpPost("users")]

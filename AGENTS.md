@@ -5,8 +5,9 @@
 > Huwag na magdagdag ng session logs dito - ilagay sa CHANGELOG.md. May format ito:
 > "## Latest Change (YYYY-MM-DD) - one-line summary" + detail, lagi sa ITAAS ng CHANGELOG.md.
 
-## Quick Status (2026-09-05)
-- POS client: 1.1.78 (Services/AppVersion.cs) | Cloud API constant: 1.1.74 | latestVer: 1.1.78 (DashboardController.cs) — lahat ng 4 stores updated via agents (exe swap)
+## Quick Status (2026-09-14)
+- POS client: **1.1.82** (Services/AppVersion.cs) | Cloud API constant: 1.1.75 | latestVer: **1.1.82** (DashboardController.cs) — v1.1.82 released 2026-09-14: **ONE RULE — customers ay sa E-COMMERCE (Google) registration lang**: POS CustomersForm view-only, CustomerService.Save update-only, cloud SyncCustomers never-insert (google_sub lang ang update), Google login **linking** (email→name) para walang "Name 2"; manual accounts (350) lahat **inactive + 0 points** (walang delete — safe references); dashboard Customers panel may **⭐ POINTS LIABILITY (LIVE)** strip (`/customers/points-summary`, 1 pt = ₱1) para ma-set aside sa bank; CustomerChatForm fix (AutoSize+MaximumSize name wrap + debug label `#if DEBUG` — tanggal ang "CustomerChatForm" overlay sa SEND).
+- **v1.1.82 rollout (checked 2026-09-16 via agent status):** HQ ✅ 1.1.82, HVR ✅ 1.1.82; **Naic + ACGS nasa 1.1.80 pa** (outdated) — i-tap ang UPDATE APP sa dalawang store.
 - **E-COMMERCE IN-APP CHAT (live, WALANG AI — real person):** customer ↔ shop app `💬` bubble (member only) ↔ **dashboard sidebar 💬 Customer Chat** (admin) ↔ **HQ POS `💬 CHAT` button** (cashier on duty, HQ store lang; cashier name naka-save sa `reply_by`, HINDI ipinapakita sa customer). Tables: `shop_chat_conversations` + `shop_chat_messages` (seen_by_admin/customer, reply_by). Conv card: 📞 phone + 🏘️ default subdivision (block/lot) mula sa customers + customer_addresses.
 - **Dashboard ➖ DEDUCT STOCK tool** (sidebar POS CLIENT group): per-store stock deduction via agents na may remark (`Adjustment: <remark>` trail, UserName 'Dashboard'); 📦 live stock chips per store; 🕘 HISTORY panel (GET /adjust-log — cloud stock_trails `Adjustment:%`).
 - **🏦 CHECKS app (EastWest + RCBC):** dashboard POS CLIENT → Checks — record (bank dropdown, check no, DUE date, payee=Suppliers, amount, auto words) + print sa **HP Smart Tank** via server (`/api/checks`, `CheckPrintService`); **per-bank** `check_template` calibration (⚙️ Print Position Settings + TEST PRINT) + **record block sa ibaba ng check** (date created/bank/check no/payee/amount/words/due date/agent/contact + signature) sa visible bond paper ng carrier; tables `checks` + `check_template`; GOTCHA: maliit na check (6.25×2.75") = PaperOut sa HP → **A4 carrier sheet** (check taped flush top-left, paper size A4).
@@ -52,7 +53,7 @@ C:\dev\JumongPosV1.01\          # DEV PC repo (primary). Server keeps a read-onl
 │   ├── ExpenseService.cs       # Expense CRUD
 │   ├── DataExporter.cs         # Import/Export JSON
 │   ├── MigrationService.cs     # Old DB migration tool
-│       ├── AppVersion.cs           # Current = "1.0.90"
+│   ├── AppVersion.cs           # Current = "1.1.82"
 │   └── ... (PrinterService, EmailService, etc.)
 ├── Forms/
 │   ├── MainForm.cs             # Sidebar navigation (POS, Products, Reports, Settings...)
@@ -74,31 +75,7 @@ C:\dev\JumongPosV1.01\          # DEV PC repo (primary). Server keeps a read-onl
 │   ├── wwwroot/
 │   │   └── index.html              # Cloud dashboard (admin.jumongdev.com)
 │   └── Dockerfile
-└── publish/
-    ├── v1.0.19/  (exe)
-    ├── v1.0.20/  (exe)
-    ├── v1.0.21/  (exe)
-    ├── v1.0.22/  (exe)
-    ├── v1.0.23/  (exe)
-    ├── v1.0.24/  (exe)
-    ├── v1.0.26/  (exe)
-    ├── v1.0.27/  (exe)
-    ├── v1.0.28/  (exe)
-    ├── v1.0.29/  (exe)
-    ├── v1.0.30/  (exe)
-    ├── v1.0.31/  (exe)
-    ├── v1.0.32/  (exe)
-    ├── v1.0.33/  (exe)
-    ├── v1.0.34/  (exe)
-    ├── v1.0.35/  (exe)
-    ├── v1.0.36/  (exe)
-    ├── v1.0.44/  (exe)
-    ├── v1.0.45/  (exe)
-    ├── v1.0.52/  (exe)
-    ├── v1.0.53/  (exe)
-    ├── v1.0.54/  (exe)
-    ├── v1.0.73/  (exe)
-    └── client/   (exe) — latest build at C:\JumongAPI\client\
+└── (walang publish/ folder sa dev repo — latest client build ay C:\dev\out\client\, store drop ay C:\JumongAPI\client\ sa server)
 ```
 
 ## Tech Stack
@@ -175,7 +152,7 @@ Both machines can remote into each other over WinRM (LAN only). **The dev PC is 
 
 > **HQ WinRM setup (2026-08-15, via agent + one UAC click):** HQ's firewall blocked ALL inbound (no WinRM/SMB/RDP; UAC enabled → the agent's PowerShell runs with a FILTERED token, so even `netsh`/`net user`/`schtasks /rl highest` fail silently with "Access is denied"). Fix applied by (1) writing `lanfix.ps1` to HQ via agent `writefile`, (2) agent `ps`: `Start-Process powershell -Verb RunAs` → staff clicked Yes on the UAC dialog once → script ran elevated: `winrm quickconfig` + `Enable-PSRemoting -Force -SkipNetworkProfileCheck`, firewall rules `WinRM HTTP LAN` (TCP 5985, any profile) + `ICMPv4 Ping LAN`, created `remotedev` admin user, `LocalAccountTokenFilterPolicy=1`. Temp files deleted after. **Verified from dev PC:** `New-PSSession -ComputerName DESKTOP-UU8E0D4 -Credential DESKTOP-UU8E0D4\remotedev` → OK (host/agent/POS exe confirmed). ALSO verified: **HQ → server LAN `DESKTOP-I097OO9:5000` = reachable** (the API is on the LAN; only HQ's own inbound was blocked). Note: on THIS dev PC the WSMan client `TrustedHosts` edit must be done via the dev PC agent (runs as SYSTEM) — a plain non-elevated shell gets "Access is denied".
 >
-> **HQ → server LAN API switch (2026-08-15, COMPLETE):** HQ POS `CloudApiUrl` = **`http://DESKTOP-I097OO9:5000/api`** (LAN, no internet/Cloudflare hop) — owner's plan: HQ hosts ALL stock (retail + wholesale + e-commerce) in one DB; warehouse to be retired. The POS reads the setting per sync call, so the flip is zero-downtime (verified: SyncLog all-OK after flip). **Phase 2 done 2026-08-15 20:31** — HQ updated to v1.1.42 via GitHub release (pos-status now posts → dashboard sync chip live) and the agent was restarted so it also uses the LAN URL (it caches at startup). **GitHub release v1.1.42 created 2026-08-15** with the exe asset (the release had been created WITHOUT the asset earlier → stores got "DOWNLOAD FAILED" 404s until the 211 MB upload finished via curl). Rollback anytime: `UPDATE Settings SET Value='https://admin.jumongdev.com/api' WHERE Key='CloudApiUrl'` + restart. The startup URL-fix migrations only rewrite `%railway%`/`%digitalocean%` values → the LAN URL survives restarts. No auto-failover: if the LAN drops, HQ sync pauses (POS keeps selling offline, auto-drains on reconnect) — same as an internet outage. Store rollout 2026-08-15: HQ 1.1.42 ✅, ACGS 1.1.42 ✅ (tapped UPDATE APP), HVR 1.1.42 ✅ (remote exe swap; version/chip show after next cashier login), Naic still 1.1.38 (PC off — UPDATE APP when back online).
+> **HQ → server LAN API switch (2026-08-15, COMPLETE):** HQ POS `CloudApiUrl` = **`http://DESKTOP-I097OO9:5000/api`** (LAN, no internet/Cloudflare hop) — owner's plan: HQ hosts ALL stock (retail + wholesale + e-commerce) in one DB; warehouse to be retired. The POS reads the setting per sync call, so the flip is zero-downtime (verified: SyncLog all-OK after flip). **Phase 2 done 2026-08-15 20:31** — HQ updated to v1.1.42 via GitHub release (pos-status now posts → dashboard sync chip live) and the agent was restarted so it also uses the LAN URL (it caches at startup). **GitHub release v1.1.42 created 2026-08-15** with the exe asset (the release had been created WITHOUT the asset earlier → stores got "DOWNLOAD FAILED" 404s until the 211 MB upload finished via curl). Rollback anytime: `UPDATE Settings SET Value='https://admin.jumongdev.com/api' WHERE Key='CloudApiUrl'` + restart. The startup URL-fix migrations only rewrite `%railway%`/`%digitalocean%` values → the LAN URL survives restarts. No auto-failover: if the LAN drops, HQ sync pauses (POS keeps selling offline, auto-drains on reconnect) — same as an internet outage. Store rollout 2026-08-15: HQ 1.1.42 ✅, ACGS 1.1.42 ✅ (tapped UPDATE APP), HVR 1.1.42 ✅ (remote exe swap; version/chip show after next cashier login), Naic still 1.1.38 (PC off — UPDATE APP when back online). *(Historical — current store versions nasa Quick Status sa itaas.)*
 
 ```powershell
 # From the DEV PC -> server (standard pattern for all deploys)
@@ -214,7 +191,7 @@ Invoke-Command -Session $s -ScriptBlock { "OK on $env:COMPUTERNAME" }
 
 ## Cloud API
 - **Local URL:** https://admin.jumongdev.com/api (via Cloudflare Tunnel) — HVR, Naic, ACGS on this; **HQ uses `http://DESKTOP-I097OO9:5000/api` (LAN, since 2026-08-15)**
-- **DB connection:** `DATABASE_URL` env var (PostgreSQL, default `localhost:5432`), or check Helpers/CloudDatabaseHelper.cs
+- **DB connection:** `DATABASE_URL` env var (PostgreSQL, default `localhost:5432`), or check `Data/CloudDatabaseHelper.cs` (client-side helper)
 
 ## Stores (in Cloud / Local PG)
 | Store ID | Name | Machine | IP |
@@ -345,8 +322,6 @@ Remove-PSSession $s
 
 ## Remote Diagnostic Agent (`tools/Agent/`)
 
-### Remote Diagnostic Agent (`tools/Agent/`)
-
 A console app that runs on each POS client machine, connecting outbound to the cloud API. Enables the AI agent to remotely query the local SQLite database, run diagnostic commands, and update files — no port forwarding, no remote desktop needed.
 
 #### Agent Files
@@ -418,15 +393,16 @@ WebView wrapper app that loads https://admin.jumongdev.com/whmobile.html (login 
 > **NOTE (2026-08-11):** APK builds still run on the **SERVER** (`C:\Users\ADMIN\Desktop\JumongPosV1.01\WarehouseApp`) until Android Studio + Android SDK are installed on the dev PC. The Gradle zip + keystores are already on the dev PC (`C:\dev\gradle\`, `C:\dev\JumongPosV1.01\WarehouseApp\*.keystore`). When the dev PC is APK-ready: `sdk.dir=C:/Users/<you>/AppData/Local/Android/Sdk` (forward slashes) in `local.properties`, `JAVA_HOME=C:\Program Files\Android\Android Studio\jbr`, and use `C:\dev\gradle\gradle-8.14.3\bin\gradle.bat`.
 
 ### Build & Sign
-`powershell
+```powershell
 Set-Location "C:\Users\ADMIN\Desktop\JumongPosV1.01\WarehouseApp"   # SERVER (until dev PC has Android Studio)
 # local.properties must use FORWARD SLASHES (backslashes = invalid path in Java properties):
 #   sdk.dir=C:/Users/ADMIN/AppData/Local/Android/Sdk
-\C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot = "C:\Program Files\Android\Android Studio\jbr"
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 & "C:\Users\ADMIN\.gradle\wrapper\dists\gradle-8.14.3-bin\cv11ve7ro1n3o1j4so8xd9n66\gradle-8.14.3\bin\gradle.bat" :app:assembleRelease --no-daemon
 # Sign (keystore: jumong_sign.keystore, alias jumong, pass jumong2026)
 & "C:\Users\ADMIN\AppData\Local\Android\Sdk\build-tools\37.0.0\apksigner.bat" sign --ks jumong_sign.keystore --ks-key-alias jumong --ks-pass "pass:jumong2026" --key-pass "pass:jumong2026" --out JumongWarehouse.apk app\build\outputs\apk\release\app-release-unsigned.apk
-`
+```
+
 Copy JumongWarehouse.apk to JumongCloudAPI\wwwroot\updates\ AND JumongCloudAPI\bin\Release\net8.0\win-x64\publish\wwwroot\updates\. Bump warehouse-version.json (version + changelog). Old warehouse.keystore password lost — v1.0.4 uses the NEW jumong_sign.keystore cert, so existing installs MUST uninstall first (changelog says so). Gradle OOM risk on this PC: only ~2.8GB free RAM; heap capped at 1536m in gradle.properties.
 
 

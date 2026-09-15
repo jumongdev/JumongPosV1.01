@@ -46,11 +46,12 @@ public static class DataExporter
         delProducts.CommandText = "DELETE FROM Products";
         delProducts.ExecuteNonQuery();
 
-        var delCustomers = new System.Data.SQLite.SQLiteCommand("DELETE FROM Customers", conn);
-        delCustomers.ExecuteNonQuery();
-
         var delUsers = new System.Data.SQLite.SQLiteCommand("DELETE FROM Users", conn);
         delUsers.ExecuteNonQuery();
+
+        // ONE RULE (v1.1.82): ang Customers ay HINDI kasama sa import/export restore —
+        // e-commerce (Google) registration lang ang gumagawa ng customers; ang POS import
+        // ay hindi na dapat mag-delete o mag-insert ng customers.
 
         foreach (var p in data.Products)
         {
@@ -63,16 +64,6 @@ public static class DataExporter
             cmd.Parameters.AddWithValue("@co", p.Cost);
             cmd.Parameters.AddWithValue("@s", p.StockQty);
             cmd.Parameters.AddWithValue("@a", p.IsActive ? 1 : 0);
-            cmd.ExecuteNonQuery();
-        }
-
-        foreach (var c in data.Customers)
-        {
-            var cmd = new System.Data.SQLite.SQLiteCommand(
-                "INSERT INTO Customers (Name, Phone, Email) VALUES (@n, @p, @e)", conn);
-            cmd.Parameters.AddWithValue("@n", c.Name);
-            cmd.Parameters.AddWithValue("@p", c.Phone ?? "");
-            cmd.Parameters.AddWithValue("@e", c.Email ?? "");
             cmd.ExecuteNonQuery();
         }
 
@@ -90,7 +81,7 @@ public static class DataExporter
 
         trans.Commit();
 
-        MessageBox.Show($"Imported {data.Products.Count} products, {data.Customers.Count} customers, {data.Users.Count} users.\nPlease restart the app.",
+        MessageBox.Show($"Imported {data.Products.Count} products, {data.Users.Count} users.\n\n(Customers: HINDI kasama — e-commerce registration lang ang gumagawa ng customers.)\nPlease restart the app.",
             "Import Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 

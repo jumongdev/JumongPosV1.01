@@ -1228,6 +1228,9 @@ public partial class SalesForm : Form
         btnCustomer.BringToFront();
         btnChat.BringToFront();
         btnScanQr.BringToFront();
+        // CHAT BADGE FIX (2026-09-12): ang badge ay naipit sa LIKOD ng buttons (BringToFront ng buttons) —
+        // kaya hindi lumalabas ang red unread count sa 💬 CHAT button. I-front ito pagkatapos ng buttons.
+        _lblChatBadge.BringToFront();
 
         _pnlSearch = new Panel { BackColor = CCard };
         _pnlSearch.Paint += (s, e) =>

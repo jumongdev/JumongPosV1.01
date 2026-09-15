@@ -4,6 +4,7 @@ public static class DebugHelper
 {
     public static void AddFormLabel(Form form)
     {
+#if DEBUG
         var label = new Label
         {
             Text = form.GetType().Name,
@@ -29,5 +30,6 @@ public static class DebugHelper
                 form.ClientSize.Width - label.PreferredWidth - 8,
                 form.ClientSize.Height - label.PreferredHeight - 4);
         };
+#endif
     }
 }
