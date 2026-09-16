@@ -36,6 +36,11 @@ public class SyncController : ControllerBase
     public IActionResult SyncProducts([FromBody] List<JsonElement> items)
     {
         var sid = StoreId();
+        // STOCK-SAFETY (2026-09-16): ang DEV test store ay HINDI na nag-pupush ng products sa cloud
+        // (na-leak dati: Alfonso Sherry Oak 6pcs / Alfonso Brandy 7pcs / Camel Yellow). Ang POS bulk
+        // timers ay may DEV skip na (MainForm) — dinadagdagan natin dito sa API para kahit lumang
+        // build ay hindi na makapasok ang dev stock sa stock-status/inventory views.
+        if (sid == "STORE-DEV-0001") return Ok(new { ok = true, skipped = items.Count, reason = "DEV store — products push disabled" });
         return SyncTable("products", items, new[] { "pos_id", "name", "barcode", "category", "price", "cost", "stock_qty", "is_active", "created_at", "modified_by" },
             "INSERT INTO products (pos_id, store_id, name, barcode, category, price, cost, stock_qty, is_active, created_at, modified_by, synced_at) " +
             "VALUES (@p0,@sid,@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,NOW()) " +

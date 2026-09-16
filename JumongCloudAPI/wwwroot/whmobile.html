@@ -692,7 +692,7 @@
   <script>
     const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
     const IN_APP = typeof AndroidPrinter !== 'undefined';
-    const WEB_VER = '20260914-1';
+    const WEB_VER = '20260916-1';
 
     // ─── Crash reporting: send any native crash.log (from the uncaught-exception
     // handler in MainActivity) to the server on the next successful launch. Also
@@ -1502,7 +1502,7 @@
       const q = document.getElementById('sellSearch').value.trim();
       const box = document.getElementById('productResults');
       if (!q) { box.innerHTML = ''; return; }
-      const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true&source=hq';
+      const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true&source=hq&excludeMasterInactive=true';
       try {
         const r = await fetch(url);
         const data = await r.json();
@@ -2655,7 +2655,7 @@
       if (!q) { box.innerHTML = ''; return; }
       box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading...</p>';
       try {
-        const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&search=' + encodeURIComponent(q) + '&source=hq');
+        const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&search=' + encodeURIComponent(q) + '&source=hq&excludeMasterInactive=true');
         const data = await r.json();
         txProdCache = data || [];
         box.innerHTML = '';

@@ -66,6 +66,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cancelOverlay: View
     private lateinit var updateOverlay: View
     private lateinit var endShiftOverlay: View
+    private lateinit var historyOverlay: View
     private var endInfo: JSONObject? = null
     private var endShiftOpen = false
     private lateinit var updVersion: TextView
@@ -121,6 +122,7 @@ class MainActivity : AppCompatActivity() {
             override fun handleOnBackPressed() {
                 when {
                     cancelOverlay.visibility == View.VISIBLE -> cancelOverlay.visibility = View.GONE
+                    historyOverlay.visibility == View.VISIBLE -> closeHistory()
                     endShiftOverlay.visibility == View.VISIBLE -> closeEndShift()
                     payScreen.visibility == View.VISIBLE -> showScreen(detailScreen)
                     detailScreen.visibility == View.VISIBLE -> backToList()
@@ -152,6 +154,7 @@ class MainActivity : AppCompatActivity() {
         cancelOverlay = findViewById(R.id.cancelOverlay)
         updateOverlay = findViewById(R.id.updateOverlay)
         endShiftOverlay = findViewById(R.id.endShiftOverlay)
+        historyOverlay = findViewById(R.id.historyOverlay)
         updVersion = findViewById(R.id.updVersion)
         updChangelog = findViewById(R.id.updChangelog)
         orderList = findViewById(R.id.orderList)
@@ -205,6 +208,8 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnEndShift).setOnClickListener { openEndShift() }
         findViewById<View>(R.id.esConfirm).setOnClickListener { confirmEndShift() }
         findViewById<View>(R.id.esClose).setOnClickListener { closeEndShift() }
+        findViewById<View>(R.id.btnHistory).setOnClickListener { openHistory() }
+        findViewById<View>(R.id.hsClose).setOnClickListener { closeHistory() }
         findViewById<View>(R.id.btnLogout).setOnClickListener { logout() }
         findViewById<View>(R.id.btnBackDetail).setOnClickListener { backToList() }
         findViewById<View>(R.id.btnArrived).setOnClickListener { markArrived() }
@@ -500,6 +505,77 @@ class MainActivity : AppCompatActivity() {
         endShiftOpen = false
         endShiftOverlay.visibility = View.GONE
         findViewById<TextView>(R.id.esErr).visibility = View.GONE
+    }
+
+    // ─── END-SHIFT HISTORY (per-day remittance) ──────────
+    private fun openHistory() {
+        try {
+            historyOverlay.visibility = View.VISIBLE
+            findViewById<TextView>(R.id.hsTotal).text = "Kinukuha ang history..."
+            loadEndInfo { renderHistory() }
+        } catch (t: Throwable) { endErr("openHistory", t) }
+    }
+
+    private fun closeHistory() { historyOverlay.visibility = View.GONE }
+
+    private fun renderHistory() {
+        try {
+            val wrap = findViewById<android.widget.LinearLayout>(R.id.hsList)
+            val empty = findViewById<TextView>(R.id.hsEmpty)
+            val totalTv = findViewById<TextView>(R.id.hsTotal)
+            val arr = endInfo?.optJSONArray("history") ?: JSONArray()
+            wrap.removeAllViews()
+            if (arr.length() == 0) {
+                empty.visibility = View.VISIBLE
+                totalTv.text = ""
+                wrap.addView(empty)
+                return
+            }
+            empty.visibility = View.GONE
+            var sumOrders = 0; var sumCash = 0.0; var sumGcash = 0.0
+            for (i in 0 until arr.length()) {
+                val h = arr.optJSONObject(i) ?: continue
+                val orders = h.optInt("deliveredOrders")
+                val cash = h.optDouble("cashTotal")
+                val gcash = h.optDouble("gcashTotal")
+                sumOrders += orders; sumCash += cash; sumGcash += gcash
+
+                val row = android.widget.LinearLayout(this)
+                row.orientation = android.widget.LinearLayout.VERTICAL
+                row.setBackgroundColor(0xFF1a1a44.toInt())
+                row.setPadding(dp(12), dp(10), dp(12), dp(10))
+                val lp = android.widget.LinearLayout.LayoutParams(android.widget.LinearLayout.LayoutParams.MATCH_PARENT, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT)
+                lp.bottomMargin = dp(6)
+                row.layoutParams = lp
+
+                val tvDate = TextView(this)
+                tvDate.text = h.optString("shiftDate") + "  ·  " + orders + " order(s)"
+                tvDate.setTextColor(0xFFFFFFFF.toInt())
+                tvDate.textSize = 13f
+                tvDate.setTypeface(tvDate.typeface, android.graphics.Typeface.BOLD)
+                row.addView(tvDate)
+
+                val tvAmt = TextView(this)
+                tvAmt.text = "Cash ₱" + fmt(cash) + "  ·  GCash ₱" + fmt(gcash) + "  ·  TOTAL ₱" + fmt(cash + gcash)
+                tvAmt.setTextColor(0xFF34d399.toInt())
+                tvAmt.textSize = 12f
+                tvAmt.setPadding(0, dp(3), 0, 0)
+                row.addView(tvAmt)
+
+                val ended = h.optString("endedAt")
+                if (ended.isNotEmpty()) {
+                    val tvEnd = TextView(this)
+                    tvEnd.text = "Ended: " + ended
+                    tvEnd.setTextColor(0xFF8b8bb5.toInt())
+                    tvEnd.textSize = 10f
+                    tvEnd.setPadding(0, dp(2), 0, 0)
+                    row.addView(tvEnd)
+                }
+                wrap.addView(row)
+            }
+            totalTv.text = arr.length().toString() + " shift(s) · TOTAL NA-REMIT: ₱" + fmt(sumCash + sumGcash) +
+                "  (Cash ₱" + fmt(sumCash) + " · GCash ₱" + fmt(sumGcash) + ")"
+        } catch (t: Throwable) { endErr("renderHistory", t) }
     }
 
     private fun renderEndShift() {

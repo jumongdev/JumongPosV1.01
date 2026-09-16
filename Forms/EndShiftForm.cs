@@ -36,6 +36,43 @@ public class EndShiftForm : Form
         var cashierName = string.IsNullOrEmpty(_currentUser.FullName) ? _currentUser.Username : _currentUser.FullName;
         lblCashierName.Text = cashierName;
         lblTotalExpenses.Text = _totalExpenses.ToString("N2");
+
+        // Non-sale stock outflow (ito ang dahilan ng inventory variance — hindi POS sales):
+        // transfers out sa ibang stores + e-commerce holds + mobile + manual adjustments.
+        var adjManual = Math.Abs(_adjustDown) - Math.Abs(_adjDownTransfers) - Math.Abs(_adjDownEcom) - Math.Abs(_adjDownMobile);
+        lblOutflowLocal.Text =
+            $"Transfers out: ₱{Math.Abs(_adjDownTransfers):N2}   ·   E-commerce holds: ₱{Math.Abs(_adjDownEcom):N2}   ·   Mobile: ₱{Math.Abs(_adjDownMobile):N2}   ·   Manual/iba pa: ₱{adjManual:N2}";
+        LoadOutflowServer();
+    }
+
+    // Server-side channel numbers (HQ only) — async para hindi mag-hang ang form kung offline.
+    private void LoadOutflowServer()
+    {
+        if (SyncService.StoreId != "STORE-20260602-7159")
+        {
+            lblOutflowServer.Text = "Non-sale stock outflow ng shift na ito (cost value). Nasa printed report ang server channel numbers.";
+            return;
+        }
+        lblOutflowServer.Text = "Server: kinukuha ang e-commerce/transfer numbers...";
+        _ = Task.Run(() =>
+        {
+            var ch = SyncService.GetEndShiftSnapshot();
+            try
+            {
+                BeginInvoke(new Action(() =>
+                {
+                    if (ch == null)
+                    {
+                        lblOutflowServer.Text = "Server: hindi makuha (offline?) — nasa printed report/email pa rin ang buong breakdown.";
+                        return;
+                    }
+                    var v = ch.Value;
+                    lblOutflowServer.Text =
+                        $"E-commerce (delivered): {v.EcomOrders} order(s) · ₱{v.EcomTotal:N2}   ·   COD collected: Cash ₱{v.EcomCollectedCash:N2} + GCash ₱{v.EcomCollectedGcash:N2}   ·   Remitted: ₱{v.EcomRemitted:N2}   ·   Transfer out: {v.TransferOutPcs} pcs   ·   Received: {v.ReceivedPcs} pcs";
+                }));
+            }
+            catch { }
+        });
     }
 
     private void Recalc()
@@ -604,6 +641,15 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
         pnlSummary.Controls.Add(lblSumTitle);
         y += 145;
 
+        // ── STOCK OUTFLOW CARD (non-sale movements — ito ang dahilan ng inventory variance) ──
+        var pnlOutflow = new Panel { Location = new Point(margin, y), Size = new Size(100, 108), BackColor = panelBg };
+        pnlOutflow.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlOutflow.Width - 1, pnlOutflow.Height - 1); };
+        var lblOutflowTitle = new Label { Text = "STOCK OUTFLOW — non-sale movements (transfers / e-commerce / adjustments)", Font = new Font("Segoe UI", 9F, FontStyle.Bold), ForeColor = dimText, Location = new Point(15, 8), Size = new Size(620, 18) };
+        lblOutflowLocal = new Label { Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = accentOrange, Location = new Point(15, 30), Size = new Size(900, 24), AutoSize = false };
+        lblOutflowServer = new Label { Font = new Font("Segoe UI", 9F), ForeColor = dimText, Location = new Point(15, 58), Size = new Size(900, 42), AutoSize = false };
+        pnlOutflow.Controls.AddRange(new Control[] { lblOutflowTitle, lblOutflowLocal, lblOutflowServer });
+        y += 118;
+
         // ── DENOMINATION CARD ──
         var pnlDenom = new Panel { Location = new Point(margin, y), Size = new Size(100, 250), BackColor = panelBg };
         pnlDenom.Paint += (s, e) => { using var pen = new Pen(borderColor, 1); e.Graphics.DrawRectangle(pen, 0, 0, pnlDenom.Width - 1, pnlDenom.Height - 1); };
@@ -645,31 +691,35 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
         btnEmail.Click += btnEmail_Click;
         pnlActions.Controls.AddRange(new Control[] { lblNotesLabel, txtNotes, btnClose, btnHistory, btnExpenses, btnEmail });
 
-        pnlMain.Controls.AddRange(new Control[] { pnlSummary, pnlDenom, pnlActions });
+        pnlMain.Controls.AddRange(new Control[] { pnlSummary, pnlOutflow, pnlDenom, pnlActions });
         Controls.Clear();
         Controls.AddRange(new Control[] { pnlMain, pnlToolbar });
 
-        Shown += (_, _) => { ResizeLayout(pnlSummary, pnlDenom, pnlActions); WarnIfShiftGap(); };
-        Resize += (_, _) => ResizeLayout(pnlSummary, pnlDenom, pnlActions);
+        Shown += (_, _) => { ResizeLayout(pnlSummary, pnlOutflow, pnlDenom, pnlActions); WarnIfShiftGap(); };
+        Resize += (_, _) => ResizeLayout(pnlSummary, pnlOutflow, pnlDenom, pnlActions);
     }
 
-    private void ResizeLayout(Panel pnlSummary, Panel pnlDenom, Panel pnlActions)
+    private void ResizeLayout(Panel pnlSummary, Panel pnlOutflow, Panel pnlDenom, Panel pnlActions)
     {
         var margin = 10;
         var w = ClientSize.Width - margin * 3;
         
         var sumH = 135;
+        var outH = 108;
         var denomH = 280;
         var actionsH = margin * 9;
         
         var availW = w;
         pnlSummary.Location = new Point(margin, margin);
         pnlSummary.Size = new Size(availW, sumH);
+
+        pnlOutflow.Location = new Point(margin, sumH + margin * 2);
+        pnlOutflow.Size = new Size(availW, outH);
         
-        pnlDenom.Location = new Point(margin, sumH + margin * 2);
+        pnlDenom.Location = new Point(margin, sumH + outH + margin * 3);
         pnlDenom.Size = new Size(availW, denomH);
         
-        pnlActions.Location = new Point(margin, sumH + denomH + margin * 3);
+        pnlActions.Location = new Point(margin, sumH + outH + denomH + margin * 4);
         pnlActions.Size = new Size(availW, actionsH);
     }
 
@@ -715,6 +765,7 @@ Are you sure you want to finalize your shift count? You cannot alter this submis
     private Label lblDate = null!, lblCashierName = null!, lblTotalExpenses = null!;
     private Label lblOpeningCash = null!;
     private Label lblCashOnHand = null!;
+    private Label lblOutflowLocal = null!, lblOutflowServer = null!;
     private NumericUpDown num1000 = null!, num500 = null!, num200 = null!, num100 = null!, num50 = null!, num20 = null!;
     private NumericUpDown txtCoins = null!;
     private TextBox txtNotes = null!;

@@ -103,6 +103,7 @@
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <button id="esBtnMain" onclick="openEndShift()" class="text-[10px] font-bold text-emerald-700 border border-emerald-300 rounded-lg px-2.5 py-1.5">🔚 END SHIFT</button>
+        <button onclick="openHistory()" class="text-[10px] font-bold text-violet-700 border border-violet-300 rounded-lg px-2.5 py-1.5">📜 HISTORY</button>
         <button onclick="openInstall()" class="text-[10px] font-bold text-violet-700 border border-violet-300 rounded-lg px-2.5 py-1.5">📲 INSTALL</button>
         <button onclick="logout()" class="text-[11px] font-bold text-red-500 border border-red-200 rounded-lg px-3 py-1.5">SIGN OUT</button>
       </div>
@@ -234,6 +235,20 @@
     </div>
     <p class="text-[10px] text-stone-400 mt-1">Mga order na hindi pa nai-deliver — nasa iyo pa ang items. I-deliver bukas o i-cancel para ibalik ang stock sa tindahan.</p>
     <div id="esCarryList" class="space-y-2 mt-2 max-h-64 overflow-y-auto"></div>
+  </div>
+</div>
+
+<!-- END-SHIFT HISTORY SCREEN -->
+<div id="historyScreen" class="hidden max-w-md mx-auto px-4 py-4 space-y-3">
+  <button onclick="backFromHistory()" class="text-xs font-bold text-violet-700">← Back to deliveries</button>
+  <div class="card p-4">
+    <p class="font-extrabold text-stone-900">📜 End-Shift History</p>
+    <p class="text-[11px] text-stone-400 mt-1">Daily na ini-remit mo sa tindahan (cash + gcash). Huling 30 end-shift.</p>
+    <p id="hsTotal" class="text-[13px] font-black text-emerald-600 mt-2"></p>
+  </div>
+  <div id="hsList" class="space-y-2"></div>
+  <div class="card p-4 hidden" id="hsEmptyCard">
+    <p class="text-center text-xs text-stone-400 py-2">Wala pang end-shift records.</p>
   </div>
 </div>
 
@@ -369,8 +384,8 @@ loadPaymentQrs();
 })();
 
 function show(id) {
-  const map = { loginScreen: 'flex', mainScreen: 'block', detailScreen: 'block', payScreen: 'block', endShiftScreen: 'block' };
-  ['loginScreen', 'mainScreen', 'detailScreen', 'payScreen', 'endShiftScreen'].forEach(s => {
+  const map = { loginScreen: 'flex', mainScreen: 'block', detailScreen: 'block', payScreen: 'block', endShiftScreen: 'block', historyScreen: 'block' };
+  ['loginScreen', 'mainScreen', 'detailScreen', 'payScreen', 'endShiftScreen', 'historyScreen'].forEach(s => {
     const el = document.getElementById(s);
     if (!el) return;
     if (s === id) { el.classList.remove('hidden'); el.style.display = (map[s] || 'block'); }
@@ -595,6 +610,35 @@ function renderCarryOver() {
 }
 
 async function esDeliver(id) { openDetail(id); }
+
+// ─── END-SHIFT HISTORY (per-day remittance) ──────────
+async function openHistory() {
+  await loadEndInfo();
+  if (!endInfo) { toast('Hindi ma-load ang history', 'error'); return; }
+  renderHistory();
+  show('historyScreen');
+}
+function backFromHistory() { show('main'); loadOrders(); }
+function renderHistory() {
+  const list = (endInfo && endInfo.history) || [];
+  const wrap = document.getElementById('hsList');
+  const empty = document.getElementById('hsEmptyCard');
+  const tot = document.getElementById('hsTotal');
+  if (!list.length) { wrap.innerHTML = ''; empty.classList.remove('hidden'); tot.textContent = ''; return; }
+  empty.classList.add('hidden');
+  let sc = 0, sg = 0;
+  wrap.innerHTML = list.map(h => {
+    const cash = h.cashTotal || 0, gcash = h.gcashTotal || 0;
+    sc += cash; sg += gcash;
+    return '<div class="card p-3">' +
+      '<div class="flex items-center justify-between"><p class="font-extrabold text-xs">' + esc(h.shiftDate) + '</p>' +
+      '<span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">₱' + fmt(cash + gcash) + '</span></div>' +
+      '<p class="text-[11px] text-stone-500 mt-1">' + (h.deliveredOrders || 0) + ' order(s) · Cash ₱' + fmt(cash) + ' · GCash ₱' + fmt(gcash) + '</p>' +
+      (h.endedAt ? '<p class="text-[10px] text-stone-400 mt-0.5">Ended: ' + esc(h.endedAt) + '</p>' : '') +
+    '</div>';
+  }).join('');
+  tot.textContent = list.length + ' shift(s) · TOTAL NA-REMIT: ₱' + fmt(sc + sg) + ' (Cash ₱' + fmt(sc) + ' · GCash ₱' + fmt(sg) + ')';
+}
 
 async function esCancel(id) {
   try {

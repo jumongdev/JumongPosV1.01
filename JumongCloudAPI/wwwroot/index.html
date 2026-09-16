@@ -91,6 +91,7 @@ tailwind.config = {
             { id:'grp-reports', icon:'📈', label:'Reports', items:[
                 { id:'rpt-sales', icon:'🧾', label:'Sales Report' },
                 { id:'rpt-invcost', icon:'💰', label:'Inventory Cost' },
+                { id:'hq-outflow', icon:'📤', label:'HQ Outflow' },
                 { id:'rpt-invval', icon:'🏦', label:'Inventory Value' },
                 { id:'rpt-shifts', icon:'🕐', label:'Shift History' },
                 { id:'analytics', icon:'📊', label:'Analytics' }
@@ -817,8 +818,11 @@ tailwind.config = {
                       <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Inv Cost</th>
                       <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">COGS</th>
                       <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Recv Cost</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]" title="Stock na ipinadala sa ibang stores (cost)">Transfer Out</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]" title="E-commerce orders na nag-hold ng HQ stock (cost)">E-com Hold</th>
                       <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Expected</th>
                       <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Variance</th>
+                      <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]" title="Variance pagkatapos alisin ang transfers/e-com = tunay na shrink/loss lang">True Var</th>
                     </tr></thead>
                     <tbody>
                       <template x-for="x in d" :key="x.closeDate+x.storeId">
@@ -831,13 +835,110 @@ tailwind.config = {
                           <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalInventoryCost)"></span></td>
                           <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalCostSold)"></span></td>
                           <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalStockReceivedCost)"></span></td>
+                          <td class="px-2 py-2 text-right text-gray-500 dark:text-[#7878aa]">&#8369;<span x-text="fmt(x.transfersOut)"></span></td>
+                          <td class="px-2 py-2 text-right text-gray-500 dark:text-[#7878aa]">&#8369;<span x-text="fmt(x.ecomHold)"></span></td>
                           <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.expected)"></span></td>
                           <td class="px-2 py-2 text-right font-semibold" :class="x.variance >= 0 ? 'text-emerald-500' : 'text-red-500'">&#8369;<span x-text="fmt(x.variance)"></span></td>
+                          <td class="px-2 py-2 text-right font-semibold" :class="x.trueVar >= 0 ? 'text-emerald-500' : 'text-red-500'">&#8369;<span x-text="fmt(x.trueVar)"></span></td>
                         </tr>
                       </template>
                     </tbody>
                   </table>
                 </div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════ -->
+      <!-- HQ OUTFLOW (e-commerce sales + transfers out)  -->
+      <!-- ═══════════════════════════════════════════════ -->
+      <div x-show="$store.app.section === 'hq-outflow'" x-transition.opacity>
+        <div x-data="hqOutflow">
+          <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
+            <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[#222255] gap-2">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">📤 HQ OUTFLOW — E-COMMERCE + TRANSFERS</h3>
+              <div class="flex items-center gap-2">
+                <template x-for="r in [['today','Today'],['7','7D'],['30','30D'],['month','This Month']]" :key="r[0]">
+                  <button @click="setRange(r[0])" class="text-[10px] px-2.5 py-1 rounded-lg font-bold border border-gray-200 dark:border-[#222255]"
+                    :class="range===r[0] ? 'bg-cyan-600 text-white border-cyan-600' : 'text-gray-500 dark:text-[#7878aa]'" x-text="r[1]"></button>
+                </template>
+                <button @click="load()" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa]">REFRESH</button>
+                <button @click="exportCSV()" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa]">CSV</button>
+              </div>
+            </div>
+            <div class="p-4 space-y-4">
+              <template x-if="loading"><div class="flex justify-center py-8"><span class="spinner"></span></div></template>
+              <template x-if="!loading && d">
+                <div class="space-y-4">
+                  <p class="text-[11px] text-gray-400" x-text="'Range: ' + d.from + ' → ' + d.to + ' · HQ store lang · E-com = delivered orders (COD) · Holds/Transfers = cost value'"></p>
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="rounded-xl border border-violet-200 dark:border-violet-900/40 bg-violet-50 dark:bg-violet-950/20 p-3">
+                      <div class="text-[10px] uppercase tracking-wider text-violet-600 dark:text-violet-400 font-bold">🛒 E-com Sales (delivered)</div>
+                      <div class="text-lg font-black text-violet-700 dark:text-violet-300">&#8369;<span x-text="fmt(d.totals.ecomTotal)"></span></div>
+                      <div class="text-[10px] text-violet-500 dark:text-violet-400/80" x-text="fmtInt(d.totals.ecomOrders) + ' order(s)'"></div>
+                    </div>
+                    <div class="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20 p-3">
+                      <div class="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-bold">📦 E-com Holds (stock out)</div>
+                      <div class="text-lg font-black text-amber-700 dark:text-amber-300">&#8369;<span x-text="fmt(d.totals.ecomHoldCost)"></span></div>
+                      <div class="text-[10px] text-amber-500 dark:text-amber-400/80" x-text="fmtInt(d.totals.ecomHoldPcs) + ' pcs'"></div>
+                    </div>
+                    <div class="rounded-xl border border-rose-200 dark:border-rose-900/40 bg-rose-50 dark:bg-rose-950/20 p-3">
+                      <div class="text-[10px] uppercase tracking-wider text-rose-600 dark:text-rose-400 font-bold">🚚 Transfers Out</div>
+                      <div class="text-lg font-black text-rose-700 dark:text-rose-300">&#8369;<span x-text="fmt(d.totals.transfersCost)"></span></div>
+                      <div class="text-[10px] text-rose-500 dark:text-rose-400/80" x-text="fmtInt(d.totals.transfersPcs) + ' pcs · ' + fmtInt(d.totals.transfersCount) + ' transfer(s)'"></div>
+                    </div>
+                    <div class="rounded-xl border border-cyan-200 dark:border-cyan-900/40 bg-cyan-50 dark:bg-cyan-950/20 p-3">
+                      <div class="text-[10px] uppercase tracking-wider text-cyan-600 dark:text-cyan-400 font-bold">📤 Total Stock Out (cost)</div>
+                      <div class="text-lg font-black text-cyan-700 dark:text-cyan-300">&#8369;<span x-text="fmt(d.totals.transfersCost + d.totals.ecomHoldCost)"></span></div>
+                      <div class="text-[10px] text-cyan-500 dark:text-cyan-400/80">transfers + e-com holds</div>
+                    </div>
+                  </div>
+                  <div>
+                    <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1.5">Transfers per destination</p>
+                    <template x-if="d.byStore.length === 0"><p class="text-xs text-gray-400">Walang transfers sa range na ito.</p></template>
+                    <div class="flex flex-wrap gap-2">
+                      <template x-for="s in d.byStore" :key="s.storeId">
+                        <span class="text-[10px] px-2.5 py-1.5 rounded-lg bg-gray-100 dark:bg-[#181848] text-gray-600 dark:text-slate-300 font-semibold">
+                          <span x-text="storeLabel(s)"></span>: <b x-text="fmtInt(s.pcs)"></b> pcs · &#8369;<span x-text="fmt(s.cost)"></span>
+                          <span class="text-gray-400 dark:text-[#5a5a8a]" x-text="'· ' + s.count + ' transfer(s)'"></span>
+                        </span>
+                      </template>
+                    </div>
+                  </div>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                      <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                        <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
+                        <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">E-com Orders</th>
+                        <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">E-com Sales</th>
+                        <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">E-com Hold Pcs</th>
+                        <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">E-com Hold Cost</th>
+                        <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Transfers</th>
+                        <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Transfer Pcs</th>
+                        <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Transfer Cost</th>
+                      </tr></thead>
+                      <tbody>
+                        <template x-for="x in d.byDay" :key="x.date">
+                          <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                            <td class="px-2 py-2 whitespace-nowrap" x-text="fmtDay(x.date)"></td>
+                            <td class="px-2 py-2 text-right" x-text="x.ecomOrders || '—'"></td>
+                            <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.ecomTotal)"></span></td>
+                            <td class="px-2 py-2 text-right text-amber-600 dark:text-amber-400" x-text="x.ecomHoldPcs || '—'"></td>
+                            <td class="px-2 py-2 text-right text-amber-600 dark:text-amber-400">&#8369;<span x-text="fmt(x.ecomHoldCost)"></span></td>
+                            <td class="px-2 py-2 text-right" x-text="x.transfersCount || '—'"></td>
+                            <td class="px-2 py-2 text-right text-rose-500" x-text="x.transfersPcs || '—'"></td>
+                            <td class="px-2 py-2 text-right text-rose-500">&#8369;<span x-text="fmt(x.transfersCost)"></span></td>
+                          </tr>
+                        </template>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </template>
+              <template x-if="!loading && !d">
+                <div class="text-center py-8 text-gray-400 text-sm">Hindi ma-load ang HQ outflow data.</div>
               </template>
             </div>
           </div>
@@ -1188,6 +1289,60 @@ tailwind.config = {
               </template>
             </div>
             <p class="px-4 py-2 text-[10px] text-gray-400">Pag-aayos ng status (🟠→🟢) ay ginagawa ng driver mismo sa 🔚 END SHIFT ng kanyang app — 1x lang kada araw. Para sa emergency correction, i-text ang developer.</p>
+          </div>
+
+          <!-- 📜 DRIVER END-SHIFT HISTORY (per-day remittance) -->
+          <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl mt-3">
+            <div class="flex flex-wrap items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#222255] gap-2">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">📜 DRIVER END-SHIFT HISTORY</h3>
+              <div class="flex items-center gap-2">
+                <template x-for="r in [[30,'30D'],[60,'60D'],[0,'ALL']]" :key="r[0]">
+                  <button @click="shiftDays=r[0]" class="text-[10px] px-2.5 py-1 rounded-lg font-bold border border-gray-200 dark:border-[#222255]"
+                    :class="shiftDays===r[0] ? 'bg-cyan-600 text-white border-cyan-600' : 'text-gray-500 dark:text-[#7878aa]'" x-text="r[1]"></button>
+                </template>
+                <button @click="exportShiftCSV()" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa]">CSV</button>
+              </div>
+            </div>
+            <div class="p-3">
+              <template x-if="shiftHistoryPaged.length === 0"><p class="text-center text-gray-400 text-xs py-6">Wala pang driver end-shift records.</p></template>
+              <template x-if="shiftHistoryPaged.length > 0">
+                <div class="overflow-x-auto">
+                  <table class="w-full text-xs">
+                    <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                      <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
+                      <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Driver</th>
+                      <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Orders</th>
+                      <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Cash</th>
+                      <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">GCash</th>
+                      <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Total Remitted</th>
+                      <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Ended At</th>
+                    </tr></thead>
+                    <tbody>
+                      <template x-for="s in shiftHistoryPaged" :key="s.driverId + s.shiftDate">
+                        <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                          <td class="px-3 py-2 whitespace-nowrap" x-text="s.shiftDate"></td>
+                          <td class="px-3 py-2 font-semibold" x-text="s.driverName || ('Driver #' + s.driverId)"></td>
+                          <td class="px-3 py-2 text-right" x-text="s.deliveredOrders"></td>
+                          <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(s.cashTotal)"></span></td>
+                          <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(s.gcashTotal)"></span></td>
+                          <td class="px-3 py-2 text-right font-bold text-emerald-600 dark:text-emerald-400">&#8369;<span x-text="fmt((s.cashTotal || 0) + (s.gcashTotal || 0))"></span></td>
+                          <td class="px-3 py-2 text-gray-400 dark:text-[#5a5a8a]" x-text="s.endedAt"></td>
+                        </tr>
+                      </template>
+                      <tr class="bg-gray-50 dark:bg-[#181848] font-black">
+                        <td class="px-3 py-2" colspan="2" x-text="'TOTAL (' + shiftHistoryPaged.length + ' shift(s))'"></td>
+                        <td class="px-3 py-2 text-right" x-text="shiftTotals(shiftHistoryPaged).orders"></td>
+                        <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(shiftTotals(shiftHistoryPaged).cash)"></span></td>
+                        <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(shiftTotals(shiftHistoryPaged).gcash)"></span></td>
+                        <td class="px-3 py-2 text-right text-emerald-600 dark:text-emerald-400">&#8369;<span x-text="fmt(shiftTotals(shiftHistoryPaged).total)"></span></td>
+                        <td class="px-3 py-2"></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </template>
+              <p class="px-1 pt-2 text-[10px] text-gray-400">Cash + GCash na ini-remit ng driver kada end-shift (kasama ang na-carry over na hindi pa na-remit noon).</p>
+            </div>
           </div>
         </div>
       </div>
@@ -2187,7 +2342,7 @@ tailwind.config = {
             <div class="flex gap-2 items-center">
               <select id="stTrfProd" class="flex-1 min-w-0 text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-3 py-2" x-init="
                 $nextTick(async ()=>{
-                  const prods = await fetchJSON(API+'/stock-status?storeId=STORE-20260602-7159');
+                  const prods = await fetchJSON(API+'/stock-status?storeId=STORE-20260602-7159&excludeMasterInactive=true');
                   const sel = $el;
                   sel.innerHTML = '<option value=\'\'>Select product...</option>';
                   prods.filter(p => p.posId > 0).forEach(p => {
@@ -4363,8 +4518,8 @@ tailwind.config = {
 
   </div><!-- /main content -->
 
-  <script src="components.js?v=20260914a"></script>
-  <script src="app.js?v=20260914a"></script>
+  <script src="components.js?v=20260916a"></script>
+  <script src="app.js?v=20260916a"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script>
   /* ── Web login gating (username + PIN, WEB ACCESS only) ── */

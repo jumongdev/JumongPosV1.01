@@ -101,7 +101,7 @@ Alpine.store('app', {
     groupParents: {
       'ai-chat': 'grp-ai', 'ai-kb': 'grp-ai',
       'health': 'grp-system', 'suspect1pc': 'grp-system',
-      'rpt-sales': 'grp-reports', 'rpt-invcost': 'grp-reports', 'rpt-shifts': 'grp-reports', 'analytics': 'grp-reports', 'rpt-invval': 'grp-reports',
+      'rpt-sales': 'grp-reports', 'rpt-invcost': 'grp-reports', 'hq-outflow': 'grp-reports', 'rpt-shifts': 'grp-reports', 'analytics': 'grp-reports', 'rpt-invval': 'grp-reports',
       'grp-reports': 'grp-pos', 'products': 'grp-pos', 'suppliers': 'grp-pos', 'pricecheck': 'grp-pos', 'remittance': 'grp-pos', 'checks': 'grp-pos', 'grp-inv': 'grp-pos',
       'online-orders': 'grp-ecom', 'shop-content': 'grp-ecom', 'msgr-bot': 'grp-ecom', 'restock-requests': 'grp-ecom', 'product-suggestions': 'grp-ecom', 'promo-free-queue': 'grp-ecom', 'feed-posts': 'grp-ecom', 'chats': 'grp-ecom',
       'st-receiving': 'grp-inv', 'st-trail': 'grp-inv', 'st-transfer': 'grp-inv',
@@ -115,7 +115,7 @@ Alpine.store('app', {
     },
     isGroupActive(id) {
       if (id === 'grp-pos' || id === 'grp-reports' || id === 'grp-inv') {
-        if (id === 'grp-reports') return ['rpt-sales', 'rpt-invcost', 'rpt-shifts', 'analytics', 'rpt-invval'].includes(this.section);
+        if (id === 'grp-reports') return ['rpt-sales', 'rpt-invcost', 'hq-outflow', 'rpt-shifts', 'analytics', 'rpt-invval'].includes(this.section);
         if (id === 'grp-inv') return this.section === 'stock' || ['st-receiving', 'st-trail', 'st-transfer'].includes(this.section);
         return this.section === 'products' || this.section === 'suppliers' || this.section === 'pricecheck' || this.section === 'remittance' || this.section === 'checks' || this.section === 'stock' || this.section === 'rpt-sales' || this.section === 'rpt-invcost' || this.section === 'rpt-shifts' || this.section === 'analytics' || this.section === 'rpt-invval';
       }
@@ -1343,6 +1343,11 @@ Alpine.data('customersList', () => ({
           x.prevInvCost = prevInvCost;
           x.expected = prevInvCost + sr - cs;
           x.variance = ic - x.expected;
+          // Non-sale outflows (transfers out + e-commerce holds) — hindi kasama sa COGS kaya
+          // dating negative ang variance. Ito ang TRUE variance pagkatapos alisin sila.
+          x.transfersOut = x.transfersOutCost || 0;
+          x.ecomHold = x.ecomHoldCost || 0;
+          x.trueVar = x.variance + x.transfersOut + x.ecomHold;
           var prevDate = prevDateByStore[x.storeId];
           x.gapDays = prevDate ? Math.round((new Date(x.closeDate) - prevDate) / 86400000) : 0;
           prevInvByStore[x.storeId] = ic;
@@ -1352,6 +1357,50 @@ Alpine.data('customersList', () => ({
         this.d = sorted.sort((a, b) => new Date(b.closeDate) - new Date(a.closeDate));
       } catch (e) { this.d = [] }
       this.loading = false;
+    }
+  }));
+
+  /* ── HQ OUTFLOW (HQ only): e-commerce sales (delivered) + holds, at transfers out sa ibang stores ── */
+  Alpine.data('hqOutflow', () => ({
+    d: null, loading: false, range: '7', from: '', to: '',
+    async init() {
+      this.setRange('7', true);
+      if (Alpine.store('app').section === 'hq-outflow') this.load();
+      this.$watch('$store.app.section', v => { if (v === 'hq-outflow') this.load(); });
+      window.addEventListener('refresh-data', () => { if (Alpine.store('app').section === 'hq-outflow') this.load(); });
+    },
+    _iso(dt) { const y = dt.getFullYear(), m = String(dt.getMonth() + 1).padStart(2, '0'), d = String(dt.getDate()).padStart(2, '0'); return y + '-' + m + '-' + d; },
+    setRange(r, init) {
+      this.range = r;
+      const to = new Date(), from = new Date();
+      if (r === '7') from.setDate(to.getDate() - 6);
+      else if (r === '30') from.setDate(to.getDate() - 29);
+      else if (r === 'month') from.setDate(1);
+      this.from = this._iso(from); this.to = this._iso(to);
+      if (!init) this.load();
+    },
+    async load() {
+      this.loading = true;
+      try { this.d = await fetchJSON(API + '/hq-outflow?from=' + this.from + '&to=' + this.to); }
+      catch (e) { this.d = null }
+      this.loading = false;
+    },
+    fmtDay(d) {
+      const m = { '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec' };
+      const p = String(d || '').split('-');
+      return p.length === 3 ? (m[p[1]] || p[1]) + ' ' + parseInt(p[2], 10) : String(d || '');
+    },
+    storeLabel(x) { return window.shortStore(x.storeId, (Alpine.store('app').storeMap || {})[x.storeId]) || x.storeName || x.storeId; },
+    exportCSV() {
+      if (!this.d) return;
+      const head = ['Date', 'Ecom Orders', 'Ecom Total', 'Ecom Hold Pcs', 'Ecom Hold Cost', 'Transfers', 'Transfer Pcs', 'Transfer Cost'];
+      const rr = (this.d.byDay || []).map(x => [x.date, x.ecomOrders, x.ecomTotal, x.ecomHoldPcs, x.ecomHoldCost, x.transfersCount, x.transfersPcs, x.transfersCost]);
+      const csv = [head, ...rr].map(r => r.map(v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+      const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'hq-outflow-' + this.from + '_' + this.to + '.csv';
+      document.body.appendChild(a); a.click(); a.remove();
     }
   }));
 
@@ -2751,6 +2800,7 @@ Alpine.data('shopContentPanel', () => ({
   /* ── Remittance (NASA DRIVER vs NASA TINDAHAN) ────────────────────────── */
   Alpine.data('remittancePanel', () => ({
     pending: [], pendingRows: [], remitted: { rows: [], total: 0, count: 0 }, closedShifts: [],
+    shiftHistory: [], shiftDays: 30,
     filter: 'ALL', loading: false,
     async init() {
       if (Alpine.store('app').section === 'remittance') await this.load();
@@ -2766,8 +2816,25 @@ Alpine.data('shopContentPanel', () => ({
         this.pendingRows = r.pendingRows || [];
         this.remitted = r.remitted || { rows: [], total: 0, count: 0 };
         this.closedShifts = r.closedShifts || [];
-      } catch (e) { this.pending = []; this.pendingRows = []; this.remitted = { rows: [], total: 0, count: 0 }; this.closedShifts = []; }
+        this.shiftHistory = r.shiftHistory || [];
+      } catch (e) { this.pending = []; this.pendingRows = []; this.remitted = { rows: [], total: 0, count: 0 }; this.closedShifts = []; this.shiftHistory = []; }
       this.loading = false;
+    },
+    get shiftHistoryPaged() { return this.shiftHistory.slice(0, this.shiftDays === 0 ? 9999 : this.shiftDays); },
+    shiftTotals(rows) {
+      const r = rows.reduce((a, x) => { a.orders += x.deliveredOrders || 0; a.cash += x.cashTotal || 0; a.gcash += x.gcashTotal || 0; return a; }, { orders: 0, cash: 0, gcash: 0 });
+      r.total = r.cash + r.gcash;
+      return r;
+    },
+    exportShiftCSV() {
+      const head = ['Date', 'Driver', 'Orders', 'Cash', 'GCash', 'Total Remitted', 'Ended At'];
+      const rr = this.shiftHistoryPaged.map(x => [x.shiftDate, x.driverName, x.deliveredOrders, x.cashTotal, x.gcashTotal, (x.cashTotal || 0) + (x.gcashTotal || 0), x.endedAt]);
+      const csv = [head, ...rr].map(r => r.map(v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+      const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'driver-endshift-' + new Date().toISOString().slice(0, 10) + '.csv';
+      document.body.appendChild(a); a.click(); a.remove();
     },
     get rows() {
       const merged = (this.pendingRows || []).map(p => ({ orderNo: p.orderNo, method: p.method, amount: p.amount, date: p.deliveredDate, status: 'DRIVER', who: p.driverName + ' (hindi pa na-remit)', remittedAt: '' }))
