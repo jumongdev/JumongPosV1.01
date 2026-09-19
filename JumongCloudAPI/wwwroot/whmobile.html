@@ -323,6 +323,13 @@
             <p class="text-gray-500 text-[11px] mt-2">Laki ng text at buttons. Standard = recommended sa phone.</p>
           </div>
           <div class="card mb-3">
+            <p class="text-white text-xs font-bold uppercase tracking-wider mb-3">🔒 Store Lock</p>
+            <p class="text-gray-400 text-[11px] mb-2" id="lockStatus">—</p>
+            <button id="btnLockStore" class="btn-primary" onclick="lockStoreToDevice()">🔒 I-LOCK ANG STORE SA DEVICE NA ITO</button>
+            <button id="btnUnlockStore" class="btn-ghost w-full hidden" onclick="unlockStoreDevice()">🔓 UNLOCK STORE</button>
+            <p class="text-gray-500 text-[11px] mt-2">Kapag naka-lock, hindi na makakapagpalit ng store ang app sa device na ito (hal. U Got phone). I-unlock lang dito sa SETUP.</p>
+          </div>
+          <div class="card mb-3">
             <p class="text-white text-xs font-bold uppercase tracking-wider mb-3">🖨️ Bluetooth Printer</p>
             <p id="printerStatusLine" class="text-[11px] font-bold text-red-400 mb-3">🖨️ NOT CONNECTED</p>
             <div class="grid grid-cols-2 gap-2 mb-3">
@@ -719,7 +726,7 @@
   <script>
     const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
     const IN_APP = typeof AndroidPrinter !== 'undefined';
-    const WEB_VER = '20260919-8';
+    const WEB_VER = '20260919-9';
 
     // ─── Crash reporting: send any native crash.log (from the uncaught-exception
     // handler in MainActivity) to the server on the next successful launch. Also
@@ -923,7 +930,20 @@
     }
 
     // DEFAULT STORE helpers (2026-09-19): huling piniling store = default sa login/reopen.
+    // DEVICE STORE LOCK (2026-09-19): kapag may wh_lock_store, iyon ang laging store ng device
+    // (hindi na makakapagpalit; i-unlock sa SETUP → Store Lock).
+    function getLockStore() { try { return localStorage.getItem('wh_lock_store') || ''; } catch (e) { return ''; } }
     function applySavedStore(stores) {
+      const locked = getLockStore();
+      if (locked) {
+        if ((stores || []).some(s => s.storeId === locked)) {
+          session.storeId = locked;
+          const st = (stores || []).find(s => s.storeId === locked);
+          session.storeName = (st && st.storeName) || locked;
+          return true;
+        }
+        toast('Naka-lock ang device sa ibang store — pumili ng store na may access.', 'warning');
+      }
       const saved = localStorage.getItem('wh_last_store');
       if (saved && (stores || []).some(s => s.storeId === saved)) {
         session.storeId = saved;
@@ -934,6 +954,29 @@
       return false;
     }
     function saveSession() { try { localStorage.setItem('wh_session', JSON.stringify(session)); } catch (e) { } }
+    // ─── STORE LOCK UI (SETUP) ──────────────────────────────
+    function lockStoreToDevice() {
+      if (!session || !session.storeId) { toast('Pumili muna ng store', 'error'); return; }
+      if (!confirm('I-lock ang device na ito sa ' + (session.storeName || session.storeId) + '?\n\nHindi na makakapagpalit ng store ang app dito (hanggang i-unlock sa SETUP).')) return;
+      try { localStorage.setItem('wh_lock_store', session.storeId); } catch (e) { }
+      updateLockUI();
+      toast('Naka-lock na ang device sa ' + (session.storeName || session.storeId));
+    }
+    function unlockStoreDevice() {
+      if (!getLockStore()) { toast('Hindi naka-lock ang device', 'warning'); return; }
+      if (!confirm('I-unlock ang store lock sa device na ito?\n\nMakakapagpalit na muli ng store.')) return;
+      try { localStorage.removeItem('wh_lock_store'); } catch (e) { }
+      updateLockUI();
+      toast('Na-unlock na ang store lock');
+    }
+    function updateLockUI() {
+      const locked = getLockStore();
+      const st = document.getElementById('lockStatus');
+      if (st) st.textContent = locked ? ('NAKA-LOCK sa ' + ((session && session.storeName) || locked)) : 'Hindi naka-lock — malayang makakapagpalit ng store.';
+      const lb = document.getElementById('btnLockStore'), ub = document.getElementById('btnUnlockStore');
+      if (lb) lb.classList.toggle('hidden', !!locked);
+      if (ub) ub.classList.toggle('hidden', !locked);
+    }
 
     function pickDefaultStore(stores) {
       const saved = localStorage.getItem('wh_last_store');
@@ -964,6 +1007,7 @@
       document.getElementById('webVer').textContent = WEB_VER;
       document.getElementById('menuStoreName').textContent = (isWh ? '🏭 ' : '🏬 ') + (session.storeName || session.storeId || '');
       document.getElementById('menuStoreIcon').textContent = isWh ? '🏭' : '🏬';
+      updateLockUI();
       // HQ-only menu items (warehouse ops) — hidden kapag store ang pinili (U Got mobile POS).
       ['menuOnlineOrders', 'menuReceiving', 'menuCreditBilling'].forEach(id => {
         const el = document.getElementById(id); if (el) el.style.display = isHqStore() ? '' : 'none';
@@ -987,6 +1031,7 @@
     }
 
     function openStoreSwitcher() {
+      if (getLockStore()) { toast('Naka-lock ang store sa device na ito (SETUP → Store Lock)', 'warning'); return; }
       const stores = session.stores || [];
       if (stores.length <= 1) return;
       const list = document.getElementById('storeSwitcherList');
