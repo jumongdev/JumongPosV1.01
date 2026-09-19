@@ -67,6 +67,10 @@
   .inv-mode-btn { background: #181848; border: 1px solid #222255; color: #a5a5d0; font-weight: 700; border-radius: 0.6rem; padding: 0.5rem 0.3rem; font-size: 0.85rem; letter-spacing: 0.3px; }
   .inv-mode-btn:active { background: #1e1e52; }
   .inv-mode-btn.active { background: var(--jacc); border-color: var(--jacc); color: white; }
+  /* Cart actions — isang row: SELL NOW | CLEAR | HOLD | HELD */
+  .cart-actions { display: flex; gap: 0.4rem; margin-top: 0.7rem; }
+  .cart-actions button { flex: 1 1 0; min-width: 0; padding: 0.5rem 0.25rem; font-size: 0.85rem; white-space: nowrap; }
+  .cart-actions button.sell { flex: 1.4 1 0; }
 </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -156,11 +160,11 @@
               <p class="text-gray-400 text-sm">TOTAL</p>
               <p class="text-white text-xl font-bold" id="cartTotal">₱0.00</p>
             </div>
-            <button class="btn-green mt-3" id="btnSellNow" onclick="checkout()">SELL NOW</button>
-            <div class="flex gap-2 mt-2">
-              <button class="btn-danger flex-1" onclick="clearCart()">🗑 CLEAR</button>
-              <button class="btn-ghost flex-1" onclick="holdCart()">⏸ HOLD</button>
-              <button class="btn-ghost flex-1" id="btnHeldCarts" onclick="openHeldCarts()">HELD (0)</button>
+            <div class="cart-actions">
+              <button class="btn-green sell" id="btnSellNow" onclick="checkout()">SELL NOW</button>
+              <button class="btn-danger" onclick="clearCart()">CLEAR</button>
+              <button class="btn-ghost" onclick="holdCart()">HOLD</button>
+              <button class="btn-ghost" id="btnHeldCarts" onclick="openHeldCarts()">HELD (0)</button>
             </div>
           </div>
         </div>
@@ -715,7 +719,7 @@
   <script>
     const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
     const IN_APP = typeof AndroidPrinter !== 'undefined';
-    const WEB_VER = '20260919-7';
+    const WEB_VER = '20260919-8';
 
     // ─── Crash reporting: send any native crash.log (from the uncaught-exception
     // handler in MainActivity) to the server on the next successful launch. Also
