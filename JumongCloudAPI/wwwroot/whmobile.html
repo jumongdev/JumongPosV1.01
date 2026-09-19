@@ -715,7 +715,7 @@
   <script>
     const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
     const IN_APP = typeof AndroidPrinter !== 'undefined';
-    const WEB_VER = '20260919-5';
+    const WEB_VER = '20260919-6';
 
     // ─── Crash reporting: send any native crash.log (from the uncaught-exception
     // handler in MainActivity) to the server on the next successful launch. Also
@@ -889,19 +889,37 @@
       try {
         const r = await fetch(API + '/dashboard/whapp/login', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
+          body: JSON.stringify({ username, password, storeId: localStorage.getItem('wh_last_store') || '' })
         });
         const j = await r.json();
         if (!r.ok || !j.success) { errEl.textContent = j.error || 'Login failed'; errEl.classList.remove('hidden'); return; }
         session = j;
-        localStorage.setItem('wh_session', JSON.stringify(j));
         const stores = j.stores || [];
-        if (stores.length > 1) { renderStores(stores); setScreen('store'); }
-        else { if (stores.length === 1) session.storeId = stores[0].storeId; enterMain(); }
+        // DEFAULT STORE (2026-09-19): kung may naka-save na store (wh_last_store) at valid pa,
+        // huwag nang magpakita ng picker — diretso sa store na iyon. Pwede pa ring magpalit sa
+        // burger menu → Store switcher.
+        const hasSaved = applySavedStore(stores);
+        if (!hasSaved && stores.length === 1) { session.storeId = stores[0].storeId; session.storeName = stores[0].storeName || stores[0].storeId; }
+        saveSession();
+        if (stores.length > 1 && !hasSaved) { renderStores(stores); setScreen('store'); }
+        else { enterMain(); }
       } catch (e) {
         errEl.textContent = 'Connection error: ' + e.message; errEl.classList.remove('hidden');
       } finally { btn.disabled = false; btn.textContent = 'SIGN IN'; }
     }
+
+    // DEFAULT STORE helpers (2026-09-19): huling piniling store = default sa login/reopen.
+    function applySavedStore(stores) {
+      const saved = localStorage.getItem('wh_last_store');
+      if (saved && (stores || []).some(s => s.storeId === saved)) {
+        session.storeId = saved;
+        const st = (stores || []).find(s => s.storeId === saved);
+        session.storeName = (st && st.storeName) || saved;
+        return true;
+      }
+      return false;
+    }
+    function saveSession() { try { localStorage.setItem('wh_session', JSON.stringify(session)); } catch (e) { } }
 
     function pickDefaultStore(stores) {
       const saved = localStorage.getItem('wh_last_store');
@@ -920,7 +938,7 @@
         chip.className = 'store-chip' + (s.storeId === defaultId ? ' active' : '');
         const isWh = s.storeId === 'STORE-WAREHOUSE';
         chip.innerHTML = '<span class="text-xl">' + (isWh ? '🏭' : '🏬') + '</span><div class="flex-1"><p class="text-white text-sm font-medium">' + s.storeName + '</p><p class="text-gray-500 text-[11px]">' + s.storeId + '</p></div>';
-        chip.onclick = () => { session.storeId = s.storeId; session.storeName = s.storeName; localStorage.setItem('wh_last_store', s.storeId); enterMain(); };
+        chip.onclick = () => { session.storeId = s.storeId; session.storeName = s.storeName; localStorage.setItem('wh_last_store', s.storeId); saveSession(); enterMain(); };
         list.appendChild(chip);
       });
     }
@@ -970,6 +988,7 @@
           if (current) { closeStoreSwitcher(); return; }
           session.storeId = s.storeId; session.storeName = s.storeName;
           localStorage.setItem('wh_last_store', s.storeId);
+          saveSession();
           cart = [];
           renderCart();
           closeStoreSwitcher();
@@ -3512,6 +3531,7 @@
             if (!s.token) {
               session = s;
               const stores = s.stores || [];
+              applySavedStore(stores);
               if (stores.length > 1 && !session.storeId) { renderStores(stores); setScreen('store'); }
               else { if (stores.length === 1) session.storeId = stores[0].storeId; enterMain(); }
               return;
@@ -3519,13 +3539,14 @@
             fetch(API + '/dashboard/whapp/validate', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ username: s.username, token: s.token, storeId: s.storeId })
+              body: JSON.stringify({ username: s.username, token: s.token, storeId: localStorage.getItem('wh_last_store') || s.storeId || '' })
             }).then(r => r.json()).then(j => {
               if (j.success) {
                 session = j;
-                localStorage.setItem('wh_session', JSON.stringify(j));
                 const stores = j.stores || [];
-                if (stores.length > 1 && !j.storeId) { renderStores(stores); setScreen('store'); }
+                applySavedStore(stores);
+                saveSession();
+                if (stores.length > 1 && !session.storeId) { renderStores(stores); setScreen('store'); }
                 else { if (stores.length === 1) session.storeId = stores[0].storeId; enterMain(); }
               } else {
                 localStorage.removeItem('wh_session');
@@ -3536,6 +3557,7 @@
             }).catch(() => {
               session = s;
               const stores = s.stores || [];
+              applySavedStore(stores);
               if (stores.length > 1 && !session.storeId) { renderStores(stores); setScreen('store'); }
               else { if (stores.length === 1) session.storeId = stores[0].storeId; enterMain(); }
             });
