@@ -729,7 +729,7 @@
   <script>
     const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
     const IN_APP = typeof AndroidPrinter !== 'undefined';
-    const WEB_VER = '20260919-11';
+    const WEB_VER = '20260919-12';
 
     // ─── Crash reporting: send any native crash.log (from the uncaught-exception
     // handler in MainActivity) to the server on the next successful launch. Also
@@ -918,7 +918,8 @@
         const j = await r.json();
         if (!r.ok || !j.success) { errEl.textContent = j.error || 'Login failed'; errEl.classList.remove('hidden'); return; }
         session = j;
-        const stores = j.stores || [];
+        const stores = visibleStores(j.stores);
+        session.stores = stores;
         // DEVICE STORE LOCK: kahit sino ang mag-login, hindi makakapasok kung walang access sa locked store.
         if (storeLockBlocked(stores)) {
           localStorage.removeItem('wh_session');
@@ -1002,11 +1003,16 @@
       if (ub) ub.classList.toggle('hidden', !locked);
     }
 
+    // STORE CHOICES (2026-09-19): WAREHOUSE retired (wala na sa choices);
+    // STORE-DEV-0001 (TEST) = admin lang.
+    function visibleStores(stores, role) {
+      const r = role || (session && session.role) || '';
+      return (stores || []).filter(s => s.storeId !== 'STORE-WAREHOUSE' && (s.storeId !== 'STORE-DEV-0001' || r === 'Admin'));
+    }
     function pickDefaultStore(stores) {
       const saved = localStorage.getItem('wh_last_store');
       if (saved && stores.find(s => s.storeId === saved)) return saved;
-      const wh = stores.find(s => s.storeId === 'STORE-WAREHOUSE');
-      return wh ? wh.storeId : (stores[0] ? stores[0].storeId : '');
+      return stores[0] ? stores[0].storeId : '';
     }
 
     function renderStores(stores) {
@@ -2273,6 +2279,7 @@
         source: 'mobile',
         stockSource: isHqStore() ? 'hq' : 'store',
         storeId: isHqStore() ? null : session.storeId,
+        cashierName: session.fullName || session.username || '',
         items
       };
       try {
@@ -2545,7 +2552,7 @@
           div.className = 'card';
           div.innerHTML = '<div class="flex items-center justify-between" onclick="loadSaleItems(' + x.id + ',\'' + String(x.invoiceNo || x.id).replace(/'/g, '') + '\')"><div><p class="text-white text-sm font-bold">' + (x.invoiceNo || ('#' + x.id)) +
             ' <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ' + pmCls + '">' + pm + '</span></p>' +
-            '<p class="text-gray-500 text-[11px]">' + (x.customerName || 'Walk-in Customer') + ' • ' + dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) + '</p></div>' +
+            '<p class="text-gray-500 text-[11px]">' + (x.customerName || 'Walk-in Customer') + (x.cashierName ? ' • ' + x.cashierName : '') + ' • ' + dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) + '</p></div>' +
             '<p class="text-cyan-400 text-sm font-bold">₱' + Number(x.total || 0).toFixed(2) + '</p></div>';
           list.appendChild(div);
         });
@@ -2786,9 +2793,9 @@
       const list = document.getElementById('transfersList');
       list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Loading...</p>';
       try {
-        // Store-aware (2026-09-19): papasok + papaalis na transfers ng NAPILING store lang.
+        // Store-aware (2026-09-19): PAPAALIS lang (mga transfer na GINAWA ng store) — direction=out.
         const sid = session.storeId || HQ_STORE;
-        const r = await fetch(API + '/dashboard/warehouse/transfers?storeId=' + encodeURIComponent(sid));
+        const r = await fetch(API + '/dashboard/warehouse/transfers?storeId=' + encodeURIComponent(sid) + '&direction=out');
         const j = await r.json();
         const rows = (j && j.items) ? j.items : [];
         list.innerHTML = '';
@@ -2845,7 +2852,7 @@
       try {
         const r = await fetch(API + '/dashboard/warehouse/clients');
         const data = await r.json();
-        (data || []).filter(c => c.storeType === 'pos' && c.storeId !== 'STORE-WAREHOUSE' && (isHqStore() ? c.storeId !== HQ_STORE : c.storeId !== session.storeId)).forEach(c => {
+        (data || []).filter(c => c.storeType === 'pos' && c.storeId !== 'STORE-WAREHOUSE' && c.storeId !== 'STORE-DEV-0001' && (isHqStore() ? c.storeId !== HQ_STORE : c.storeId !== session.storeId)).forEach(c => {
           const o = document.createElement('option');
           o.value = c.id;
           o.textContent = c.name;
@@ -2944,6 +2951,7 @@
         storeId: txClientStoreId,
         source: isHqStore() ? 'hq' : 'store',
         fromStoreId: isHqStore() ? null : session.storeId,
+        createdBy: session.fullName || session.username || '',
         items: txItems.map(x => ({ productId: x.productId, productName: x.productName, barcode: x.barcode, qty: x.qty }))
       };
       const btn = document.querySelector('#tabNewTransfer .btn-green');
@@ -3176,7 +3184,7 @@
       const source = recvSourceValue();
       if (!source) { toast('Pumili ng source (store o supplier)', 'error'); return; }
       if (!recvCart.length) { toast('Add at least one item', 'error'); return; }
-      const body = { source, stockSource: isHqStore() ? 'hq' : 'store', storeId: isHqStore() ? null : session.storeId, items: recvCart.map(i => ({ productId: i.id, qty: i.qty })) };
+      const body = { source, stockSource: isHqStore() ? 'hq' : 'store', storeId: isHqStore() ? null : session.storeId, userName: session.fullName || session.username || '', items: recvCart.map(i => ({ productId: i.id, qty: i.qty })) };
       const btn = document.getElementById('btnSaveReceiving');
       btn.disabled = true; btn.textContent = 'SAVING...';
       try {
@@ -3212,25 +3220,23 @@
     let lastReceiving = null;
 
     // ─── RECEIVING SOURCE PICKER (2026-09-19) ───────────────
-    // Source = ang IBANG stores (kung U Got → HQ/HVR/ACGS; kung HQ → U Got/HVR/ACGS)
-    // + "Iba pa" para sa supplier (free text). Store-aware na ang receiving (destination = selected store).
+    // Source = SUPPLIERS (cloud suppliers table, active lang) + "Iba pa" para sa manual na pangalan.
     let recvSourcesLoaded = false;
     async function loadRecvSources() {
       const sel = document.getElementById('recvSourceSel');
       if (!sel || recvSourcesLoaded) return;
       try {
-        const r = await fetch(API + '/dashboard/warehouse/clients');
+        const r = await fetch(API + '/dashboard/suppliers');
         const data = await r.json();
-        const cur = session.storeId || '';
-        (data || []).filter(c => c.storeType === 'pos' && c.storeId !== 'STORE-WAREHOUSE' && c.storeId !== 'STORE-DEV-0001' && c.storeId !== cur).forEach(c => {
+        (data || []).forEach(sp => {
           const o = document.createElement('option');
-          o.value = c.name;
-          o.textContent = c.name;
+          o.value = sp.companyName;
+          o.textContent = sp.companyName + (sp.agent ? ' (' + sp.agent + ')' : '');
           sel.appendChild(o);
         });
         const o2 = document.createElement('option');
         o2.value = '__other__';
-        o2.textContent = '✏️ Iba pa (supplier — i-type)';
+        o2.textContent = '✏️ Iba pa (i-type)';
         sel.appendChild(o2);
         recvSourcesLoaded = true;
       } catch (e) { }
@@ -3667,7 +3673,8 @@
           if (s && s.success) {
             if (!s.token) {
               session = s;
-              const stores = s.stores || [];
+              const stores = visibleStores(s.stores);
+              session.stores = stores;
               if (storeLockBlocked(stores)) {
                 localStorage.removeItem('wh_session');
                 setScreen('login');
@@ -3685,7 +3692,7 @@
               body: JSON.stringify({ username: s.username, token: s.token, storeId: localStorage.getItem('wh_last_store') || s.storeId || '' })
             }).then(r => r.json()).then(j => {
               if (j.success) {
-                const lockStores = j.stores || [];
+                const lockStores = visibleStores(j.stores);
                 if (storeLockBlocked(lockStores)) {
                   localStorage.removeItem('wh_session');
                   setScreen('login');
@@ -3693,7 +3700,8 @@
                   return;
                 }
                 session = j;
-                const stores = j.stores || [];
+                const stores = lockStores;
+                session.stores = stores;
                 applySavedStore(stores);
                 saveSession();
                 if (stores.length > 1 && !session.storeId) { renderStores(stores); setScreen('store'); }
@@ -3706,7 +3714,8 @@
               }
             }).catch(() => {
               session = s;
-              const stores = s.stores || [];
+              const stores = visibleStores(s.stores);
+              session.stores = stores;
               if (storeLockBlocked(stores)) { localStorage.removeItem('wh_session'); setScreen('login'); return; }
               applySavedStore(stores);
               if (stores.length > 1 && !session.storeId) { renderStores(stores); setScreen('store'); }

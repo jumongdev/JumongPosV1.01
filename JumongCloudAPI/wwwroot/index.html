@@ -996,6 +996,7 @@ tailwind.config = {
                                 <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Invoice</th>
                                 <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
                                 <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Customer</th>
+                                <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Cashier</th>
                                 <th class="text-center px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Payment</th>
                                 <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Items</th>
                                 <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Total</th>
@@ -1006,13 +1007,14 @@ tailwind.config = {
                                     <td class="px-3 py-2 whitespace-nowrap font-semibold" x-text="x.invoiceNo || ('#' + x.id)"></td>
                                     <td class="px-3 py-2 whitespace-nowrap" x-text="fmtDate(x.createdAt)"></td>
                                     <td class="px-3 py-2" x-text="x.customerName || 'Walk-in'"></td>
+                                    <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.cashierName || '—'"></td>
                                     <td class="px-3 py-2 text-center"><span class="text-[9px] font-black px-1.5 py-0.5 rounded" :class="pmCls(x.paymentMethod)" x-text="(x.paymentMethod || 'Cash').toUpperCase()"></span></td>
                                     <td class="px-3 py-2 text-right" x-text="x.itemCount"></td>
                                     <td class="px-3 py-2 text-right" x-text="'&#8369;' + fmt(x.total)"></td>
                                   </tr>
                                 </template>
                                 <tr class="bg-gray-50 dark:bg-[#181848]/60 font-bold">
-                                  <td class="px-3 py-2" colspan="5" x-text="'TOTAL (' + salesTotals(s.id).count + ')'"></td>
+                                  <td class="px-3 py-2" colspan="6" x-text="'TOTAL (' + salesTotals(s.id).count + ')'"></td>
                                   <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(salesTotals(s.id).total)"></span></td>
                                 </tr>
                               </tbody>
@@ -2514,7 +2516,7 @@ tailwind.config = {
                   const clients = await fetchJSON(API+'/warehouse/clients');
                   const sel = $el;
                   sel.innerHTML = '<option value=\'\'>Select POS client...</option>';
-                  clients.filter(c=>c.storeType==='pos' && c.storeId!=='STORE-WAREHOUSE' && c.storeId!=='STORE-20260602-7159').forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; o.setAttribute('data-sid',c.storeId||''); sel.appendChild(o) });
+                  clients.filter(c=>c.storeType==='pos' && c.storeId!=='STORE-WAREHOUSE' && c.storeId!=='STORE-20260602-7159' && c.storeId!=='STORE-DEV-0001').forEach(c => { const o = document.createElement('option'); o.value = c.id; o.textContent = c.name; o.setAttribute('data-sid',c.storeId||''); sel.appendChild(o) });
                 })">
             </select>
           </div>
@@ -4700,8 +4702,8 @@ tailwind.config = {
 
   </div><!-- /main content -->
 
-  <script src="components.js?v=20260919"></script>
-  <script src="app.js?v=20260919"></script>
+  <script src="components.js?v=20260919b"></script>
+  <script src="app.js?v=20260919b"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script>
   /* ── Web login gating (username + PIN, WEB ACCESS only) ── */

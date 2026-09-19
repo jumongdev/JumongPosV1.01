@@ -876,6 +876,13 @@ public static class PgDatabaseHelper
             CREATE INDEX IF NOT EXISTS idx_wh_daily_closes_store ON wh_daily_closes(store_id)";
         try { whDcDenoms.ExecuteNonQuery(); } catch { }
 
+        // Reporting tags (2026-09-19): sino ang login user na gumawa ng transaction (mobile POS).
+        using var whReportMig = conn.CreateCommand();
+        whReportMig.CommandText = @"
+            ALTER TABLE wh_walkin_sales ADD COLUMN IF NOT EXISTS cashier_name TEXT NOT NULL DEFAULT '';
+            ALTER TABLE wh_transfers ADD COLUMN IF NOT EXISTS created_by TEXT NOT NULL DEFAULT ''";
+        try { whReportMig.ExecuteNonQuery(); } catch { }
+
         using var raMig = conn.CreateCommand();
         raMig.CommandText = @"
             CREATE TABLE IF NOT EXISTS receipt_audits (

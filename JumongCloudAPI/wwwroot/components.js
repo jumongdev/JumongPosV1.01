@@ -1497,8 +1497,8 @@ Alpine.data('customersList', () => ({
     exportSalesCSV(sid) {
       const rr = this.salesList(sid);
       if (!rr.length) return;
-      const head = ['Date', 'Invoice', 'Customer', 'Payment', 'Items', 'Total', 'Status'];
-      const rows = rr.map(x => [new Date(x.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }), x.invoiceNo, x.customerName, x.paymentMethod, x.itemCount, x.total, x.isVoided ? 'VOIDED' : 'OK']);
+      const head = ['Date', 'Invoice', 'Customer', 'Cashier', 'Payment', 'Items', 'Total', 'Status'];
+      const rows = rr.map(x => [new Date(x.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }), x.invoiceNo, x.customerName, x.cashierName, x.paymentMethod, x.itemCount, x.total, x.isVoided ? 'VOIDED' : 'OK']);
       const lbl = (this.stores.find(s => s.id === sid) || {}).label || sid;
       this._csv(head, rows, 'mobile-pos-sales-' + lbl.replace(/\s+/g, '-').toLowerCase() + '-' + this.from + '_' + this.to + '.csv');
     }
