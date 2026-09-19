@@ -715,7 +715,7 @@
   <script>
     const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
     const IN_APP = typeof AndroidPrinter !== 'undefined';
-    const WEB_VER = '20260919-4';
+    const WEB_VER = '20260919-5';
 
     // ─── Crash reporting: send any native crash.log (from the uncaught-exception
     // handler in MainActivity) to the server on the next successful launch. Also
@@ -947,7 +947,7 @@
       if (tab === 'sales') loadSales();
       if (tab === 'products') loadProducts();
       if (tab === 'transfers') loadTransfers();
-      document.getElementById('appInfo').textContent = IN_APP ? 'App version: ' + AndroidApp.getVersion() + ' (native APK with Bluetooth)' : 'Browser mode (no Bluetooth print)';
+      document.getElementById('appInfo').textContent = (IN_APP ? 'App version: ' + (AndroidApp.getVersion() || '?') + ' (native APK with Bluetooth)' : 'Browser mode (no Bluetooth print)') + ' · Web: ' + WEB_VER;
       loadPaperWidth();
       if (IN_APP) { refreshPrinters(); if (AndroidPrinter.isConnected()) updatePrinterStatus(true); }
       else updatePrinterStatus(false, 'Browser mode');
