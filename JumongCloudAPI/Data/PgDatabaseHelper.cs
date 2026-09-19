@@ -565,6 +565,11 @@ public static class PgDatabaseHelper
             -- HQ-source transfers (same table): 'warehouse' = legacy warehouse-to-POS, 'hq' = HQ-to-POS
             ALTER TABLE wh_transfers ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'warehouse';
             CREATE INDEX IF NOT EXISTS idx_wh_transfers_source ON wh_transfers(source);
+            -- Store-source transfers (2026-09-18): source='store' + from_store_id = source store.
+            -- 'hq' rows = HQ (backfilled). Mobile POS: U Got -> ACGS/HVR/HQ.
+            ALTER TABLE wh_transfers ADD COLUMN IF NOT EXISTS from_store_id TEXT NOT NULL DEFAULT '';
+            UPDATE wh_transfers SET from_store_id = 'STORE-20260602-7159' WHERE source = 'hq' AND from_store_id = '';
+            CREATE INDEX IF NOT EXISTS idx_wh_transfers_from_store ON wh_transfers(from_store_id);
             -- HQ transfers store the HQ products.pos_id in product_id (barcode is the true linkage),
             -- so the wh_products FK would reject them - drop it (validation is done in the endpoint)
             ALTER TABLE wh_transfer_items DROP CONSTRAINT IF EXISTS wh_transfer_items_product_id_fkey;
@@ -865,7 +870,10 @@ public static class PgDatabaseHelper
             ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS denom20 NUMERIC NOT NULL DEFAULT 0;
             ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS denom_coins NUMERIC NOT NULL DEFAULT 0;
             ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS sale_count INTEGER NOT NULL DEFAULT 0;
-            ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS credit_collected NUMERIC NOT NULL DEFAULT 0";
+            ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS credit_collected NUMERIC NOT NULL DEFAULT 0;
+            -- Mobile POS end-shift per store (2026-09-18): HQ default para sa lumang rows.
+            ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS store_id TEXT NOT NULL DEFAULT 'STORE-20260602-7159';
+            CREATE INDEX IF NOT EXISTS idx_wh_daily_closes_store ON wh_daily_closes(store_id)";
         try { whDcDenoms.ExecuteNonQuery(); } catch { }
 
         using var raMig = conn.CreateCommand();

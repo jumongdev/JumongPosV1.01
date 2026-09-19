@@ -101,7 +101,7 @@ Alpine.store('app', {
     groupParents: {
       'ai-chat': 'grp-ai', 'ai-kb': 'grp-ai',
       'health': 'grp-system', 'suspect1pc': 'grp-system',
-      'rpt-sales': 'grp-reports', 'rpt-invcost': 'grp-reports', 'hq-outflow': 'grp-reports', 'rpt-shifts': 'grp-reports', 'analytics': 'grp-reports', 'rpt-invval': 'grp-reports',
+      'rpt-sales': 'grp-reports', 'rpt-invcost': 'grp-reports', 'hq-outflow': 'grp-reports', 'mpos-shifts': 'grp-reports', 'rpt-shifts': 'grp-reports', 'analytics': 'grp-reports', 'rpt-invval': 'grp-reports',
       'grp-reports': 'grp-pos', 'products': 'grp-pos', 'suppliers': 'grp-pos', 'pricecheck': 'grp-pos', 'remittance': 'grp-pos', 'checks': 'grp-pos', 'grp-inv': 'grp-pos',
       'online-orders': 'grp-ecom', 'shop-content': 'grp-ecom', 'msgr-bot': 'grp-ecom', 'restock-requests': 'grp-ecom', 'product-suggestions': 'grp-ecom', 'promo-free-queue': 'grp-ecom', 'feed-posts': 'grp-ecom', 'chats': 'grp-ecom',
       'st-receiving': 'grp-inv', 'st-trail': 'grp-inv', 'st-transfer': 'grp-inv',
@@ -1401,6 +1401,106 @@ Alpine.data('customersList', () => ({
       a.href = URL.createObjectURL(blob);
       a.download = 'hq-outflow-' + this.from + '_' + this.to + '.csv';
       document.body.appendChild(a); a.click(); a.remove();
+    }
+  }));
+
+  // MOBILE POS panel (per-store mobile POS: SALES + END SHIFTS — HQ + U Got)
+  Alpine.data('mobilePos', () => ({
+    tab: 'sales',
+    loading: true,
+    shifts: {},
+    sales: {},
+    range: '7', from: '', to: '',
+    saleModal: null, saleItems: [], saleLoading: false,
+    stores: [
+      { id: 'STORE-20260602-7159', label: 'MOBILE POS HQ' },
+      { id: 'STORE-20260622-E174', label: 'MOBILE POS U GOT' }
+    ],
+    async init() {
+      this.setRange('7', true);
+      if (Alpine.store('app').section === 'mpos-shifts') this.load();
+      this.$watch('$store.app.section', v => { if (v === 'mpos-shifts') this.load(); });
+      window.addEventListener('refresh-data', () => { if (Alpine.store('app').section === 'mpos-shifts') this.load(); });
+    },
+    _iso(dt) { const y = dt.getFullYear(), m = String(dt.getMonth() + 1).padStart(2, '0'), d = String(dt.getDate()).padStart(2, '0'); return y + '-' + m + '-' + d; },
+    setRange(r, init) {
+      this.range = r;
+      const to = new Date(), from = new Date();
+      if (r === '7') from.setDate(to.getDate() - 6);
+      else if (r === '30') from.setDate(to.getDate() - 29);
+      else if (r === 'month') from.setDate(1);
+      this.from = this._iso(from); this.to = this._iso(to);
+      if (!init) this.load();
+    },
+    async load() {
+      this.loading = true;
+      const shifts = {}, sales = {};
+      for (const s of this.stores) {
+        try { shifts[s.id] = await fetchJSON(API + '/warehouse/shifts?limit=100&storeId=' + encodeURIComponent(s.id)) || []; }
+        catch (e) { shifts[s.id] = []; }
+        try { sales[s.id] = await fetchJSON(API + '/warehouse/sales?limit=500&storeId=' + encodeURIComponent(s.id) + '&from=' + this.from + '&to=' + this.to) || []; }
+        catch (e) { sales[s.id] = []; }
+      }
+      this.shifts = shifts; this.sales = sales;
+      this.loading = false;
+    },
+    // ── End shifts ──
+    list(sid) { return this.shifts[sid] || []; },
+    totals(sid) {
+      const rr = this.list(sid);
+      const sum = k => rr.reduce((a, x) => a + Number(x[k] || 0), 0);
+      return { count: rr.length, sales: sum('totalSales'), cash: sum('totalCash'), ew: sum('totalEw'), credit: sum('totalCredit'), expenses: sum('expenses'), cashOnHand: sum('cashOnHand'), diff: sum('difference') };
+    },
+    // ── Mobile sales ──
+    salesList(sid) { return this.sales[sid] || []; },
+    salesTotals(sid) {
+      const rr = this.salesList(sid);
+      const ok = rr.filter(x => !x.isVoided);
+      const sum = arr => arr.reduce((a, x) => a + Number(x.total || 0), 0);
+      return {
+        count: rr.length,
+        total: sum(ok),
+        voidedCount: rr.length - ok.length,
+        cash: sum(ok.filter(x => x.paymentMethod === 'Cash')),
+        ew: sum(ok.filter(x => x.paymentMethod === 'E-Wallet')),
+        credit: sum(ok.filter(x => x.paymentMethod === 'Credit'))
+      };
+    },
+    async openSale(x) {
+      this.saleModal = x; this.saleItems = []; this.saleLoading = true;
+      try { this.saleItems = await fetchJSON(API + '/warehouse/sales/' + x.id + '/items') || []; }
+      catch (e) { this.saleItems = []; }
+      this.saleLoading = false;
+    },
+    closeSale() { this.saleModal = null; this.saleItems = []; },
+    // ── helpers ──
+    fmt(n) { return Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+    fmtDate(d) { return d ? new Date(d).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) : ''; },
+    diffCls(v) { const n = Number(v || 0); return n === 0 ? 'text-gray-500 dark:text-slate-300' : (n > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'); },
+    pmCls(pm) { return pm === 'E-Wallet' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : pm === 'Credit' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'; },
+    _csv(head, rows, name) {
+      const csv = [head, ...rows].map(r => r.map(v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+      const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+    },
+    exportCSV(sid) {
+      const rr = this.list(sid);
+      if (!rr.length) return;
+      const head = ['Date', 'Cashier', 'Sales', 'Cash', 'EWallet', 'Credit', 'Expenses', 'CashOnHand', 'Difference'];
+      const rows = rr.map(x => [new Date(x.closeDate).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }), x.cashierName, x.totalSales, x.totalCash, x.totalEw, x.totalCredit, x.expenses, x.cashOnHand, x.difference]);
+      const lbl = (this.stores.find(s => s.id === sid) || {}).label || sid;
+      this._csv(head, rows, 'mobile-pos-shifts-' + lbl.replace(/\s+/g, '-').toLowerCase() + '.csv');
+    },
+    exportSalesCSV(sid) {
+      const rr = this.salesList(sid);
+      if (!rr.length) return;
+      const head = ['Date', 'Invoice', 'Customer', 'Payment', 'Items', 'Total', 'Status'];
+      const rows = rr.map(x => [new Date(x.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }), x.invoiceNo, x.customerName, x.paymentMethod, x.itemCount, x.total, x.isVoided ? 'VOIDED' : 'OK']);
+      const lbl = (this.stores.find(s => s.id === sid) || {}).label || sid;
+      this._csv(head, rows, 'mobile-pos-sales-' + lbl.replace(/\s+/g, '-').toLowerCase() + '-' + this.from + '_' + this.to + '.csv');
     }
   }));
 

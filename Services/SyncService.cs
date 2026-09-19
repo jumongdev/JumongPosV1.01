@@ -735,7 +735,10 @@ public static class SyncService
     /// </summary>
     public static async Task PullStockDeltasAsync()
     {
-        if (StoreId != "STORE-20260602-7159") return;
+        // 2026-09-18: dating HQ-only ito. Ngayon LAHAT ng stores ay nag-a-apply ng server stock
+        // deltas (mobile POS SELL/TRANSFER ng store, at iba pang server-side stock changes) —
+        // pos_id < 0 rows sa stock_trails -> local StockQty + StockTrail, tapos push + ack.
+        if (string.IsNullOrEmpty(StoreId) || StoreId == "STORE-DEV-0001") return;
         try
         {
             long lastId = 0;

@@ -397,10 +397,10 @@
           <div class="menu-row" onclick="goProducts()"><span>📦</span>Product</div>
           <div class="menu-row" onclick="goInventory('all')"><span>📊</span>Inventory</div>
           <div class="menu-row" onclick="goSalesReport()"><span>🧾</span>Sales</div>
-          <div class="menu-row" onclick="goOnlineOrders()"><span>🛒</span>Online Orders</div>
+          <div class="menu-row" id="menuOnlineOrders" onclick="goOnlineOrders()"><span>🛒</span>Online Orders</div>
           <div class="menu-row" onclick="goTransfers()"><span>🚚</span>Transfer</div>
-          <div class="menu-row" onclick="goReceiving()"><span>📥</span>Receiving</div>
-          <div class="menu-row" onclick="openCreditBilling()"><span>💳</span>Credit Billing</div>
+          <div class="menu-row" id="menuReceiving" onclick="goReceiving()"><span>📥</span>Receiving</div>
+          <div class="menu-row" id="menuCreditBilling" onclick="openCreditBilling()"><span>💳</span>Credit Billing</div>
           <div class="menu-row" onclick="goEndShift()"><span>🔒</span>End Shift</div>
         </div>
 
@@ -457,9 +457,16 @@
           <p class="text-white font-bold text-base">Select Customer</p>
           <button onclick="closeCustPicker()" class="text-red-400 text-lg font-bold">✕</button>
         </div>
-        <div class="flex gap-2 mb-3">
+        <div class="flex gap-2 mb-2">
           <input id="custSearch" class="input-field flex-1" type="text" placeholder="🔍 Search name or phone" enterkeyhint="search">
           <button class="btn-ghost px-4" onclick="searchCustomers()">SEARCH</button>
+        </div>
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-[10px] text-gray-500">⭐ May points lang (QR) — "Lahat" para sa Credit</span>
+          <div class="flex gap-1">
+            <button id="custFQr" onclick="setCustFilter(false)" class="text-[10px] px-2.5 py-1 rounded-lg font-bold border">⭐ QR</button>
+            <button id="custFAll" onclick="setCustFilter(true)" class="text-[10px] px-2.5 py-1 rounded-lg font-bold border">Lahat</button>
+          </div>
         </div>
         <button class="btn-ghost w-full mb-3" onclick="pickCustomer(null)">🚶 Walk-in (no customer)</button>
         <div id="custResults" class="space-y-2"></div>
@@ -692,7 +699,7 @@
   <script>
     const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
     const IN_APP = typeof AndroidPrinter !== 'undefined';
-    const WEB_VER = '20260916-1';
+    const WEB_VER = '20260919-1';
 
     // ─── Crash reporting: send any native crash.log (from the uncaught-exception
     // handler in MainActivity) to the server on the next successful launch. Also
@@ -726,6 +733,11 @@
       } catch (e) {}
     }
     let session = null;
+    // ─── STORE-AWARE SOURCE (2026-09-18) ───────────────────
+    // Isang app, store/user ang difference: HQ = source=hq; ibang store = source=store&storeId=.
+    const HQ_STORE = 'STORE-20260602-7159';
+    function isHqStore() { return !session || !session.storeId || session.storeId === HQ_STORE; }
+    function srcQ() { return isHqStore() ? 'source=hq' : ('source=store&storeId=' + encodeURIComponent(session.storeId)); }
     let cart = [];
     let currentProduct = null;
     let selectedUnitIndex = 0;
@@ -856,6 +868,12 @@
       document.getElementById('webVer').textContent = WEB_VER;
       document.getElementById('menuStoreName').textContent = (isWh ? '🏭 ' : '🏬 ') + (session.storeName || session.storeId || '');
       document.getElementById('menuStoreIcon').textContent = isWh ? '🏭' : '🏬';
+      // HQ-only menu items (warehouse ops) — hidden kapag store ang pinili (U Got mobile POS).
+      ['menuOnlineOrders', 'menuReceiving', 'menuCreditBilling'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.style.display = isHqStore() ? '' : 'none';
+      });
+      // Customer chat 💬 = HQ customer service (online shop) — hidden sa store mode.
+      const fab = document.getElementById('chatFab'); if (fab) fab.style.display = isHqStore() ? '' : 'none';
       setScreen('main');
       const savedTab = localStorage.getItem('wh_tab');
       const tab = (savedTab === 'inventory' || savedTab === 'setup' || savedTab === 'sales' || savedTab === 'products' || savedTab === 'transfers') ? savedTab : 'sell';
@@ -1502,7 +1520,7 @@
       const q = document.getElementById('sellSearch').value.trim();
       const box = document.getElementById('productResults');
       if (!q) { box.innerHTML = ''; return; }
-      const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true&source=hq&excludeMasterInactive=true';
+      const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true&' + srcQ() + '&excludeMasterInactive=true';
       try {
         const r = await fetch(url);
         const data = await r.json();
@@ -1528,7 +1546,7 @@
     async function ensureSellProdCache() {
       if (sellProdCacheLoaded) return;
       try {
-        const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&source=hq');
+        const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&' + srcQ());
         const data = await r.json();
         sellProdCache = data || [];
         sellProdCacheLoaded = true;
@@ -1616,7 +1634,7 @@
       list.innerHTML = '';
       document.getElementById('cartEmpty').style.display = cart.length ? 'none' : 'block';
       document.getElementById('cartCount').textContent = cart.length + ' item(s)';
-      document.getElementById('custName').textContent = selectedCustomer ? selectedCustomer.name : 'Walk-in Customer';
+      document.getElementById('custName').textContent = selectedCustomer ? ((selectedCustomer.qr ? '⭐ ' : '') + selectedCustomer.name) : 'Walk-in Customer';
       let total = 0;
       cart.forEach((c, i) => {
         total += c.price * c.qty;
@@ -1683,9 +1701,22 @@
     }
 
     // ─── CUSTOMER PICKER ────────────────────────────────────
+    let custShowAll = false; // false = ⭐ QR customers lang (may points); true = lahat (para sa Credit)
+    function setCustFilter(all) {
+      custShowAll = !!all;
+      const qr = document.getElementById('custFQr'), al = document.getElementById('custFAll');
+      const on = 'bg-cyan-600 text-white border-cyan-600';
+      const off = 'border-[#222255] text-gray-400';
+      if (qr) qr.className = 'text-[10px] px-2.5 py-1 rounded-lg font-bold border ' + (!custShowAll ? on : off);
+      if (al) al.className = 'text-[10px] px-2.5 py-1 rounded-lg font-bold border ' + (custShowAll ? on : off);
+      searchCustomers();
+    }
+
     function openCustPicker() {
       document.getElementById('custResults').innerHTML = '';
       document.getElementById('custSearch').value = '';
+      custShowAll = false;
+      setCustFilter(false);
       show(document.getElementById('custPickerModal'));
       setTimeout(() => { const s = document.getElementById('custSearch'); if (s) s.focus(); }, 100);
     }
@@ -1782,16 +1813,19 @@
       const box = document.getElementById('custResults');
       box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading...</p>';
       try {
-        const r = await fetch(API + '/dashboard/warehouse/customers?search=' + encodeURIComponent(q), { signal: AbortSignal.timeout(12000) });
+        const r = await fetch(API + '/dashboard/warehouse/customers?search=' + encodeURIComponent(q) + (custShowAll ? '' : '&qrOnly=true'), { signal: AbortSignal.timeout(12000) });
         const data = await r.json();
         box.innerHTML = '';
-        if (!data || !data.length) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">No customers found</p>'; return; }
+        if (!data || !data.length) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">' + (custShowAll ? 'No customers found' : 'Walang QR customer na nahanap — i-tap ang "Lahat" para sa credit customers') + '</p>'; return; }
         data.forEach(c => {
+          const hasQr = !!c.qrCode;
           const d = document.createElement('div');
           d.className = 'cart-item';
-          d.innerHTML = '<div class="flex-1"><p class="text-white text-xs font-bold">' + c.name + '</p>' +
-            '<p class="text-gray-500 text-[10px]">' + (c.phone || 'no phone') + (c.creditBalance > 0 ? ' • credit ₱' + Number(c.creditBalance).toFixed(2) : '') + '</p></div>' +
-            '<button class="btn-green px-3 py-1.5 text-[10px]" onclick="pickCustomer({id:' + c.id + ',name:\'' + String(c.name).replace(/'/g, '') + '\'})">SELECT</button>';
+          d.innerHTML = '<div class="flex-1"><p class="text-white text-xs font-bold">' + (hasQr ? '⭐ ' : '') + c.name + '</p>' +
+            '<p class="text-gray-500 text-[10px]">' + (c.phone || 'no phone') +
+            (hasQr ? ' • ⭐ ' + Number(c.points || 0) + ' pts' : ' • walang points account') +
+            (c.creditBalance > 0 ? ' • credit ₱' + Number(c.creditBalance).toFixed(2) : '') + '</p></div>' +
+            '<button class="btn-green px-3 py-1.5 text-[10px]" onclick=\'pickCustomer({id:' + c.id + ',name:' + JSON.stringify(String(c.name)) + ',qr:' + hasQr + ',points:' + Number(c.points || 0) + '})\'>SELECT</button>';
           box.appendChild(d);
         });
       } catch (e) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Failed: ' + e.message + '</p>'; }
@@ -2046,6 +2080,7 @@
     async function confirmPay() {
       const method = document.getElementById('payMethod').value;
       const cash = parseFloat(document.getElementById('payCash').value) || 0;
+      if (method === 'Credit' && !selectedCustomer) { toast('Credit payment requires a customer (i-tap ang customer name → SELECT)', 'error'); return; }
       if (method === 'Cash' && cash < pendingPay) { toast('Cash must cover the total', 'error'); return; }
       const items = cart.map(c => ({ productId: c.productId, productName: c.productName, unitIndex: c.unitIndex, qty: c.qty, price: c.price, unitName: c.unitName, qtyPerUnit: c.qtyPerUnit || 1 }));
       const body = {
@@ -2054,7 +2089,8 @@
         paymentMethod: method,
         cashReceived: cash,
         source: 'mobile',
-        stockSource: 'hq',
+        stockSource: isHqStore() ? 'hq' : 'store',
+        storeId: isHqStore() ? null : session.storeId,
         items
       };
       try {
@@ -2122,6 +2158,17 @@
         t += pad('CASH', money(cash)) + '\n';
         t += pad('CHANGE', money(cash - (j.grandTotal || 0))) + '\n';
       }
+      // LOYALTY (2026-09-19): points info — QR customers lang ang kumikita (galing sa sell response)
+      if (j && j.qr) {
+        t += hair + '\n';
+        t += 'POINTS\n';
+        t += pad('Previous', String(Number(j.pointsPrevious || 0))) + '\n';
+        t += pad('+ Earned', String(Number(j.pointsEarned || 0))) + '\n';
+        t += pad('New Balance', String(Number(j.pointsNew || 0))) + '\n';
+      } else if (selectedCustomer) {
+        t += hair + '\n';
+        t += 'Walang points account\n';
+      }
       t += heavy + '\n';
       t += '\n';
       t += '<<CENTER>>THANK YOU!\n';
@@ -2144,7 +2191,7 @@
 
     async function loadInventoryTotals() {
       try {
-        const r = await fetch(API + '/dashboard/warehouse/inventory-summary?source=hq');
+        const r = await fetch(API + '/dashboard/warehouse/inventory-summary?' + srcQ());
         const j = await r.json();
         document.getElementById('invCost').textContent = '₱' + Number(j.totalCost || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         document.getElementById('invGross').textContent = '₱' + Number(j.totalPrice || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -2191,7 +2238,7 @@
     async function searchInventory() {
       loadInventoryTotals();
       const q = document.getElementById('invSearch').value.trim();
-      const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true&source=hq';
+      const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true&' + srcQ();
       try {
         const r = await fetch(url);
         const data = await r.json();
@@ -2242,7 +2289,7 @@
       if (!IN_APP || !AndroidPrinter.isConnected()) { toast('Connect printer first', 'error'); return; }
       const q = document.getElementById('invSearch').value.trim();
       const cat = getInvCatFilter();
-      const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true&source=hq';
+      const url = API + '/dashboard/warehouse/products?search=' + encodeURIComponent(q) + '&noImage=true&' + srcQ();
       let data = [];
       try {
         const r = await fetch(url);
@@ -2313,7 +2360,7 @@
       const list = document.getElementById('salesList');
       list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Loading...</p>';
       const range = salesFromTo();
-      let url = API + '/dashboard/warehouse/sales?limit=100';
+      let url = API + '/dashboard/warehouse/sales?limit=100&storeId=' + encodeURIComponent(session.storeId || HQ_STORE);
       if (range.from) url += '&from=' + range.from + '&to=' + range.to;
       try {
         const r = await fetch(url);
@@ -2339,8 +2386,8 @@
 
     async function loadSalesSummary() {
       const range = salesFromTo();
-      let url = API + '/dashboard/warehouse/sales/summary';
-      if (range.from) url += '?from=' + range.from + '&to=' + range.to;
+      let url = API + '/dashboard/warehouse/sales/summary?storeId=' + encodeURIComponent(session.storeId || HQ_STORE);
+      if (range.from) url += '&from=' + range.from + '&to=' + range.to;
       try {
         const r = await fetch(url);
         const j = await r.json();
@@ -2487,7 +2534,7 @@
 
     async function loadProducts() {
       const q = document.getElementById('prodSearch').value.trim();
-      const url = API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&source=hq' + (q ? '&search=' + encodeURIComponent(q) : '');
+      const url = API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&' + srcQ() + (q ? '&search=' + encodeURIComponent(q) : '');
       const list = document.getElementById('prodResults');
       list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Loading...</p>';
       try {
@@ -2584,7 +2631,9 @@
       const list = document.getElementById('transfersList');
       list.innerHTML = '<p class="text-gray-500 text-center text-sm py-4">Loading...</p>';
       try {
-        const r = await fetch(API + '/dashboard/warehouse/transfers');
+        // Store-aware (2026-09-19): papasok + papaalis na transfers ng NAPILING store lang.
+        const sid = session.storeId || HQ_STORE;
+        const r = await fetch(API + '/dashboard/warehouse/transfers?storeId=' + encodeURIComponent(sid));
         const j = await r.json();
         const rows = (j && j.items) ? j.items : [];
         list.innerHTML = '';
@@ -2592,10 +2641,12 @@
         rows.forEach(x => {
           const st = String(x.status || '').toLowerCase();
           const stColor = st === 'completed' ? 'text-emerald-400' : (st === 'pending' ? 'text-amber-400' : 'text-cyan-400');
+          const isOut = x.fromStoreId && x.fromStoreId === sid;
+          const dir = isOut ? '➡ OUT' : '⬅ IN';
           const div = document.createElement('div');
           div.className = 'card';
           const dt = new Date(x.createdAt);
-          div.innerHTML = '<div class="flex items-center justify-between" onclick="loadTransferItems(' + x.id + ',\'' + String(x.id).replace(/'/g, '') + '\')"><div class="flex-1 pr-2"><p class="text-white text-sm font-bold">Transfer #' + x.id + (x.hasShortage ? ' ⚠' : '') + '</p>' +
+          div.innerHTML = '<div class="flex items-center justify-between" onclick="loadTransferItems(' + x.id + ',\'' + String(x.id).replace(/'/g, '') + '\')"><div class="flex-1 pr-2"><p class="text-white text-sm font-bold"><span class="text-[9px] font-black px-1.5 py-0.5 rounded ' + (isOut ? 'bg-rose-900/50 text-rose-300' : 'bg-emerald-900/50 text-emerald-300') + '">' + dir + '</span> Transfer #' + x.id + (x.hasShortage ? ' ⚠' : '') + '</p>' +
             '<p class="text-gray-500 text-[11px]">' + (x.clientName || '') + ' • ' + dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) + '</p></div>' +
             '<p class="' + stColor + ' text-[10px] font-bold uppercase">' + (x.status || '') + '</p></div>';
           list.appendChild(div);
@@ -2639,7 +2690,7 @@
       try {
         const r = await fetch(API + '/dashboard/warehouse/clients');
         const data = await r.json();
-        (data || []).filter(c => c.storeType === 'pos' && c.storeId !== 'STORE-WAREHOUSE' && c.storeId !== 'STORE-20260602-7159').forEach(c => {
+        (data || []).filter(c => c.storeType === 'pos' && c.storeId !== 'STORE-WAREHOUSE' && (isHqStore() ? c.storeId !== HQ_STORE : c.storeId !== session.storeId)).forEach(c => {
           const o = document.createElement('option');
           o.value = c.id;
           o.textContent = c.name;
@@ -2655,7 +2706,7 @@
       if (!q) { box.innerHTML = ''; return; }
       box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading...</p>';
       try {
-        const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&search=' + encodeURIComponent(q) + '&source=hq&excludeMasterInactive=true');
+        const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&search=' + encodeURIComponent(q) + '&' + srcQ() + '&excludeMasterInactive=true');
         const data = await r.json();
         txProdCache = data || [];
         box.innerHTML = '';
@@ -2736,7 +2787,8 @@
         clientName: txClientName,
         notes: document.getElementById('txNotes').value.trim(),
         storeId: txClientStoreId,
-        source: 'hq',
+        source: isHqStore() ? 'hq' : 'store',
+        fromStoreId: isHqStore() ? null : session.storeId,
         items: txItems.map(x => ({ productId: x.productId, productName: x.productName, barcode: x.barcode, qty: x.qty }))
       };
       const btn = document.querySelector('#tabNewTransfer .btn-green');
@@ -3193,7 +3245,7 @@
         const r = await fetch(API + '/dashboard/warehouse/end-shift', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ preview: true })
+          body: JSON.stringify({ preview: true, storeId: session.storeId || HQ_STORE })
         });
         if (!r.ok) { toast('Failed to load shift totals', 'error'); return; }
         esPreview = await r.json();
@@ -3260,7 +3312,8 @@
         denom20: Math.max(0, Math.floor(Number(document.getElementById('esD20').value || 0))),
         denomCoins: Math.max(0, Number(document.getElementById('esDCoins').value || 0)),
         expenses: Math.max(0, Number(document.getElementById('esExpenses').value || 0)),
-        cashierName: session.fullName || session.username || ''
+        cashierName: session.fullName || session.username || '',
+        storeId: session.storeId || HQ_STORE
       };
       const d1000 = body.denom1000 * 1000, d500 = body.denom500 * 500, d200 = body.denom200 * 200,
         d100 = body.denom100 * 100, d50 = body.denom50 * 50, d20 = body.denom20 * 20;
@@ -3340,7 +3393,7 @@
       document.getElementById('txItemsTitle').textContent = 'SHIFT HISTORY';
       list.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading...</p>';
       try {
-        const r = await fetch(API + '/dashboard/warehouse/shifts?limit=50');
+        const r = await fetch(API + '/dashboard/warehouse/shifts?limit=50&storeId=' + encodeURIComponent(session.storeId || HQ_STORE));
         const data = await r.json();
         if (!data || !data.length) { list.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">No shifts yet</p>'; }
         else {
