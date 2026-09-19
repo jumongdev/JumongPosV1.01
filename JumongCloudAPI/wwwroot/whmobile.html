@@ -729,7 +729,7 @@
   <script>
     const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
     const IN_APP = typeof AndroidPrinter !== 'undefined';
-    const WEB_VER = '20260919-10';
+    const WEB_VER = '20260919-11';
 
     // ─── Crash reporting: send any native crash.log (from the uncaught-exception
     // handler in MainActivity) to the server on the next successful launch. Also
@@ -919,6 +919,14 @@
         if (!r.ok || !j.success) { errEl.textContent = j.error || 'Login failed'; errEl.classList.remove('hidden'); return; }
         session = j;
         const stores = j.stores || [];
+        // DEVICE STORE LOCK: kahit sino ang mag-login, hindi makakapasok kung walang access sa locked store.
+        if (storeLockBlocked(stores)) {
+          localStorage.removeItem('wh_session');
+          session = null;
+          errEl.textContent = '🔒 Naka-lock ang device na ito sa ' + (getLockStoreName() || getLockStore()) + ' — ang account na ito ay walang access doon. Gumamit ng account na may access sa store.';
+          errEl.classList.remove('hidden');
+          return;
+        }
         // DEFAULT STORE (2026-09-19): kung may naka-save na store (wh_last_store) at valid pa,
         // huwag nang magpakita ng picker — diretso sa store na iyon. Pwede pa ring magpalit sa
         // burger menu → Store switcher.
@@ -936,6 +944,13 @@
     // DEVICE STORE LOCK (2026-09-19): kapag may wh_lock_store, iyon ang laging store ng device
     // (hindi na makakapagpalit; i-unlock sa SETUP → Store Lock).
     function getLockStore() { try { return localStorage.getItem('wh_lock_store') || ''; } catch (e) { return ''; } }
+    function getLockStoreName() { try { return localStorage.getItem('wh_lock_store_name') || ''; } catch (e) { return ''; } }
+    // true = BLOCKED (naka-lock ang device pero walang access ang account na ito sa locked store).
+    function storeLockBlocked(stores) {
+      const locked = getLockStore();
+      if (!locked) return false;
+      return !(stores || []).some(s => s.storeId === locked);
+    }
     function applySavedStore(stores) {
       const locked = getLockStore();
       if (locked) {
@@ -960,22 +975,28 @@
     // ─── STORE LOCK UI (SETUP) ──────────────────────────────
     function lockStoreToDevice() {
       if (!session || !session.storeId) { toast('Pumili muna ng store', 'error'); return; }
-      if (!confirm('I-lock ang device na ito sa ' + (session.storeName || session.storeId) + '?\n\nHindi na makakapagpalit ng store ang app dito (hanggang i-unlock sa SETUP).')) return;
-      try { localStorage.setItem('wh_lock_store', session.storeId); } catch (e) { }
+      if (!confirm('I-lock ang device na ito sa ' + (session.storeName || session.storeId) + '?\n\nHindi na makakapagpalit ng store ang app dito (hanggang i-unlock sa SETUP). Kahit sino ang mag-login, sa store na ito pa rin.')) return;
+      try {
+        localStorage.setItem('wh_lock_store', session.storeId);
+        localStorage.setItem('wh_lock_store_name', session.storeName || '');
+      } catch (e) { }
       updateLockUI();
       toast('Naka-lock na ang device sa ' + (session.storeName || session.storeId));
     }
     function unlockStoreDevice() {
       if (!getLockStore()) { toast('Hindi naka-lock ang device', 'warning'); return; }
       if (!confirm('I-unlock ang store lock sa device na ito?\n\nMakakapagpalit na muli ng store.')) return;
-      try { localStorage.removeItem('wh_lock_store'); } catch (e) { }
+      try {
+        localStorage.removeItem('wh_lock_store');
+        localStorage.removeItem('wh_lock_store_name');
+      } catch (e) { }
       updateLockUI();
       toast('Na-unlock na ang store lock');
     }
     function updateLockUI() {
       const locked = getLockStore();
       const st = document.getElementById('lockStatus');
-      if (st) st.textContent = locked ? ('NAKA-LOCK sa ' + ((session && session.storeName) || locked)) : 'Hindi naka-lock — malayang makakapagpalit ng store.';
+      if (st) st.textContent = locked ? ('NAKA-LOCK sa ' + (getLockStoreName() || (session && session.storeName) || locked)) : 'Hindi naka-lock — malayang makakapagpalit ng store.';
       const lb = document.getElementById('btnLockStore'), ub = document.getElementById('btnUnlockStore');
       if (lb) lb.classList.toggle('hidden', !!locked);
       if (ub) ub.classList.toggle('hidden', !locked);
@@ -3647,6 +3668,12 @@
             if (!s.token) {
               session = s;
               const stores = s.stores || [];
+              if (storeLockBlocked(stores)) {
+                localStorage.removeItem('wh_session');
+                setScreen('login');
+                toast('Naka-lock ang device sa ' + (getLockStoreName() || getLockStore()) + ' — mag-login ng account na may access.', 'error');
+                return;
+              }
               applySavedStore(stores);
               if (stores.length > 1 && !session.storeId) { renderStores(stores); setScreen('store'); }
               else { if (stores.length === 1) session.storeId = stores[0].storeId; enterMain(); }
@@ -3658,6 +3685,13 @@
               body: JSON.stringify({ username: s.username, token: s.token, storeId: localStorage.getItem('wh_last_store') || s.storeId || '' })
             }).then(r => r.json()).then(j => {
               if (j.success) {
+                const lockStores = j.stores || [];
+                if (storeLockBlocked(lockStores)) {
+                  localStorage.removeItem('wh_session');
+                  setScreen('login');
+                  toast('Naka-lock ang device sa ' + (getLockStoreName() || getLockStore()) + ' — mag-login ng account na may access.', 'error');
+                  return;
+                }
                 session = j;
                 const stores = j.stores || [];
                 applySavedStore(stores);
@@ -3673,6 +3707,7 @@
             }).catch(() => {
               session = s;
               const stores = s.stores || [];
+              if (storeLockBlocked(stores)) { localStorage.removeItem('wh_session'); setScreen('login'); return; }
               applySavedStore(stores);
               if (stores.length > 1 && !session.storeId) { renderStores(stores); setScreen('store'); }
               else { if (stores.length === 1) session.storeId = stores[0].storeId; enterMain(); }
