@@ -715,7 +715,7 @@
   <script>
     const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
     const IN_APP = typeof AndroidPrinter !== 'undefined';
-    const WEB_VER = '20260919-2';
+    const WEB_VER = '20260919-3';
 
     // ─── Crash reporting: send any native crash.log (from the uncaught-exception
     // handler in MainActivity) to the server on the next successful launch. Also
@@ -782,8 +782,34 @@
     let selectedCustomer = null;
     let pendingPay = null;
     let paperWidth = 80;
-    // Global text-fit helper for thermal printing (used by credit-pay voucher + all print builders).
-    const fit = s => { const str = String(s); const w = paperWidth <= 50 ? 32 : 48; return str.length > w ? str.slice(0, w - 1) + '~' : str; };
+    // ─── THERMAL PRINT HELPERS (2026-09-19) ─────────────────
+    // W = printable chars per line: 50mm = 32, 80mm = 48. Lahat ng print builders ay W-aware.
+    const PW = () => (paperWidth <= 50 ? 32 : 48);
+    const fitW = (s, w) => { const str = String(s == null ? '' : s); const n = w || PW(); return str.length > n ? str.slice(0, Math.max(1, n - 1)) + '~' : str; };
+    const wrapW = (s, w) => {
+      const str = String(s == null ? '' : s); const n = Math.max(1, w || PW()); const out = []; let rest = str;
+      while (rest.length > n) { out.push(rest.slice(0, n)); rest = rest.slice(n); }
+      out.push(rest);
+      return out.length ? out : [''];
+    };
+    // label + dots + amount, laging <= w chars
+    const padLR = (label, amount, w) => {
+      const n = w || PW();
+      const a = fitW(amount, Math.max(4, Math.min(16, n - 4)));
+      const l = fitW(label, Math.max(4, n - a.length - 1));
+      const dots = Math.max(1, n - l.length - a.length);
+      return l + '.'.repeat(dots) + a;
+    };
+    const ctrW = (s, w) => '<<CENTER>>' + fitW(s, w || PW());
+    // ESC/POS (APK) = US-ASCII: alisin ang non-ASCII (emoji/box-drawing) at ₱ -> P para walang '?'.
+    const asciiSafe = (s) => String(s == null ? '' : s)
+      .replace(/\u20B1/g, 'P')
+      .replace(/[\u2500-\u257F]/g, '-')
+      .replace(/[\u2022\u00B7\u25CF]/g, '*')
+      .replace(/[\u2013\u2014]/g, '-')
+      .replace(/[^\x20-\x7E\n]/g, '');
+    // Global text-fit helper for thermal printing (legacy alias).
+    const fit = s => fitW(s);
     let invMode = 'all';
     let invRows = [];
     let invPage = 1;
@@ -1201,21 +1227,24 @@
     }
     function printOnlineOrder() {
       if (!IN_APP) { toast('Open the app (APK) to use Bluetooth', 'error'); return; }
+      const W = PW();
       const lines = [];
-      lines.push('ONLINE ORDER PICK SLIP');
-      lines.push('----------------------');
-      lines.push('Order: ' + ooCur.orderNo);
-      lines.push('Customer: ' + ooCur.customerName);
-      lines.push('Phone: ' + ooCur.phone);
-      lines.push('Address: Blk ' + (ooCur.block || '-') + ' Lot ' + (ooCur.lot || '-') + ', ' + (ooCur.subdivision || ''));
-      if (ooCur.address) lines.push(ooCur.address);
-      lines.push('Payment: ' + ooCur.paymentMethod + (ooCur.gcashRef ? ' (' + ooCur.gcashRef + ')' : ''));
-      lines.push('----------------------');
-      (ooCur.items || []).forEach(it => { lines.push((it.productName || '') + '  x' + it.qty); });
-      lines.push('----------------------');
-      lines.push('TOTAL: ' + ooCur.total.toFixed(2));
+      lines.push(ctrW('ONLINE ORDER PICK SLIP', W));
+      lines.push('-'.repeat(W));
+      lines.push(fitW('Order: ' + (ooCur.orderNo || ''), W));
+      lines.push(fitW('Customer: ' + (ooCur.customerName || ''), W));
+      if (ooCur.phone) lines.push(fitW('Phone: ' + ooCur.phone, W));
+      wrapW('Address: Blk ' + (ooCur.block || '-') + ' Lot ' + (ooCur.lot || '-') + ', ' + (ooCur.subdivision || ''), W).forEach(l => lines.push(l));
+      if (ooCur.address) wrapW(ooCur.address, W).forEach(l => lines.push(l));
+      lines.push(fitW('Payment: ' + ooCur.paymentMethod + (ooCur.gcashRef ? ' (' + ooCur.gcashRef + ')' : ''), W));
+      lines.push('-'.repeat(W));
+      (ooCur.items || []).forEach(it => {
+        wrapW((it.productName || '') + '  x' + it.qty, W).forEach(l => lines.push(l));
+      });
+      lines.push('-'.repeat(W));
+      lines.push(padLR('TOTAL', ooCur.total.toFixed(2), W));
       lines.push('');
-      const pr = AndroidPrinter.print(lines.join('\n'));
+      const pr = AndroidPrinter.print(asciiSafe(lines.join('\n')));
       if (pr !== 'OK') toast(pr.replace('ERR:', ''), 'error');
     }
     // ─── EDIT ITEMS (pending/confirmed, bago i-assign sa driver) ───────
@@ -1292,33 +1321,37 @@
     function printOrderReceipt() {
       if (!IN_APP) { toast('Open the app (APK) to use Bluetooth', 'error'); return; }
       const o = ooCur;
-      const padN = (t, n) => { t = String(t); while (t.length < n) t += ' '; return t; };
-      const center = (t) => ' '.repeat(Math.max(0, Math.floor((44 - t.length) / 2))) + t;
-      const sep = '----------------------------';
+      const W = PW();
+      const sep = '-'.repeat(W);
       const dt = String(o.createdAt || '').slice(0, 16).replace('T', ' ');
       const withPts = (o.items || []).filter(it => Number(it.points || 0) > 0);
       const noPts = (o.items || []).filter(it => !(Number(it.points || 0) > 0));
       const tp = Number(o.totalPoints || 0);
       const ap = Number(o.awardPoints || 0);
       const verb = o.paidStatus === 'paid' ? 'earned' : 'to earn';
-      const itemLine = (it) => padN((it.productName || '').slice(0, 29), 30) + ' x' + it.qty + ' ' + Number(it.total).toFixed(2);
+      const itemLine = (it) => {
+        const qty = 'x' + it.qty;
+        const price = Number(it.total).toFixed(2);
+        const nameW = Math.max(6, W - qty.length - price.length - 2);
+        return fitW(it.productName || '', nameW) + ' ' + qty + ' ' + price;
+      };
       const L = [];
-      L.push(center('ANDENGS SUPERSTORE'));
-      L.push(center('--- Online Order Receipt ---'));
+      L.push(ctrW('ANDENGS SUPERSTORE', W));
+      L.push(ctrW('--- Online Order Receipt ---', W));
       L.push(sep);
-      L.push('Order: ' + (o.orderNo || ''));
-      if (dt) L.push('Date:  ' + dt);
-      L.push('Customer: ' + (o.customerName || ''));
-      if (o.phone) L.push('Phone: ' + o.phone);
-      L.push('Address: Blk ' + (o.block || '-') + ' Lot ' + (o.lot || '-') + (o.subdivision ? ', ' + o.subdivision : ''));
-      if (o.address) L.push('  ' + o.address);
-      if (o.deliveryNote) L.push('Note: ' + o.deliveryNote);
+      L.push(fitW('Order: ' + (o.orderNo || ''), W));
+      if (dt) L.push(fitW('Date:  ' + dt, W));
+      L.push(fitW('Customer: ' + (o.customerName || ''), W));
+      if (o.phone) L.push(fitW('Phone: ' + o.phone, W));
+      wrapW('Address: Blk ' + (o.block || '-') + ' Lot ' + (o.lot || '-') + (o.subdivision ? ', ' + o.subdivision : ''), W).forEach(l => L.push(l));
+      if (o.address) wrapW('  ' + o.address, W).forEach(l => L.push(l));
+      if (o.deliveryNote) wrapW('Note: ' + o.deliveryNote, W).forEach(l => L.push(l));
       L.push(sep);
       if (withPts.length) {
         L.push('-- WITH POINTS --');
         withPts.forEach(it => L.push(itemLine(it)));
         L.push(sep);
-        L.push('** TOTAL: ' + tp.toFixed(2) + ' pts -> ' + (ap >= 1 ? '+' + ap.toFixed(2) + ' point' + (ap > 1 ? 's' : '') + ' (' + verb + ')' : '+0.00 (kulang pa para sa 1 point)'));
+        wrapW('** TOTAL: ' + tp.toFixed(2) + ' pts -> ' + (ap >= 1 ? '+' + ap.toFixed(2) + ' point' + (ap > 1 ? 's' : '') + ' (' + verb + ')' : '+0.00 (kulang pa para sa 1 point)'), W).forEach(l => L.push(l));
         L.push(sep);
       }
       if (noPts.length) {
@@ -1327,15 +1360,15 @@
         L.push(sep);
       }
       const sub = (o.items || []).reduce((s, it) => s + Number(it.total || 0), 0);
-      L.push(padN('SUBTOTAL', 38) + sub.toFixed(2));
-      L.push(padN('DELIVERY FEE', 38) + Number(o.deliveryFee || 0).toFixed(2));
-      L.push(padN('TOTAL', 38) + Number(o.total || 0).toFixed(2));
-      if (withPts.length && ap < 1) L.push('** Points ' + verb + ': ' + tp.toFixed(2) + ' pts -> +0.00 (P200 = 1 point)');
-      L.push('Payment: ' + (o.paymentMethod || 'COD'));
+      L.push(padLR('SUBTOTAL', sub.toFixed(2), W));
+      L.push(padLR('DELIVERY FEE', Number(o.deliveryFee || 0).toFixed(2), W));
+      L.push(padLR('TOTAL', Number(o.total || 0).toFixed(2), W));
+      if (withPts.length && ap < 1) wrapW('** Points ' + verb + ': ' + tp.toFixed(2) + ' pts -> +0.00 (P200 = 1 point)', W).forEach(l => L.push(l));
+      L.push(fitW('Payment: ' + (o.paymentMethod || 'COD'), W));
       L.push(sep);
-      L.push(center('Salamat po!'));
-      L.push(center('Mag-order muli :)'));
-      const pr = AndroidPrinter.print(L.join('\n'));
+      L.push(ctrW('Salamat po!', W));
+      L.push(ctrW('Mag-order muli :)', W));
+      const pr = AndroidPrinter.print(asciiSafe(L.join('\n')));
       if (pr !== 'OK') toast(pr.replace('ERR:', ''), 'error');
     }
 
@@ -2057,10 +2090,11 @@
         if (IN_APP && AndroidPrinter.isConnected()) {
           try {
             const bal = Number(j.balance || 0);
-            const t = '<<CENTER>>JUMONG POS\n<<CENTER>>' + fit(session.storeName || '') + '\n<<CENTER>>─── CREDIT PAYMENT ───\n' +
-              (inv ? padDL('Invoice', inv) : '') + padDL('Customer', j.customerName) + padDL('Method', method) + padDL('Amount', '₱' + amt.toFixed(2)) +
-              padDL('Remaining', '₱' + bal.toFixed(2)) + '\n<<CENTER>>' + new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) + '\n<<CENTER>>THANK YOU!\n';
-            const pr = AndroidPrinter.print(t);
+            const W = PW();
+            const t = ctrW('JUMONG POS', W) + '\n' + ctrW(session.storeName || '', W) + '\n' + ctrW('=== CREDIT PAYMENT ===', W) + '\n' +
+              (inv ? padDL('Invoice', inv) : '') + padDL('Customer', j.customerName) + padDL('Method', method) + padDL('Amount', 'P' + amt.toFixed(2)) +
+              padDL('Remaining', 'P' + bal.toFixed(2)) + '\n' + ctrW(new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' }), W) + '\n' + ctrW('THANK YOU!', W) + '\n';
+            const pr = AndroidPrinter.print(asciiSafe(t));
             if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
           } catch (pe) {
             toast('Payment OK, pero hindi na-print ang voucher: ' + pe.message, 'error');
@@ -2085,11 +2119,7 @@
     }
 
     function padDL(label, amount) {
-      const W = paperWidth <= 50 ? 32 : 48;
-      const f = s => { const str = String(s); return str.length > W ? str.slice(0, W - 1) + '~' : str; };
-      const l = f(label); const a = f(amount);
-      const padN = W - l.length - a.length;
-      return (padN > 0 ? l + ' '.repeat(padN) + a : l + ' ' + a) + '\n';
+      return padLR(label, amount, PW()) + '\n';
     }
 
     // ─── CHECKOUT ────────────────────────────────────────────
@@ -2153,66 +2183,52 @@
     }
 
     function buildReceiptText(j, items, method) {
-      const W = paperWidth <= 50 ? 32 : 48;
-      const hair = '------------------------------------------------'.slice(0, W);
-      const heavy = '================================================'.slice(0, W);
-      const money = n => '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      const wrap = (s, max) => {
-        const str = String(s);
-        const out = [];
-        let rest = str;
-        while (rest.length > max) { out.push(rest.slice(0, max)); rest = rest.slice(max); }
-        if (rest.length) out.push(rest);
-        return out.length ? out : [''];
-      };
-      const pad = (label, amount) => {
-        const l = String(label).slice(0, W - 16);
-        const a = String(amount).slice(0, 14);
-        const dots = Math.max(2, W - l.length - a.length - 1);
-        return l + '.'.repeat(dots) + a;
-      };
+      const W = PW();
+      const hair = '-'.repeat(W);
+      const heavy = '='.repeat(W);
+      const money = n => 'P' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       let t = '';
       t += '\n';
-      t += '<<CENTER>>JUMONG POS\n';
-      t += '<<CENTER>>' + String(session.storeName || '').slice(0, W) + '\n';
+      t += ctrW('JUMONG POS', W) + '\n';
+      t += ctrW(session.storeName || '', W) + '\n';
       t += heavy + '\n';
-      t += 'Invoice : ' + (j.invoiceNo || j.saleId) + '\n';
-      t += 'Cashier : ' + String(session.fullName || session.username || '').slice(0, W) + '\n';
-      t += 'Date    : ' + new Date().toLocaleString('en-PH') + '\n';
+      t += fitW('Invoice : ' + (j.invoiceNo || j.saleId), W) + '\n';
+      t += fitW('Cashier : ' + (session.fullName || session.username || ''), W) + '\n';
+      t += fitW('Date    : ' + new Date().toLocaleString('en-PH'), W) + '\n';
       t += heavy + '\n';
       t += 'ITEMS  (' + items.length + ')\n';
       items.forEach(c => {
-        const nameLines = wrap(c.productName, W - 2);
+        const nameLines = wrapW(c.productName, W - 2);
         nameLines.forEach((l, i) => t += (i === 0 ? '<<BIG>>' : '<<BIG>>  ') + l + '\n');
         let unitLine = String(c.unitName || 'Piece') + ' x ' + c.qty;
         if ((c.qtyPerUnit || 1) > 1) unitLine += ' (' + (c.qty * (c.qtyPerUnit || 1)) + 'pcs)';
-        t += pad(unitLine, money(c.price * c.qty)) + '\n';
+        t += padLR(unitLine, money(c.price * c.qty), W) + '\n';
       });
       t += hair + '\n';
-      t += pad('TOTAL', money(j.grandTotal)) + '\n';
-      t += 'PAYMENT: ' + method + '\n';
+      t += padLR('TOTAL', money(j.grandTotal), W) + '\n';
+      t += fitW('PAYMENT: ' + method, W) + '\n';
       const cash = parseFloat(document.getElementById('payCash').value) || 0;
       if (method === 'Cash' && cash > 0) {
-        t += pad('CASH', money(cash)) + '\n';
-        t += pad('CHANGE', money(cash - (j.grandTotal || 0))) + '\n';
+        t += padLR('CASH', money(cash), W) + '\n';
+        t += padLR('CHANGE', money(cash - (j.grandTotal || 0)), W) + '\n';
       }
       // LOYALTY (2026-09-19): points info — QR customers lang ang kumikita (galing sa sell response)
       if (j && j.qr) {
         t += hair + '\n';
         t += 'POINTS\n';
-        t += pad('Previous', String(Number(j.pointsPrevious || 0))) + '\n';
-        t += pad('+ Earned', String(Number(j.pointsEarned || 0))) + '\n';
-        t += pad('New Balance', String(Number(j.pointsNew || 0))) + '\n';
+        t += padLR('Previous', String(Number(j.pointsPrevious || 0)), W) + '\n';
+        t += padLR('+ Earned', String(Number(j.pointsEarned || 0)), W) + '\n';
+        t += padLR('New Balance', String(Number(j.pointsNew || 0)), W) + '\n';
       } else if (selectedCustomer) {
         t += hair + '\n';
         t += 'Walang points account\n';
       }
       t += heavy + '\n';
       t += '\n';
-      t += '<<CENTER>>THANK YOU!\n';
-      t += '<<CENTER>>Please come again\n';
+      t += ctrW('THANK YOU!', W) + '\n';
+      t += ctrW('Please come again', W) + '\n';
       t += '\n';
-      return t;
+      return asciiSafe(t);
     }
 
     // ─── INVENTORY ───────────────────────────────────────────
@@ -2335,34 +2351,35 @@
       } catch (e) { toast('Fetch failed: ' + e.message, 'error'); return; }
       const rows = invFilterRows(data);
       if (!rows.length) { toast('Nothing to print', 'error'); return; }
-      const W = paperWidth <= 50 ? 32 : 48;
-      const dash = '------------------------------------------------'.slice(0, W);
-      const fit = s => { const str = String(s); return str.length > W ? str.slice(0, W - 1) + '~' : str; };
+      const W = PW();
+      const dash = '-'.repeat(W);
       const now = new Date();
       const catTitle = cat ? cat : 'ALL CATEGORIES';
       const modeTitle = invMode === 'out' ? 'NO STOCK' : invMode === 'low' ? 'LOW STOCK' : 'STOCK';
       const lines = [
-        '        JUMONG POS WAREHOUSE',
+        ctrW('JUMONG POS - INVENTORY', W),
         dash,
-        'INVENTORY - ' + fit(modeTitle),
-        'Category: ' + fit(catTitle),
-        'Date: ' + now.toLocaleString('en-PH', { timeZone: 'Asia/Manila' }),
-        'Cashier: ' + (session && (session.fullName || session.username) || '-'),
+        fitW('INVENTORY - ' + modeTitle, W),
+        fitW('Category: ' + catTitle, W),
+        fitW('Date: ' + now.toLocaleString('en-PH', { timeZone: 'Asia/Manila' }), W),
+        fitW('Cashier: ' + (session && (session.fullName || session.username) || '-'), W),
         dash
       ];
-      const rowW = W - 8;
-      lines.push('ITEM'.padEnd(rowW) + 'STOCK' + ' ____');
+      const rowW = W - 8; // + 3 (qty) + 5 (write space) = eksaktong W
+      lines.push('ITEM'.padEnd(rowW) + 'STK' + ' ____');
       rows.slice(0, 500).forEach(p => {
-        const raw = String(p.name);
-        const nm = raw.length > rowW ? raw.slice(0, rowW - 1) + '~' : raw;
-        lines.push(nm.padEnd(rowW) + String(Number(p.stockQty || 0)).padStart(3) + ' ____');
+        const qty = String(Number(p.stockQty || 0));
+        const qs = qty.length > 4 ? qty.slice(0, 4) : qty.padStart(3);
+        const nmW = W - qs.length - 5;
+        const nm = fitW(p.name, nmW);
+        lines.push(nm.padEnd(nmW) + qs + ' ____');
       });
       lines.push(dash);
-      lines.push('TOTAL ITEMS: ' + rows.length);
-      lines.push('TOTAL UNITS: ' + rows.reduce((s, p) => s + Number(p.stockQty || 0), 0));
+      lines.push(fitW('TOTAL ITEMS: ' + rows.length, W));
+      lines.push(fitW('TOTAL UNITS: ' + rows.reduce((s, p) => s + Number(p.stockQty || 0), 0), W));
       lines.push(dash);
       lines.push('Thank you!');
-      const pr = AndroidPrinter.print(lines.join('\n'));
+      const pr = AndroidPrinter.print(asciiSafe(lines.join('\n')));
       if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
       else toast('Inventory printed (' + rows.length + ' items)');
     }
@@ -2519,50 +2536,36 @@
     }
 
     function buildReceiptTextReprint(h, items) {
-      const W = paperWidth <= 50 ? 32 : 48;
-      const dash = '------------------------------------------------'.slice(0, W);
-      const fit = s => { const str = String(s); return str.length > W ? str.slice(0, W - 1) + '~' : str; };
-      const wrap = (s, max) => {
-        const str = String(s);
-        const out = [];
-        let rest = str;
-        while (rest.length > max) { out.push(rest.slice(0, max)); rest = rest.slice(max); }
-        if (rest.length) out.push(rest);
-        return out.length ? out : [''];
-      };
-      const pad = (label, amount) => {
-        const l = fit(label); const a = fit(amount);
-        const padN = W - l.length - a.length;
-        return padN > 0 ? l + ' '.repeat(padN) + a : l + ' ' + a;
-      };
-      const money = n => '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const W = PW();
+      const dash = '-'.repeat(W);
+      const money = n => 'P' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const dt = new Date(h.createdAt || new Date());
       const active = (items || []).filter(c => !c.isVoided);
       const voidedCount = (items || []).length - active.length;
       if (!active.length) return null;
       let t = '';
-      t += '<<CENTER>>JUMONG POS\n';
-      t += '<<CENTER>>' + fit(session.storeName || '') + '\n';
-      t += '<<CENTER>>Invoice: ' + (h.invoiceNo || h.id) + '\n';
-      t += '<<CENTER>>Cashier: ' + fit(session.fullName || session.username) + '\n';
-      t += '<<CENTER>>' + dt.toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) + '\n';
-      if (h.customerName) t += '<<CENTER>>Customer: ' + fit(h.customerName) + '\n';
+      t += ctrW('JUMONG POS', W) + '\n';
+      t += ctrW(session.storeName || '', W) + '\n';
+      t += ctrW('Invoice: ' + (h.invoiceNo || h.id), W) + '\n';
+      t += ctrW('Cashier: ' + (session.fullName || session.username || ''), W) + '\n';
+      t += ctrW(dt.toLocaleString('en-PH', { timeZone: 'Asia/Manila' }), W) + '\n';
+      if (h.customerName) t += ctrW('Customer: ' + h.customerName, W) + '\n';
       t += dash + '\n';
       active.forEach(c => {
-        wrap(c.productName, W - 2).forEach((l, i) => t += (i === 0 ? '<<BIG>>' : '<<BIG>>  ') + l + '\n');
-        const line = fit((c.unitName || 'Piece') + ' x ' + c.qty);
+        wrapW(c.productName, W - 2).forEach((l, i) => t += (i === 0 ? '<<BIG>>' : '<<BIG>>  ') + l + '\n');
+        const line = (c.unitName || 'Piece') + ' x ' + c.qty;
         const amt = money(Number(c.subtotal) || (c.price * c.qty));
-        t += pad(line, amt) + '\n';
+        t += padLR(line, amt, W) + '\n';
       });
       t += dash + '\n';
       const total = active.reduce((s, c) => s + (Number(c.subtotal) || (c.price * c.qty) || 0), 0);
-      t += pad('TOTAL', money(total)) + '\n';
-      if (voidedCount > 0) t += 'VOID ADJUSTED (' + voidedCount + ' item' + (voidedCount > 1 ? 's' : '') + ' voided)\n';
-      t += 'PAYMENT: ' + (h.paymentMethod || 'Cash') + '\n';
+      t += padLR('TOTAL', money(total), W) + '\n';
+      if (voidedCount > 0) t += fitW('VOID ADJUSTED (' + voidedCount + ' item' + (voidedCount > 1 ? 's' : '') + ' voided)', W) + '\n';
+      t += fitW('PAYMENT: ' + (h.paymentMethod || 'Cash'), W) + '\n';
       t += '\n';
-      t += '<<CENTER>>THANK YOU!\n';
-      t += '<<CENTER>>Please come again\n';
-      return t;
+      t += ctrW('THANK YOU!', W) + '\n';
+      t += ctrW('Please come again', W) + '\n';
+      return asciiSafe(t);
     }
 
     function closeSaleItems() { hide(document.getElementById('saleItemsModal')); }
@@ -3095,30 +3098,29 @@
     function printReceivingBatch() {
       if (!lastReceiving) { toast('Nothing to print', 'error'); return; }
       if (!IN_APP || !AndroidPrinter.isConnected()) { toast('Printer not connected', 'error'); return; }
-      const W = paperWidth <= 50 ? 32 : 48;
-      const dash = '------------------------------------------------'.slice(0, W);
-      const fit = s => { const str = String(s); return str.length > W ? str.slice(0, W - 1) + '~' : str; };
+      const W = PW();
+      const dash = '-'.repeat(W);
       const now = new Date();
       const lines = [
-        '        JUMONG POS WAREHOUSE',
+        ctrW('JUMONG POS - RECEIVING', W),
         dash,
         'STOCK RECEIVING',
-        'Ref: ' + fit(lastReceiving.reference.split(' | ')[0]),
-        'Source: ' + fit(lastReceiving.source),
-        'Date: ' + now.toLocaleString('en-PH', { timeZone: 'Asia/Manila' }),
-        'Cashier: ' + (session && (session.fullName || session.username) || '-'),
+        fitW('Ref: ' + lastReceiving.reference.split(' | ')[0], W),
+        fitW('Source: ' + lastReceiving.source, W),
+        fitW('Date: ' + now.toLocaleString('en-PH', { timeZone: 'Asia/Manila' }), W),
+        fitW('Cashier: ' + (session && (session.fullName || session.username) || '-'), W),
         dash,
-        'Qty  Item'
+        'Qty Item'
       ];
       lastReceiving.items.forEach(it => {
-        lines.push(String(it.qty).padStart(3) + '   ' + fit(it.productName));
+        lines.push(String(it.qty).padStart(3) + ' ' + fitW(it.productName, W - 4));
       });
       lines.push(dash);
-      lines.push('TOTAL ITEMS: ' + lastReceiving.items.length);
-      lines.push('TOTAL QTY: ' + lastReceiving.items.reduce((s, i) => s + i.qty, 0));
+      lines.push(fitW('TOTAL ITEMS: ' + lastReceiving.items.length, W));
+      lines.push(fitW('TOTAL QTY: ' + lastReceiving.items.reduce((s, i) => s + i.qty, 0), W));
       lines.push(dash);
       lines.push('Thank you!');
-      const pr = AndroidPrinter.print(lines.join('\n'));
+      const pr = AndroidPrinter.print(asciiSafe(lines.join('\n')));
       if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
       else toast('Receiving voucher printed');
     }
@@ -3386,43 +3388,37 @@
 
     function printEndShift(j, dateLabel, cashierLabel) {
       if (!IN_APP || !AndroidPrinter.isConnected()) { toast('End shift printed on cloud. Connect printer to print report.', 'warning'); return; }
-      const W = paperWidth <= 50 ? 32 : 48;
-      const dash = '------------------------------------------------'.slice(0, W);
-      const fit = s => { const str = String(s); return str.length > W ? str.slice(0, W - 1) + '~' : str; };
-      const pad = (label, amount) => {
-        const l = fit(label); const a = fit(amount);
-        const padN = W - l.length - a.length;
-        return padN > 0 ? l + ' '.repeat(padN) + a : l + ' ' + a;
-      };
+      const W = PW();
+      const dash = '-'.repeat(W);
       const dt = dateLabel ? new Date(dateLabel) : new Date();
       let t = '';
-      t += '<<CENTER>>JUMONG POS\n';
-      t += '<<CENTER>>' + fit(session.storeName || '') + '\n';
-      t += '<<CENTER>>─── END OF SHIFT ───\n';
-      t += '<<CENTER>>' + dt.toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) + '\n';
-      t += '<<CENTER>>Cashier: ' + fit(cashierLabel || session.fullName || session.username) + '\n';
+      t += ctrW('JUMONG POS', W) + '\n';
+      t += ctrW(session.storeName || '', W) + '\n';
+      t += ctrW('=== END OF SHIFT ===', W) + '\n';
+      t += ctrW(dt.toLocaleString('en-PH', { timeZone: 'Asia/Manila' }), W) + '\n';
+      t += ctrW('Cashier: ' + (cashierLabel || session.fullName || session.username || ''), W) + '\n';
       t += dash + '\n';
-      t += pad('Total Sales', fmtMoney(j.totalSales)) + '\n';
-      t += pad('Sale Count', String(j.saleCount || 0)) + '\n';
-      t += pad('Cash', fmtMoney(j.totalCash)) + '\n';
-      t += pad('E-Wallet', fmtMoney(j.totalEw)) + '\n';
-      t += pad('Credit', fmtMoney(j.totalCredit)) + '\n';
-      if (Number(j.creditCollected) > 0) t += pad('Credit Collected', fmtMoney(j.creditCollected)) + '\n';
-      t += pad('Voided', fmtMoney(j.totalVoided)) + '\n';
+      t += padLR('Total Sales', fmtMoney(j.totalSales), W) + '\n';
+      t += padLR('Sale Count', String(j.saleCount || 0), W) + '\n';
+      t += padLR('Cash', fmtMoney(j.totalCash), W) + '\n';
+      t += padLR('E-Wallet', fmtMoney(j.totalEw), W) + '\n';
+      t += padLR('Credit', fmtMoney(j.totalCredit), W) + '\n';
+      if (Number(j.creditCollected) > 0) t += padLR('Credit Collected', fmtMoney(j.creditCollected), W) + '\n';
+      t += padLR('Voided', fmtMoney(j.totalVoided), W) + '\n';
       t += dash + '\n';
-      t += pad('₱1000 x' + (j.denom1000 || 0), fmtMoney((j.denom1000 || 0) * 1000)) + '\n';
-      t += pad('₱500 x' + (j.denom500 || 0), fmtMoney((j.denom500 || 0) * 500)) + '\n';
-      t += pad('₱200 x' + (j.denom200 || 0), fmtMoney((j.denom200 || 0) * 200)) + '\n';
-      t += pad('₱100 x' + (j.denom100 || 0), fmtMoney((j.denom100 || 0) * 100)) + '\n';
-      t += pad('₱50 x' + (j.denom50 || 0), fmtMoney((j.denom50 || 0) * 50)) + '\n';
-      t += pad('₱20 x' + (j.denom20 || 0), fmtMoney((j.denom20 || 0) * 20)) + '\n';
-      t += pad('Coins', fmtMoney(j.denomCoins || 0)) + '\n';
+      t += padLR('P1000 x' + (j.denom1000 || 0), fmtMoney((j.denom1000 || 0) * 1000), W) + '\n';
+      t += padLR('P500 x' + (j.denom500 || 0), fmtMoney((j.denom500 || 0) * 500), W) + '\n';
+      t += padLR('P200 x' + (j.denom200 || 0), fmtMoney((j.denom200 || 0) * 200), W) + '\n';
+      t += padLR('P100 x' + (j.denom100 || 0), fmtMoney((j.denom100 || 0) * 100), W) + '\n';
+      t += padLR('P50 x' + (j.denom50 || 0), fmtMoney((j.denom50 || 0) * 50), W) + '\n';
+      t += padLR('P20 x' + (j.denom20 || 0), fmtMoney((j.denom20 || 0) * 20), W) + '\n';
+      t += padLR('Coins', fmtMoney(j.denomCoins || 0), W) + '\n';
       t += dash + '\n';
-      t += pad('Cash on Hand', fmtMoney(j.cashOnHand)) + '\n';
-      if (j.expenses > 0) t += pad('Expenses', fmtMoney(j.expenses)) + '\n';
-      t += pad('Difference', (j.difference >= 0 ? '+' : '') + fmtMoney(j.difference)) + '\n';
-      t += '\n<<CENTER>>THANK YOU!\n';
-      const pr = AndroidPrinter.print(t);
+      t += padLR('Cash on Hand', fmtMoney(j.cashOnHand), W) + '\n';
+      if (j.expenses > 0) t += padLR('Expenses', fmtMoney(j.expenses), W) + '\n';
+      t += padLR('Difference', (j.difference >= 0 ? '+' : '') + fmtMoney(j.difference), W) + '\n';
+      t += '\n' + ctrW('THANK YOU!', W) + '\n';
+      const pr = AndroidPrinter.print(asciiSafe(t));
       if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
     }
 
