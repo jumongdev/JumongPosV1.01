@@ -18,53 +18,53 @@
 <style>
   * { -webkit-tap-highlight-color: transparent; }
   html, body { padding: 0; margin: 0; }
-  html { font-size: 13px; } /* MOBILE-COMPACT (2026-09-19): global rem scale — lahat ng Tailwind sizes/spacing */
+  html { font-size: 13px; } /* MOBILE-COMPACT: global rem scale — lahat (custom + Tailwind) sumusunod */
   :root { --jbg: #10102a; --jacc: #06b6d4; --jacc-dark: #0891b2; }
   body { background: var(--jbg); font-family: 'Segoe UI', system-ui, sans-serif; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
   /* Phone-width container kahit sa tablet/desktop */
   #app { width: 100%; max-width: 560px; margin: 0 auto; }
   /* Compact headings (override Tailwind) */
-  body .text-3xl { font-size: 21px; line-height: 1.2; }
-  body .text-2xl { font-size: 18px; line-height: 1.25; }
-  body .text-xl { font-size: 16px; }
+  body .text-3xl { font-size: 1.6rem; line-height: 1.2; }
+  body .text-2xl { font-size: 1.38rem; line-height: 1.25; }
+  body .text-xl { font-size: 1.23rem; }
   .input-field {
     width: 100%; background: #181848; border: 1px solid #222255;
-    border-radius: 10px; padding: 10px 12px; color: #e2e8f0; font-size: 14px; outline: none;
+    border-radius: 0.7rem; padding: 0.7rem 0.9rem; color: #e2e8f0; font-size: 1rem; outline: none;
   }
   .input-field:focus { border-color: var(--jacc); box-shadow: 0 0 0 3px rgba(6,182,212,0.15); }
-  .btn-primary { width: 100%; background: var(--jacc); color: white; font-weight: 700; border-radius: 10px; padding: 11px; font-size: 14px; letter-spacing: 0.3px; }
+  .btn-primary { width: 100%; background: var(--jacc); color: white; font-weight: 700; border-radius: 0.7rem; padding: 0.75rem; font-size: 1rem; letter-spacing: 0.3px; }
   .btn-primary:active { background: var(--jacc-dark); }
   .btn-primary:disabled { opacity: 0.5; }
-  .btn-ghost { background: #181848; border: 1px solid #222255; color: #e2e8f0; font-weight: 600; border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+  .btn-ghost { background: #181848; border: 1px solid #222255; color: #e2e8f0; font-weight: 600; border-radius: 0.7rem; padding: 0.62rem 0.85rem; font-size: 0.92rem; }
   .btn-ghost:active { background: #1e1e52; }
-  .btn-danger { background: #7f1d1d; color: #fecaca; font-weight: 600; border-radius: 10px; padding: 10px 12px; font-size: 13px; }
-  .btn-green { background: #059669; color: white; font-weight: 700; border-radius: 10px; padding: 11px; font-size: 14px; }
+  .btn-danger { background: #7f1d1d; color: #fecaca; font-weight: 600; border-radius: 0.7rem; padding: 0.62rem 0.85rem; font-size: 0.92rem; }
+  .btn-green { background: #059669; color: white; font-weight: 700; border-radius: 0.7rem; padding: 0.75rem; font-size: 1rem; }
   .btn-green:active { background: #047857; }
-  .store-chip { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #181848; border: 1px solid #222255; border-radius: 10px; cursor: pointer; transition: all 0.15s; }
+  .store-chip { display: flex; align-items: center; gap: 0.6rem; padding: 0.7rem 0.9rem; background: #181848; border: 1px solid #222255; border-radius: 0.7rem; cursor: pointer; transition: all 0.15s; }
   .store-chip.active { border-color: var(--jacc); background: rgba(6,182,212,0.1); }
-  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; color: #f8fafc; padding: 10px 16px; border-radius: 10px; font-size: 12px; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.4); max-width: 90%; text-align: center; }
+  .toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); background: #1e293b; color: #f8fafc; padding: 0.7rem 1.1rem; border-radius: 0.7rem; font-size: 0.85rem; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.4); max-width: 90%; text-align: center; }
   .toast.error { background: #7f1d1d; }
-  .card { background: #181848; border: 1px solid #222255; border-radius: 12px; padding: 11px; }
-  .tab-btn { flex: 1; padding: 9px 4px; font-size: 12px; font-weight: 700; color: #7878aa; border-radius: 8px; text-align: center; }
+  .card { background: #181848; border: 1px solid #222255; border-radius: 0.85rem; padding: 0.8rem; }
+  .tab-btn { flex: 1; padding: 0.65rem 0.3rem; font-size: 0.92rem; font-weight: 700; color: #7878aa; border-radius: 0.6rem; text-align: center; }
   .tab-btn.active { background: var(--jacc); color: white; }
-  .printer-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 11px; background: #14143a; border: 1px solid #222255; border-radius: 10px; margin-bottom: 6px; }
+  .printer-row { display: flex; align-items: center; justify-content: space-between; padding: 0.65rem 0.8rem; background: #14143a; border: 1px solid #222255; border-radius: 0.7rem; margin-bottom: 0.5rem; }
   .printer-row.connected { border-color: #059669; }
-  .qty-btn { width: 34px; height: 34px; border-radius: 9px; background: #181848; border: 1px solid #222255; color: white; font-size: 16px; font-weight: 700; }
+  .qty-btn { width: 2.4rem; height: 2.4rem; border-radius: 0.6rem; background: #181848; border: 1px solid #222255; color: white; font-size: 1.15rem; font-weight: 700; }
   .qty-btn:active { background: #26265e; }
-  .qty-input { width: 40px; height: 34px; border-radius: 9px; background: #0d0d24; border: 1px solid var(--jacc); color: white; font-size: 14px; font-weight: 800; text-align: center; -moz-appearance: textfield; }
+  .qty-input { width: 2.8rem; height: 2.4rem; border-radius: 0.6rem; background: #0d0d24; border: 1px solid var(--jacc); color: white; font-size: 1rem; font-weight: 800; text-align: center; -moz-appearance: textfield; }
   .qty-input::-webkit-outer-spin-button, .qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-  .cart-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: #14143a; border: 1px solid #222255; border-radius: 10px; margin-bottom: 6px; }
-  .unit-chip { display: inline-block; padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; border: 1px solid #222255; color: #a5a5d0; margin: 3px; }
+  .cart-item { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.75rem; background: #14143a; border: 1px solid #222255; border-radius: 0.7rem; margin-bottom: 0.45rem; }
+  .unit-chip { display: inline-block; padding: 0.38rem 0.75rem; border-radius: 0.6rem; font-size: 0.85rem; font-weight: 600; border: 1px solid #222255; color: #a5a5d0; margin: 0.2rem; }
   .unit-chip.selected { background: var(--jacc); color: white; border-color: var(--jacc); }
-  .nav-bottom { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 560px; background: #16163a; border-top: 1px solid #222255; display: flex; padding: 6px 10px; padding-bottom: calc(6px + env(safe-area-inset-bottom)); z-index: 50; }
-  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 9.5px; color: #7878aa; font-weight: 600; padding: 5px 0; }
+  .nav-bottom { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 560px; background: #16163a; border-top: 1px solid #222255; display: flex; padding: 0.4rem 0.75rem; padding-bottom: calc(0.4rem + env(safe-area-inset-bottom)); z-index: 50; }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 0.75rem; color: #7878aa; font-weight: 600; padding: 0.35rem 0; }
   .nav-item.active { color: var(--jacc); }
-  .nav-item span.icon { font-size: 18px; }
-  .main-content { padding-bottom: 104px; }
-  .menu-row { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: #181848; border: 1px solid #222255; border-radius: 10px; color: #e2e8f0; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .nav-item span.icon { font-size: 1.3rem; }
+  .main-content { padding-bottom: 7rem; }
+  .menu-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 0.9rem; background: #181848; border: 1px solid #222255; border-radius: 0.7rem; color: #e2e8f0; font-size: 1rem; font-weight: 600; cursor: pointer; }
   .menu-row:active { background: #1e1e52; }
-  .menu-row span { font-size: 15px; }
-  .inv-mode-btn { background: #181848; border: 1px solid #222255; color: #a5a5d0; font-weight: 700; border-radius: 8px; padding: 7px 4px; font-size: 11px; letter-spacing: 0.3px; }
+  .menu-row span { font-size: 1.1rem; }
+  .inv-mode-btn { background: #181848; border: 1px solid #222255; color: #a5a5d0; font-weight: 700; border-radius: 0.6rem; padding: 0.5rem 0.3rem; font-size: 0.85rem; letter-spacing: 0.3px; }
   .inv-mode-btn:active { background: #1e1e52; }
   .inv-mode-btn.active { background: var(--jacc); border-color: var(--jacc); color: white; }
 </style>
@@ -715,7 +715,7 @@
   <script>
     const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
     const IN_APP = typeof AndroidPrinter !== 'undefined';
-    const WEB_VER = '20260919-3';
+    const WEB_VER = '20260919-4';
 
     // ─── Crash reporting: send any native crash.log (from the uncaught-exception
     // handler in MainActivity) to the server on the next successful launch. Also
