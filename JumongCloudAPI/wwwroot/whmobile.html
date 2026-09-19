@@ -359,8 +359,11 @@
 
           <div id="recvEntryView">
             <div class="card mb-3">
-              <p class="text-gray-400 text-[10px] uppercase tracking-wider mb-1.5">🏷️ Supplier / Source *</p>
-              <input id="recvSource" class="input-field" type="text" placeholder="e.g. SM MEGA delivery" enterkeyhint="done">
+              <p class="text-gray-400 text-[10px] uppercase tracking-wider mb-1.5">🏷️ Source *</p>
+              <select id="recvSourceSel" class="input-field mb-2" onchange="onRecvSourceChange()">
+                <option value="">— Select source —</option>
+              </select>
+              <input id="recvSource" class="input-field hidden" type="text" placeholder="e.g. SM MEGA delivery" enterkeyhint="done">
             </div>
             <div class="flex gap-2 mb-3">
               <input id="recvSearch" class="input-field flex-1" type="text" placeholder="🔍 Search or scan barcode">
@@ -726,7 +729,7 @@
   <script>
     const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
     const IN_APP = typeof AndroidPrinter !== 'undefined';
-    const WEB_VER = '20260919-9';
+    const WEB_VER = '20260919-10';
 
     // ─── Crash reporting: send any native crash.log (from the uncaught-exception
     // handler in MainActivity) to the server on the next successful launch. Also
@@ -1009,7 +1012,8 @@
       document.getElementById('menuStoreIcon').textContent = isWh ? '🏭' : '🏬';
       updateLockUI();
       // HQ-only menu items (warehouse ops) — hidden kapag store ang pinili (U Got mobile POS).
-      ['menuOnlineOrders', 'menuReceiving', 'menuCreditBilling'].forEach(id => {
+      // RECEIVING ay available na sa lahat (store-aware na — 2026-09-19).
+      ['menuOnlineOrders', 'menuCreditBilling'].forEach(id => {
         const el = document.getElementById(id); if (el) el.style.display = isHqStore() ? '' : 'none';
       });
       // Customer chat 💬 = HQ customer service (online shop) — hidden sa store mode.
@@ -1085,7 +1089,7 @@
 
     function goProducts() { closeBurgerMenu(); switchTab('products'); loadProducts(); }
     function goTransfers() { closeBurgerMenu(); switchTab('transfers'); loadTransfers(); }
-    function goReceiving() { closeBurgerMenu(); switchTab('receiving'); document.getElementById('recvSearch').value = ''; document.getElementById('recvResults').innerHTML = ''; document.getElementById('recvSearch').focus(); }
+    function goReceiving() { closeBurgerMenu(); switchTab('receiving'); document.getElementById('recvSearch').value = ''; document.getElementById('recvResults').innerHTML = ''; loadRecvSources(); document.getElementById('recvSearch').focus(); }
     function goNewTransfer() {
       switchTab('newtransfer');
       txItems = [];
@@ -2950,7 +2954,7 @@
       if (!q) { box.innerHTML = ''; return; }
       box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading...</p>';
       try {
-        const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&search=' + encodeURIComponent(q) + '&source=hq');
+        const r = await fetch(API + '/dashboard/warehouse/products?activeOnly=true&noImage=true&search=' + encodeURIComponent(q) + '&' + srcQ());
         const data = await r.json();
         recvProdCache = data || [];
         box.innerHTML = '';
@@ -3148,10 +3152,10 @@
     function clearRecvCart() { recvCart = []; renderRecvCart(); }
 
     async function saveReceivingBatch() {
-      const source = document.getElementById('recvSource').value.trim();
-      if (!source) { toast('Enter the supplier / source', 'error'); document.getElementById('recvSource').focus(); return; }
+      const source = recvSourceValue();
+      if (!source) { toast('Pumili ng source (store o supplier)', 'error'); return; }
       if (!recvCart.length) { toast('Add at least one item', 'error'); return; }
-      const body = { source, stockSource: 'hq', items: recvCart.map(i => ({ productId: i.id, qty: i.qty })) };
+      const body = { source, stockSource: isHqStore() ? 'hq' : 'store', storeId: isHqStore() ? null : session.storeId, items: recvCart.map(i => ({ productId: i.id, qty: i.qty })) };
       const btn = document.getElementById('btnSaveReceiving');
       btn.disabled = true; btn.textContent = 'SAVING...';
       try {
@@ -3176,6 +3180,8 @@
         document.getElementById('recvSearch').value = '';
         document.getElementById('recvResults').innerHTML = '';
         document.getElementById('recvSource').value = '';
+        const rsel = document.getElementById('recvSourceSel'); if (rsel) rsel.value = '';
+        onRecvSourceChange();
         toast('Stock received: +' + total + ' pcs');
       } catch (e) { toast('Failed: ' + e.message, 'error'); }
       finally { btn.disabled = false; btn.textContent = 'SAVE RECEIVING'; }
@@ -3183,6 +3189,46 @@
 
     // ─── RECEIVING PRINT HISTORY ─────────────────────────────
     let lastReceiving = null;
+
+    // ─── RECEIVING SOURCE PICKER (2026-09-19) ───────────────
+    // Source = ang IBANG stores (kung U Got → HQ/HVR/ACGS; kung HQ → U Got/HVR/ACGS)
+    // + "Iba pa" para sa supplier (free text). Store-aware na ang receiving (destination = selected store).
+    let recvSourcesLoaded = false;
+    async function loadRecvSources() {
+      const sel = document.getElementById('recvSourceSel');
+      if (!sel || recvSourcesLoaded) return;
+      try {
+        const r = await fetch(API + '/dashboard/warehouse/clients');
+        const data = await r.json();
+        const cur = session.storeId || '';
+        (data || []).filter(c => c.storeType === 'pos' && c.storeId !== 'STORE-WAREHOUSE' && c.storeId !== 'STORE-DEV-0001' && c.storeId !== cur).forEach(c => {
+          const o = document.createElement('option');
+          o.value = c.name;
+          o.textContent = c.name;
+          sel.appendChild(o);
+        });
+        const o2 = document.createElement('option');
+        o2.value = '__other__';
+        o2.textContent = '✏️ Iba pa (supplier — i-type)';
+        sel.appendChild(o2);
+        recvSourcesLoaded = true;
+      } catch (e) { }
+    }
+    function onRecvSourceChange() {
+      const sel = document.getElementById('recvSourceSel');
+      const inp = document.getElementById('recvSource');
+      if (!sel || !inp) return;
+      if (sel.value === '__other__') { inp.classList.remove('hidden'); inp.focus(); }
+      else inp.classList.add('hidden');
+    }
+    function recvSourceValue() {
+      const sel = document.getElementById('recvSourceSel');
+      const inp = document.getElementById('recvSource');
+      if (sel && sel.value === '__other__') return (inp.value || '').trim();
+      return sel ? sel.value : '';
+    }
+    // History query: HQ = source=hq; ibang stores = storeId=<selected>.
+    function recvHistQ() { return isHqStore() ? 'source=hq' : ('storeId=' + encodeURIComponent(session.storeId || '')); }
 
     function printReceivingBatch() {
       if (!lastReceiving) { toast('Nothing to print', 'error'); return; }
@@ -3224,7 +3270,7 @@
       const box = document.getElementById('recvHistoryList');
       box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">Loading...</p>';
       try {
-        const r = await fetch(API + '/dashboard/warehouse/receivings?source=hq');
+        const r = await fetch(API + '/dashboard/warehouse/receivings?' + recvHistQ());
         const rows = await r.json();
         box.innerHTML = '';
         if (!rows || !rows.length) { box.innerHTML = '<p class="text-gray-500 text-center text-xs py-3">No receiving history yet</p>'; return; }
@@ -3247,7 +3293,7 @@
 
     async function showRecvHistoryItems(ref) {
       try {
-        const r = await fetch(API + '/dashboard/warehouse/receivings/' + encodeURIComponent(ref) + '/items?source=hq');
+        const r = await fetch(API + '/dashboard/warehouse/receivings/' + encodeURIComponent(ref) + '/items?' + recvHistQ());
         const items = await r.json();
         const box = document.getElementById('recvHistoryList');
         box.innerHTML = '<div class="card !mb-2"><p class="text-white text-xs font-bold">' + ref + '</p>' +
@@ -3265,7 +3311,7 @@
 
     async function reprintReceiving(ref) {
       try {
-        const r = await fetch(API + '/dashboard/warehouse/receivings/' + encodeURIComponent(ref) + '/items?source=hq');
+        const r = await fetch(API + '/dashboard/warehouse/receivings/' + encodeURIComponent(ref) + '/items?' + recvHistQ());
         const items = await r.json();
         const parts = ref.split(' | ');
         lastReceiving = { reference: ref, source: parts[1] || '—', items: (items || []).map(i => ({ productName: i.productName, qty: i.qty })) };
