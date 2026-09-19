@@ -715,7 +715,7 @@
   <script>
     const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
     const IN_APP = typeof AndroidPrinter !== 'undefined';
-    const WEB_VER = '20260919-6';
+    const WEB_VER = '20260919-7';
 
     // ─── Crash reporting: send any native crash.log (from the uncaught-exception
     // handler in MainActivity) to the server on the next successful launch. Also
@@ -810,6 +810,16 @@
       .replace(/[^\x20-\x7E\n]/g, '');
     // Global text-fit helper for thermal printing (legacy alias).
     const fit = s => fitW(s);
+    // ─── ESC/POS CONTROL (2026-09-19) ───────────────────────
+    // Standard 57mm = Font A (32 chars) na HINDI bold. Ang native APK ay nagpi-print ng
+    // BOLD ON sa bawat linya — kaya nag-e-embed tayo ng ESC E 0 (bold off) PAGKATAPOS ng
+    // markers (<<CENTER>>/<<RIGHT>>/<<BIG>>) para normal weight ang lahat ng text.
+    const ESC = '\x1b';
+    const escWrap = (t) => String(t == null ? '' : t).split('\n').map(line =>
+      line.length ? line.replace(/^((?:<<(?:CENTER|RIGHT|BIG)>>)*)/, '$1' + ESC + 'E\x00') : line
+    ).join('\n');
+    // Lahat ng print ay dapat dumaan dito (asciiSafe muna, tapos escWrap — hindi dapat salain ng asciiSafe ang ESC bytes).
+    const ptPrint = (t) => AndroidPrinter.print(escWrap(asciiSafe(t)));
     let invMode = 'all';
     let invRows = [];
     let invPage = 1;
@@ -1263,7 +1273,7 @@
       lines.push('-'.repeat(W));
       lines.push(padLR('TOTAL', ooCur.total.toFixed(2), W));
       lines.push('');
-      const pr = AndroidPrinter.print(asciiSafe(lines.join('\n')));
+      const pr = ptPrint(lines.join('\n'));
       if (pr !== 'OK') toast(pr.replace('ERR:', ''), 'error');
     }
     // ─── EDIT ITEMS (pending/confirmed, bago i-assign sa driver) ───────
@@ -1387,7 +1397,7 @@
       L.push(sep);
       L.push(ctrW('Salamat po!', W));
       L.push(ctrW('Mag-order muli :)', W));
-      const pr = AndroidPrinter.print(asciiSafe(L.join('\n')));
+      const pr = ptPrint(L.join('\n'));
       if (pr !== 'OK') toast(pr.replace('ERR:', ''), 'error');
     }
 
@@ -1564,9 +1574,20 @@
 
     function printTest() {
       if (!IN_APP) { toast('Open the app (APK) to use Bluetooth', 'error'); return; }
-      const result = AndroidPrinter.printTest();
-      if (result === 'OK') toast('Test print sent to printer!');
-      else { updatePrinterStatus(false); toast(result.replace('ERR:', ''), 'error'); }
+      if (!AndroidPrinter.isConnected()) { toast('Connect a printer first', 'error'); return; }
+      // JS-built test print — standard 57mm Font A, HINDI bold (ESC E 0 via ptPrint).
+      const W = PW();
+      const t = '\n' + ctrW('JUMONG POS', W) + '\n' +
+        ctrW((session && (session.storeName || session.storeId)) || '', W) + '\n' +
+        '-'.repeat(W) + '\n' +
+        fitW('PRINTER TEST OK', W) + '\n' +
+        fitW('Font: standard ' + W + ' chars', W) + '\n' +
+        fitW('Bold: OFF', W) + '\n' +
+        '-'.repeat(W) + '\n' +
+        ctrW('THANK YOU!', W) + '\n\n';
+      const pr = ptPrint(t);
+      if (pr === 'OK') toast('Test print sent to printer!');
+      else { updatePrinterStatus(false); toast(pr.replace('ERR:', ''), 'error'); }
     }
 
     // ─── PRODUCT SEARCH ──────────────────────────────────────
@@ -2113,7 +2134,7 @@
             const t = ctrW('JUMONG POS', W) + '\n' + ctrW(session.storeName || '', W) + '\n' + ctrW('=== CREDIT PAYMENT ===', W) + '\n' +
               (inv ? padDL('Invoice', inv) : '') + padDL('Customer', j.customerName) + padDL('Method', method) + padDL('Amount', 'P' + amt.toFixed(2)) +
               padDL('Remaining', 'P' + bal.toFixed(2)) + '\n' + ctrW(new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' }), W) + '\n' + ctrW('THANK YOU!', W) + '\n';
-            const pr = AndroidPrinter.print(asciiSafe(t));
+            const pr = ptPrint(t);
             if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
           } catch (pe) {
             toast('Payment OK, pero hindi na-print ang voucher: ' + pe.message, 'error');
@@ -2190,7 +2211,7 @@
         const invoiceNo = j.invoiceNo || ('#' + j.saleId);
         if (IN_APP && AndroidPrinter.isConnected()) {
           const receipt = buildReceiptText(j, items, method);
-          const pr = AndroidPrinter.print(receipt);
+          const pr = ptPrint(receipt);
           if (pr !== 'OK') toast('Sale OK but print failed: ' + pr, 'error');
         }
         toast('Sale complete! ' + invoiceNo);
@@ -2398,7 +2419,7 @@
       lines.push(fitW('TOTAL UNITS: ' + rows.reduce((s, p) => s + Number(p.stockQty || 0), 0), W));
       lines.push(dash);
       lines.push('Thank you!');
-      const pr = AndroidPrinter.print(asciiSafe(lines.join('\n')));
+      const pr = ptPrint(lines.join('\n'));
       if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
       else toast('Inventory printed (' + rows.length + ' items)');
     }
@@ -2548,7 +2569,7 @@
         const h = j.header || {};
         const text = buildReceiptTextReprint(h, j.items || []);
         if (text === null) { toast('All items in this receipt are voided. Nothing to reprint.', 'warning'); return; }
-        const pr = AndroidPrinter.print(text);
+        const pr = ptPrint(text);
         if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
         else toast('Receipt re-printed');
       } catch (e) { toast('Reprint failed: ' + e.message, 'error'); }
@@ -3139,7 +3160,7 @@
       lines.push(fitW('TOTAL QTY: ' + lastReceiving.items.reduce((s, i) => s + i.qty, 0), W));
       lines.push(dash);
       lines.push('Thank you!');
-      const pr = AndroidPrinter.print(asciiSafe(lines.join('\n')));
+      const pr = ptPrint(lines.join('\n'));
       if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
       else toast('Receiving voucher printed');
     }
@@ -3437,7 +3458,7 @@
       if (j.expenses > 0) t += padLR('Expenses', fmtMoney(j.expenses), W) + '\n';
       t += padLR('Difference', (j.difference >= 0 ? '+' : '') + fmtMoney(j.difference), W) + '\n';
       t += '\n' + ctrW('THANK YOU!', W) + '\n';
-      const pr = AndroidPrinter.print(asciiSafe(t));
+      const pr = ptPrint(t);
       if (pr !== 'OK') toast('Print failed: ' + pr, 'error');
     }
 
