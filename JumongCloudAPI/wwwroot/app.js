@@ -53,8 +53,8 @@ window.exportCSV = (name) => {
   if (name === 'st-transfer') {
     const st = document.querySelector('[x-data="storeTransferPanel"]')?.__x?.$data;
     if (!st || !st.transfers || !st.transfers.length) { toast('No data to export', 'error'); return }
-    const headers = 'ID,Client,Status,Notes,Date';
-    const rows = st.transfers.map(x => [x.id, x.clientName, x.status, x.notes, x.createdAt]);
+    const headers = 'ID,Client,Status,Notes,Date,Created By,Via,Accepted';
+    const rows = st.transfers.map(x => [x.id, x.clientName, x.status, x.notes, x.createdAt, x.createdBy, x.createdVia, x.receivedAt]);
     let csv = headers + '\n' + rows.map(r => r.map(c => '"' + (c + '').replace(/"/g, '""') + '"').join(',')).join('\n');
     downloadCSV(csv, name);
     return;

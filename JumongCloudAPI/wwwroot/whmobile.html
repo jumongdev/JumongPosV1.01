@@ -729,7 +729,7 @@
   <script>
     const API = (location.protocol === 'https:' ? location.origin : 'https://admin.jumongdev.com') + '/api';
     const IN_APP = typeof AndroidPrinter !== 'undefined';
-    const WEB_VER = '20260919-12';
+    const WEB_VER = '20260919-13';
 
     // ─── Crash reporting: send any native crash.log (from the uncaught-exception
     // handler in MainActivity) to the server on the next successful launch. Also
@@ -2809,7 +2809,9 @@
           div.className = 'card';
           const dt = new Date(x.createdAt);
           div.innerHTML = '<div class="flex items-center justify-between" onclick="loadTransferItems(' + x.id + ',\'' + String(x.id).replace(/'/g, '') + '\')"><div class="flex-1 pr-2"><p class="text-white text-sm font-bold"><span class="text-[9px] font-black px-1.5 py-0.5 rounded ' + (isOut ? 'bg-rose-900/50 text-rose-300' : 'bg-emerald-900/50 text-emerald-300') + '">' + dir + '</span> Transfer #' + x.id + (x.hasShortage ? ' ⚠' : '') + '</p>' +
-            '<p class="text-gray-500 text-[11px]">' + (x.clientName || '') + ' • ' + dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) + '</p></div>' +
+            '<p class="text-gray-500 text-[11px]">' + (x.clientName || '') + ' • ' + dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) + '</p>' +
+            (x.receivedAt ? '<p class="text-emerald-400/90 text-[10px] font-bold">✅ Accepted: ' + new Date(x.receivedAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) + '</p>' : '') +
+            '</div>' +
             '<p class="' + stColor + ' text-[10px] font-bold uppercase">' + (x.status || '') + '</p></div>';
           list.appendChild(div);
         });
@@ -2952,6 +2954,7 @@
         source: isHqStore() ? 'hq' : 'store',
         fromStoreId: isHqStore() ? null : session.storeId,
         createdBy: session.fullName || session.username || '',
+        createdVia: 'mobile',
         items: txItems.map(x => ({ productId: x.productId, productName: x.productName, barcode: x.barcode, qty: x.qty }))
       };
       const btn = document.querySelector('#tabNewTransfer .btn-green');

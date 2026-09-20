@@ -973,6 +973,7 @@ Alpine.store('app', {
             notes: this.stTransferForm.notes,
             storeId: this.stTransferForm.storeId,
             source: 'hq',
+            createdVia: 'dashboard',
             items: this.stTransferFormItems.map(x => ({ productId: x.productId, productName: x.productName, barcode: x.barcode, qty: x.qty }))
           })
         });

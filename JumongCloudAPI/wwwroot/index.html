@@ -2452,6 +2452,8 @@ tailwind.config = {
                         <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Status</th>
                         <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Notes</th>
                         <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
+                        <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Accepted</th>
+                        <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Via</th>
                         <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Actions</th>
                       </tr></thead>
                       <tbody>
@@ -2469,6 +2471,8 @@ tailwind.config = {
                             </td>
                             <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] max-w-[140px] truncate" :title="x.notes || ''" x-text="x.notes || '—'"></td>
                             <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="new Date(x.createdAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Manila'})"></td>
+                            <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa] whitespace-nowrap" x-text="x.receivedAt ? new Date(x.receivedAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Manila'}) : '—'"></td>
+                            <td class="px-3 py-2 text-gray-400 dark:text-[#5a5a8a] whitespace-nowrap" x-text="x.createdVia === 'mobile' ? '📱 mobile' : (x.createdVia === 'dashboard' ? '🖥 dashboard' : (x.createdVia || '—'))"></td>
                             <td class="px-3 py-2 whitespace-nowrap">
                               <button @click="viewTransfer(x.id)" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848] transition-colors">VIEW</button>
                               <template x-if="x.status==='pending'">
@@ -4702,8 +4706,8 @@ tailwind.config = {
 
   </div><!-- /main content -->
 
-  <script src="components.js?v=20260919b"></script>
-  <script src="app.js?v=20260919b"></script>
+  <script src="components.js?v=20260919c"></script>
+  <script src="app.js?v=20260919c"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script>
   /* ── Web login gating (username + PIN, WEB ACCESS only) ── */

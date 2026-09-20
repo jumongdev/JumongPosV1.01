@@ -880,7 +880,11 @@ public static class PgDatabaseHelper
         using var whReportMig = conn.CreateCommand();
         whReportMig.CommandText = @"
             ALTER TABLE wh_walkin_sales ADD COLUMN IF NOT EXISTS cashier_name TEXT NOT NULL DEFAULT '';
-            ALTER TABLE wh_transfers ADD COLUMN IF NOT EXISTS created_by TEXT NOT NULL DEFAULT ''";
+            ALTER TABLE wh_transfers ADD COLUMN IF NOT EXISTS created_by TEXT NOT NULL DEFAULT '';
+            -- Transfer timestamps (2026-09-19): accept/receive time + kung anong app ang ginawa.
+            ALTER TABLE wh_transfers ADD COLUMN IF NOT EXISTS received_at TIMESTAMPTZ;
+            ALTER TABLE wh_transfers ADD COLUMN IF NOT EXISTS created_via TEXT NOT NULL DEFAULT '';
+            UPDATE wh_transfers SET received_at = updated_at WHERE received_at IS NULL AND status IN ('completed','partial')";
         try { whReportMig.ExecuteNonQuery(); } catch { }
 
         using var raMig = conn.CreateCommand();
