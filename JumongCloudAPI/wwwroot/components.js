@@ -905,7 +905,7 @@ Alpine.store('app', {
   // ════════════════════════════════════════════════════
   Alpine.data('storeTransferPanel', () => ({
     transfers: [], loading: true,
-    transferPage: 1, transferPageSize: 30, transferTotal: 0, transferFilterDate: '', transferFilterSearch: '',
+    transferPage: 1, transferPageSize: 30, transferTotal: 0, transferFilterDate: '', transferFilterSearch: '', transferFilterSource: '',
     stTransferModal: false, stTransferSaving: false, stTransferForm: { clientId: '', clientName: '', notes: '', storeId: '' }, stTransferFormItems: [],
     stTransferViewOpen: false, stTransferViewId: null, stTransferViewItems: [],
     async init() {
@@ -920,7 +920,10 @@ Alpine.store('app', {
         const q = [];
         if (this.transferFilterDate) q.push('date=' + this.transferFilterDate);
         if (this.transferFilterSearch) q.push('search=' + encodeURIComponent(this.transferFilterSearch));
-        q.push('source=hq');
+        // SOURCE FILTER (2026-09-21): dating hardcoded source=hq — kaya HINDI lumalabas ang
+        // store-to-store transfers (source=store) na gawa ng mobile app (hal. U Got -> ACGS #1181).
+        // Ngayon: default = LAHAT; pwedeng i-filter sa HQ o STORE.
+        if (this.transferFilterSource) q.push('source=' + this.transferFilterSource);
         q.push('page=' + this.transferPage);
         q.push('pageSize=' + this.transferPageSize);
         const d = await fetchJSON(API + '/warehouse/transfers?' + q.join('&'));
@@ -930,7 +933,7 @@ Alpine.store('app', {
       this.loading = false;
     },
     applyTransferFilter() { this.transferPage = 1; this.load() },
-    clearTransferFilter() { this.transferFilterDate = ''; this.transferFilterSearch = ''; this.transferPage = 1; this.load() },
+    clearTransferFilter() { this.transferFilterDate = ''; this.transferFilterSearch = ''; this.transferFilterSource = ''; this.transferPage = 1; this.load() },
     prevTransferPage() { if (this.transferPage > 1) { this.transferPage--; this.load() } },
     nextTransferPage() { if (this.transferPage < this.transferTotalPages) { this.transferPage++; this.load() } },
     gotoTransferPage(p) { this.transferPage = p; this.load() },
