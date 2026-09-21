@@ -47,6 +47,17 @@ public class SyncController : ControllerBase
             "ON CONFLICT (store_id, pos_id) DO UPDATE SET name=@p1, barcode=@p2, category=@p3, price=@p4, cost=@p5, stock_qty=@p6, is_active=@p7, modified_by=@p9, synced_at=NOW()", sid);
     }
 
+    // v1.1.82 BUGFIX (2026-09-21): ang POS ay camelCase ang JSON (posId, loyaltyPoints, isActive...)
+    // dahil sa PostAsync naming policy — pero ang SyncCustomers/SyncUsers (bagong code) ay snake_case
+    // lang ang binabasa → pos_id=0 at loyalty_points=0 sa BAWAT push (na-wipe ang points ng lahat ng
+    // QR customers simula nang ma-deploy ang v1.1.82 API). Dual lookup gaya ng SyncTable.
+    private static bool TryGetProp(JsonElement item, string snake, out JsonElement val)
+    {
+        if (item.TryGetProperty(snake, out val)) return true;
+        var camel = string.Concat(snake.Split('_').Select((w, j) => j == 0 ? w : char.ToUpper(w[0]) + w[1..]));
+        return item.TryGetProperty(camel, out val);
+    }
+
     [HttpPost("customers")]
     public IActionResult SyncCustomers([FromBody] List<JsonElement> items)
     {
@@ -59,34 +70,58 @@ public class SyncController : ControllerBase
             var updated = 0; var skipped = 0;
             foreach (var item in items)
             {
-                var name = item.TryGetProperty("name", out var nEl) ? nEl.GetString() ?? "" : "";
+                var name = TryGetProp(item, "name", out var nEl) ? nEl.GetString() ?? "" : "";
                 if (string.IsNullOrEmpty(name)) { skipped++; continue; }
 
-                int posId = item.TryGetProperty("pos_id", out var pEl) && pEl.ValueKind == JsonValueKind.Number ? pEl.GetInt32() : 0;
-                var phone = item.TryGetProperty("phone", out var phEl) ? phEl.GetString() ?? "" : "";
-                var email = item.TryGetProperty("email", out var eEl) ? eEl.GetString() ?? "" : "";
-                var points = item.TryGetProperty("loyalty_points", out var lpEl) && lpEl.ValueKind == JsonValueKind.Number ? lpEl.GetInt32() : 0;
-                var isActive = !(item.TryGetProperty("is_active", out var iaEl) && iaEl.ValueKind == JsonValueKind.False);
-                var creditBalance = item.TryGetProperty("credit_balance", out var cbEl) && cbEl.ValueKind == JsonValueKind.Number ? cbEl.GetDecimal() : 0m;
-                var creditLimit = item.TryGetProperty("credit_limit", out var clEl) && clEl.ValueKind == JsonValueKind.Number ? clEl.GetDecimal() : 0m;
-                var address = item.TryGetProperty("address", out var aEl) ? aEl.GetString() ?? "" : "";
-                var modifiedBy = item.TryGetProperty("modified_by", out var mbEl) ? mbEl.GetString() ?? "" : "";
+                int posId = TryGetProp(item, "pos_id", out var pEl) && pEl.ValueKind == JsonValueKind.Number ? pEl.GetInt32() : 0;
+                var phone = TryGetProp(item, "phone", out var phEl) ? phEl.GetString() ?? "" : "";
+                var email = TryGetProp(item, "email", out var eEl) ? eEl.GetString() ?? "" : "";
+                var points = TryGetProp(item, "loyalty_points", out var lpEl) && lpEl.ValueKind == JsonValueKind.Number ? lpEl.GetInt32() : 0;
+                var isActive = !(TryGetProp(item, "is_active", out var iaEl) && iaEl.ValueKind == JsonValueKind.False);
+                var creditBalance = TryGetProp(item, "credit_balance", out var cbEl) && cbEl.ValueKind == JsonValueKind.Number ? cbEl.GetDecimal() : 0m;
+                var creditLimit = TryGetProp(item, "credit_limit", out var clEl) && clEl.ValueKind == JsonValueKind.Number ? clEl.GetDecimal() : 0m;
+                var address = TryGetProp(item, "address", out var aEl) ? aEl.GetString() ?? "" : "";
+                var modifiedBy = TryGetProp(item, "modified_by", out var mbEl) ? mbEl.GetString() ?? "" : "";
 
-                using var cmd = conn.CreateCommand();
-                cmd.CommandText = @"UPDATE customers SET pos_id=@p0, phone=@p2, email=@p3, loyalty_points=@p4, is_active=@p5,
-                    credit_balance=@p6, credit_limit=@p7, address=@p8, modified_by=@p10, synced_at=NOW()
-                    WHERE name = @name AND COALESCE(google_sub,'') <> ''";
-                cmd.Parameters.AddWithValue("p0", posId);
-                cmd.Parameters.AddWithValue("p2", phone);
-                cmd.Parameters.AddWithValue("p3", email);
-                cmd.Parameters.AddWithValue("p4", points);
-                cmd.Parameters.AddWithValue("p5", isActive);
-                cmd.Parameters.AddWithValue("p6", creditBalance);
-                cmd.Parameters.AddWithValue("p7", creditLimit);
-                cmd.Parameters.AddWithValue("p8", address);
-                cmd.Parameters.AddWithValue("p10", modifiedBy);
-                cmd.Parameters.AddWithValue("name", name);
-                if (cmd.ExecuteNonQuery() > 0) updated++; else skipped++;
+                NpgsqlCommand MakeUpd(string where)
+                {
+                    var c = conn.CreateCommand();
+                    c.CommandText = @"UPDATE customers SET pos_id=@p0, phone=@p2, email=@p3, loyalty_points=@p4, is_active=@p5,
+                        credit_balance=@p6, credit_limit=@p7, address=@p8, modified_by=@p10, synced_at=NOW() " + where;
+                    c.Parameters.AddWithValue("p0", posId);
+                    c.Parameters.AddWithValue("p2", phone);
+                    c.Parameters.AddWithValue("p3", email);
+                    c.Parameters.AddWithValue("p4", points);
+                    c.Parameters.AddWithValue("p5", isActive);
+                    c.Parameters.AddWithValue("p6", creditBalance);
+                    c.Parameters.AddWithValue("p7", creditLimit);
+                    c.Parameters.AddWithValue("p8", address);
+                    c.Parameters.AddWithValue("p10", modifiedBy);
+                    c.Parameters.AddWithValue("name", name);
+                    return c;
+                }
+
+                var n = 0;
+                using (var cmd = MakeUpd("WHERE name = @name AND COALESCE(google_sub,'') <> ''"))
+                    n = cmd.ExecuteNonQuery();
+
+                // FALLBACK (2026-09-21): kung 0 ang na-update BY NAME (hal. nag-rename ang customer sa shop
+                // app habang offline ang store — stale ang local name), subukan BY EMAIL tapos BY PHONE.
+                // Google-registered row lang (ONE RULE) at isang row lang ang target (ORDER BY id LIMIT 1)
+                // para hindi ma-contaminate ang ibang account. Dati: updated=0 + HTTP 200 → naka-clear ang
+                // PointsDirty sa POS → tuluyang nawawala ang points.
+                if (n == 0 && !string.IsNullOrEmpty(email))
+                {
+                    using var cmd = MakeUpd("WHERE id = (SELECT id FROM customers WHERE LOWER(email) = LOWER(@p3) AND COALESCE(google_sub,'') <> '' ORDER BY id LIMIT 1)");
+                    n = cmd.ExecuteNonQuery();
+                }
+                if (n == 0 && !string.IsNullOrEmpty(phone))
+                {
+                    using var cmd = MakeUpd("WHERE id = (SELECT id FROM customers WHERE phone = @p2 AND phone <> '' AND COALESCE(google_sub,'') <> '' ORDER BY id LIMIT 1)");
+                    n = cmd.ExecuteNonQuery();
+                }
+
+                if (n > 0) updated++; else skipped++;
             }
             return Ok(new { ok = true, updated, skipped });
         }
@@ -102,12 +137,12 @@ public class SyncController : ControllerBase
             using var conn = Data.PgDatabaseHelper.GetConnection();
             foreach (var item in items)
             {
-                var posId = item.TryGetProperty("pos_id", out var pidEl) && pidEl.ValueKind == JsonValueKind.Number ? pidEl.GetInt32() : 0;
-                var username = item.TryGetProperty("username", out var uEl) ? uEl.GetString() ?? "" : "";
-                var role = item.TryGetProperty("role", out var rEl) ? rEl.GetString() ?? "Cashier" : "Cashier";
-                var fullName = item.TryGetProperty("full_name", out var fnEl) ? fnEl.GetString() ?? "" : "";
-                var isActive = item.TryGetProperty("is_active", out var iaEl) ? iaEl.GetBoolean() : true;
-                var passwordHash = item.TryGetProperty("password_hash", out var phEl) ? phEl.GetString() : null;
+                var posId = TryGetProp(item, "pos_id", out var pidEl) && pidEl.ValueKind == JsonValueKind.Number ? pidEl.GetInt32() : 0;
+                var username = TryGetProp(item, "username", out var uEl) ? uEl.GetString() ?? "" : "";
+                var role = TryGetProp(item, "role", out var rEl) ? rEl.GetString() ?? "Cashier" : "Cashier";
+                var fullName = TryGetProp(item, "full_name", out var fnEl) ? fnEl.GetString() ?? "" : "";
+                var isActive = TryGetProp(item, "is_active", out var iaEl) ? iaEl.GetBoolean() : true;
+                var passwordHash = TryGetProp(item, "password_hash", out var phEl) ? phEl.GetString() : null;
 
                 if (string.IsNullOrEmpty(username)) continue;
 

@@ -959,16 +959,17 @@ tailwind.config = {
                   <button @click="tab='sales'" class="text-[10px] px-2.5 py-1 rounded-lg font-bold border border-gray-200 dark:border-[#222255]" :class="tab==='sales' ? 'bg-cyan-600 text-white border-cyan-600' : 'text-gray-500 dark:text-[#7878aa]'">SALES</button>
                   <button @click="tab='shifts'" class="text-[10px] px-2.5 py-1 rounded-lg font-bold border border-gray-200 dark:border-[#222255]" :class="tab==='shifts' ? 'bg-cyan-600 text-white border-cyan-600' : 'text-gray-500 dark:text-[#7878aa]'">END SHIFT</button>
                 </div>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300" x-text="dayLabel"></span>
               </div>
-              <div class="flex items-center gap-2">
-                <template x-if="tab==='sales'">
-                  <div class="flex items-center gap-1">
-                    <template x-for="r in [['today','Today'],['7','7D'],['30','30D'],['month','This Month']]" :key="r[0]">
-                      <button @click="setRange(r[0])" class="text-[10px] px-2.5 py-1 rounded-lg font-bold border border-gray-200 dark:border-[#222255]"
-                        :class="range===r[0] ? 'bg-cyan-600 text-white border-cyan-600' : 'text-gray-500 dark:text-[#7878aa]'" x-text="r[1]"></button>
-                    </template>
-                  </div>
-                </template>
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="flex items-center gap-1">
+                  <button @click="setDay('today')" class="text-[10px] px-2.5 py-1 rounded-lg font-bold border border-gray-200 dark:border-[#222255]"
+                    :class="day==='today' ? 'bg-cyan-600 text-white border-cyan-600' : 'text-gray-500 dark:text-[#7878aa]'">TODAY</button>
+                  <button @click="setDay('all')" class="text-[10px] px-2.5 py-1 rounded-lg font-bold border border-gray-200 dark:border-[#222255]"
+                    :class="day==='all' ? 'bg-cyan-600 text-white border-cyan-600' : 'text-gray-500 dark:text-[#7878aa]'">ALL</button>
+                  <input type="date" x-model="pickedDate" @change="setDay(pickedDate)"
+                    class="text-[10px] bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg px-2 py-1 text-gray-700 dark:text-slate-200 max-w-[130px]">
+                </div>
                 <button @click="load()" class="text-[10px] px-2 py-1 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa]">REFRESH</button>
               </div>
             </div>
@@ -1023,6 +1024,51 @@ tailwind.config = {
                         </template>
                       </div>
                     </template>
+
+                    <!-- E-COMMERCE (HQ online — delivered orders) -->
+                    <div class="rounded-xl border border-violet-200 dark:border-violet-900/40 overflow-hidden">
+                      <div class="flex flex-wrap items-center justify-between px-3 py-2 bg-violet-50 dark:bg-violet-900/20 gap-2">
+                        <p class="text-[11px] font-black uppercase tracking-wider text-violet-700 dark:text-violet-300">🛒 E-COMMERCE (HQ ONLINE)</p>
+                        <div class="flex items-center gap-3 text-[10px] text-gray-500 dark:text-[#7878aa]">
+                          <span x-text="ecomTotals().count + ' order(s)'"></span>
+                          <span>Total: &#8369;<b x-text="fmt(ecomTotals().total)"></b></span>
+                          <button @click="exportEcomCSV()" class="px-2 py-1 rounded border border-gray-200 dark:border-[#222255]">CSV</button>
+                        </div>
+                      </div>
+                      <template x-if="ecomList().length === 0"><p class="text-center text-gray-400 text-xs py-6">Walang e-commerce delivered sa range na ito.</p></template>
+                      <template x-if="ecomList().length > 0">
+                        <div class="overflow-x-auto">
+                          <table class="w-full text-xs">
+                            <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                              <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Order No</th>
+                              <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Delivered</th>
+                              <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Customer</th>
+                              <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Driver</th>
+                              <th class="text-center px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Payment</th>
+                              <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Items</th>
+                              <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Total</th>
+                            </tr></thead>
+                            <tbody>
+                              <template x-for="x in ecomList()" :key="'ecom-'+x.id">
+                                <tr @click="openEcomOrder(x)" class="cursor-pointer border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                                  <td class="px-3 py-2 whitespace-nowrap font-semibold" x-text="x.orderNo || ('#' + x.id)"></td>
+                                  <td class="px-3 py-2 whitespace-nowrap" x-text="fmtDate(x.deliveredAt)"></td>
+                                  <td class="px-3 py-2" x-text="x.customerName"></td>
+                                  <td class="px-3 py-2 text-gray-500 dark:text-[#7878aa]" x-text="x.driverName || '—'"></td>
+                                  <td class="px-3 py-2 text-center"><span class="text-[9px] font-black px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300" x-text="(x.paymentMethod || 'COD').toUpperCase()"></span></td>
+                                  <td class="px-3 py-2 text-right" x-text="x.itemCount"></td>
+                                  <td class="px-3 py-2 text-right" x-text="'&#8369;' + fmt(x.total)"></td>
+                                </tr>
+                              </template>
+                              <tr class="bg-violet-50 dark:bg-violet-900/10 font-bold">
+                                <td class="px-3 py-2" colspan="6" x-text="'TOTAL (' + ecomTotals().count + ')'"></td>
+                                <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(ecomTotals().total)"></span></td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </template>
+                    </div>
                   </div>
 
                   <!-- END SHIFT TAB -->
@@ -2630,7 +2676,15 @@ tailwind.config = {
       <div x-show="$store.app.section === 'customers'" x-transition.opacity x-data="customersList">
         <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl">
           <div class="px-4 py-3 border-b border-gray-100 dark:border-[#222255] flex items-center justify-between gap-3 flex-wrap">
-            <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">CUSTOMERS</h3>
+            <div class="flex items-center gap-3 flex-wrap">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-700 dark:text-cyan-400">CUSTOMERS</h3>
+              <div class="relative">
+                <input type="text" x-model="search" placeholder="🔍 Search name / phone / email / QR"
+                  class="text-xs bg-gray-50 dark:bg-[#181848] border border-gray-200 dark:border-[#222255] rounded-lg pl-3 pr-7 py-1.5 text-gray-700 dark:text-slate-200 w-64 max-w-[60vw] focus:border-cyan-500 outline-none">
+                <button x-show="search" @click="search=''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs" title="Clear search">✕</button>
+              </div>
+              <span x-show="search" class="text-[10px] font-bold text-cyan-700 dark:text-cyan-300" x-text="filtered.length + ' resulta'"></span>
+            </div>
             <div class="flex items-center gap-3 flex-wrap">
               <div class="flex gap-1.5">
                 <button @click="setPtsFilter('all')" class="text-[10px] font-bold px-2.5 py-1.5 rounded-lg border transition" :class="ptsFilter==='all' ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-gray-100 dark:bg-[#181848] text-gray-600 dark:text-slate-300 border-gray-200 dark:border-[#222255]'">ALL (<span x-text="d.length"></span>)</button>
@@ -2648,7 +2702,7 @@ tailwind.config = {
           </div>
           <div class="overflow-x-auto">
             <template x-if="loading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
-            <template x-if="!loading && filtered.length===0"><div class="text-center py-6 text-gray-400">No customers</div></template>
+            <template x-if="!loading && filtered.length===0"><div class="text-center py-6 text-gray-400" x-text="search ? 'Walang customer na tumutugma sa search.' : 'No customers'"></div></template>
             <template x-if="filtered.length > 0">
               <table class="w-full text-xs">
                 <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
@@ -4706,8 +4760,8 @@ tailwind.config = {
 
   </div><!-- /main content -->
 
-  <script src="components.js?v=20260919c"></script>
-  <script src="app.js?v=20260919c"></script>
+  <script src="components.js?v=20260921c"></script>
+  <script src="app.js?v=20260921c"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script>
   /* ── Web login gating (username + PIN, WEB ACCESS only) ── */

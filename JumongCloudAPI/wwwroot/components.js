@@ -1018,6 +1018,7 @@ Alpine.store('app', {
   /* ΓöÇΓöÇ Customers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 Alpine.data('customersList', () => ({
     d: [], loading: true, orders: [], ordersOpen: false, ordersName: '', ordersLoading: false, ptsFilter: 'star',
+    search: '',
     showInactive: false, deactivating: false, ptsSummary: null,
     phoneOpen: false, phoneTarget: null, phoneInput: '', phoneSaving: false,
     upOpen: false, upTarget: null, upInput: '', upList: [], upSaving: false,
@@ -1038,6 +1039,17 @@ Alpine.data('customersList', () => ({
     get noPhone() { return this.d.filter(x => this._act(x) && !!x.googleSub && !x.phone).length },
     get inactiveCount() { return this.d.filter(x => x.isActive === false).length },
     get filtered() {
+      // SEARCH (2026-09-21): kapag may query, hinahanap sa LAHAT ng customers (name/phone/email/QR)
+      // — hindi na pinipigilan ng ⭐/⛔ filter para siguradong makita ang customer.
+      // HINDI kasama ang INACTIVE customers sa search (manual/lumang accounts).
+      const q = (this.search || '').trim().toLowerCase();
+      if (q) {
+        return this.d.filter(x => this._act(x) && (
+          (x.name || '').toLowerCase().includes(q) ||
+          (x.phone || '').toLowerCase().includes(q) ||
+          (x.email || '').toLowerCase().includes(q) ||
+          (x.qrCode || '').toLowerCase().includes(q)));
+      }
       const base = this.showInactive ? this.d : this.d.filter(x => this._act(x));
       if (this.ptsFilter === 'star') return base.filter(x => !!x.qrCode);
       if (this.ptsFilter === 'nostar') return base.filter(x => !x.qrCode);
@@ -1411,37 +1423,49 @@ Alpine.data('customersList', () => ({
     loading: true,
     shifts: {},
     sales: {},
-    range: '7', from: '', to: '',
+    ecom: null,
+    day: 'today', pickedDate: '', from: '', to: '',
     saleModal: null, saleItems: [], saleLoading: false,
     stores: [
       { id: 'STORE-20260602-7159', label: 'MOBILE POS HQ' },
       { id: 'STORE-20260622-E174', label: 'MOBILE POS U GOT' }
     ],
     async init() {
-      this.setRange('7', true);
+      this.setDay('today', true);
       if (Alpine.store('app').section === 'mpos-shifts') this.load();
       this.$watch('$store.app.section', v => { if (v === 'mpos-shifts') this.load(); });
       window.addEventListener('refresh-data', () => { if (Alpine.store('app').section === 'mpos-shifts') this.load(); });
     },
     _iso(dt) { const y = dt.getFullYear(), m = String(dt.getMonth() + 1).padStart(2, '0'), d = String(dt.getDate()).padStart(2, '0'); return y + '-' + m + '-' + d; },
-    setRange(r, init) {
-      this.range = r;
-      const to = new Date(), from = new Date();
-      if (r === '7') from.setDate(to.getDate() - 6);
-      else if (r === '30') from.setDate(to.getDate() - 29);
-      else if (r === 'month') from.setDate(1);
-      this.from = this._iso(from); this.to = this._iso(to);
+    setDay(v, init) {
+      this.day = v || 'today';
+      if (this.day === 'today') { const t = this._iso(new Date()); this.from = t; this.to = t; this.pickedDate = ''; }
+      else if (this.day === 'all') { this.from = ''; this.to = ''; this.pickedDate = ''; }
+      else { this.from = this.day; this.to = this.day; this.pickedDate = this.day; }
       if (!init) this.load();
     },
+    get dayLabel() {
+      if (this.day === 'all') return 'ALL';
+      if (this.day === 'today') return 'TODAY';
+      return this.fmtDay(this.day);
+    },
+    fmtDay(d) {
+      const m = { '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec' };
+      const p = String(d || '').split('-');
+      return p.length === 3 ? (m[p[1]] || p[1]) + ' ' + parseInt(p[2], 10) + ', ' + p[0] : String(d || '');
+    },
+    _q() { return this.from ? ('&from=' + this.from + '&to=' + this.to) : ''; },
     async load() {
       this.loading = true;
       const shifts = {}, sales = {};
       for (const s of this.stores) {
-        try { shifts[s.id] = await fetchJSON(API + '/warehouse/shifts?limit=100&storeId=' + encodeURIComponent(s.id)) || []; }
+        try { shifts[s.id] = await fetchJSON(API + '/warehouse/shifts?limit=100&storeId=' + encodeURIComponent(s.id) + this._q()) || []; }
         catch (e) { shifts[s.id] = []; }
-        try { sales[s.id] = await fetchJSON(API + '/warehouse/sales?limit=500&storeId=' + encodeURIComponent(s.id) + '&from=' + this.from + '&to=' + this.to) || []; }
+        try { sales[s.id] = await fetchJSON(API + '/warehouse/sales?limit=500&storeId=' + encodeURIComponent(s.id) + this._q()) || []; }
         catch (e) { sales[s.id] = []; }
       }
+      try { this.ecom = await fetchJSON(API + '/ecom-sales?limit=500' + this._q()) || null; }
+      catch (e) { this.ecom = null; }
       this.shifts = shifts; this.sales = sales;
       this.loading = false;
     },
@@ -1474,6 +1498,18 @@ Alpine.data('customersList', () => ({
       this.saleLoading = false;
     },
     closeSale() { this.saleModal = null; this.saleItems = []; },
+    // ── E-commerce (HQ online, delivered) ──
+    ecomList() { return (this.ecom && this.ecom.orders) || []; },
+    ecomTotals() { return (this.ecom && this.ecom.totals) || { count: 0, total: 0 }; },
+    async openEcomOrder(x) {
+      this.saleModal = { invoiceNo: x.orderNo, customerName: x.customerName, paymentMethod: x.paymentMethod, createdAt: x.deliveredAt, total: x.total };
+      this.saleItems = []; this.saleLoading = true;
+      try {
+        const r = await fetchJSON(API + '/shop/orders/' + x.id);
+        this.saleItems = ((r && r.items) || []).map(it => Object.assign({}, it, { subtotal: it.total }));
+      } catch (e) { this.saleItems = []; }
+      this.saleLoading = false;
+    },
     // ── helpers ──
     fmt(n) { return Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
     fmtDate(d) { return d ? new Date(d).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' }) : ''; },
@@ -1502,6 +1538,13 @@ Alpine.data('customersList', () => ({
       const rows = rr.map(x => [new Date(x.createdAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }), x.invoiceNo, x.customerName, x.cashierName, x.paymentMethod, x.itemCount, x.total, x.isVoided ? 'VOIDED' : 'OK']);
       const lbl = (this.stores.find(s => s.id === sid) || {}).label || sid;
       this._csv(head, rows, 'mobile-pos-sales-' + lbl.replace(/\s+/g, '-').toLowerCase() + '-' + this.from + '_' + this.to + '.csv');
+    },
+    exportEcomCSV() {
+      const rr = this.ecomList();
+      if (!rr.length) return;
+      const head = ['Delivered', 'Order No', 'Customer', 'Phone', 'Driver', 'Payment', 'Items', 'Total'];
+      const rows = rr.map(x => [x.deliveredAt ? new Date(x.deliveredAt).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : '', x.orderNo, x.customerName, x.phone, x.driverName, x.paymentMethod, x.itemCount, x.total]);
+      this._csv(head, rows, 'mobile-pos-ecom-' + (this.day || 'all') + '.csv');
     }
   }));
 

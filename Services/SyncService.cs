@@ -210,7 +210,50 @@ public static class SyncService
                 ModifiedBy = customer.ModifiedBy
             }
         };
-        return await PostAsync("/customers", data);
+
+        // v1.1.84 POINTS-SAFETY (2026-09-21): hindi sapat ang HTTP 200 — kung `updated=0` ang cloud
+        // (walang na-match na customer row, hal. nag-rename sa shop app), HUWAG i-clear ang PointsDirty.
+        // Manatiling pending locally (protektado rin ng PointsDirty ang local points sa 5-min pull) at
+        // susubukan ulit sa susunod na award/void o manual SYNC ALL. Dati: 200 = OK → naka-clear ang
+        // flag → tuluyang nawawala ang points.
+        try
+        {
+            var url = ApiUrl.TrimEnd('/') + "/customers?store_id=" + StoreId + "&store_name=" + Uri.EscapeDataString(StoreName);
+            var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _client.PostAsync(url, content);
+            if (!response.IsSuccessStatusCode)
+            {
+                var err = await response.Content.ReadAsStringAsync();
+                LogSync("/customers", "FAIL", err);
+                EnqueueFailed("/customers", json);
+                return false;
+            }
+            var body = await response.Content.ReadAsStringAsync();
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                if (doc.RootElement.TryGetProperty("updated", out var up) && up.ValueKind == JsonValueKind.Number && up.GetInt32() <= 0)
+                {
+                    LogSync("/customers", "SKIP", "updated=0 — hindi na-match ang customer, points pending (retry sa susunod na award/void)");
+                    return false;
+                }
+            }
+            catch { }
+            LogSync("/customers", "OK", "");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            LogSync("/customers", "ERROR", ex.Message);
+            try
+            {
+                var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                EnqueueFailed("/customers", json);
+            }
+            catch (Exception ex2) { ErrorLogger.Log("SyncService.SyncCustomer(enqueue)", ex2); }
+            return false;
+        }
     }
 
     public static async Task SyncUser(User user)
