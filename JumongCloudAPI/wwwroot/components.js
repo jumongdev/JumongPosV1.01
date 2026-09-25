@@ -410,9 +410,20 @@ Alpine.store('app', {
     get filtered() { return this.search ? this.d.filter(x => JSON.stringify(x).toLowerCase().includes(this.search.toLowerCase())) : this.d },
     get total() { return this.filtered.length },
     get pages() { return Math.ceil(this.total / PAGE_SIZE) },
-    get paged() { return this.filtered.slice(this.page * PAGE_SIZE, (this.page + 1) * PAGE_SIZE) },
+get paged() { return this.filtered.slice(this.page * PAGE_SIZE, (this.page + 1) * PAGE_SIZE) },
     prev() { if (this.page > 0) this.page-- },
-    next() { if (this.page < this.pages - 1) this.page++ }
+    next() { if (this.page < this.pages - 1) this.page++ },
+    async checkShift(x, checked) {
+      try {
+        const r = await fetchJSON(API + '/shift-check', {
+          method: 'POST',
+          body: JSON.stringify({ storeId: x.storeId, posId: x.posId, checked, checkedBy: localStorage.getItem('jpos_web_user') || 'Admin' }),
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (r && r.ok) { x.checkedBy = r.checkedBy; x.checkedAt = r.checkedAt; }
+        else alert('Hindi ma-mark ang shift. Pakisubukan muli.');
+      } catch (e) { alert('Error: ' + e.message) }
+    }
   }));
 
   /* ΓöÇΓöÇ Stock Receiving ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
@@ -1501,6 +1512,17 @@ Alpine.data('customersList', () => ({
       this.saleLoading = false;
     },
     closeSale() { this.saleModal = null; this.saleItems = []; },
+    async checkShift(x, checked) {
+      try {
+        const r = await fetchJSON(API + '/warehouse/shift-check', {
+          method: 'POST',
+          body: JSON.stringify({ id: x.id, checked, checkedBy: localStorage.getItem('jpos_web_user') || 'Admin' }),
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (r && r.ok) { x.checkedBy = r.checkedBy; x.checkedAt = r.checkedAt; }
+        else alert('Hindi ma-mark ang shift. Pakisubukan muli.');
+      } catch (e) { alert('Error: ' + e.message) }
+    },
     // ── E-commerce (HQ online, delivered) ──
     ecomList() { return (this.ecom && this.ecom.orders) || []; },
     ecomTotals() { return (this.ecom && this.ecom.totals) || { count: 0, total: 0 }; },
@@ -1529,8 +1551,8 @@ Alpine.data('customersList', () => ({
     exportCSV(sid) {
       const rr = this.list(sid);
       if (!rr.length) return;
-      const head = ['Date', 'Cashier', 'Sales', 'Cash', 'EWallet', 'Credit', 'Expenses', 'CashOnHand', 'Difference'];
-      const rows = rr.map(x => [new Date(x.closeDate).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }), x.cashierName, x.totalSales, x.totalCash, x.totalEw, x.totalCredit, x.expenses, x.cashOnHand, x.difference]);
+      const head = ['Date', 'Cashier', 'Sales', 'Cash', 'EWallet', 'Credit', 'Expenses', 'CashOnHand', 'Difference', 'CheckedBy', 'CheckedAt'];
+      const rows = rr.map(x => [new Date(x.closeDate).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }), x.cashierName, x.totalSales, x.totalCash, x.totalEw, x.totalCredit, x.expenses, x.cashOnHand, x.difference, x.checkedBy || '', x.checkedAt || '']);
       const lbl = (this.stores.find(s => s.id === sid) || {}).label || sid;
       this._csv(head, rows, 'mobile-pos-shifts-' + lbl.replace(/\s+/g, '-').toLowerCase() + '.csv');
     },

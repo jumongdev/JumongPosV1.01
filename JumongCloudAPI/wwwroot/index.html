@@ -1097,6 +1097,7 @@ tailwind.config = {
                                 <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Expenses</th>
                                 <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Cash on Hand</th>
                                 <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Difference</th>
+                                <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Finance</th>
                               </tr></thead>
                               <tbody>
                                 <template x-for="x in list(s.id)" :key="x.id">
@@ -1110,6 +1111,14 @@ tailwind.config = {
                                     <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.expenses)"></span></td>
                                     <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.cashOnHand)"></span></td>
                                     <td class="px-3 py-2 text-right font-bold" :class="diffCls(x.difference)"><span x-text="(Number(x.difference||0) >= 0 ? '+' : '') + fmt(x.difference)"></span></td>
+                                    <td class="px-3 py-2">
+                                      <template x-if="x.checkedBy">
+                                        <span class="inline-flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 cursor-pointer" title="Click to uncheck" @click="checkShift(x, false)">✅ <span x-text="x.checkedBy"></span> · <span x-text="fmtDate(x.checkedAt)"></span></span>
+                                      </template>
+                                      <template x-if="!x.checkedBy">
+                                        <button @click="checkShift(x, true)" class="text-[9px] font-bold px-2 py-0.5 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">✓ MARK CHECKED</button>
+                                      </template>
+                                    </td>
                                   </tr>
                                 </template>
                                 <tr class="bg-gray-50 dark:bg-[#181848]/60 font-bold">
@@ -1121,6 +1130,7 @@ tailwind.config = {
                                   <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(totals(s.id).expenses)"></span></td>
                                   <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(totals(s.id).cashOnHand)"></span></td>
                                   <td class="px-3 py-2 text-right" x-text="fmt(totals(s.id).diff)"></td>
+                                  <td class="px-3 py-2"></td>
                                 </tr>
                               </tbody>
                             </table>
@@ -1389,6 +1399,7 @@ tailwind.config = {
                       <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">COGS</th>
                       <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Recv Cost</th>
                       <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">User</th>
+                      <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Finance</th>
                     </tr></thead>
                     <tbody>
                       <template x-for="x in paged" :key="x.closeDate+x.userName">
@@ -1407,6 +1418,14 @@ tailwind.config = {
                           <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalCostSold)"></span></td>
                           <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalStockReceivedCost)"></span></td>
                           <td class="px-2 py-2" x-text="x.userName"></td>
+                          <td class="px-2 py-2">
+                            <template x-if="x.checkedBy">
+                              <span class="inline-flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 cursor-pointer" title="Click to uncheck" @click="checkShift(x, false)">✅ <span x-text="x.checkedBy"></span> · <span x-text="new Date(x.checkedAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Manila'})"></span></span>
+                            </template>
+                            <template x-if="!x.checkedBy">
+                              <button @click="checkShift(x, true)" class="text-[9px] font-bold px-2 py-0.5 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">✓ MARK CHECKED</button>
+                            </template>
+                          </td>
                         </tr>
                       </template>
                     </tbody>
@@ -4769,8 +4788,8 @@ tailwind.config = {
 
   </div><!-- /main content -->
 
-  <script src="components.js?v=20260921d"></script>
-  <script src="app.js?v=20260921d"></script>
+  <script src="components.js?v=20260924a"></script>
+  <script src="app.js?v=20260924a"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script>
   /* ── Web login gating (username + PIN, WEB ACCESS only) ── */

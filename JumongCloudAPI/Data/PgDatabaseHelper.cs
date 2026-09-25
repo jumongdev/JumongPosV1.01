@@ -193,6 +193,8 @@ public static class PgDatabaseHelper
                 notes TEXT DEFAULT '',
                 user_id INTEGER NOT NULL DEFAULT 0,
                 user_name TEXT DEFAULT '',
+                checked_by TEXT NOT NULL DEFAULT '',
+                checked_at TIMESTAMPTZ,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 UNIQUE(store_id, pos_id)
@@ -254,6 +256,13 @@ public static class PgDatabaseHelper
         invMig.ExecuteNonQuery();
         invMig.CommandText = "ALTER TABLE daily_closes ADD COLUMN IF NOT EXISTS total_stock_received_cost NUMERIC NOT NULL DEFAULT 0";
         invMig.ExecuteNonQuery();
+
+        // Migration: mark end shift as checked by finance (2026-09-24)
+        using var dcCheckMig = conn.CreateCommand();
+        dcCheckMig.CommandText = "ALTER TABLE daily_closes ADD COLUMN IF NOT EXISTS checked_by TEXT NOT NULL DEFAULT ''";
+        dcCheckMig.ExecuteNonQuery();
+        dcCheckMig.CommandText = "ALTER TABLE daily_closes ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ";
+        dcCheckMig.ExecuteNonQuery();
 
         // Migration: backfill empty cashier_name from users table
         using var backfill = conn.CreateCommand();
@@ -873,6 +882,9 @@ public static class PgDatabaseHelper
             ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS credit_collected NUMERIC NOT NULL DEFAULT 0;
             -- Mobile POS end-shift per store (2026-09-18): HQ default para sa lumang rows.
             ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS store_id TEXT NOT NULL DEFAULT 'STORE-20260602-7159';
+            -- Mark end shift as checked by finance (2026-09-24)
+            ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS checked_by TEXT NOT NULL DEFAULT '';
+            ALTER TABLE wh_daily_closes ADD COLUMN IF NOT EXISTS checked_at TIMESTAMPTZ;
             CREATE INDEX IF NOT EXISTS idx_wh_daily_closes_store ON wh_daily_closes(store_id)";
         try { whDcDenoms.ExecuteNonQuery(); } catch { }
 
