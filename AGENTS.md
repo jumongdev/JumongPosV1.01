@@ -101,7 +101,9 @@ C:\dev\JumongPosV1.01\          # DEV PC repo (primary). Server keeps a read-onl
 ```powershell
 Set-Location C:\dev\JumongPosV1.01
 dotnet publish JumongCloudAPI\JumongCloudAPI.csproj -c Release -r win-x64 --self-contained true
-$s = New-PSSession -ComputerName DESKTOP-I097OO9 -Credential DESKTOP-I097OO9\remotedev
+$pw = ConvertTo-SecureString 'Jum0ng!Server26' -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential('ADMIN', $pw)
+$s = New-PSSession -ComputerName DESKTOP-I097OO9 -Credential $cred   # MACHINE NAME lang — IP fails 0x8009030e
 Copy-Item -ToSession $s -Path 'JumongCloudAPI\bin\Release\net8.0\win-x64\publish\*' -Destination 'C:\JumongAPI\' -Recurse
 Invoke-Command -Session $s -ScriptBlock { net stop JumongCloudAPI; net start JumongCloudAPI }
 Remove-PSSession $s
@@ -119,7 +121,7 @@ The batch file lives on the Desktop so it's easy to find. It must always be run 
 ### Machine Roles (IMPORTANT — WHERE IS WHAT)
 | Machine | Role | What lives there |
 |---|---|---|
-| `DESKTOP-I097OO9` @ `192.168.1.21` (Ethernet, 1 Gbps) + `192.168.1.41` (Wi-Fi) | **SERVER ONLY** (Cloud API host, no dev) | API service at `C:\JumongAPI\` (+ client drop `C:\JumongAPI\client\`), Cloudflare tunnel, PostgreSQL, Cloudflare config. Repo clone kept at `C:\Users\ADMIN\Desktop\JumongPosV1.01` (read-only reference — NO dev work here anymore) |
+| `DESKTOP-I097OO9` @ `192.168.1.20` (DHCP — was .21/.41; verify via DNS) | **SERVER ONLY** (Cloud API host, no dev) | API service at `C:\JumongAPI\` (+ client drop `C:\JumongAPI\client\`), Cloudflare tunnel, PostgreSQL, Cloudflare config. Repo clone kept at `C:\Users\ADMIN\Desktop\JumongPosV1.01` (read-only reference — NO dev work here anymore) |
 | `DESKTOP-Q36S34R` (DHCP — was `192.168.1.55`, now `192.168.1.35` as of 2026-08-12) | **DEV PC (all development happens here)** | Cloned repo at **`C:\dev\JumongPosV1.01`**, non-git assets at `C:\dev\extras\`, client publish output `C:\dev\out\client`, Gradle at `C:\dev\gradle\gradle-8.14.3`, dev DB `C:\dev\JumongPosV1.01\JumongPos.db` (STORE-DEV-0001) |
 | `DESKTOP-UU8E0D4` @ `192.168.1.25` (verified 2026-08-15; was .26) | **HQ store (Andengs Superstore - HQ)** | POS client at **`C:\Users\ADMIN\Desktop\JumongPosHW\`** ← NOT in `C:\JumongAPI\client\` |
 | `DESKTOP-U5BO3Q0` @ `192.168.1.100` | HVR store (moved to new PC 2026-08-19; was DESKTOP-TK63MO6 @ 192.168.1.15) | POS client at **`C:\Users\ADMIN\Desktop\HVR_POS\`** (verified 2026-09-05), agent on `DESKTOP-U5BO3Q0`; inbound RDP/WinRM/ICMP BLOCKED (lanfix not yet done); sleep = never |
@@ -147,13 +149,15 @@ Both machines can remote into each other over WinRM (LAN only). **The dev PC is 
 
 | Item | Detail |
 |---|---|
-| Dev PC → Server account | `DESKTOP-I097OO9\remotedev` / `Jum0ng!Dev55` (admin) |
+| Dev PC → Server account | **`ADMIN`** / **`Jum0ng!Server26`** (admin) — ⚠️ HINDI `remotedev`/`Jum0ng!Dev55` (mali iyon — old docs) |
 | Server → Dev PC account | `DESKTOP-Q36S34R\serverdev` / `Jum0ng!Dev55` (admin) |
 | Dev PC → **HQ** account | `DESKTOP-UU8E0D4\remotedev` / `Jum0ng!Dev55` (admin, created 2026-08-15) |
 | Server TrustedHosts (as client) | `DESKTOP-Q36S34R` (names only — no IPs; DHCP changes don't break TrustedHosts) |
 | Dev PC TrustedHosts (as client) | `DESKTOP-I097OO9, DESKTOP-UU8E0D4` (names only) |
 | Ports | WinRM 5985 both machines + HQ, ICMP enabled |
 | Server Ethernet | **1 Gbps full duplex** (cable fixed 2026-08-11; was 10 Mbps) |
+
+> **🚨 SERVER ACCESS GOTCHA (na-verify 2026-09-25):** ang server machine (`DESKTOP-I097OO9`) ay nasa **192.168.1.20** na (DHCP — hindi na .21/.41 gaya ng dating docs). **Connect by MACHINE NAME lang ang gumagana:** `New-PSSession -ComputerName DESKTOP-I097OO9 -Credential (ADMIN / Jum0ng!Server26)` — kapag IP ang gamit (`192.168.1.20`) → `0x8009030e` ("A specified logon session does not exist"). Ang username sa server ay **`ADMIN`** (hindi remotedev!) at ang password ay **`Jum0ng!Server26`** (hindi `Jum0ng!Dev55` — iyon ay HQ/dev PC lang). Na-verify via SMB IPC$ + WinRM 2026-09-25 (deploy ng API 1.1.85).
 
 > **HQ WinRM setup (2026-08-15, via agent + one UAC click):** HQ's firewall blocked ALL inbound (no WinRM/SMB/RDP; UAC enabled → the agent's PowerShell runs with a FILTERED token, so even `netsh`/`net user`/`schtasks /rl highest` fail silently with "Access is denied"). Fix applied by (1) writing `lanfix.ps1` to HQ via agent `writefile`, (2) agent `ps`: `Start-Process powershell -Verb RunAs` → staff clicked Yes on the UAC dialog once → script ran elevated: `winrm quickconfig` + `Enable-PSRemoting -Force -SkipNetworkProfileCheck`, firewall rules `WinRM HTTP LAN` (TCP 5985, any profile) + `ICMPv4 Ping LAN`, created `remotedev` admin user, `LocalAccountTokenFilterPolicy=1`. Temp files deleted after. **Verified from dev PC:** `New-PSSession -ComputerName DESKTOP-UU8E0D4 -Credential DESKTOP-UU8E0D4\remotedev` → OK (host/agent/POS exe confirmed). ALSO verified: **HQ → server LAN `DESKTOP-I097OO9:5000` = reachable** (the API is on the LAN; only HQ's own inbound was blocked). Note: on THIS dev PC the WSMan client `TrustedHosts` edit must be done via the dev PC agent (runs as SYSTEM) — a plain non-elevated shell gets "Access is denied".
 >
@@ -252,7 +256,7 @@ dotnet publish -c Release -r win-x64 --self-contained true
 dotnet publish -c Release -r win-x64 --self-contained true -o C:\dev\out\client
 
 # Deploy the client drop to the server (then stores update via UPDATE APP)
-$s = New-PSSession -ComputerName DESKTOP-I097OO9 -Credential DESKTOP-I097OO9\remotedev
+$s = New-PSSession -ComputerName DESKTOP-I097OO9 -Credential (New-Object System.Management.Automation.PSCredential('ADMIN', (ConvertTo-SecureString 'Jum0ng!Server26' -AsPlainText -Force)))
 Copy-Item -ToSession $s -Path 'C:\dev\out\client\*' -Destination 'C:\JumongAPI\client\' -Recurse
 Remove-PSSession $s
 ```
