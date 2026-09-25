@@ -423,6 +423,26 @@ get paged() { return this.filtered.slice(this.page * PAGE_SIZE, (this.page + 1) 
         if (r && r.ok) { x.checkedBy = r.checkedBy; x.checkedAt = r.checkedAt; }
         else alert('Hindi ma-mark ang shift. Pakisubukan muli.');
       } catch (e) { alert('Error: ' + e.message) }
+    },
+    async markAllExceptToday() {
+      const now = new Date();
+      const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+      const iso = d => { const dt = new Date(d); return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'); };
+      const targets = this.d.filter(x => iso(x.closeDate) < today && !x.checkedBy);
+      if (!targets.length) { toast('Wala nang shift na ma-mark (hindi kasama ang today).', 'error'); return; }
+      if (!confirm('Mark ' + targets.length + ' shift(s) as CHECKED by finance (EXCEPT today)?')) return;
+      let ok = 0;
+      for (const x of targets) {
+        try {
+          const r = await fetchJSON(API + '/shift-check', {
+            method: 'POST',
+            body: JSON.stringify({ storeId: x.storeId, posId: x.posId, checked: true, checkedBy: localStorage.getItem('jpos_web_user') || 'Admin' }),
+            headers: { 'Content-Type': 'application/json' }
+          });
+          if (r && r.ok) { x.checkedBy = r.checkedBy; x.checkedAt = r.checkedAt; ok++; }
+        } catch (e) { }
+      }
+      toast('Marked ' + ok + '/' + targets.length + ' shift(s) as checked.');
     }
   }));
 
@@ -1455,11 +1475,13 @@ Alpine.data('customersList', () => ({
       this.day = v || 'today';
       if (this.day === 'today') { const t = this._iso(new Date()); this.from = t; this.to = t; this.pickedDate = ''; }
       else if (this.day === 'all') { this.from = ''; this.to = ''; this.pickedDate = ''; }
+      else if (this.day === 'exceptToday') { this.from = ''; const y = new Date(); y.setDate(y.getDate() - 1); this.to = this._iso(y); this.pickedDate = ''; }
       else { this.from = this.day; this.to = this.day; this.pickedDate = this.day; }
       if (!init) this.load();
     },
     get dayLabel() {
       if (this.day === 'all') return 'ALL';
+      if (this.day === 'exceptToday') return 'ALL EXC TODAY';
       if (this.day === 'today') return 'TODAY';
       return this.fmtDay(this.day);
     },
@@ -1522,6 +1544,27 @@ Alpine.data('customersList', () => ({
         if (r && r.ok) { x.checkedBy = r.checkedBy; x.checkedAt = r.checkedAt; }
         else alert('Hindi ma-mark ang shift. Pakisubukan muli.');
       } catch (e) { alert('Error: ' + e.message) }
+    },
+    async markAllExceptToday() {
+      const today = this._iso(new Date());
+      const targets = [];
+      for (const s of this.stores) for (const x of (this.shifts[s.id] || [])) {
+        if (this._iso(new Date(x.closeDate)) < today && !x.checkedBy) targets.push(x);
+      }
+      if (!targets.length) { toast('Wala nang shift na ma-mark (hindi kasama ang today).', 'error'); return; }
+      if (!confirm('Mark ' + targets.length + ' shift(s) as CHECKED by finance (EXCEPT today)?')) return;
+      let ok = 0;
+      for (const x of targets) {
+        try {
+          const r = await fetchJSON(API + '/warehouse/shift-check', {
+            method: 'POST',
+            body: JSON.stringify({ id: x.id, checked: true, checkedBy: localStorage.getItem('jpos_web_user') || 'Admin' }),
+            headers: { 'Content-Type': 'application/json' }
+          });
+          if (r && r.ok) { x.checkedBy = r.checkedBy; x.checkedAt = r.checkedAt; ok++; }
+        } catch (e) { }
+      }
+      toast('Marked ' + ok + '/' + targets.length + ' shift(s) as checked.');
     },
     // ── E-commerce (HQ online, delivered) ──
     ecomList() { return (this.ecom && this.ecom.orders) || []; },
