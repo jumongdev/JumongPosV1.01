@@ -4,6 +4,7 @@
 
 /* Constants & utilities needed by Alpine components at init time */
 const PAGE_SIZE = 20;
+window.WEB_VER = '20260925b';
 window.fmt = n => Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 window.fmtInt = n => Number(n || 0).toLocaleString('en-PH');
 window.esc = s => (s + '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -84,6 +85,7 @@ Alpine.store('app', {
     stores: [],
     storeMap: {},
     lastRefresh: '',
+    apiVersion: '',
     cache: {},
     editorOpen: false, editingId: null, editingProductData: null,
     saleModalOpen: false, saleInvoiceNo: '', saleItems: [], saleLoading: false,
@@ -226,9 +228,16 @@ Alpine.store('app', {
       this.range = 'custom';
       this.refreshAll();
     },
-    refreshAll() {
+refreshAll() {
       dispatchEvent(new CustomEvent('refresh-data'));
       this.lastRefresh = new Date().toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+      this.fetchVersion();
+    },
+    async fetchVersion() {
+      try {
+        const r = await fetch(API + '/version?_t=' + Date.now());
+        if (r.ok) { const j = await r.json(); this.apiVersion = j.version || ''; }
+      } catch (e) { }
     },
     get storeParam() { return this.storeId ? '&storeId=' + encodeURIComponent(this.storeId) : '' },
     get rangeParam() {
@@ -395,8 +404,8 @@ Alpine.store('app', {
   }));
 
   /* ΓöÇΓöÇ Shift History ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
-  Alpine.data('shiftHistory', () => ({
-    d: [], loading: true, page: 0, search: '', collapsed: false,
+Alpine.data('shiftHistory', () => ({
+    d: [], loading: true, page: 0, search: '', collapsed: false, view: 'pending',
     async init() { await this.load(); window.addEventListener('refresh-data', () => this.load()) },
     async load() {
       this.loading = true;
@@ -407,7 +416,9 @@ Alpine.store('app', {
       this.loading = false;
       this.page = 0;
     },
-    get filtered() { return this.search ? this.d.filter(x => JSON.stringify(x).toLowerCase().includes(this.search.toLowerCase())) : this.d },
+    setView(v) { this.view = v; this.page = 0 },
+    get visible() { return this.view === 'history' ? this.d.filter(x => x.checkedBy) : this.d.filter(x => !x.checkedBy) },
+    get filtered() { return this.search ? this.visible.filter(x => JSON.stringify(x).toLowerCase().includes(this.search.toLowerCase())) : this.visible },
     get total() { return this.filtered.length },
     get pages() { return Math.ceil(this.total / PAGE_SIZE) },
 get paged() { return this.filtered.slice(this.page * PAGE_SIZE, (this.page + 1) * PAGE_SIZE) },
@@ -423,26 +434,6 @@ get paged() { return this.filtered.slice(this.page * PAGE_SIZE, (this.page + 1) 
         if (r && r.ok) { x.checkedBy = r.checkedBy; x.checkedAt = r.checkedAt; }
         else alert('Hindi ma-mark ang shift. Pakisubukan muli.');
       } catch (e) { alert('Error: ' + e.message) }
-    },
-    async markAllExceptToday() {
-      const now = new Date();
-      const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-      const iso = d => { const dt = new Date(d); return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'); };
-      const targets = this.d.filter(x => iso(x.closeDate) < today && !x.checkedBy);
-      if (!targets.length) { toast('Wala nang shift na ma-mark (hindi kasama ang today).', 'error'); return; }
-      if (!confirm('Mark ' + targets.length + ' shift(s) as CHECKED by finance (EXCEPT today)?')) return;
-      let ok = 0;
-      for (const x of targets) {
-        try {
-          const r = await fetchJSON(API + '/shift-check', {
-            method: 'POST',
-            body: JSON.stringify({ storeId: x.storeId, posId: x.posId, checked: true, checkedBy: localStorage.getItem('jpos_web_user') || 'Admin' }),
-            headers: { 'Content-Type': 'application/json' }
-          });
-          if (r && r.ok) { x.checkedBy = r.checkedBy; x.checkedAt = r.checkedAt; ok++; }
-        } catch (e) { }
-      }
-      toast('Marked ' + ok + '/' + targets.length + ' shift(s) as checked.');
     }
   }));
 
@@ -1465,7 +1456,7 @@ Alpine.data('customersList', () => ({
       { id: 'STORE-20260622-E174', label: 'MOBILE POS U GOT' }
     ],
     async init() {
-      this.setDay('today', true);
+      this.setDay('exceptToday', true);
       if (Alpine.store('app').section === 'mpos-shifts') this.load();
       this.$watch('$store.app.section', v => { if (v === 'mpos-shifts') this.load(); });
       window.addEventListener('refresh-data', () => { if (Alpine.store('app').section === 'mpos-shifts') this.load(); });
@@ -1506,7 +1497,12 @@ Alpine.data('customersList', () => ({
       this.loading = false;
     },
     // ── End shifts ──
-    list(sid) { return this.shifts[sid] || []; },
+    shiftView: 'pending',
+    setShiftView(v) { this.shiftView = v },
+    list(sid) {
+      const rr = this.shifts[sid] || [];
+      return this.shiftView === 'history' ? rr.filter(x => x.checkedBy) : rr.filter(x => !x.checkedBy);
+    },
     totals(sid) {
       const rr = this.list(sid);
       const sum = k => rr.reduce((a, x) => a + Number(x[k] || 0), 0);
@@ -1544,27 +1540,6 @@ Alpine.data('customersList', () => ({
         if (r && r.ok) { x.checkedBy = r.checkedBy; x.checkedAt = r.checkedAt; }
         else alert('Hindi ma-mark ang shift. Pakisubukan muli.');
       } catch (e) { alert('Error: ' + e.message) }
-    },
-    async markAllExceptToday() {
-      const today = this._iso(new Date());
-      const targets = [];
-      for (const s of this.stores) for (const x of (this.shifts[s.id] || [])) {
-        if (this._iso(new Date(x.closeDate)) < today && !x.checkedBy) targets.push(x);
-      }
-      if (!targets.length) { toast('Wala nang shift na ma-mark (hindi kasama ang today).', 'error'); return; }
-      if (!confirm('Mark ' + targets.length + ' shift(s) as CHECKED by finance (EXCEPT today)?')) return;
-      let ok = 0;
-      for (const x of targets) {
-        try {
-          const r = await fetchJSON(API + '/warehouse/shift-check', {
-            method: 'POST',
-            body: JSON.stringify({ id: x.id, checked: true, checkedBy: localStorage.getItem('jpos_web_user') || 'Admin' }),
-            headers: { 'Content-Type': 'application/json' }
-          });
-          if (r && r.ok) { x.checkedBy = r.checkedBy; x.checkedAt = r.checkedAt; ok++; }
-        } catch (e) { }
-      }
-      toast('Marked ' + ok + '/' + targets.length + ' shift(s) as checked.');
     },
     // ── E-commerce (HQ online, delivered) ──
     ecomList() { return (this.ecom && this.ecom.orders) || []; },
