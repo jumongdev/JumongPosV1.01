@@ -4,7 +4,7 @@
 
 /* Constants & utilities needed by Alpine components at init time */
 const PAGE_SIZE = 20;
-window.WEB_VER = '20260925b';
+window.WEB_VER = '20260925c';
 window.fmt = n => Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 window.fmtInt = n => Number(n || 0).toLocaleString('en-PH');
 window.esc = s => (s + '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -650,7 +650,7 @@ get paged() { return this.filtered.slice(this.page * PAGE_SIZE, (this.page + 1) 
       else if (this.status === 'inactive') items = items.filter(x => x.isActive === false);
       if (this.search) { const q = this.search.toLowerCase(); items = items.filter(x => (x.name || '').toLowerCase().includes(q) || (x.barcode || '').toLowerCase().includes(q) || (x.category || '').toLowerCase().includes(q)) }
       if (this.catFilter) items = items.filter(x => x.category === this.catFilter);
-      if (this.supplierFilter) items = items.filter(x => (x.supplierIds || []).includes(this.supplierFilter));
+      if (this.supplierFilter) { const f = String(this.supplierFilter); items = items.filter(x => (x.supplierIds || []).map(String).includes(f)); }
       return items;
     },
     supplierName(sid) { const s = this.suppliersOpts.find(o => o.id === sid); return s ? s.companyName : ('#' + sid) },
