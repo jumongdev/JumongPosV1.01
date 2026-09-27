@@ -1099,6 +1099,7 @@ tailwind.config = {
                           <div class="overflow-x-auto">
                             <table class="w-full text-xs">
                               <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                                <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">#</th>
                                 <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
                                 <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Cashier</th>
                                 <th class="text-right px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Sales</th>
@@ -1111,8 +1112,9 @@ tailwind.config = {
                                 <th class="text-left px-3 py-2 border-b border-gray-100 dark:border-[#222255]">Finance</th>
                               </tr></thead>
                               <tbody>
-                                <template x-for="x in list(s.id)" :key="x.id">
-                                  <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                                <template x-for="(x,i) in list(s.id)" :key="x.id">
+                                  <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02] cursor-pointer" @click="openShift(x)">
+                                    <td class="px-3 py-2 text-gray-400" x-text="i+1"></td>
                                     <td class="px-3 py-2 whitespace-nowrap" x-text="fmtDate(x.closeDate)"></td>
                                     <td class="px-3 py-2" x-text="x.cashierName || '—'"></td>
                                     <td class="px-3 py-2 text-right">&#8369;<span x-text="fmt(x.totalSales)"></span></td>
@@ -1126,11 +1128,11 @@ tailwind.config = {
                                       <template x-if="shiftView==='history' && x.checkedBy">
                                         <div class="flex flex-col gap-1 items-start">
                                           <span class="inline-flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">✅ <span x-text="x.checkedBy"></span> · <span x-text="fmtDate(x.checkedAt)"></span></span>
-                                          <button @click="checkShift(x, false)" class="text-[9px] font-bold px-2 py-0.5 rounded border border-red-200 dark:border-red-900/40 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">✕ UNMARK</button>
+                                          <button @click.stop="checkShift(x, false)" class="text-[9px] font-bold px-2 py-0.5 rounded border border-red-200 dark:border-red-900/40 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">✕ UNMARK</button>
                                         </div>
                                       </template>
                                       <template x-if="shiftView==='pending'">
-                                        <button @click="checkShift(x, true)" class="text-[9px] font-bold px-2 py-0.5 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">✓ MARK CHECKED</button>
+                                        <button @click.stop="checkShift(x, true)" class="text-[9px] font-bold px-2 py-0.5 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">✓ MARK CHECKED</button>
                                       </template>
                                     </td>
                                   </tr>
@@ -1193,6 +1195,68 @@ tailwind.config = {
                 <div class="flex justify-end mt-3 text-sm font-bold text-gray-700 dark:text-slate-200">
                   <span x-text="saleModal ? ('TOTAL: &#8369;' + fmt(saleModal.total)) : ''"></span>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SHIFT DETAILS MODAL (mobile POS end shift) -->
+          <div x-show="shiftModal" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" @click.self="closeShift()" style="display:none;">
+            <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
+              <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[#222255]">
+                <div>
+                  <p class="text-sm font-bold text-gray-700 dark:text-slate-200" x-text="'🔒 Shift · ' + (shiftModal ? (shiftModal.cashierName || '—') : '')"></p>
+                  <p class="text-[11px] text-gray-400" x-text="shiftModal ? fmtDate(shiftModal.closeDate) : ''"></p>
+                </div>
+                <button @click="closeShift()" class="text-gray-400 hover:text-red-500 text-lg font-bold">✕</button>
+              </div>
+              <div class="p-4 overflow-auto">
+                <template x-if="shiftModal">
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3 text-[11px]">
+                    <div class="bg-gray-50 dark:bg-[#181848] rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Sales</p><p class="font-bold">&#8369;<span x-text="fmt(shiftModal.totalSales)"></span></p></div>
+                    <div class="bg-gray-50 dark:bg-[#181848] rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Cash</p><p class="font-bold">&#8369;<span x-text="fmt(shiftModal.totalCash)"></span></p></div>
+                    <div class="bg-gray-50 dark:bg-[#181848] rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">E-Wallet</p><p class="font-bold">&#8369;<span x-text="fmt(shiftModal.totalEw)"></span></p></div>
+                    <div class="bg-gray-50 dark:bg-[#181848] rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Credit</p><p class="font-bold">&#8369;<span x-text="fmt(shiftModal.totalCredit)"></span></p></div>
+                    <div class="bg-gray-50 dark:bg-[#181848] rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Expenses</p><p class="font-bold">&#8369;<span x-text="fmt(shiftModal.expenses)"></span></p></div>
+                    <div class="bg-gray-50 dark:bg-[#181848] rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Cash on Hand</p><p class="font-bold">&#8369;<span x-text="fmt(shiftModal.cashOnHand)"></span></p></div>
+                    <div class="bg-gray-50 dark:bg-[#181848] rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Difference</p><p class="font-bold" :class="diffCls(shiftModal.difference)"><span x-text="(Number(shiftModal.difference||0) >= 0 ? '+' : '') + fmt(shiftModal.difference)"></span></p></div>
+                    <div class="bg-gray-50 dark:bg-[#181848] rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Finance</p><p class="font-bold" x-text="shiftModal.checkedBy ? ('✅ ' + shiftModal.checkedBy) : '—'"></p></div>
+                  </div>
+                </template>
+                <div class="flex items-center justify-between mb-2">
+                  <p class="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-[#7878aa]" x-text="'🧾 MGA RESIBO (' + shiftInvoices.length + ') — click para sa details'"></p>
+                </div>
+                <template x-if="shiftLoading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
+                <template x-if="!shiftLoading && shiftInvoices.length===0"><p class="text-center text-gray-400 text-xs py-6">Walang resibo sa shift na ito.</p></template>
+                <template x-if="!shiftLoading && shiftInvoices.length > 0">
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                      <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                        <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">#</th>
+                        <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Invoice</th>
+                        <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
+                        <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Customer</th>
+                        <th class="text-center px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Payment</th>
+                        <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Total</th>
+                      </tr></thead>
+                      <tbody>
+                        <template x-for="(iv,j) in shiftInvoices" :key="iv.id">
+                          <tr @click="openSale(iv)" class="cursor-pointer border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]" :class="iv.isVoided ? 'opacity-50' : ''">
+                            <td class="px-2 py-2 text-gray-400" x-text="j+1"></td>
+                            <td class="px-2 py-2 font-semibold whitespace-nowrap" x-text="iv.invoiceNo || ('#' + iv.id)"></td>
+                            <td class="px-2 py-2 whitespace-nowrap" x-text="fmtDate(iv.createdAt)"></td>
+                            <td class="px-2 py-2" x-text="iv.customerName || 'Walk-in'"></td>
+                            <td class="px-2 py-2 text-center"><span class="text-[9px] font-black px-1.5 py-0.5 rounded" :class="pmCls(iv.paymentMethod)" x-text="(iv.paymentMethod||'Cash').toUpperCase()"></span></td>
+                            <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(iv.total)"></span></td>
+                          </tr>
+                        </template>
+                        <tr class="bg-gray-50 dark:bg-[#181848]/60 font-bold">
+                          <td class="px-2 py-2" colspan="5" x-text="'TOTAL (' + shiftInvoices.length + ')'"></td>
+                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(shiftInvoices.reduce((a,v)=>a+Number(v.isVoided?0:v.total||0),0))"></span></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </template>
               </div>
             </div>
           </div>
@@ -1405,6 +1469,7 @@ tailwind.config = {
                 <template x-if="filtered.length > 0">
                   <table class="w-full text-xs">
                     <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                      <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">#</th>
                       <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Close Date</th>
                       <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Store</th>
                       <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Sales</th>
@@ -1422,8 +1487,9 @@ tailwind.config = {
                       <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Finance</th>
                     </tr></thead>
                     <tbody>
-                      <template x-for="x in paged" :key="x.closeDate+x.userName">
-                        <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                      <template x-for="(x,i) in paged" :key="x.closeDate+x.userName">
+                        <tr class="border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02] cursor-pointer" @click="openShift(x)">
+                           <td class="px-2 py-2 text-gray-400" x-text="page*PAGE_SIZE + i + 1"></td>
                            <td class="px-2 py-2 whitespace-nowrap" x-text="new Date(x.closeDate).toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Manila'})"></td>
                            <td class="px-2 py-2"><span class="text-[10px] bg-cyan-100 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.5 rounded" x-text="shortStore(x.storeId, $store.app.storeMap[x.storeId])"></span></td>
                           <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(x.totalSales)"></span></td>
@@ -1442,11 +1508,11 @@ tailwind.config = {
                             <template x-if="view==='history' && x.checkedBy">
                               <div class="flex flex-col gap-1 items-start">
                                 <span class="inline-flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">✅ <span x-text="x.checkedBy"></span> · <span x-text="new Date(x.checkedAt).toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Manila'})"></span></span>
-                                <button @click="checkShift(x, false)" class="text-[9px] font-bold px-2 py-0.5 rounded border border-red-200 dark:border-red-900/40 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">✕ UNMARK</button>
+                                <button @click.stop="checkShift(x, false)" class="text-[9px] font-bold px-2 py-0.5 rounded border border-red-200 dark:border-red-900/40 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">✕ UNMARK</button>
                               </div>
                             </template>
                             <template x-if="view==='pending'">
-                              <button @click="checkShift(x, true)" class="text-[9px] font-bold px-2 py-0.5 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">✓ MARK CHECKED</button>
+                              <button @click.stop="checkShift(x, true)" class="text-[9px] font-bold px-2 py-0.5 rounded border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa] hover:bg-gray-100 dark:hover:bg-[#181848]">✓ MARK CHECKED</button>
                             </template>
                           </td>
                         </tr>
@@ -1461,6 +1527,76 @@ tailwind.config = {
                   <button :disabled="page===0" @click="prev()" class="px-3 py-1 rounded border border-gray-200 dark:border-[#222255] disabled:opacity-30">Prev</button>
                   <button :disabled="page>=pages-1" @click="next()" class="px-3 py-1 rounded border border-gray-200 dark:border-[#222255] disabled:opacity-30">Next</button>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SHIFT DETAILS MODAL (shift history) -->
+          <div x-show="shiftModal" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" @click.self="closeShift()" style="display:none;">
+            <div class="bg-white dark:bg-[#10102a] border border-gray-200 dark:border-[#222255] rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
+              <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[#222255]">
+                <div>
+                  <p class="text-sm font-bold text-gray-700 dark:text-slate-200" x-text="'🔒 Shift · ' + (shiftModal ? (shiftModal.userName || '—') : '')"></p>
+                  <p class="text-[11px] text-gray-400" x-text="shiftModal ? new Date(shiftModal.closeDate).toLocaleString('en-PH',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Manila'}) : ''"></p>
+                </div>
+                <button @click="closeShift()" class="text-gray-400 hover:text-red-500 text-lg font-bold">✕</button>
+              </div>
+              <div class="p-4 overflow-auto">
+                <template x-if="shiftModal">
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3 text-[11px]">
+                    <div class="bg-gray-50 dark:bg-[#181848] rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Sales</p><p class="font-bold">&#8369;<span x-text="fmt(shiftModal.totalSales)"></span></p></div>
+                    <div class="bg-gray-50 dark:bg-[#181848] rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Cash</p><p class="font-bold">&#8369;<span x-text="fmt(shiftModal.totalCash)"></span></p></div>
+                    <div class="bg-gray-50 dark:bg-[#181848] rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">E-Wallet</p><p class="font-bold">&#8369;<span x-text="fmt(shiftModal.totalEwallet)"></span></p></div>
+                    <div class="bg-gray-50 dark:bg-[#181848] rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Credit</p><p class="font-bold">&#8369;<span x-text="fmt(shiftModal.totalCredit)"></span></p></div>
+                    <div class="bg-gray-50 dark:bg-[#181848] rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Voided</p><p class="font-bold">&#8369;<span x-text="fmt(shiftModal.totalVoided)"></span></p></div>
+                    <div class="bg-gray-50 dark:bg-[#181848] rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Expenses</p><p class="font-bold">&#8369;<span x-text="fmt(shiftModal.totalExpenses)"></span></p></div>
+                    <div class="bg-gray-50 dark:bg-[#181848] rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Cash on Hand</p><p class="font-bold">&#8369;<span x-text="fmt(shiftModal.cashOnHand)"></span></p></div>
+                    <div class="bg-gray-50 dark:bg-[#181848] rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Variance</p><p class="font-bold" :class="shiftModal.difference >= 0 ? 'text-emerald-500' : 'text-red-500'">&#8369;<span x-text="fmt(shiftModal.difference)"></span></p></div>
+                  </div>
+                </template>
+                <template x-if="shiftAudit">
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3 text-[11px]">
+                    <div class="bg-amber-50 dark:bg-amber-900/10 rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Total Resibo</p><p class="font-bold" x-text="shiftAudit.totalReceipts"></p></div>
+                    <div class="bg-amber-50 dark:bg-amber-900/10 rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Voided</p><p class="font-bold text-amber-500" x-text="shiftAudit.voidedCount"></p></div>
+                    <div class="bg-red-50 dark:bg-red-900/10 rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Missing/Deleted</p><p class="font-bold text-red-500" x-text="shiftAudit.deletedCount"></p></div>
+                    <div class="bg-red-50 dark:bg-red-900/10 rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Lost &#8369;</p><p class="font-bold text-red-500">&#8369;<span x-text="fmt(shiftAudit.lostValue)"></span></p></div>
+                  </div>
+                </template>
+                <div class="flex items-center justify-between mb-2">
+                  <p class="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-[#7878aa]" x-text="'🧾 MGA RESIBO (' + shiftInvoices.length + ') — click para sa details'"></p>
+                </div>
+                <template x-if="shiftLoading"><div class="flex justify-center py-6"><span class="spinner"></span></div></template>
+                <template x-if="!shiftLoading && shiftInvoices.length===0"><p class="text-center text-gray-400 text-xs py-6">Walang resibo sa shift window na ito.</p></template>
+                <template x-if="!shiftLoading && shiftInvoices.length > 0">
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-xs">
+                      <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                        <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">#</th>
+                        <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Invoice</th>
+                        <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Date</th>
+                        <th class="text-left px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Cashier</th>
+                        <th class="text-center px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Payment</th>
+                        <th class="text-right px-2 py-2 border-b border-gray-100 dark:border-[#222255]">Total</th>
+                      </tr></thead>
+                      <tbody>
+                        <template x-for="(iv,j) in shiftInvoices" :key="iv.invoiceNo">
+                          <tr @click="Alpine.store('app')._showSaleItems(iv.invoiceNo, shiftModal.storeId)" class="cursor-pointer border-b border-gray-50 dark:border-[#222255]/40 hover:bg-gray-50 dark:hover:bg-white/[0.02]" :class="iv.isVoided ? 'opacity-50 line-through' : ''">
+                            <td class="px-2 py-2 text-gray-400" x-text="j+1"></td>
+                            <td class="px-2 py-2 font-semibold whitespace-nowrap" x-text="iv.invoiceNo"></td>
+                            <td class="px-2 py-2 whitespace-nowrap" x-text="new Date(iv.saleDate).toLocaleString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Manila'})"></td>
+                            <td class="px-2 py-2" x-text="iv.cashier || '—'"></td>
+                            <td class="px-2 py-2 text-center"><span class="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300" x-text="(iv.paymentMethod||'Cash').toUpperCase()"></span></td>
+                            <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(iv.grandTotal)"></span></td>
+                          </tr>
+                        </template>
+                        <tr class="bg-gray-50 dark:bg-[#181848]/60 font-bold">
+                          <td class="px-2 py-2" colspan="5" x-text="'TOTAL (' + shiftInvoices.length + ')'"></td>
+                          <td class="px-2 py-2 text-right">&#8369;<span x-text="fmt(shiftInvoices.reduce((a,v)=>a+Number(v.isVoided?0:v.grandTotal||0),0))"></span></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </template>
               </div>
             </div>
           </div>
@@ -3075,10 +3211,10 @@ tailwind.config = {
                 <button @click="closeModal()" class="text-xs px-4 py-2 rounded-lg border border-gray-200 dark:border-[#222255] text-gray-500 dark:text-[#7878aa]">CANCEL</button>
                 <button @click="save()" class="text-xs px-4 py-2 rounded-lg bg-cyan-600 text-white font-medium">SAVE</button>
               </div>
+</div>
             </div>
           </div>
         </div>
-      </div>
       </div>
 
       <!-- ═══════════════════════════════════════════════════ -->
@@ -4811,8 +4947,8 @@ tailwind.config = {
 
   </div><!-- /main content -->
 
-  <script src="components.js?v=20260925c"></script>
-  <script src="app.js?v=20260925c"></script>
+  <script src="components.js?v=20260925d"></script>
+  <script src="app.js?v=20260925d"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script>
   /* ── Web login gating (username + PIN, WEB ACCESS only) ── */

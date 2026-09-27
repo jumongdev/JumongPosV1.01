@@ -4,7 +4,7 @@
 
 /* Constants & utilities needed by Alpine components at init time */
 const PAGE_SIZE = 20;
-window.WEB_VER = '20260925c';
+window.WEB_VER = '20260925d';
 window.fmt = n => Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 window.fmtInt = n => Number(n || 0).toLocaleString('en-PH');
 window.esc = s => (s + '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -434,7 +434,35 @@ get paged() { return this.filtered.slice(this.page * PAGE_SIZE, (this.page + 1) 
         if (r && r.ok) { x.checkedBy = r.checkedBy; x.checkedAt = r.checkedAt; }
         else alert('Hindi ma-mark ang shift. Pakisubukan muli.');
       } catch (e) { alert('Error: ' + e.message) }
-    }
+    },
+    // ── Shift details (clickable row → mga resibo ng shift window + receipt audit trace) ──
+    shiftModal: null, shiftInvoices: [], shiftAudit: null, shiftLoading: false,
+    _phDate(d) { return new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }); },
+    async openShift(x) {
+      const same = [...this.d].filter(s => s.storeId === x.storeId).sort((a, b) => new Date(a.closeDate) - new Date(b.closeDate));
+      const idx = same.findIndex(s => s.posId === x.posId && this._phDate(s.closeDate) === this._phDate(x.closeDate));
+      const prev = idx > 0 ? same[idx - 1] : null;
+      this.shiftModal = x;
+      this.shiftInvoices = [];
+      this.shiftAudit = null;
+      this.shiftLoading = true;
+      try {
+        const fromDay = prev ? this._phDate(prev.closeDate) : this._phDate(x.closeDate);
+        const toDay = this._phDate(x.closeDate);
+        const sales = await fetchJSON(API + '/recent-sales?limit=1000&storeId=' + encodeURIComponent(x.storeId) +
+          '&range=custom&date=' + fromDay + '&date_to=' + toDay) || [];
+        const fromT = prev ? new Date(prev.closeDate).getTime() : 0;
+        const toT = new Date(x.closeDate).getTime();
+        this.shiftInvoices = sales.filter(s => {
+          const t = new Date(s.saleDate).getTime();
+          return t >= fromT && t <= toT;
+        });
+        const audits = await fetchJSON(API + '/receipt-audit?limit=200') || [];
+        this.shiftAudit = audits.find(a => a.storeId === x.storeId && this._phDate(a.shiftDate) === toDay) || null;
+      } catch (e) { this.shiftInvoices = []; }
+      this.shiftLoading = false;
+    },
+    closeShift() { this.shiftModal = null; this.shiftInvoices = []; this.shiftAudit = null; }
   }));
 
   /* ΓöÇΓöÇ Stock Receiving ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
@@ -1541,6 +1569,25 @@ Alpine.data('customersList', () => ({
         else alert('Hindi ma-mark ang shift. Pakisubukan muli.');
       } catch (e) { alert('Error: ' + e.message) }
     },
+    // ── Shift details (clickable row → mga resibo ng shift window) ──
+    shiftModal: null, shiftInvoices: [], shiftLoading: false,
+    async openShift(x) {
+      const sid = x.storeId || 'STORE-20260602-7159';
+      const all = [...(this.shifts[sid] || [])].sort((a, b) => new Date(a.closeDate) - new Date(b.closeDate));
+      const idx = all.findIndex(s => s.id === x.id);
+      const prev = idx > 0 ? all[idx - 1] : null;
+      this.shiftModal = x;
+      this.shiftInvoices = [];
+      this.shiftLoading = true;
+      try {
+        let q = '/warehouse/sales?limit=1000&storeId=' + encodeURIComponent(sid);
+        if (prev) q += '&from=' + encodeURIComponent(prev.closeDate);
+        q += '&to=' + encodeURIComponent(x.closeDate);
+        this.shiftInvoices = await fetchJSON(API + q) || [];
+      } catch (e) { this.shiftInvoices = []; }
+      this.shiftLoading = false;
+    },
+    closeShift() { this.shiftModal = null; this.shiftInvoices = []; },
     // ── E-commerce (HQ online, delivered) ──
     ecomList() { return (this.ecom && this.ecom.orders) || []; },
     ecomTotals() { return (this.ecom && this.ecom.totals) || { count: 0, total: 0 }; },
