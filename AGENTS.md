@@ -198,6 +198,12 @@ Invoke-Command -Session $s -ScriptBlock { "OK on $env:COMPUTERNAME" }
 | Auto-start | `cloudflare_tunnel.vbs` in Windows Startup folder |
 | Binary | `cloudflared.exe` (runs as background process, no window) |
 
+### 🧹 opencode.db maintenance (session DB — HINDI JumongPOS-related)
+- `C:\Users\ADMIN\.local\share\opencode\opencode.db` = opencode chat/session DB (SQLite WAL). **Lumalaki ito nang husto** dahil sa `event` table (tool outputs/file reads/diffs — paulit-ulit na pagbasa ng malalaking file = GBs per session). Na-cleanup 2026-09-27: 172GB → 46GB (keep huling 10 sessions + VACUUM).
+- **To query:** `node:sqlite` (`new DatabaseSync(path, {readOnly:true})`) — walang sqlite3 CLI/python sa dev PC.
+- **To clean:** i-close ang opencode → `DELETE FROM event/message/part/session` para sa luma sessions (NOT IN huling 10 by time_updated) → `VACUUM`. GOTCHA: ang DELETE na may malalaking blobs ay 1+ oras (overflow freeing) — mag-commit pa rin kahit ma-kill ang process; huwag i-ubos ang disk habang ginagawa (need space para sa VACUUM temp).
+- **Prevention:** huwag ulitin ang buong pagbasa ng malalaking file (hal. 66MB DashboardController.cs) sa loob ng isang session; monthly cleanup kung malaki na.
+
 ## Cloud API
 - **Local URL:** https://admin.jumongdev.com/api (via Cloudflare Tunnel) — HVR, Naic, ACGS on this; **HQ uses `http://DESKTOP-I097OO9:5000/api` (LAN, since 2026-08-15)**
 - **DB connection:** `DATABASE_URL` env var (PostgreSQL, default `localhost:5432`), or check `Data/CloudDatabaseHelper.cs` (client-side helper)
