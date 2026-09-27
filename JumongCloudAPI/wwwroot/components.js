@@ -4,7 +4,7 @@
 
 /* Constants & utilities needed by Alpine components at init time */
 const PAGE_SIZE = 20;
-window.WEB_VER = '20260925d';
+window.WEB_VER = '20260925e';
 window.fmt = n => Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 window.fmtInt = n => Number(n || 0).toLocaleString('en-PH');
 window.esc = s => (s + '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -436,7 +436,7 @@ get paged() { return this.filtered.slice(this.page * PAGE_SIZE, (this.page + 1) 
       } catch (e) { alert('Error: ' + e.message) }
     },
     // ── Shift details (clickable row → mga resibo ng shift window + receipt audit trace) ──
-    shiftModal: null, shiftInvoices: [], shiftAudit: null, shiftLoading: false,
+    shiftModal: null, shiftInvoices: [], shiftAudit: null, shiftExpenses: [], shiftCredit: [], shiftLoading: false,
     _phDate(d) { return new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }); },
     async openShift(x) {
       const same = [...this.d].filter(s => s.storeId === x.storeId).sort((a, b) => new Date(a.closeDate) - new Date(b.closeDate));
@@ -445,6 +445,8 @@ get paged() { return this.filtered.slice(this.page * PAGE_SIZE, (this.page + 1) 
       this.shiftModal = x;
       this.shiftInvoices = [];
       this.shiftAudit = null;
+      this.shiftExpenses = [];
+      this.shiftCredit = [];
       this.shiftLoading = true;
       try {
         const fromDay = prev ? this._phDate(prev.closeDate) : this._phDate(x.closeDate);
@@ -457,12 +459,22 @@ get paged() { return this.filtered.slice(this.page * PAGE_SIZE, (this.page + 1) 
           const t = new Date(s.saleDate).getTime();
           return t >= fromT && t <= toT;
         });
+        const exp = await fetchJSON(API + '/expenses-list?storeId=' + encodeURIComponent(x.storeId) +
+          '&range=custom&date=' + fromDay + '&date_to=' + toDay) || [];
+        this.shiftExpenses = exp.filter(e => {
+          const t = new Date(e.timestamp).getTime();
+          return t >= fromT && t <= toT;
+        });
+        let cq = '/credit-collections?storeId=' + encodeURIComponent(x.storeId);
+        if (prev) cq += '&from=' + encodeURIComponent(prev.closeDate);
+        cq += '&to=' + encodeURIComponent(x.closeDate);
+        this.shiftCredit = await fetchJSON(API + cq) || [];
         const audits = await fetchJSON(API + '/receipt-audit?limit=200') || [];
         this.shiftAudit = audits.find(a => a.storeId === x.storeId && this._phDate(a.shiftDate) === toDay) || null;
-      } catch (e) { this.shiftInvoices = []; }
+      } catch (e) { this.shiftInvoices = []; this.shiftExpenses = []; this.shiftCredit = []; }
       this.shiftLoading = false;
     },
-    closeShift() { this.shiftModal = null; this.shiftInvoices = []; this.shiftAudit = null; }
+    closeShift() { this.shiftModal = null; this.shiftInvoices = []; this.shiftAudit = null; this.shiftExpenses = []; this.shiftCredit = []; }
   }));
 
   /* ΓöÇΓöÇ Stock Receiving ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
@@ -1570,7 +1582,7 @@ Alpine.data('customersList', () => ({
       } catch (e) { alert('Error: ' + e.message) }
     },
     // ── Shift details (clickable row → mga resibo ng shift window) ──
-    shiftModal: null, shiftInvoices: [], shiftLoading: false,
+    shiftModal: null, shiftInvoices: [], shiftCredit: [], shiftLoading: false,
     async openShift(x) {
       const sid = x.storeId || 'STORE-20260602-7159';
       const all = [...(this.shifts[sid] || [])].sort((a, b) => new Date(a.closeDate) - new Date(b.closeDate));
@@ -1578,16 +1590,21 @@ Alpine.data('customersList', () => ({
       const prev = idx > 0 ? all[idx - 1] : null;
       this.shiftModal = x;
       this.shiftInvoices = [];
+      this.shiftCredit = [];
       this.shiftLoading = true;
       try {
         let q = '/warehouse/sales?limit=1000&storeId=' + encodeURIComponent(sid);
         if (prev) q += '&from=' + encodeURIComponent(prev.closeDate);
         q += '&to=' + encodeURIComponent(x.closeDate);
         this.shiftInvoices = await fetchJSON(API + q) || [];
-      } catch (e) { this.shiftInvoices = []; }
+        let cq = '/credit-collections?';
+        if (prev) cq += 'from=' + encodeURIComponent(prev.closeDate) + '&';
+        cq += 'to=' + encodeURIComponent(x.closeDate);
+        this.shiftCredit = await fetchJSON(API + cq) || [];
+      } catch (e) { this.shiftInvoices = []; this.shiftCredit = []; }
       this.shiftLoading = false;
     },
-    closeShift() { this.shiftModal = null; this.shiftInvoices = []; },
+    closeShift() { this.shiftModal = null; this.shiftInvoices = []; this.shiftCredit = []; },
     // ── E-commerce (HQ online, delivered) ──
     ecomList() { return (this.ecom && this.ecom.orders) || []; },
     ecomTotals() { return (this.ecom && this.ecom.totals) || { count: 0, total: 0 }; },

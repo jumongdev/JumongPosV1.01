@@ -1222,6 +1222,40 @@ tailwind.config = {
                     <div class="bg-gray-50 dark:bg-[#181848] rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Finance</p><p class="font-bold" x-text="shiftModal.checkedBy ? ('✅ ' + shiftModal.checkedBy) : '—'"></p></div>
                   </div>
                 </template>
+                <div class="grid grid-cols-3 gap-2 mb-3 text-[11px]">
+                  <div class="bg-emerald-50 dark:bg-emerald-900/10 rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">💵 Cash</p><p class="font-bold" x-text="shiftInvoices.filter(v=>!v.isVoided&&v.paymentMethod==='Cash').length + ' resibo'"></p><p class="font-bold text-emerald-600 dark:text-emerald-400">&#8369;<span x-text="fmt(shiftInvoices.reduce((a,v)=>a+(v.isVoided||v.paymentMethod!=='Cash'?0:Number(v.total||0)),0))"></span></p></div>
+                  <div class="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">💳 E-Wallet</p><p class="font-bold" x-text="shiftInvoices.filter(v=>!v.isVoided&&v.paymentMethod==='E-Wallet').length + ' resibo'"></p><p class="font-bold text-blue-600 dark:text-blue-400">&#8369;<span x-text="fmt(shiftInvoices.reduce((a,v)=>a+(v.isVoided||v.paymentMethod!=='E-Wallet'?0:Number(v.total||0)),0))"></span></p></div>
+                  <div class="bg-purple-50 dark:bg-purple-900/10 rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">💜 Credit Sales</p><p class="font-bold" x-text="shiftInvoices.filter(v=>!v.isVoided&&v.paymentMethod==='Credit').length + ' resibo'"></p><p class="font-bold text-purple-600 dark:text-purple-400">&#8369;<span x-text="fmt(shiftInvoices.reduce((a,v)=>a+(v.isVoided||v.paymentMethod!=='Credit'?0:Number(v.total||0)),0))"></span></p></div>
+                </div>
+                <template x-if="shiftCredit.length > 0">
+                  <div class="mb-3">
+                    <p class="text-[10px] font-black uppercase tracking-wider text-purple-600 dark:text-purple-400 mb-1" x-text="'💳 CREDIT COLLECTIONS (' + shiftCredit.length + ')'"></p>
+                    <div class="overflow-x-auto rounded-lg border border-gray-100 dark:border-[#222255]">
+                      <table class="w-full text-xs">
+                        <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                          <th class="text-left px-2 py-1.5 border-b border-gray-100 dark:border-[#222255]">Customer</th>
+                          <th class="text-left px-2 py-1.5 border-b border-gray-100 dark:border-[#222255]">Invoice</th>
+                          <th class="text-center px-2 py-1.5 border-b border-gray-100 dark:border-[#222255]">Method</th>
+                          <th class="text-right px-2 py-1.5 border-b border-gray-100 dark:border-[#222255]">Amount</th>
+                        </tr></thead>
+                        <tbody>
+                          <template x-for="(c,k) in shiftCredit" :key="k">
+                            <tr class="border-b border-gray-50 dark:border-[#222255]/40">
+                              <td class="px-2 py-1.5" x-text="c.customerName || '—'"></td>
+                              <td class="px-2 py-1.5 whitespace-nowrap" x-text="c.invoiceNo || '—'"></td>
+                              <td class="px-2 py-1.5 text-center"><span class="text-[9px] font-black px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300" x-text="(c.paymentMethod||'Cash').toUpperCase()"></span></td>
+                              <td class="px-2 py-1.5 text-right">&#8369;<span x-text="fmt(c.amount)"></span></td>
+                            </tr>
+                          </template>
+                          <tr class="bg-purple-50 dark:bg-purple-900/10 font-bold">
+                            <td class="px-2 py-1.5" colspan="3" x-text="'TOTAL COLLECTED (' + shiftCredit.length + ')'"></td>
+                            <td class="px-2 py-1.5 text-right">&#8369;<span x-text="fmt(shiftCredit.reduce((a,v)=>a+Number(v.amount||0),0))"></span></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </template>
                 <div class="flex items-center justify-between mb-2">
                   <p class="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-[#7878aa]" x-text="'🧾 MGA RESIBO (' + shiftInvoices.length + ') — click para sa details'"></p>
                 </div>
@@ -1560,6 +1594,69 @@ tailwind.config = {
                     <div class="bg-amber-50 dark:bg-amber-900/10 rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Voided</p><p class="font-bold text-amber-500" x-text="shiftAudit.voidedCount"></p></div>
                     <div class="bg-red-50 dark:bg-red-900/10 rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Missing/Deleted</p><p class="font-bold text-red-500" x-text="shiftAudit.deletedCount"></p></div>
                     <div class="bg-red-50 dark:bg-red-900/10 rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">Lost &#8369;</p><p class="font-bold text-red-500">&#8369;<span x-text="fmt(shiftAudit.lostValue)"></span></p></div>
+                  </div>
+                </template>
+                <div class="grid grid-cols-3 gap-2 mb-3 text-[11px]">
+                  <div class="bg-emerald-50 dark:bg-emerald-900/10 rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">💵 Cash</p><p class="font-bold" x-text="shiftInvoices.filter(v=>!v.isVoided&&v.paymentMethod==='Cash').length + ' resibo'"></p><p class="font-bold text-emerald-600 dark:text-emerald-400">&#8369;<span x-text="fmt(shiftInvoices.reduce((a,v)=>a+(v.isVoided||v.paymentMethod!=='Cash'?0:Number(v.grandTotal||0)),0))"></span></p></div>
+                  <div class="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">💳 E-Wallet</p><p class="font-bold" x-text="shiftInvoices.filter(v=>!v.isVoided&&v.paymentMethod==='E-Wallet').length + ' resibo'"></p><p class="font-bold text-blue-600 dark:text-blue-400">&#8369;<span x-text="fmt(shiftInvoices.reduce((a,v)=>a+(v.isVoided||v.paymentMethod!=='E-Wallet'?0:Number(v.grandTotal||0)),0))"></span></p></div>
+                  <div class="bg-purple-50 dark:bg-purple-900/10 rounded-lg p-2"><p class="text-gray-400 text-[9px] uppercase tracking-wider">💜 Credit Sales</p><p class="font-bold" x-text="shiftInvoices.filter(v=>!v.isVoided&&v.paymentMethod==='Credit').length + ' resibo'"></p><p class="font-bold text-purple-600 dark:text-purple-400">&#8369;<span x-text="fmt(shiftInvoices.reduce((a,v)=>a+(v.isVoided||v.paymentMethod!=='Credit'?0:Number(v.grandTotal||0)),0))"></span></p></div>
+                </div>
+                <template x-if="shiftCredit.length > 0">
+                  <div class="mb-3">
+                    <p class="text-[10px] font-black uppercase tracking-wider text-purple-600 dark:text-purple-400 mb-1" x-text="'💳 CREDIT COLLECTIONS (' + shiftCredit.length + ')'"></p>
+                    <div class="overflow-x-auto rounded-lg border border-gray-100 dark:border-[#222255]">
+                      <table class="w-full text-xs">
+                        <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                          <th class="text-left px-2 py-1.5 border-b border-gray-100 dark:border-[#222255]">Customer</th>
+                          <th class="text-left px-2 py-1.5 border-b border-gray-100 dark:border-[#222255]">Invoice</th>
+                          <th class="text-center px-2 py-1.5 border-b border-gray-100 dark:border-[#222255]">Method</th>
+                          <th class="text-right px-2 py-1.5 border-b border-gray-100 dark:border-[#222255]">Amount</th>
+                        </tr></thead>
+                        <tbody>
+                          <template x-for="(c,k) in shiftCredit" :key="k">
+                            <tr class="border-b border-gray-50 dark:border-[#222255]/40">
+                              <td class="px-2 py-1.5" x-text="c.customerName || '—'"></td>
+                              <td class="px-2 py-1.5 whitespace-nowrap" x-text="c.invoiceNo || '—'"></td>
+                              <td class="px-2 py-1.5 text-center"><span class="text-[9px] font-black px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300" x-text="(c.paymentMethod||'Cash').toUpperCase()"></span></td>
+                              <td class="px-2 py-1.5 text-right">&#8369;<span x-text="fmt(c.amount)"></span></td>
+                            </tr>
+                          </template>
+                          <tr class="bg-purple-50 dark:bg-purple-900/10 font-bold">
+                            <td class="px-2 py-1.5" colspan="3" x-text="'TOTAL COLLECTED (' + shiftCredit.length + ')'"></td>
+                            <td class="px-2 py-1.5 text-right">&#8369;<span x-text="fmt(shiftCredit.reduce((a,v)=>a+Number(v.amount||0),0))"></span></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </template>
+                <template x-if="shiftExpenses.length > 0">
+                  <div class="mb-3">
+                    <p class="text-[10px] font-black uppercase tracking-wider text-orange-600 dark:text-orange-400 mb-1" x-text="'🧾 EXPENSES (' + shiftExpenses.length + ')'"></p>
+                    <div class="overflow-x-auto rounded-lg border border-gray-100 dark:border-[#222255]">
+                      <table class="w-full text-xs">
+                        <thead><tr class="text-gray-400 dark:text-[#7878aa] uppercase tracking-wider text-[10px]">
+                          <th class="text-left px-2 py-1.5 border-b border-gray-100 dark:border-[#222255]">Category</th>
+                          <th class="text-left px-2 py-1.5 border-b border-gray-100 dark:border-[#222255]">Description</th>
+                          <th class="text-left px-2 py-1.5 border-b border-gray-100 dark:border-[#222255]">Cashier</th>
+                          <th class="text-right px-2 py-1.5 border-b border-gray-100 dark:border-[#222255]">Amount</th>
+                        </tr></thead>
+                        <tbody>
+                          <template x-for="(e,k) in shiftExpenses" :key="k">
+                            <tr class="border-b border-gray-50 dark:border-[#222255]/40">
+                              <td class="px-2 py-1.5 whitespace-nowrap" x-text="e.category || '—'"></td>
+                              <td class="px-2 py-1.5" x-text="e.description || '—'"></td>
+                              <td class="px-2 py-1.5" x-text="e.cashier || '—'"></td>
+                              <td class="px-2 py-1.5 text-right">&#8369;<span x-text="fmt(e.amount)"></span></td>
+                            </tr>
+                          </template>
+                          <tr class="bg-orange-50 dark:bg-orange-900/10 font-bold">
+                            <td class="px-2 py-1.5" colspan="3" x-text="'TOTAL EXPENSES (' + shiftExpenses.length + ')'"></td>
+                            <td class="px-2 py-1.5 text-right">&#8369;<span x-text="fmt(shiftExpenses.reduce((a,v)=>a+Number(v.amount||0),0))"></span></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </template>
                 <div class="flex items-center justify-between mb-2">
@@ -4947,8 +5044,8 @@ tailwind.config = {
 
   </div><!-- /main content -->
 
-  <script src="components.js?v=20260925d"></script>
-  <script src="app.js?v=20260925d"></script>
+  <script src="components.js?v=20260925e"></script>
+  <script src="app.js?v=20260925e"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script>
   /* ── Web login gating (username + PIN, WEB ACCESS only) ── */
